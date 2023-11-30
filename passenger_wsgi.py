@@ -1,9 +1,7 @@
-import imp
+from importlib.machinery import SourceFileLoader
 import os
 import sys
 
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-wsgi = imp.load_source('wsgi', 'app.py')
+wsgi = SourceFileLoader('wsgi', os.path.join(os.path.dirname(__file__), 'app.py')).load_module()
 application = wsgi.application

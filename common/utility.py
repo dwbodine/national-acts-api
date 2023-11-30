@@ -44,6 +44,6 @@ def queueEmail(subject, html, toAddress, toName, ccEmails):
         'cc_emails': ccEmails
     }
 
-    result = db.execute(sql, data)
+    result = db.insert(sql, data)
 
-    return str(result)
+    return (result > 0)
