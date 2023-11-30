@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime
 from flask import Flask, request, jsonify
-#from flask_jwt import JWT, jwt_required, current_identity
+from flask_jwt import JWT, jwt_required, current_identity
 
 sys.path.insert(0, os.path.dirname(__file__))
 
