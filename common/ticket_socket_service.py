@@ -192,36 +192,49 @@ class TicketSocketService:
                 if 'venue' in item:
                     venue = utility.fixMagicQuotes(venue)
 
+                customFields = {}
+                if 'customFields' in item:
+                    customFields = item['customFields']
+
                 address1 = ''                
                 if 'venueAddress1' in item:
                     address1 = utility.fixMagicQuotes(item['venueAddress1'])
+                elif customFields != {} and 'venueAddress1' in customFields:
+                    address1 = utility.fixMagicQuotes(customFields['venueAddress1'])
 
                 address2 = ''
                 if 'venueAddress2' in item:
                     address2 = utility.fixMagicQuotes(item['venueAddress2'])
+                elif customFields != {} and 'venueAddress2' in customFields:
+                    address2 = utility.fixMagicQuotes(customFields['venueAddress2'])
 
                 city = ''
                 if 'venueCity' in item:
                     city = utility.fixMagicQuotes(item['venueCity'])
+                elif customFields != {} and 'venueCity' in customFields:
+                    city = utility.fixMagicQuotes(customFields['venueCity'])
 
                 state = ''
                 if 'venueState' in item:
                     state = utility.fixMagicQuotes(item['venueState'])
+                elif customFields != {} and 'venueState' in customFields:
+                    state = utility.fixMagicQuotes(customFields['venueState'])
 
                 zip = ''
                 if 'venuePostalCode' in item:
                     zip = utility.fixMagicQuotes(item['venuePostalCode'])
+                elif customFields != {} and 'venuePostalCode' in customFields:
+                    zip = utility.fixMagicQuotes(customFields['venuePostalCode'])
 
                 country = ''
                 if 'venueCountry' in item:
                     country = utility.fixMagicQuotes(item['venueCountry'])
+                elif customFields != {} and 'venueCountry' in customFields:
+                    country = utility.fixMagicQuotes(customFields['venueCountry'])
 
                 timezone = ''
-                customFields = {}
-                if 'customFields' in item:
-                    customFields = item['customFields']
-                    if 'timezone' in customFields:
-                        timezone = customFields['timezone']
+                if customFields != {} and 'timezone' in customFields:
+                    timezone = customFields['timezone']
                 
                 event.venue = TicketSocketVenue(venue, address1, address2, city, state, zip, country, timezone)
                 
