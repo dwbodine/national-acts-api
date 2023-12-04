@@ -261,6 +261,14 @@ class EventService:
 
                         if ticketSocketOrderId and len(order.tickets) > 0:
                             orderTickets: list[int] = []
+
+                            # clean up any migrated data that doesn't have ticket Ids
+                            deleteSql = "DELETE FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(ticketSocketOrderId)s AND TicketId IS NULL"
+                            deleteData = {
+                                'ticketSocketOrderId': ticketSocketOrderId
+                            }
+                            db.delete(deleteSql, deleteData)
+
                             for ticket in order.tickets:
                                 orderTickets.append(ticket.id)
                                 # compile ticket data for update

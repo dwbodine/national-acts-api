@@ -11,8 +11,10 @@ from common.ticket_socket_service import *
 from common.event_service import *
 from common.exchange_rate_service import *
 from common.update_service import *
+from common.migration_service import *
 from common.models.user import *
 from common.environment import *
+
 
 #user = User(1, 'user', 'password')
 
@@ -117,6 +119,37 @@ def updateAllExchangeRates():
 def getTokens():
    tokens = getAllTokens()
    return convertToJson(tokens)
+
+@app.route('/internal/migrate/clear')
+def migrationClear():
+   service = MigrationService()
+   result = service.clearOutNewTables()
+   return convertToJson(result)
+
+@app.route('/internal/migrate/findMissingSellers')
+def findMissingSellers():
+   service = MigrationService()
+   missing = service.findMissingSellers()
+   return convertToJson(missing)
+
+@app.route('/internal/migrate/migrateUserSellers')
+def migrateSellers():
+   service = MigrationService()
+   result = service.migrateSellers()
+   return convertToJson(result)
+
+@app.route('/internal/migrate/migrateExternalEvents')
+def migrateExternalEvents():
+   service = MigrationService()
+   result = service.migrateExternalEvents()
+   return convertToJson(result)
+
+@app.route('/internal/migrate/migrateEventsAndOrders')
+def migrateEventsAndOrders():
+   service = MigrationService()
+   results = service.migrateEventData()
+   return convertToJson(results)
+
 
 if __name__ == "__main__":
     app.run()

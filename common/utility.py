@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime
 
 from . import db
 
@@ -32,6 +33,12 @@ def fixMagicQuotes(raw: str):
     raw = raw.replace(u"\u2018", "'")
     raw = raw.replace(u"\u2019", "'")
     return raw
+
+def add_months(current_date, months_to_add):
+    new_date = datetime(current_date.year + (current_date.month + months_to_add - 1) // 12,
+                        (current_date.month + months_to_add - 1) % 12 + 1,
+                        current_date.day)
+    return new_date
 
 def queueEmail(subject, html, toAddress, toName, ccEmails):
     sql = "INSERT INTO MailServiceQueue (ToAddress, ToName, Subject, Message, CcEmails) VALUES (%(toAddress)s, %(toName)s, %(subject)s, %(html)s, %(ccEmails)s)"
