@@ -16,36 +16,51 @@ from common.models.user import *
 from common.environment import *
 
 
-#user = User(1, 'user', 'password')
+user = User(1, 'user', 'password')
 
-#def authenticate(username, password):
-#    if username == user.username and password == user.password:
-#        return user
+def authenticate(username, password):
+    if username == user.username and password == user.password:
+        return user
 
-#def identity(payload):
-#    return user
+def identity(payload):
+    return user
 
 app = Flask(__name__)
 application = app
 loadEnv()
-#app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-#jwt = JWT(app, authenticate, identity)
+jwt = JWT(app, authenticate, identity)
 
-#@app.after_request
-#def after_request(response):
-#    response.headers.add('Access-Control-Allow-Origin',
-#                         'http://localhost:4200')
-#    response.headers.add('Access-Control-Allow-Credentials', 'true')
-#    response.headers.add('Access-Control-Allow-Headers',
-#                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires') 
-#    response.headers.add('Access-Control-Allow-Methods',
-#                         'GET,PUT,POST,DELETE')
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin',
+                         'http://localhost:4200')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Headers',
+                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires') 
+    response.headers.add('Access-Control-Allow-Methods',
+                         'GET,PUT,POST,DELETE')
 
-#    response.cache_control.no_cache = True
-#    response.cache_control.no_store = True
-#    response.cache_control.must_revalidate = True
-#    return response
+    response.cache_control.no_cache = True
+    response.cache_control.no_store = True
+    response.cache_control.must_revalidate = True
+    return response
+
+@app.route('/unprotected')
+def unprotected():
+    return jsonify({
+        'message': 'This is an unprotected resource.'
+    })
+
+
+@app.route('/protected')
+@jwt_required()
+def protected():
+    return jsonify({
+        'message': 'This is a protected resource.',
+        'current_identity': str(current_identity)
+    })
 
 @app.route('/')
 def health():
