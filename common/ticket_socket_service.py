@@ -190,7 +190,7 @@ class TicketSocketService:
                 # venue info
                 venue = ''
                 if 'venue' in item:
-                    venue = utility.fixMagicQuotes(venue)
+                    venue = utility.fixMagicQuotes(item['venue'])
 
                 customFields = {}
                 if 'customFields' in item:

@@ -89,16 +89,22 @@ class VipOrder(TicketSocketOrder):
             
 
 class VipEvent(TicketSocketEvent):
+    ticketSocketEventId: int = 0
     totalRevenue: float = 0
     totalTickets: int = 0
     totalShirts: int = 0
     shirtSales: list[ShirtSales] = []
     isActive: bool = True
     orders: list[VipOrder] = []
-    externalUrl: str = ''
+    externalEventId: int = None
+    externalSellerId: int = None
+    externalTitle: str = None
+    externalThumbnail: str = None
+    externalUrl: str = None
+    externalVenue: TicketSocketVenue = None
     disableLinkButton: bool = False
     disableLinkReason: bool = False
-    externalVipLink: str = ''
+    externalVipLink: str = None
     disableVipLinkButton: bool = False
     disableVipLinkReason: bool = False
     sellerEventCategoryId: int = None
@@ -155,8 +161,8 @@ class Seller:
         if row != {}:
             self.thumbnail = row['SellerThumbnail']
             self.name = row['Name']
-            self.hideInList = bool(row['HideInList'])
-            self.isActive = bool(row['Inactive']) != False
+            self.hideInList = int(row['HideInList']) == 1
+            self.isActive = int(row['Inactive']) != 1
             self.created = row['Created']
             self.lastUpdated = row['LastUpdate']
             if self.isActive:
@@ -187,3 +193,10 @@ class Seller:
                 break
 
         return sellerEventCategory
+    
+    def getSellerEventCategoryIds(self):
+        ids: list[int] = []
+        if len(self.sellerEventCategories) > 0:
+            for sec in self.sellerEventCategories:
+                ids.append(sec.sellerEventCategoryId)
+        return ids
