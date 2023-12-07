@@ -14,7 +14,7 @@ class SellerService:
     def getUserSellers(self, userId: int):
         sellers: list[Seller] = []
 
-        sql = """SELECT SellerId FROM Sellers"""
+        sql = """SELECT SellerId, Name FROM Sellers ORDER BY Name"""
         data = None
         if userId != None:
             userSql = """SELECT IF(UserId > 0, 1, 0) AS IsValid, COALESCE(IsAdmin, 0) AS IsAdmin
@@ -31,10 +31,11 @@ class SellerService:
                 if isValid == False:
                     return []
                 if isAdmin == False:
-                    sql = """SELECT COALESCE(Sellers.SellerId, 0) AS SellerId
+                    sql = """SELECT COALESCE(Sellers.SellerId, 0) AS SellerId, Sellers.Name
                                 FROM Sellers
                                 LEFT JOIN UserSeller ON UserSeller.SellerId=Sellers.SellerId
-                                WHERE UserSeller.UserId=%(userId)s"""
+                                WHERE UserSeller.UserId=%(userId)s 
+                                ORDER BY Sellers.Name"""
                     data = {
                         'userId': userId
                     }

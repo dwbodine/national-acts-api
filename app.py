@@ -34,20 +34,20 @@ loadEnv()
 
 #jwt = JWT(app, authenticate, identity)
 
-#@app.after_request
-#def after_request(response):
-#    response.headers.add('Access-Control-Allow-Origin',
-#                         'http://localhost:4200')
-#    response.headers.add('Access-Control-Allow-Credentials', 'true')
-#    response.headers.add('Access-Control-Allow-Headers',
-#                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires') 
-#    response.headers.add('Access-Control-Allow-Methods',
-#                         'GET,PUT,POST,DELETE')
-#
-#    response.cache_control.no_cache = True
-#    response.cache_control.no_store = True
-#    response.cache_control.must_revalidate = True
-#    return response
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin',
+                         '*')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Headers',
+                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires') 
+    response.headers.add('Access-Control-Allow-Methods',
+                         'GET,PUT,POST,DELETE')
+
+    response.cache_control.no_cache = True
+    response.cache_control.no_store = True
+    response.cache_control.must_revalidate = True
+    return response
 
 #@app.route('/unprotected')
 #def unprotected():
