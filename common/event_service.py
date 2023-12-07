@@ -245,7 +245,6 @@ class EventService:
             orders.append(order)
         return orders
 
-    
     def __getTicketsFromOrderId(self, ticketSocketOrderId: int):
         tickets: list[VipTicket] = []
         sql = """SELECT * FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(ticketSocketOrderId)s"""

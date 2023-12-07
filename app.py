@@ -11,7 +11,7 @@ from common.ticket_socket_service import *
 from common.event_service import *
 from common.exchange_rate_service import *
 from common.update_service import *
-from common.migration_service import *
+from common.seller_service import *
 from common.models.user import *
 from common.environment import *
 
@@ -114,6 +114,12 @@ def getEventsAndOrders():
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))
    results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm)
+   return convertToJson(results)
+
+@app.route('/sellers/<int:userId>')
+def getUserSellers(userId: int):
+   service = SellerService()
+   results = service.getUserSellers(userId)
    return convertToJson(results)
 
 @app.route('/internal/getEventsFromService/<int:sellerId>')

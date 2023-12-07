@@ -145,8 +145,6 @@ class Seller:
     thumbnail: str = ''
     hideInList: bool = False
     isActive: bool = True
-    created: str = ''
-    lastUpdated: str = ''
 
     sellerEventCategories: list[SellerEventCategory] = []
 
@@ -167,8 +165,6 @@ class Seller:
             self.name = str(row['Name'])
             self.hideInList = int(row['HideInList']) == 1
             self.isActive = int(row['Inactive']) != 1
-            self.created = str(row['Created'])
-            self.lastUpdated = str(row['LastUpdate'])
             self.__getSellerEventCategories()
 
     def __getSellerEventCategories(self):
