@@ -18,11 +18,16 @@ class EventService:
         if sellerId != None:
             seller = Seller(sellerId)
             sellerEventCategoryIds = seller.getSellerEventCategoryIds()
+            # prevent against returning every event in the database
+            if len(sellerEventCategoryIds) == 0: 
+                return []
 
-        if searchTerm != None:
+        if getOrders == False and searchTerm != None:
             searchTerm = searchTerm.replace("'", "''")
             searchTerm = searchTerm.replace('"', '')
             searchTerm = searchTerm.replace('=', '')
+        else:
+            searchTerm = None
 
         sql = """SELECT TicketSocketEvents.*, 
                     ExternalEventsNew.EventId AS ExternalEventId, 
@@ -66,6 +71,7 @@ class EventService:
         if len(sellerEventCategoryIds) > 0:
             sellerEventCategoryIdStr = db.convertListToParameters(sellerEventCategoryIds, data, 'sellerEventCategoryId')
             whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
+        
         if start != None and end != None:
             whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
             data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
@@ -77,7 +83,7 @@ class EventService:
         elif start != None:
             whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
             data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-        else:
+        elif getOrders == False or sellerId == None:
             whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
             data["startDate"] = datetime.now().strftime('%Y-%m-%d')
 
@@ -123,8 +129,9 @@ class EventService:
                 orders = self.__getOrdersFromEventId(ticketSocketEventId)
                 vipEvent.orders = orders
             
-            events.append(vipEvent)
+            vipEvent.getTotals()
             
+            events.append(vipEvent)            
 
         # get external events without matching TicketSocketEvents
         externalSql = """SELECT * FROM ExternalEventsNew WHERE """
@@ -137,7 +144,7 @@ class EventService:
             externalWhereClause.append("""MATCH (Title, Venue, Address, City, State, Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
             externalData["searchTerm"] = '*' + searchTerm + '*'
         if sellerId != None:
-            externalWhereClause.append("SellerId = %(sellerId)")
+            externalWhereClause.append("SellerId = %(sellerId)s")
             externalData["sellerId"] = sellerId
         if start != None and end != None:
             externalWhereClause.append("EventDate BETWEEEN %(startDate)s AND %(endDate)s")
@@ -157,12 +164,11 @@ class EventService:
         if len(externalWhereClause) > 0:
             externalSql += " AND ".join(externalWhereClause)
                     
-        externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId 
-                FROM ExternalEventsNew 
-                JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
-                JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
-                JOIN TicketSocketEvents ON SellerEventCategory.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId 
-                    AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) ORDER BY EventDate ASC, Title ASC"""
+        externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId FROM ExternalEventsNew
+            JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
+            JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
+            JOIN TicketSocketEvents ON SellerEventCategory.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
+            ORDER BY EventDate ASC, Title ASC"""
     
         externalSql = externalSql.replace('\n', '')
 
@@ -190,10 +196,74 @@ class EventService:
         return events
 
     def __getOrdersFromEventId(self, ticketSocketEventId: int):
-        pass
+        orders: list[VipOrder] = []
+        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, TicketSocketOrders.* FROM TicketSocketOrders
+                    JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+                    JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
+                    LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = TicketSocket.ExchangeRateId 
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId
+        }
+
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            orderId = int(row["OrderId"])
+            eventId = int(row["EventId"])
+            ticketSocketOrderId = int(row["Id"])
+            order = VipOrder(orderId, eventId)
+            order.ticketSocketEventId = ticketSocketEventId
+            order.ticketSocketOrderId = ticketSocketOrderId
+            order.numTickets = int(row["NumTickets"])
+            order.purchaseDate = str(row["PurchaseDate"])
+            order.userId = int(row["UserId"])
+            order.phone = str(row["Phone"])
+            order.email = str(row["Email"])
+            order.purchaserLastName = str(row["PurchaserLastName"])
+            order.purchaserFirstName = str(row["PurchaserFirstName"])
+            order.revenue = float(row["Revenue"])
+            order.exchangeRate = float(row["ExchangeRate"])
+            order.isActive = True if int(row["IsActive"]) == 1 else False
+            shirtStr = str(row["Shirts"]).strip()
+            shirts = []
+            if len(shirtStr) > 0:
+                shirtArray = shirtStr.split("/")
+                for shirt in shirtArray:
+                    shirts.append(shirt.strip())
+            order.shirts = shirts
+            attendeeStr = str(row["AttendeeNames"]).strip()
+            attendees = []
+            if len(attendeeStr) > 0:
+                attendeeArray = attendeeStr.split("/")
+                for attendee in attendeeArray:
+                    attendees.append(attendee.strip())
+            order.attendeeNames = attendees
+            tickets = self.__getTicketsFromOrderId(ticketSocketOrderId)
+            order.tickets = tickets
+            order.getTotals()
+            orders.append(order)
+        return orders
+
     
     def __getTicketsFromOrderId(self, ticketSocketOrderId: int):
-        pass
+        tickets: list[VipTicket] = []
+        sql = """SELECT * FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(ticketSocketOrderId)s"""
+        data = {
+            'ticketSocketOrderId': ticketSocketOrderId
+        }
+
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            ticketId: int = 0
+            if row["TicketId"] != None and row["TicketId"] != '':
+                ticketId = int(row["TicketId"])
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]))
+            ticket.ticketSocketOrderId = ticketSocketOrderId
+            ticket.ticketSocketOrderTicketId = int(row["Id"])
+            ticket.isActive = True if int(row["IsActive"]) == 1 else False
+            tickets.append(ticket)
+        return tickets
 
     def retrieveTicketSocketEventsForUpdate(self, sellerId: int = None, start: int = None, end: int = None):
         # go get seller information from database
@@ -218,8 +288,6 @@ class EventService:
             refreshSec: SellerEventCategory = None
             if seller != None:
                 refreshSec = seller.getSellerEventCategory(ticketSocketId)
-                ids = seller.getSellerEventCategoryIds()
-                print('ts = ' + str(ticketSocketId) + ", sec = " + str(seller.sellerId))
 
                 # if we are restricting by seller and the seller doesn't have a category on this TS service, 
                 # just skip it or the service will return everything for everyone in the time period
@@ -552,9 +620,6 @@ class EventService:
                 
                 deleteEventStr = db.convertListToParameters(serviceEvents, deleteData, 'serviceEvent')
                 delEventSql += " AND EventId NOT IN " + deleteEventStr
-
-                print(delEventSql)
-                print(json.dumps(deleteData))
 
                 deleteRows = db.queryAll(delEventSql, deleteData)
                 for dRow in deleteRows:

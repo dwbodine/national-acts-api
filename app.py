@@ -102,15 +102,18 @@ def getEventsAndOrders():
    start: int = None
    end: int = None
    searchTerm: str = None
+   showInactive: bool = False
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
    if request.args.get('start') != None:
       start = int(request.args.get('start'))
    if request.args.get('end') != None:
       end = int(request.args.get('end'))
+   if request.args.get('inactive') != None:
+      showInactive = True if int(request.args.get('inactive')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))
-   results = service.getEventsAndOrders(True, sellerId, start, end, searchTerm)
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm)
    return convertToJson(results)
 
 @app.route('/internal/getEventsFromService/<int:sellerId>')

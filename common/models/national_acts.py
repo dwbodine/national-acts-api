@@ -68,22 +68,26 @@ class ShirtSales:
         self.total = total
 
 class VipTicket(TicketSocketTicket):
+    ticketSocketOrderId: int = 0
+    ticketSocketOrderTicketId: int = 0
     isActive: bool = True
 
     def __init__(self, id: int, ticketType: str, price: float):
         super().__init__(id, ticketType, price)
 
 class VipOrder(TicketSocketOrder):
+    ticketSocketEventId: int = 0
+    ticketSocketOrderId: int = 0
     isActive: bool = True
     totalShirts: int = 0
     revenueUsd: float = 0
     exchangeRate: float = 1.0
+    tickets: list[VipTicket] = []
 
-    def __init__(self, id: int, title: str):
-        super().__init__(id, title)
+    def __init__(self, id: int, eventId: int):
+        super().__init__(id, eventId)
 
     def getTotals(self):
-        self.getExchangeRate()
         self.totalShirts = len(self.shirts)
         self.revenueUsd = self.revenue * self.exchangeRate
             
@@ -141,8 +145,8 @@ class Seller:
     thumbnail: str = ''
     hideInList: bool = False
     isActive: bool = True
-    created: datetime
-    lastUpdated: datetime
+    created: str = ''
+    lastUpdated: str = ''
 
     sellerEventCategories: list[SellerEventCategory] = []
 
@@ -159,14 +163,13 @@ class Seller:
 
         row = db.queryOne(sql, data)
         if row != {}:
-            self.thumbnail = row['SellerThumbnail']
-            self.name = row['Name']
+            self.thumbnail = str(row['SellerThumbnail'])
+            self.name = str(row['Name'])
             self.hideInList = int(row['HideInList']) == 1
             self.isActive = int(row['Inactive']) != 1
-            self.created = row['Created']
-            self.lastUpdated = row['LastUpdate']
-            if self.isActive:
-                self.__getSellerEventCategories()
+            self.created = str(row['Created'])
+            self.lastUpdated = str(row['LastUpdate'])
+            self.__getSellerEventCategories()
 
     def __getSellerEventCategories(self):
         sql = """SELECT * 
@@ -176,11 +179,12 @@ class Seller:
             'sellerId': self.sellerId
         }
 
-        self.sellerEventCategories = []
+        sellerEventCategories = []
         rows = db.queryAll(sql, data)
         for row in rows:
             sec = SellerEventCategory(self.sellerId, int(row['TicketSocketId']), int(row['EventCategoryId']), int(row['SellerEventCategoryId']))
-            self.sellerEventCategories.append(sec)
+            sellerEventCategories.append(sec)
+        self.sellerEventCategories = sellerEventCategories
 
     def getSellerEventCategory(self, ticketSocketId: int):
         if len(self.sellerEventCategories) == 0:
