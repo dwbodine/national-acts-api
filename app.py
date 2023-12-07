@@ -82,6 +82,7 @@ def getEvents():
    end: int = None
    searchTerm: str = None
    showInactive: bool = False
+   tsEventId: int = None
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
    if request.args.get('start') != None:
@@ -92,7 +93,9 @@ def getEvents():
       showInactive = True if int(request.args.get('inactive')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))   
-   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm)
+   if request.args.get('tsEventId') != None:
+      tsEventId = int(request.args.get('tsEventId'))
+   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId)
    return convertToJson(results)
 
 @app.route('/eventsAndOrders')
@@ -103,6 +106,7 @@ def getEventsAndOrders():
    end: int = None
    searchTerm: str = None
    showInactive: bool = False
+   tsEventId: int = None
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
    if request.args.get('start') != None:
@@ -113,7 +117,9 @@ def getEventsAndOrders():
       showInactive = True if int(request.args.get('inactive')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))
-   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm)
+   if request.args.get('tsEventId') != None:
+      tsEventId = int(request.args.get('tsEventId'))
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId)
    return convertToJson(results)
 
 @app.route('/sellers/<int:userId>')

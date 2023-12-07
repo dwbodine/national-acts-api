@@ -11,7 +11,7 @@ from common.models.national_acts import *
 from common.models.ticket_socket import *
 
 class EventService:
-    def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, searchTerm: str = None):
+    def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, searchTerm: str = None, tsEventId: int = None):
         events: list[VipEvent] = []
         
         sellerEventCategoryIds: list[int] = []
@@ -60,6 +60,9 @@ class EventService:
         whereClause: list[str] = []        
         if showInactive != True:
             whereClause.append("TicketSocketEvents.IsActive = 1")
+        if tsEventId != None:
+            whereClause.append("TicketSocketEvents.Id = %(eventId)s")
+            data["eventId"] = tsEventId
         if searchTerm != None and len(searchTerm) > 0:
             whereClause.append("""MATCH (TicketSocketEvents.Title, 
                                          TicketSocketEvents.Venue, 
