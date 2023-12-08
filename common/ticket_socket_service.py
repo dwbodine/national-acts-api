@@ -197,37 +197,37 @@ class TicketSocketService:
                     customFields = item['customFields']
 
                 address1 = ''                
-                if 'venueAddress1' in item:
+                if 'venueAddress1' in item and item['venueAddress1'] != '':
                     address1 = utility.fixMagicQuotes(item['venueAddress1'])
                 elif customFields != {} and 'venueAddress1' in customFields:
                     address1 = utility.fixMagicQuotes(customFields['venueAddress1'])
 
                 address2 = ''
-                if 'venueAddress2' in item:
+                if 'venueAddress2' in item and item['venueAddress2'] != '':
                     address2 = utility.fixMagicQuotes(item['venueAddress2'])
                 elif customFields != {} and 'venueAddress2' in customFields:
                     address2 = utility.fixMagicQuotes(customFields['venueAddress2'])
 
                 city = ''
-                if 'venueCity' in item:
+                if 'venueCity' in item and item['venueCity'] != '':
                     city = utility.fixMagicQuotes(item['venueCity'])
                 elif customFields != {} and 'venueCity' in customFields:
                     city = utility.fixMagicQuotes(customFields['venueCity'])
 
                 state = ''
-                if 'venueState' in item:
+                if 'venueState' in item and item['venueState'] != '':
                     state = utility.fixMagicQuotes(item['venueState'])
                 elif customFields != {} and 'venueState' in customFields:
                     state = utility.fixMagicQuotes(customFields['venueState'])
 
                 zip = ''
-                if 'venuePostalCode' in item:
+                if 'venuePostalCode' in item and item['venuePostalCode'] != '':
                     zip = utility.fixMagicQuotes(item['venuePostalCode'])
                 elif customFields != {} and 'venuePostalCode' in customFields:
                     zip = utility.fixMagicQuotes(customFields['venuePostalCode'])
 
                 country = ''
-                if 'venueCountry' in item:
+                if 'venueCountry' in item and item['venueCountry'] != '':
                     country = utility.fixMagicQuotes(item['venueCountry'])
                 elif customFields != {} and 'venueCountry' in customFields:
                     country = utility.fixMagicQuotes(customFields['venueCountry'])
