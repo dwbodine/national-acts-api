@@ -101,7 +101,7 @@ class TicketSocketRefreshHistory:
             'startTimer': self.startTimer,
             'endTimer': self.endTimer,
             'duration': self.duration,
-            'success': 1 if self.success == True else 0,
+            'success': 1 if self.succeeded == True else 0,
             'errorMessage': self.errorMessage,
             'serviceEventsSkipped': ", ".join(self.serviceEventsSkipped),
             'eventsFailed': ", ".join(self.eventsFailed),

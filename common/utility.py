@@ -40,15 +40,15 @@ def add_months(current_date, months_to_add):
                         current_date.day)
     return new_date
 
-def queueEmail(subject, html, toAddress, toName, ccEmails):
+def queueEmail(subject: str, html: str, toAddress: str, toName: str, ccEmails: str = None):
     sql = "INSERT INTO MailServiceQueue (ToAddress, ToName, Subject, Message, CcEmails) VALUES (%(toAddress)s, %(toName)s, %(subject)s, %(html)s, %(ccEmails)s)"
 
     data = {
-        'to_address': toAddress,
-        'to_name': toName,
+        'toAddress': toAddress,
+        'toName': toName,
         'subject': subject,
         'html': html,
-        'cc_emails': ccEmails
+        'ccEmails': ccEmails
     }
 
     result = db.insert(sql, data)
