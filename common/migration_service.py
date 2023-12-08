@@ -38,7 +38,7 @@ class MigrationData:
         self.totalTickets = totalTickets
 
 class MigrationService:
-    def clearOutNewTables(self):
+    def clearOutEvents(self):
         success: bool = True
         errMsg: str = ''
 
@@ -52,11 +52,6 @@ class MigrationService:
             sql = "DELETE FROM TicketSocketEvents"
             db.delete(sql)
 
-            sql = "DELETE FROM ExternalEventsNew"
-            db.delete(sql)
-
-            sql = "DELETE FROM UserSeller"
-            db.delete(sql)
         except Exception as error:
             errMsg = error
             success = False
@@ -291,6 +286,7 @@ class MigrationService:
                 'orderId': orderId,
                 'numTickets': numTickets,
                 'purchaseDate': purchaseDate.strftime("%Y-%m-%d"),
+                'purchaseTimestamp': purchaseDate.strftime("%Y-%m-%d %H:%M:%S"),
                 'phone': str(row["Phone"]),
                 'shirts': " / ".join(shirts),
                 'attendeeNames': " / ".join(attendees),
@@ -303,10 +299,10 @@ class MigrationService:
                 'lastUpdate': str(row["LastUpdate"])
             }
 
-            insertSql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, EventId, OrderId, NumTickets, PurchaseDate, 
+            insertSql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, EventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, 
                             Phone, Shirts, AttendeeNames, UserId, PurchaserLastName, PurchaserFirstName, Email, 
                             Revenue, IsActive, LastUpdate) VALUES (%(ticketSocketEventId)s, %(eventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, 
-                            %(phone)s, %(shirts)s, %(attendeeNames)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, 
+                            %(purchaseTimestamp)s, %(phone)s, %(shirts)s, %(attendeeNames)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, 
                             %(revenue)s, %(isActive)s, %(lastUpdate)s)"""
             
             id = db.insert(insertSql, data)
@@ -358,6 +354,7 @@ class MigrationService:
                 'orderId': orderId,
                 'numTickets': numTickets,
                 'purchaseDate': purchaseDate.strftime("%Y-%m-%d"),
+                'purchaseTimestamp': purchaseDate.strftime("%Y-%m-%d %H:%M:%S"),
                 'phone': str(row["Phone"]),
                 'shirts': " / ".join(shirts),
                 'attendeeNames': " / ".join(attendees),
@@ -370,10 +367,10 @@ class MigrationService:
                 'lastUpdate': str(row["LastUpdate"])
             }
 
-            insertSql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, EventId, OrderId, NumTickets, PurchaseDate, 
+            insertSql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, EventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, 
                             Phone, Shirts, AttendeeNames, UserId, PurchaserLastName, PurchaserFirstName, Email, 
                             Revenue, IsActive, LastUpdate) VALUES (%(ticketSocketEventId)s, %(eventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, 
-                            %(phone)s, %(shirts)s, %(attendeeNames)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, 
+                            %(purchaseTimestamp)s, %(phone)s, %(shirts)s, %(attendeeNames)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, 
                             %(revenue)s, %(isActive)s, %(lastUpdate)s)"""
             
             id = db.insert(insertSql, data)

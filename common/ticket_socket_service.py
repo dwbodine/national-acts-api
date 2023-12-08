@@ -311,6 +311,13 @@ class TicketSocketService:
                     continue
 
                 order = TicketSocketOrder(id, eventId)
+
+                if 'cancelled' in jsonData:
+                    order.cancelled = bool(jsonData['cancelled'])
+
+                if 'deleted' in jsonData:
+                    order.deleted = True if int(jsonData['deleted']) == 1 else False
+
                 tickets = None
                 if 'tickets' in jsonData:
                     tickets = jsonData['tickets']
@@ -345,9 +352,10 @@ class TicketSocketService:
                         if order.purchaserLastName == '' and 'billing_lastName' in item:
                             order.purchaserLastName = utility.fixMagicQuotes(item['billing_lastName'])
                         if order.purchaseDate == '' and 'purchaseDate' in item:
-                            # datetime is not serializable in python, convert it to a string that everybody likes (near-ISO)
+                            # datetime is not serializable in python, convert it to ISO-compatible string
                             purchaseDate = datetime.fromtimestamp(float(item['purchaseDate']))
                             order.purchaseDate = purchaseDate.strftime('%Y-%m-%d')
+                            order.purchaseTimestamp = purchaseDate.strftime('%Y-%m-%d %H:%M:%S')
                         if order.email == '' and 'email' in item:
                             order.email = item['email']
                         

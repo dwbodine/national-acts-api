@@ -32,9 +32,12 @@ class TicketSocketOrder:
     purchaserFirstName: str = ''
     purchaserLastName: str = ''
     purchaseDate: str = ''
+    purchaseTimestamp: str = ''
     email: str = ''
     attendeeNames: list[str] = []
     revenue: float = ''
+    cancelled: bool = False
+    deleted: bool = False
 
     def __init__(self, id: int, eventId: int):
         self.id = id
@@ -58,7 +61,7 @@ class TicketSocketEvent:
 class TicketSocketRefreshHistory:
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int],
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, eventsDeactivated: int,
-                  ordersInserted: int, ordersUpdated: int, ordersDeactivated: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
+                  ordersInserted: int, ordersUpdated: int, ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
                   startTimer: int, endTimer: int, duration: int, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
                   errorMessage: str = None):
         self.serviceEventsSkipped = serviceEventsSkipped
@@ -72,6 +75,7 @@ class TicketSocketRefreshHistory:
         self.ordersInserted = ordersInserted
         self.ordersUpdated = ordersUpdated
         self.ordersDeactivated = ordersDeactivated
+        self.ordersDeleted = ordersDeleted
         self.ticketsUpdated = ticketsUpdated
         self.ticketsInserted = ticketsInserted
         self.ticketsDeactivated = ticketsDeactivated
@@ -88,10 +92,10 @@ class TicketSocketRefreshHistory:
     def commit(self):
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
                  ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted, EventsDeactivated, 
-                 OrdersInserted, OrdersUpdated, OrdersDeactivated, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 
+                 OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 
                  %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s, %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
                  %(ordersFailed)s, %(ticketsFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(eventsDeactivated)s, %(ordersInserted)s, 
-                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s)"""
+                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s)"""
         
         data = {
             'userId': self.userId,
@@ -114,6 +118,7 @@ class TicketSocketRefreshHistory:
             'ordersInserted': self.ordersInserted,
             'ordersUpdated': self.ordersUpdated,
             'ordersDeactivated': self.ordersDeactivated, 
+            'ordersDeleted': self.ordersDeleted,
             'ticketsUpdated': self.ticketsUpdated,
             'ticketsInserted': self.ticketsInserted, 
             'ticketsDeactivated': self.ticketsDeactivated

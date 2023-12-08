@@ -3,8 +3,6 @@ import json
 import time
 from datetime import datetime
 import operator
-import sys
-import traceback
 
 from . import utility
 from . import db
@@ -228,6 +226,7 @@ class EventService:
             order.ticketSocketOrderId = ticketSocketOrderId
             order.numTickets = int(row["NumTickets"])
             order.purchaseDate = str(row["PurchaseDate"])
+            order.purchaseTimestamp = str(row["PurchaseTimestamp"])
             order.userId = int(row["UserId"])
             order.phone = str(row["Phone"])
             order.email = str(row["Email"])
@@ -361,6 +360,7 @@ class EventService:
         ordersInserted: int = 0
         ordersUpdated: int = 0
         ordersDeactivated: int = 0
+        ordersDeleted: int = 0
         ticketsUpdated: int = 0
         ticketsInserted: int = 0
         ticketsDeactivated: int = 0
@@ -456,6 +456,7 @@ class EventService:
                     
                     if ticketSocketEventId and len(evt.orders) > 0:
                         eventOrders: list[int] = []
+                        ordersToDelete: list[int] = []
                         for order in evt.orders:
                             eventOrders.append(order.id)
                             # compile order data for update
@@ -466,9 +467,15 @@ class EventService:
                             if len(order.attendeeNames) > 0:
                                 attendeeNames = " / ".join(order.attendeeNames)
 
+                            isOrderActive: int = 0 if order.cancelled else 1                            
+
+                            if order.deleted:
+                                ordersToDelete.append(order.id)
+
                             orderData = {
                                 'numTickets': order.numTickets,
                                 'purchaseDate': order.purchaseDate.strip(),
+                                'purchaseTimestamp': order.purchaseTimestamp.strip(),
                                 'phone': order.phone.strip(),
                                 'shirts': shirts,
                                 'attendeeNames': attendeeNames,
@@ -477,7 +484,8 @@ class EventService:
                                 'purchaserLastName': order.purchaserLastName.strip(),
                                 'purchaserFirstName': order.purchaserFirstName.strip(),
                                 'email': order.email.strip(),
-                                'revenue': order.revenue
+                                'revenue': order.revenue,
+                                'isActive': isOrderActive
                             }
 
                             # determine if order already exists
@@ -498,20 +506,20 @@ class EventService:
                                 #update existing order
                                 ticketSocketOrderId = int(existingOrder['Id'])
                                 orderData['id'] = ticketSocketOrderId
-                                sql = """Update TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, Phone=%(phone)s, Shirts=%(shirts)s, 
-                                        AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, PurchaserLastName=%(purchaserLastName)s, 
-                                        PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, 
-                                        IsActive=1, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s, 
+                                        Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
+                                        PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, 
+                                        IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                 orderSuccess = db.update(sql, orderData)
                             else:
                                 orderAddNew = True
                                 #insert new order
                                 orderData['orderId'] = int(order.id)
                                 orderData['ticketSocketEventId'] = ticketSocketEventId
-                                sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, Phone, Shirts, 
-                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue) 
-                                                VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(phone)s, %(shirts)s, 
-                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s)"""
+                                sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, Phone, Shirts, 
+                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue, IsActive) 
+                                                VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
+                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s, %(isActive)s)"""
                                 ticketSocketOrderId = db.insert(sql, orderData)
                                 orderSuccess = (ticketSocketOrderId > 0)
 
@@ -599,6 +607,16 @@ class EventService:
                                     inactiveTickets = db.update(sql, orderTicketData)
                                     ticketsDeactivated += inactiveTickets
                                 
+                        # delete any orders marked as deleted by TS
+                        if len(ordersToDelete) > 0:
+                            deleteOrderData = {
+                                'ticketSocketEventId': ticketSocketEventId
+                            }
+                            deleteOrderStr = db.convertListToParameters(ordersToDelete, deleteOrderData, 'deletedOrder')
+                            deleteOrderSql = """DELETE FROM TicketSocketOrders WHERE TicketSocketEventId=%(ticketSocketEventId)s AND OrderId IN """ + deleteOrderStr
+                            deletedOrders = db.update(deleteOrderSql, deleteOrderData)
+                            ordersDeleted += deletedOrders
+                        
                         # find any orders not returned by the service and mark as inactive
                         if len(eventOrders) > 0:
                             eventOrderData = {
@@ -656,13 +674,12 @@ class EventService:
             duration = endTimer - startTimer              
                                     
             results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, 
-                                                eventsUpdated, eventsInserted, eventsDeactivated, ordersInserted, ordersUpdated, ordersDeactivated, 
+                                                eventsUpdated, eventsInserted, eventsDeactivated, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
                                                 ticketsUpdated, ticketsInserted, ticketsDeactivated, startTimer, endTimer, duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
             updateSuccess = results.commit()
 
         except Exception as error:
-            traceback.print_exception(*sys.exc_info()) 
             updateSuccess = False
             errorMessage = error        
 
