@@ -122,7 +122,7 @@ class VipEvent(TicketSocketEvent):
         totalShirts: int = 0
         shirtd: dict() = {}
         for order in self.orders:
-            totalRevenue += order.revenue
+            totalRevenue += order.revenueUsd
             totalTickets += order.numTickets
             if len(order.shirts) > 0:
                 totalShirts += len(order.shirts)
