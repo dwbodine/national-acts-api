@@ -82,6 +82,8 @@ class VipOrder(TicketSocketOrder):
     totalShirts: int = 0
     revenueUsd: float = 0
     exchangeRate: float = 1.0
+    currencySymbol: str = None
+    currencyAbbrev: str = None
     tickets: list[VipTicket] = []
 
     def __init__(self, id: int, eventId: int):

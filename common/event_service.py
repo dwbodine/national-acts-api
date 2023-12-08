@@ -51,44 +51,46 @@ class EventService:
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
             LEFT JOIN ExternalEventsNew ON ExternalEventsNew.SellerId = Sellers.SellerId AND TicketSocketEvents.EventDate = ExternalEventsNew.EventDate """
         
-        if showInactive != True:
+        if tsEventId == None and showInactive != True:
             sql += " AND ExternalEventsNew.IsActive = 1"
 
         sql += " WHERE "
         data = {}
 
-        whereClause: list[str] = []        
-        if showInactive != True:
-            whereClause.append("TicketSocketEvents.IsActive = 1")
+        whereClause: list[str] = []       
         if tsEventId != None:
             whereClause.append("TicketSocketEvents.Id = %(eventId)s")
-            data["eventId"] = tsEventId
-        if searchTerm != None and len(searchTerm) > 0:
-            whereClause.append("""MATCH (TicketSocketEvents.Title, 
-                                         TicketSocketEvents.Venue, 
-                                         TicketSocketEvents.Address, 
-                                         TicketSocketEvents.City, 
-                                         TicketSocketEvents.State, 
-                                         TicketSocketEvents.Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
-            data["searchTerm"] = '*' + searchTerm + '*'
-        if len(sellerEventCategoryIds) > 0:
-            sellerEventCategoryIdStr = db.convertListToParameters(sellerEventCategoryIds, data, 'sellerEventCategoryId')
-            whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
-        
-        if start != None and end != None:
-            whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
-            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
-        elif end != None:
-            whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
-            data["startDate"] = datetime.now().strftime('%Y-%m-%d')
-            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
-        elif start != None:
-            whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
-            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-        elif getOrders == False or sellerId == None:
-            whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
-            data["startDate"] = datetime.now().strftime('%Y-%m-%d')
+            data["eventId"] = tsEventId        
+        else:
+            if showInactive != True:
+                whereClause.append("TicketSocketEvents.IsActive = 1")
+            
+            if searchTerm != None and len(searchTerm) > 0:
+                whereClause.append("""MATCH (TicketSocketEvents.Title, 
+                                            TicketSocketEvents.Venue, 
+                                            TicketSocketEvents.Address, 
+                                            TicketSocketEvents.City, 
+                                            TicketSocketEvents.State, 
+                                            TicketSocketEvents.Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
+                data["searchTerm"] = '*' + searchTerm + '*'
+            if len(sellerEventCategoryIds) > 0:
+                sellerEventCategoryIdStr = db.convertListToParameters(sellerEventCategoryIds, data, 'sellerEventCategoryId')
+                whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
+            
+            if start != None and end != None:
+                whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+                data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+                data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            elif end != None:
+                whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+                data["startDate"] = datetime.now().strftime('%Y-%m-%d')
+                data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            elif start != None:
+                whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
+                data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+            elif getOrders == False or sellerId == None:
+                whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
+                data["startDate"] = datetime.now().strftime('%Y-%m-%d')
 
         if len(whereClause) > 0:
             sql += " AND ".join(whereClause)
@@ -96,6 +98,8 @@ class EventService:
         sql += " ORDER BY TicketSocketEvents.EventDate ASC, TicketSocketEvents.Title ASC"       
 
         sql = sql.replace('\n', '') 
+
+        print(sql)
 
         eventRows = db.queryAll(sql, data)
         for row in eventRows:
@@ -200,12 +204,14 @@ class EventService:
 
     def __getOrdersFromEventId(self, ticketSocketEventId: int):
         orders: list[VipOrder] = []
-        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, TicketSocketOrders.* FROM TicketSocketOrders
+        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.* 
+                    FROM TicketSocketOrders
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
                     JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
                     JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
-                    LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = TicketSocket.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+                    JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
+                    LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s"""
         data = {
             'ticketSocketEventId': ticketSocketEventId
         }
@@ -227,6 +233,8 @@ class EventService:
             order.purchaserFirstName = str(row["PurchaserFirstName"])
             order.revenue = float(row["Revenue"])
             order.exchangeRate = float(row["ExchangeRate"])
+            order.currencyAbbrev = str(row["CurrencyAbbrev"])
+            order.currencySymbol = str(row["Symbol"])
             order.isActive = True if int(row["IsActive"]) == 1 else False
             shirtStr = str(row["Shirts"]).strip()
             shirts = []
