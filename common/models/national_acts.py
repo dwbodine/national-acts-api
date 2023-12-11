@@ -117,7 +117,6 @@ class VipEvent(TicketSocketEvent):
     sellerEventCategoryId: int = None
     isVip: bool = True
     isDeleted: bool = False
-    eventAddress: str = None
 
     def getTotals(self):
         totalRevenue: float = 0
@@ -147,22 +146,25 @@ class VipEvent(TicketSocketEvent):
 
         # roll up external event data, if any
         if self.externalVenue != None:
-            self.eventAddress = self.externalVenue.address1
-            if self.externalVenue.address2 != None:
-                self.eventAddress += " " + self.externalVenue.address2
-            self.eventAddress += ", " + self.externalVenue.city + ", " + self.externalVenue.state + " " + self.externalVenue.postalCode
-            if self.externalVenue.country != None and self.externalVenue.country != "" and self.externalVenue.country != "United States" and self.externalVenue.country.upper() != "USA":
-                self.eventAddress += " " + self.externalVenue.country            
-        elif self.venue != None:
-            self.eventAddress = self.venue.address1
-            if self.venue.address2 != None:
-                self.eventAddress += " " + self.venue.address2
-            self.eventAddress += ", " + self.venue.city + ", " + self.venue.state + " " + self.venue.postalCode
-            if self.venue.country != None and self.venue.country != "" and self.venue.country != "United States" and self.venue.country.upper() != "USA":
-                self.eventAddress += " " + self.venue.country 
+            if self.externalVenue.name != None and self.externalVenue.name != "":
+                self.venue.name = self.externalVenue.name
+            if self.externalVenue.address1 != None and self.externalVenue.address1 != "":
+                self.venue.address1 = self.externalVenue.address1
+            if self.externalVenue.address2 != None and self.externalVenue.address2 != "":
+                self.venue.address2 = self.externalVenue.address2
+            if self.externalVenue.city != None and self.externalVenue.city != "":
+                self.venue.city = self.externalVenue.city
+            if self.externalVenue.state != None and self.externalVenue.state != "":
+                self.venue.state = self.externalVenue.state
+            if self.externalVenue.postalCode != None and self.externalVenue.postalCode != "":
+                self.venue.postalCode = self.externalVenue.postalCode
 
-        if self.externalTitle != None:
-            self.title = self.externalTitle
+        if self.externalThumbnail != None and self.externalThumbnail != "":
+            self.thumbnail = self.externalThumbnail
+        
+        if self.externalVipLink != None and self.externalVipLink != "":
+            self.ticketSocketUrl = self.externalVipLink
+
 
 class Seller:
     thumbnail: str = ''

@@ -80,6 +80,8 @@ def getEvents():
    sellerId: int = None
    start: int = None
    end: int = None
+   excludeStart: int = None
+   excludeEnd: int = None
    searchTerm: str = None
    showInactive: bool = False
    tsEventId: int = None
@@ -89,13 +91,17 @@ def getEvents():
       start = int(request.args.get('start'))
    if request.args.get('end') != None:
       end = int(request.args.get('end'))
+   if request.args.get('excludeStart') != None:
+      excludeStart = int(request.args.get('excludeStart'))
+   if request.args.get('excludeEnd') != None:
+      excludeEnd = int(request.args.get('excludeEnd'))
    if request.args.get('inactive') != None:
       showInactive = True if int(request.args.get('inactive')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))   
    if request.args.get('tsEventId') != None:
       tsEventId = int(request.args.get('tsEventId'))
-   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId)
+   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, excludeStart, excludeEnd)
    return convertToJson(results)
 
 @app.route('/eventsAndOrders')

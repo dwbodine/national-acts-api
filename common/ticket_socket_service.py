@@ -185,7 +185,7 @@ class TicketSocketService:
                 if 'sefUrl' in item:
                     sefUrl = item['sefUrl']
 
-                event.ticketSocketUrl = "https://" + self.serviceUrl + "/event" + sefUrl
+                event.ticketSocketUrl = "https://" + self.serviceUrl + "/event/" + sefUrl
 
                 # venue info
                 venue = ''

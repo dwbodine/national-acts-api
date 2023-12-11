@@ -12,7 +12,7 @@ from common.models.ticket_socket import *
 
 class EventService:
     def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, 
-                           searchTerm: str = None, tsEventId: int = None, showDeleted: bool = False):
+                           searchTerm: str = None, tsEventId: int = None, showDeleted: bool = False, excludeStart: int = None, excludeEnd: int = None):
         events: list[VipEvent] = []
         
         sellerEventCategoryIds: list[int] = []
@@ -94,6 +94,11 @@ class EventService:
             elif getOrders == False or sellerId == None:
                 whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime('%Y-%m-%d')
+
+            if excludeStart != None and excludeEnd != None:
+                whereClause.append("TicketSocketEvents.EventDate NOT BETWEEEN %(excludeStart)s AND %(excludeEnd)s")
+                data["excludeStart"] = datetime.fromtimestamp(excludeStart).strftime('%Y-%m-%d')
+                data["excludeEnd"] = datetime.fromtimestamp(excludeEnd).strftime('%Y-%m-%d')
 
         if len(whereClause) > 0:
             sql += " AND ".join(whereClause)
