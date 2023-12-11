@@ -107,8 +107,6 @@ class EventService:
 
         sql = sql.replace('\n', '') 
 
-        print(sql)
-
         eventRows = db.queryAll(sql, data)
         for row in eventRows:
             eventId = int(row["EventId"])
@@ -263,6 +261,7 @@ class EventService:
                 attendeeArray = attendeeStr.split("/")
                 for attendee in attendeeArray:
                     attendees.append(attendee.strip())
+            attendees.sort()
             order.attendeeNames = attendees
             tickets = self.__getTicketsFromOrderId(ticketSocketOrderId)
             order.tickets = tickets

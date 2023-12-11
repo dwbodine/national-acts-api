@@ -19,7 +19,6 @@ class ExchangeRateService:
         self.exchangeRate = exchangeRate
 
     def __getCurrentRate(self):
-        print('called current rate')
         url = '/rates/' + self.exchangeRate.exchangeRateSlug
 
         headers = {
@@ -33,7 +32,6 @@ class ExchangeRateService:
         response = conn.getresponse() 
 
         exchangeRate: float = 1.0
-        print('response.status = ' + str(response.status))
         if response.status == 200:
             jsonResponse = json.loads(response.read())
             json_data = jsonResponse['data']

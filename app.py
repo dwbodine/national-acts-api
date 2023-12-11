@@ -12,7 +12,6 @@ from common.event_service import *
 from common.exchange_rate_service import *
 from common.update_service import *
 from common.seller_service import *
-from common.models.user import *
 from common.environment import *
 
 

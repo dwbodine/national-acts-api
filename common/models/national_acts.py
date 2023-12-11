@@ -145,6 +145,9 @@ class VipEvent(TicketSocketEvent):
         self.shirtSales = shirtSales
 
         # roll up external event data, if any
+        if self.externalTitle != None and self.externalTitle != "":
+            self.title = self.externalTitle
+            
         if self.externalVenue != None:
             if self.externalVenue.name != None and self.externalVenue.name != "":
                 self.venue.name = self.externalVenue.name
@@ -225,3 +228,115 @@ class Seller:
             for sec in self.sellerEventCategories:
                 ids.append(sec.sellerEventCategoryId)
         return ids
+
+class User:
+    userId: int = 0
+    username: str = None
+    password: str = None
+    firstName: str = None
+    lastName: str = None
+    notes: str = None
+    isActive: bool = False
+    isAdmin: bool = False
+    showInactiveEvents: bool = False
+
+    def authenticate(self, username: str, password: str):
+        pass
+
+    def getUserById(self, userId: int):
+        sql = "SELECT * FROM Users WHERE UserId=%(userId)s"
+        data = {
+            'userId': userId
+        }
+        row = db.queryOne(sql, data)
+        if row != {}:
+            self.userId = userId
+            self.username = str(row["Username"])
+            self.firstName = str(row["FirstName"])
+            self.lastName = str(row["LastName"])
+            self.isActive = True if int(row["IsActive"]) == 1 else False
+            self.isAdmin = True if int(row["IsAdmin"]) == 1 else False
+            self.notes = str(row["Notes"])
+            if self.isAdmin == True:
+                self.showInactiveEvents = True
+            else:
+                self.showInactiveEvents = True if int(row["ShowInactiveEvents"]) == 1 else False
+
+    
+
+class TicketSocketRefreshHistory:
+    sellerName: str = None
+    userName: str = None
+
+    def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int],
+                  totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
+                  ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
+                  startTimer: int, endTimer: int, duration: int, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
+                  errorMessage: str = None):
+        self.serviceEventsSkipped = serviceEventsSkipped
+        self.eventsFailed = eventsFailed
+        self.ordersFailed = ordersFailed
+        self.ticketsFailed = ticketsFailed
+        self.totalEventsFromService = totalEventsFromService
+        self.eventsUpdated = eventsUpdated
+        self.eventsInserted = eventsInserted
+        self.ordersInserted = ordersInserted
+        self.ordersUpdated = ordersUpdated
+        self.ordersDeactivated = ordersDeactivated
+        self.ordersDeleted = ordersDeleted
+        self.ticketsUpdated = ticketsUpdated
+        self.ticketsInserted = ticketsInserted
+        self.ticketsDeactivated = ticketsDeactivated
+        self.userId = userId
+        self.sellerId = sellerId
+        self.start = start
+        self.end = end
+        self.startTimer = startTimer
+        self.endTimer = endTimer
+        self.duration = duration
+        self.succeeded = succeeded
+        self.errorMessage = errorMessage
+        if self.sellerId != None:
+            seller = Seller(self.sellerId)
+            self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
+        if self.userId > 0:
+            user = User()
+            user.getUserById(self.userId)
+            self.userName = user.firstName + " " + user.lastName + " (" + user.username + ")"
+            
+
+    def commit(self):
+        sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
+                 ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
+                 OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 
+                 %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s, %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
+                 %(ordersFailed)s, %(ticketsFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
+                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s)"""
+        
+        data = {
+            'userId': self.userId,
+            'sellerId': self.sellerId,
+            'start': self.start,
+            'end': self.end,
+            'startTimer': self.startTimer,
+            'endTimer': self.endTimer,
+            'duration': self.duration,
+            'success': 1 if self.succeeded == True else 0,
+            'errorMessage': self.errorMessage,
+            'serviceEventsSkipped': ", ".join(self.serviceEventsSkipped),
+            'eventsFailed': ", ".join(self.eventsFailed),
+            'ordersFailed': ", ".join(self.ordersFailed),
+            'ticketsFailed': ", ".join(self.ticketsFailed),
+            'totalEventsFromService': self.totalEventsFromService,
+            'eventsUpdated': self.eventsUpdated,
+            'eventsInserted': self.eventsInserted,
+            'ordersInserted': self.ordersInserted,
+            'ordersUpdated': self.ordersUpdated,
+            'ordersDeactivated': self.ordersDeactivated, 
+            'ordersDeleted': self.ordersDeleted,
+            'ticketsUpdated': self.ticketsUpdated,
+            'ticketsInserted': self.ticketsInserted, 
+            'ticketsDeactivated': self.ticketsDeactivated
+        }
+
+        return (db.insert(sql, data) > 0)
