@@ -155,7 +155,8 @@ def refreshEventsFromService(sellerId: int = None):
       end = int(request.args.get('end'))
    
    if sellerId != None:
-      results = service.refreshDatabaseFromTicketSocket(sellerId, start, end)
+      # currently hard-coded to TJ as updater
+      results = service.refreshDatabaseFromTicketSocket(sellerId, start, end, 5)
    else:
       results = None
    return convertToJson(results)
