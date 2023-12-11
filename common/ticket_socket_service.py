@@ -366,7 +366,7 @@ class TicketSocketService:
                             if 'partyMemberLastName' in item:
                                 attendeeName += ' ' + utility.fixMagicQuotes(item['partyMemberLastName'])
 
-                        if attendeeName != '' and attendeeName not in orderAttendeeNames:
+                        if attendeeName != '':
                             orderAttendeeNames.append(attendeeName)
 
                         # get shirt and phone data from questions    

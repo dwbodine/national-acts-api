@@ -117,6 +117,7 @@ class VipEvent(TicketSocketEvent):
     sellerEventCategoryId: int = None
     isVip: bool = True
     isDeleted: bool = False
+    eventAddress: str = None
 
     def getTotals(self):
         totalRevenue: float = 0
@@ -144,6 +145,24 @@ class VipEvent(TicketSocketEvent):
             shirtSales.append(shirtSale)
         self.shirtSales = shirtSales
 
+        # roll up external event data, if any
+        if self.externalVenue != None:
+            self.eventAddress = self.externalVenue.address1
+            if self.externalVenue.address2 != None:
+                self.eventAddress += " " + self.externalVenue.address2
+            self.eventAddress += ", " + self.externalVenue.city + ", " + self.externalVenue.state + " " + self.externalVenue.postalCode
+            if self.externalVenue.country != None and self.externalVenue.country != "" and self.externalVenue.country != "United States" and self.externalVenue.country.upper() != "USA":
+                self.eventAddress += " " + self.externalVenue.country            
+        elif self.venue != None:
+            self.eventAddress = self.venue.address1
+            if self.venue.address2 != None:
+                self.eventAddress += " " + self.venue.address2
+            self.eventAddress += ", " + self.venue.city + ", " + self.venue.state + " " + self.venue.postalCode
+            if self.venue.country != None and self.venue.country != "" and self.venue.country != "United States" and self.venue.country.upper() != "USA":
+                self.eventAddress += " " + self.venue.country 
+
+        if self.externalTitle != None:
+            self.title = self.externalTitle
 
 class Seller:
     thumbnail: str = ''
