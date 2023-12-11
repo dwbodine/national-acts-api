@@ -60,8 +60,8 @@ class TicketSocketEvent:
 
 class TicketSocketRefreshHistory:
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int],
-                  totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, eventsDeactivated: int,
-                  ordersInserted: int, ordersUpdated: int, ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
+                  totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
+                  ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
                   startTimer: int, endTimer: int, duration: int, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
                   errorMessage: str = None):
         self.serviceEventsSkipped = serviceEventsSkipped
@@ -71,7 +71,6 @@ class TicketSocketRefreshHistory:
         self.totalEventsFromService = totalEventsFromService
         self.eventsUpdated = eventsUpdated
         self.eventsInserted = eventsInserted
-        self.eventsDeactivated = eventsDeactivated
         self.ordersInserted = ordersInserted
         self.ordersUpdated = ordersUpdated
         self.ordersDeactivated = ordersDeactivated
@@ -91,10 +90,10 @@ class TicketSocketRefreshHistory:
 
     def commit(self):
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
-                 ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted, EventsDeactivated, 
+                 ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
                  OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 
                  %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s, %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
-                 %(ordersFailed)s, %(ticketsFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(eventsDeactivated)s, %(ordersInserted)s, 
+                 %(ordersFailed)s, %(ticketsFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
                  %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s)"""
         
         data = {
@@ -114,7 +113,6 @@ class TicketSocketRefreshHistory:
             'totalEventsFromService': self.totalEventsFromService,
             'eventsUpdated': self.eventsUpdated,
             'eventsInserted': self.eventsInserted,
-            'eventsDeactivated': self.eventsDeactivated,
             'ordersInserted': self.ordersInserted,
             'ordersUpdated': self.ordersUpdated,
             'ordersDeactivated': self.ordersDeactivated, 

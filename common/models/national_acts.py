@@ -79,6 +79,7 @@ class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
     ticketSocketOrderId: int = 0
     isActive: bool = True
+    isDeleted: bool = False
     totalShirts: int = 0
     revenueUsd: float = 0
     exchangeRate: float = 1.0
@@ -115,6 +116,7 @@ class VipEvent(TicketSocketEvent):
     disableVipLinkReason: bool = False
     sellerEventCategoryId: int = None
     isVip: bool = True
+    isDeleted: bool = False
 
     def getTotals(self):
         totalRevenue: float = 0
