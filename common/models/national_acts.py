@@ -117,6 +117,7 @@ class VipEvent(TicketSocketEvent):
     sellerEventCategoryId: int = None
     isVip: bool = True
     isDeleted: bool = False
+    isExternal: bool = False
 
     def getTotals(self):
         totalRevenue: float = 0

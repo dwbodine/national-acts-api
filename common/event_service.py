@@ -112,6 +112,7 @@ class EventService:
             eventId = int(row["EventId"])
             ticketSocketEventId = int(row["Id"])
             vipEvent = VipEvent(eventId, str(row["Title"]))
+            vipEvent.isExternal = False
             vipEvent.ticketSocketEventId = ticketSocketEventId
             vipEvent.sellerEventCategoryId = int(row["SellerEventCategoryId"])
             vipEvent.eventDate = str(row["EventDate"])
@@ -190,6 +191,7 @@ class EventService:
         for row in externalEventRows:
             eventId = int(row["EventId"])
             vipEvent = VipEvent(eventId, str(row["Title"]))
+            vipEvent.isExternal = True
             vipEvent.eventDate = str(row["EventDate"])
             vipEvent.thumbnail = str(row["Thumbnail"])
             vipEvent.ticketSocketUrl = str(row["URL"])
@@ -201,6 +203,7 @@ class EventService:
             vipEvent.disableLinkButton = str(row["DisableLinkButton"])
             vipEvent.disableLinkReason = str(row["DisableLinkReason"])
             vipEvent.externalVipLink = str(row["ExternalVipLink"])
+            vipEvent.isVip = True if (vipEvent.externalVipLink != None and vipEvent.externalVipLink != "") else False
             vipEvent.disableVipLinkButton = str(row["DisableVipLinkButton"])
             vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
             events.append(vipEvent)
