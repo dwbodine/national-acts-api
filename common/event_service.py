@@ -117,10 +117,11 @@ class EventService:
             vipEvent.sellerEventCategoryId = int(row["SellerEventCategoryId"])
             vipEvent.eventDate = str(row["EventDate"])
             vipEvent.utcTime = int(row["UtcTime"])
-            vipEvent.displayDate = str(row["DisplayDate"])
-            vipEvent.thumbnail = str(row["Thumbnail"])
+            vipEvent.displayDate = str(row["DisplayDate"]) if row["DisplayDate"] != None else None
+            vipEvent.thumbnail = str(row["Thumbnail"]) if row["Thumbnail"] != None else None
             vipEvent.ticketSocketUrl = str(row["URL"])
-            venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), str(row["Country"]), '')
+            vipCountry = str(row["Country"]) if row["Country"] != None else None
+            venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), vipCountry, '')
             vipEvent.venue = venue
             vipEvent.onSale = True if int(row["OnSale"]) == 1 else False
             vipEvent.isActive = True if int(row["IsActive"]) == 1 else False
@@ -132,7 +133,8 @@ class EventService:
                 vipEvent.externalTitle = str(row["ExternalTitle"])
                 vipEvent.externalThumbnail = str(row["ExternalThumbnail"])
                 vipEvent.externalUrl = str(row["ExternalUrl"])
-                externalVenue = TicketSocketVenue(str(row["ExternalVenue"]), str(row["ExternalAddress"]), '', str(row["ExternalCity"]), str(row["ExternalState"]), str(row["ExternalZip"]), str(row["ExternalCountry"]), '')
+                externalCountry = str(row["ExternalCountry"]) if row["ExternalCountry"] != None else None
+                externalVenue = TicketSocketVenue(str(row["ExternalVenue"]), str(row["ExternalAddress"]), '', str(row["ExternalCity"]), str(row["ExternalState"]), str(row["ExternalZip"]), externalCountry, '')
                 vipEvent.externalVenue = externalVenue
                 vipEvent.disableLinkButton = str(row["DisableLinkButton"])
                 vipEvent.disableLinkReason = str(row["DisableLinkReason"])
@@ -241,24 +243,24 @@ class EventService:
             order.purchaseDate = str(row["PurchaseDate"])
             order.purchaseTimestamp = str(row["PurchaseTimestamp"])
             order.userId = int(row["UserId"])
-            order.phone = str(row["Phone"])
-            order.email = str(row["Email"])
-            order.purchaserLastName = str(row["PurchaserLastName"])
-            order.purchaserFirstName = str(row["PurchaserFirstName"])
+            order.phone = str(row["Phone"]) if row["Phone"] != None else None
+            order.email = str(row["Email"]) if row["Email"] != None else None
+            order.purchaserLastName = str(row["PurchaserLastName"]) if row["PurchaserLastName"] != None else None
+            order.purchaserFirstName = str(row["PurchaserFirstName"]) if row["PurchaserFirstName"] != None else None
             order.revenue = float(row["Revenue"])
             order.exchangeRate = float(row["ExchangeRate"])
             order.currencyAbbrev = str(row["CurrencyAbbrev"])
             order.currencySymbol = str(row["Symbol"])
             order.isActive = True if int(row["IsActive"]) == 1 else False
             order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
-            shirtStr = str(row["Shirts"]).strip()
+            shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
             shirts = []
             if len(shirtStr) > 0:
                 shirtArray = shirtStr.split("/")
                 for shirt in shirtArray:
                     shirts.append(shirt.strip())
             order.shirts = shirts
-            attendeeStr = str(row["AttendeeNames"]).strip()
+            attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
             attendees = []
             if len(attendeeStr) > 0:
                 attendeeArray = attendeeStr.split("/")
@@ -410,10 +412,10 @@ class EventService:
                         'city': evt.venue.city.strip(),
                         'state': evt.venue.state.strip(),
                         'zip': evt.venue.postalCode.strip(),
-                        'country': evt.venue.country.strip(),
+                        'country': evt.venue.country.strip() if evt.venue.country != None else None,
                         'onsale': 1 if evt.onSale else 0,
-                        'thumbnail': evt.thumbnail.strip(),
-                        'displayDate': evt.displayDate.strip(),
+                        'thumbnail': evt.thumbnail.strip() if evt.thumbnail != None else None,
+                        'displayDate': evt.displayDate.strip() if evt.displayDate != None else None,
                         'isVip': 1 if evt.isVip else 0
                     }
 
@@ -471,10 +473,10 @@ class EventService:
                         for order in evt.orders:
                             eventOrders.append(order.id)
                             # compile order data for update
-                            shirts: str = ''
+                            shirts: str = None
                             if len(order.shirts) > 0:
                                 shirts = " / ".join(order.shirts)
-                            attendeeNames: str = ''
+                            attendeeNames: str = None
                             if len(order.attendeeNames) > 0:
                                 attendeeNames = " / ".join(order.attendeeNames)
 
@@ -485,14 +487,14 @@ class EventService:
                                 'numTickets': order.numTickets,
                                 'purchaseDate': order.purchaseDate.strip(),
                                 'purchaseTimestamp': order.purchaseTimestamp.strip(),
-                                'phone': order.phone.strip(),
+                                'phone': order.phone.strip() if order.phone != None else None,
                                 'shirts': shirts,
                                 'attendeeNames': attendeeNames,
                                 'userId': order.userId,
                                 'eventId': order.eventId,
-                                'purchaserLastName': order.purchaserLastName.strip(),
-                                'purchaserFirstName': order.purchaserFirstName.strip(),
-                                'email': order.email.strip(),
+                                'purchaserLastName': order.purchaserLastName.strip() if order.purchaserLastName != None else None,
+                                'purchaserFirstName': order.purchaserFirstName.strip() if order.purchaserFirstName != None else None,
+                                'email': order.email.strip() if order.email != None else None,
                                 'revenue': order.revenue,
                                 'isActive': isOrderActive,
                                 'isDeleted': isOrderDeleted
@@ -558,7 +560,7 @@ class EventService:
                                     orderTickets.append(ticket.id)
                                     # compile ticket data for update
                                     ticketData = {
-                                        'price': ticket.price,
+                                        'price': ticket.price if ticket.price != None else 0,
                                         'ticketType': ticket.ticketType.strip()
                                     }
 
