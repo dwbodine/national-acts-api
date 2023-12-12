@@ -271,7 +271,7 @@ class TicketSocketRefreshHistory:
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int],
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
                   ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
-                  startTimer: int, endTimer: int, duration: int, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
+                  startTimer: int, endTimer: int, duration: float, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
                   errorMessage: str = None):
         self.serviceEventsSkipped = serviceEventsSkipped
         self.eventsFailed = eventsFailed
@@ -296,6 +296,8 @@ class TicketSocketRefreshHistory:
         self.duration = duration
         self.succeeded = succeeded
         self.errorMessage = errorMessage
+
+    def getNames(self):
         if self.sellerId != None:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
@@ -303,9 +305,10 @@ class TicketSocketRefreshHistory:
             user = User()
             user.getUserById(self.userId)
             self.userName = user.firstName + " " + user.lastName + " (" + user.username + ")"
-            
 
     def commit(self):
+        self.getNames()
+
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
                  ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
                  OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 

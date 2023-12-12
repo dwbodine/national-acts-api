@@ -178,5 +178,27 @@ def updateAllExchangeRates():
    rates = service.updateAllExchangeRates()
    return convertToJson(rates)
 
+@app.route('/internal/getUpdateHistory')
+def getUpdateHistory():
+   service = EventService()
+   sellerId: int = None
+   start: int = None
+   end: int = None
+   userId: int = None
+   limit: int = None
+   if request.args.get('sellerId') != None:
+      sellerId = int(request.args.get('sellerId'))
+   if request.args.get('start') != None:
+      start = int(request.args.get('start'))
+   if request.args.get('end') != None:
+      end = int(request.args.get('end'))
+   if request.args.get('userId') != None:
+      userId = int(request.args.get('userId'))
+   if request.args.get('limit') != None:
+      limit = int(request.args.get('limit'))
+
+   logs = service.getTicketSocketRefreshHistory(sellerId, start, end, userId, limit)
+   return convertToJson(logs)
+
 if __name__ == "__main__":
     app.run()

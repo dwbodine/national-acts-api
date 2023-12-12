@@ -357,9 +357,9 @@ class EventService:
         errorMessage: str = None
         
         # initialize counters
-        startTimer: int = int(time.time())
-        endTimer: int = 0
-        duration: int = 0
+        startTimer: float = time.time()
+        endTimer: float = 0
+        duration: float = 0
 
         serviceEventsSkipped: list[str] = []
         eventsFailed: list[int] = []
@@ -626,12 +626,12 @@ class EventService:
                             inactiveOrders = db.update(sql, eventOrderData)
                             ordersDeactivated += inactiveOrders
 
-            endTimer = int(time.time())
+            endTimer = time.time()
             duration = endTimer - startTimer              
                                     
             results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, 
                                                 eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
-                                                ticketsUpdated, ticketsInserted, ticketsDeactivated, startTimer, endTimer, duration, userId, sellerId, start, end, 
+                                                ticketsUpdated, ticketsInserted, ticketsDeactivated, int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
             updateSuccess = results.commit()
 
@@ -652,3 +652,83 @@ class EventService:
             
         return results
         
+    def getTicketSocketRefreshHistory(self, sellerId: int = None, start: int = None, end: int = None, userId: int = 0, limit: int = None):
+        logs: list[TicketSocketRefreshHistory] = []
+
+        if limit == None or limit == 0:
+            limit = 20
+
+        sql = """SELECT TicketSocketRefreshHistory.*, CONCAT(Users.FirstName, ' ', Users.LastName) AS UserName, Users.UserName AS Email, Sellers.Name AS SellerName
+                  FROM TicketSocketRefreshHistory 
+                  LEFT JOIN Users ON Users.UserId = TicketSocketRefreshHistory.UserId
+                  LEFT JOIN Sellers ON Sellers.SellerId = TicketSocketRefreshHistory.SellerId
+                  WHERE """
+        data = {
+            'limit': limit
+        }
+
+        whereClause: list[str] = []
+        if sellerId != None:
+            whereClause.append("SellerId = %(sellerId)s")
+            data["sellerId"] = sellerId
+        if userId != None:
+            whereClause.append("UserId = %(userId)s")
+            data["userId"] = userId
+        if start != None and end != None:
+            whereClause.append("StartTimer BETWEEEN %(startDate)s AND %(endDate)s")
+            data["startDate"] = start
+            data["endDate"] = end
+        elif end != None:
+            whereClause.append("StartTimer BETWEEEN %(startDate)s AND %(endDate)s")
+            data["startDate"] = int(datetime.now().timestamp() - (24 * 60 * 60))
+            data["endDate"] = end
+        elif start != None:
+            whereClause.append("StartTimer >= %(startDate)s")
+            data["startDate"] = start
+        else:
+            whereClause.append("StartTimer >= %(startDate)s")
+            data["startDate"] = int(datetime.now().timestamp() - (24 * 60 * 60))
+
+        if len(whereClause) > 0:
+            sql += " AND ".join(whereClause)
+
+        sql += " ORDER BY StartTimer DESC LIMIT 0, %(limit)s"
+
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            userId = int(row["UserId"])
+            if userId == 0:
+                userName = "System"
+            else:
+                userName = str(row["UserName"]) + " (" + str(row["Email"]) + ")"
+            sellerName = str(row["SellerName"]) if row["SellerName"] != None else None
+            start = int(row["Start"]) if row["Start"] != None else None
+            end = int(row["End"]) if row["End"] != None else None
+            startTimer = int(row["StartTimer"])
+            endTimer = int(row["EndTimer"])
+            duration = float(row["Duration"])
+            succeeded = True if int(row["Success"]) == 1 else False
+            errorMessage = str(row["ErrorMessage"])
+            serviceEventsSkipped = str(row["ServiceEventsSkipped"])
+            eventsFailed = str(row["EventsFailed"])
+            ordersFailed = str(row["OrdersFailed"])
+            ticketsFailed = str(row["TicketsFailed"])
+            totalEventsFromService = int(row["TotalEventsFromService"])
+            eventsUpdated = int(row["EventsUpdated"])
+            eventsInserted = int(row["EventsInserted"])
+            ordersInserted = int(row["OrdersInserted"])
+            ordersUpdated = int(row["OrdersUpdated"])
+            ordersDeactivated = int(row["OrdersDeactivated"])
+            ordersDeleted = int(row["OrdersDeleted"])
+            ticketsUpdated = int(row["TicketsUpdated"])
+            ticketsInserted = int(row["TicketsInserted"])
+            ticketsDeactivated = int(row["TicketsDeactivated"])
+
+            history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, eventsUpdated, 
+                                                 eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
+                                                 ticketsDeactivated, startTimer, endTimer, duration, userId, sellerId, start, end, succeeded, errorMessage)
+            history.sellerName = sellerName
+            history.userName = userName
+            logs.append(history)
+        
+        return logs
