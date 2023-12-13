@@ -67,12 +67,6 @@ def after_request(response):
 def health():
    return 'All is Well\r\n'
 
-@app.route('/account/<int:ticketSocketId>/categories')
-def getCategories(ticketSocketId):
-   service = TicketSocketService(ticketSocketId)
-   categories = service.getCategories()
-   return convertToJson(categories)
-
 @app.route('/events')
 def getEvents():
    service = EventService()
@@ -165,6 +159,17 @@ def refreshEventsFromService(sellerId: int = None):
    else:
       results = None
    return convertToJson(results)
+
+@app.route('/internal/accounts')
+def getAccounts():
+   accounts = getAllAccounts()
+   return convertToJson(accounts)
+
+@app.route('/internal/<int:ticketSocketId>/categories')
+def getCategories(ticketSocketId):
+   service = TicketSocketService(ticketSocketId)
+   categories = service.getCategories()
+   return convertToJson(categories)
 
 @app.route('/internal/updateAllEventsFromService')
 def updateAllEventsFromService():

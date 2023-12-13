@@ -171,7 +171,6 @@ class VipEvent(TicketSocketEvent):
 
 
 class Seller:
-    thumbnail: str = ''
     hideInList: bool = False
     isActive: bool = True
 
@@ -190,7 +189,6 @@ class Seller:
 
         row = db.queryOne(sql, data)
         if row != {}:
-            self.thumbnail = str(row['SellerThumbnail'])
             self.name = str(row['Name'])
             self.hideInList = int(row['HideInList']) == 1
             self.isActive = int(row['Inactive']) != 1

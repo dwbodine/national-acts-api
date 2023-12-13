@@ -452,11 +452,12 @@ class TicketSocketService:
         
         return orderIds
     
-def getAllTokens():
-    tokens = {}
-    sql = "select TicketSocketId from TicketSocket"
-    rows = db.queryAll(sql) 
+def getAllAccounts():
+    accounts: list[TicketSocketService] = []
+    sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
+    rows = db.queryAll(sql)
     for row in rows:
-        service = TicketSocketService(int(row['TicketSocketId']))
-        tokens[service.name] = service.token
-    return tokens
+        ticketSocketId = int(row["TicketSocketId"])
+        account = TicketSocketService(ticketSocketId)
+        accounts.append(account)
+    return accounts
