@@ -480,9 +480,6 @@ class EventService:
                             if len(order.attendeeNames) > 0:
                                 attendeeNames = " / ".join(order.attendeeNames)
 
-                            isOrderActive: int = 0 if order.cancelled else 1   
-                            isOrderDeleted: int = 1 if order.deleted else 0
-
                             orderData = {
                                 'numTickets': order.numTickets,
                                 'purchaseDate': order.purchaseDate.strip(),
@@ -495,9 +492,7 @@ class EventService:
                                 'purchaserLastName': order.purchaserLastName.strip() if order.purchaserLastName != None else None,
                                 'purchaserFirstName': order.purchaserFirstName.strip() if order.purchaserFirstName != None else None,
                                 'email': order.email.strip() if order.email != None else None,
-                                'revenue': order.revenue,
-                                'isActive': isOrderActive,
-                                'isDeleted': isOrderDeleted
+                                'revenue': order.revenue
                             }
 
                             # determine if order already exists
