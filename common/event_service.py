@@ -255,14 +255,14 @@ class EventService:
             order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
             shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
             shirts = []
-            if len(shirtStr) > 0:
+            if shirtStr != None:
                 shirtArray = shirtStr.split("/")
                 for shirt in shirtArray:
                     shirts.append(shirt.strip())
             order.shirts = shirts
             attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
             attendees = []
-            if len(attendeeStr) > 0:
+            if attendeeStr != None:
                 attendeeArray = attendeeStr.split("/")
                 for attendee in attendeeArray:
                     attendees.append(attendee.strip())
