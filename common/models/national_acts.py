@@ -1,6 +1,11 @@
 from datetime import datetime
+import hashlib
+import random
 from common.models.ticket_socket import *
+from common.models.user import *
+
 from .. import db
+from .. import utility
 
 class SellerEventCategory:
     sellerId: int = 0
@@ -118,6 +123,9 @@ class VipEvent(TicketSocketEvent):
     isVip: bool = True
     isDeleted: bool = False
     isExternal: bool = False
+    hasShirtData: bool = False
+    hasPhoneData: bool = False
+    hasNonUSAOrders: bool = False
 
     def getTotals(self):
         totalRevenue: float = 0
@@ -125,6 +133,15 @@ class VipEvent(TicketSocketEvent):
         totalShirts: int = 0
         shirtd: dict() = {}
         for order in self.orders:
+            if self.hasNonUSAOrders == False and order.currencyAbbrev != "USD":
+                self.hasNonUSAOrders = True
+
+            if self.hasShirtData == False and len(order.shirts) > 0:
+                self.hasShirtData = True
+
+            if self.hasPhoneData == False and order.phone != None and len(order.phone) > 0:
+                self.hasPhoneData = True
+                
             totalRevenue += order.revenueUsd
             totalTickets += order.numTickets
             if len(order.shirts) > 0:
@@ -227,42 +244,7 @@ class Seller:
             for sec in self.sellerEventCategories:
                 ids.append(sec.sellerEventCategoryId)
         return ids
-
-class User:
-    userId: int = 0
-    username: str = None
-    password: str = None
-    firstName: str = None
-    lastName: str = None
-    notes: str = None
-    isActive: bool = False
-    isAdmin: bool = False
-    showInactiveEvents: bool = False
-
-    def authenticate(self, username: str, password: str):
-        pass
-
-    def getUserById(self, userId: int):
-        sql = "SELECT * FROM Users WHERE UserId=%(userId)s"
-        data = {
-            'userId': userId
-        }
-        row = db.queryOne(sql, data)
-        if row != {}:
-            self.userId = userId
-            self.username = str(row["Username"])
-            self.firstName = str(row["FirstName"])
-            self.lastName = str(row["LastName"])
-            self.isActive = True if int(row["IsActive"]) == 1 else False
-            self.isAdmin = True if int(row["IsAdmin"]) == 1 else False
-            self.notes = str(row["Notes"])
-            if self.isAdmin == True:
-                self.showInactiveEvents = True
-            else:
-                self.showInactiveEvents = True if int(row["ShowInactiveEvents"]) == 1 else False
-
-    
-
+  
 class TicketSocketRefreshHistory:
     sellerName: str = None
     userName: str = None

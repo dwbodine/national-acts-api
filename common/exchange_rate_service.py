@@ -82,8 +82,8 @@ class ExchangeRateService:
                     'midnightDate': midnightDate,
                     'currentRate': currentRate
                 }    
-                success = db.execute(sql2, data2)
-                if success:
+                id = db.insert(sql2, data2)
+                if id > 0:
                     existingRate = currentRate
             elif currentRate != existingRate:
                 sql2 = """UPDATE ExchangeRateHistory SET USDRate=".$currentRate.", LastUpdated=CURRENT_TIMESTAMP 
@@ -94,7 +94,7 @@ class ExchangeRateService:
                     'midnightDate': midnightDate,
                     'currentRate': currentRate
                 }    
-                success = db.execute(sql2, data2)			
+                success = db.update(sql2, data2)			
                 if success:
                     existingRate = currentRate
 

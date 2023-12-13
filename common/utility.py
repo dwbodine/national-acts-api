@@ -40,6 +40,10 @@ def add_months(current_date, months_to_add):
                         current_date.day)
     return new_date
 
+def validateEmailAddress(email: str):
+    regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+    return re.fullmatch(regex, email)
+
 def queueEmail(subject: str, html: str, toAddress: str, toName: str, ccEmails: str = None):
     sql = "INSERT INTO MailServiceQueue (ToAddress, ToName, Subject, Message, CcEmails) VALUES (%(toAddress)s, %(toName)s, %(subject)s, %(html)s, %(ccEmails)s)"
 
