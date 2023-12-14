@@ -1,7 +1,5 @@
 from datetime import datetime
-import traceback 
-import sys 
-
+import traceback
 from . import db
 from common.ticket_socket_service import *
 from common.models.national_acts import *
@@ -53,7 +51,7 @@ class MigrationService:
             db.delete(sql)
 
         except Exception as error:
-            errMsg = error
+            errMsg = str(error)
             success = False
 
         return "Success" if success else errMsg
@@ -94,7 +92,7 @@ class MigrationService:
             result = db.update(sql)
             success = (result > 0)
         except Exception as error:
-            errMsg = error
+            errMsg = str(error)
             success = False
 
         return "Success" if success else errMsg 
@@ -117,7 +115,7 @@ class MigrationService:
             result = db.update(sql)
             success = (result > 0)
         except Exception as error:
-            errMsg = error
+            errMsg = str(error)
             success = False
 
         return "Success" if success else errMsg 
@@ -244,8 +242,7 @@ class MigrationService:
 
             return migrationData
         except Exception as error:
-            traceback.print_exception(*sys.exc_info()) 
-            return error
+            return str(error) + "\n" + traceback.print_exc()
     
     def __migrateOrdersForEvent(self, ticketSocketEventId: int, eventId: int):
         migratedOrders: list[MigrationOrder] = []

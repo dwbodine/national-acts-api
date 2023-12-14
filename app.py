@@ -12,6 +12,7 @@ from common.event_service import *
 from common.exchange_rate_service import *
 from common.update_service import *
 from common.seller_service import *
+from common.user_service import *
 from common.environment import *
 
 # loads environment variables in debug mode
@@ -42,31 +43,34 @@ def after_request(response):
 def health():
    return 'All is Well\r\n'
 
-@app.route('/token', methods=["POST"])
+@app.route('/user/login', methods=["POST"])
 def create_token():
-    email = request.json.get("email", None)
+    username = request.json.get("username", None)
     password = request.json.get("password", None)
     
-    if email == None or password == None:
+    if username == None or password == None:
         return {"msg", "Bad request"}, 400
     
-    user = User()
-    user.authenticate(email, password)
-    if user.isAuthenticated != True:
-        return {"msg": "Wrong email or password"}, 401
-
-    access_token = create_access_token(identity=email)
-    response = {"access_token":access_token}
+    service = UserService()
+    loginResponse = service.login(username, password)
+    
+    if loginResponse.errorMessage != None:
+       return {"msg": loginResponse.errorMessage}, 401
+    elif loginResponse.user == None or loginResponse.user.isAuthenticated != True:
+       return {"msg": "Invalid username or password"}, 401    
+    
+    access_token = create_access_token(identity=username)
+    response = {"access_token": access_token}
     return convertToJson(response)
 
 @app.route("/logout", methods=["POST"])
-@jwt_required()
 def logout():
     response = jsonify({"msg": "logout successful"})
     unset_jwt_cookies(response)
     return response
 
 @app.route('/profile')
+@jwt_required()
 def my_profile():
     response_body = {
         "name": "Nagato",
@@ -75,37 +79,46 @@ def my_profile():
 
     return response_body
 
-@app.route("/sendPasswordReset", methods=["POST"])
+@app.route("/user/sendPasswordReset", methods=["POST"])
 def sendPasswordReset():
-   email = request.json.get("email", None)
-   if email == None:
+   username = request.json.get("username", None)
+   if username == None:
       return {"msg", "Bad request"}, 400
-   user = User()
-   success = user.sendPasswordResetEmail(email)
+   service = UserService()
+   success = service.sendPasswordResetEmail(username)
    return convertToJson(success)
    
-@app.route("/validateResetCode", methods=["POST"])
+@app.route("/user/validateResetCode", methods=["POST"])
 def validateResetCode():
-   userId = request.json.get("userId", None)
+   username = request.json.get("username", None)
    code = request.json.get("code", None)
-   if userId == None or code == None:
+   if username == None or code == None:
       return {"msg", "Bad request"}, 400
-   user = User()
-   success = user.validatePasswordResetCode(int(userId), int(code))
+   service = UserService()
+   success = service.validatePasswordResetCode(str(username), int(code))
    return convertToJson(success)
 
-@app.route("/setPassword", methods=["POST"])
+@app.route("/user/resetPassword", methods=["POST"])
 def resetPassword():
-   userId = request.json.get("userId", None)
+   username = request.json.get("username", None)
    password = request.json.get("password", None)
    confirmPassword = request.json.get("confirmPassword", None)
-   user = User()
-   if userId == None or password == None or confirmPassword == None:
+   code = request.json.get("code", None)
+   service = UserService()
+   if username == None or password == None or confirmPassword == None or code == None:
       return {"msg", "Bad request"}, 400
-   error = user.validatePassword(password, confirmPassword)
-   if error != None:
-      return {"msg", error}, 400
-   return None   
+   result = service.resetPassword(username, code, password, confirmPassword)
+   return convertToJson(result)
+   
+   
+@app.route("/user/<int:userId>")
+def getUser(userId: int = None):
+   if userId <= 0:
+      return None
+   service = UserService()
+   user = service.getUserById(userId)
+   return convertToJson(user)
+      
 
 @app.route('/events')
 def getEvents():

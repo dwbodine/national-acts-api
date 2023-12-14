@@ -1,14 +1,14 @@
-import os
-import json
 import time
 from datetime import datetime
 import operator
+import traceback
 
 from . import utility
 from . import db
 from common.ticket_socket_service import *
 from common.models.national_acts import *
 from common.models.ticket_socket import *
+from common.user_service import *
 
 class EventService:
     def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, 
@@ -383,7 +383,6 @@ class EventService:
         results: TicketSocketRefreshHistory = None
 
         try:
-
             allEvents = self.retrieveTicketSocketEventsForUpdate(sellerId, start, end)
 
             # get total number of events grabbed from service
@@ -516,7 +515,7 @@ class EventService:
                                 sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s, 
                                         Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
                                         PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, 
-                                        IsActive=%(isActive)s, IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                        LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                 orderSuccess = db.update(sql, orderData)
                             else:
                                 orderAddNew = True
@@ -524,9 +523,9 @@ class EventService:
                                 orderData['orderId'] = int(order.id)
                                 orderData['ticketSocketEventId'] = ticketSocketEventId
                                 sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, Phone, Shirts, 
-                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue, IsActive, IsDeleted) 
+                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue) 
                                                 VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
-                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s, %(isActive)s, %(isDeleted)s)"""
+                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s)"""
                                 ticketSocketOrderId = db.insert(sql, orderData)
                                 orderSuccess = (ticketSocketOrderId > 0)
 
@@ -633,11 +632,18 @@ class EventService:
                                                 eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
                                                 ticketsUpdated, ticketsInserted, ticketsDeactivated, int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
+            if userId != None:
+                userService = UserService()
+                user = userService.getUserById(userId)
+                results.userName = user.userFullname()
+            
             updateSuccess = results.commit()
 
         except Exception as error:
             updateSuccess = False
-            errorMessage = str(error)
+            errorMessage: str = str(error) + "\n" + traceback.format_exc()
+            print(errorMessage)
+            
 
         # alert dB if it failed
         if updateSuccess != True or (results != None and results.succeeded != True):

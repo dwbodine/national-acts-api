@@ -1,11 +1,7 @@
-from datetime import datetime
-import hashlib
-import random
 from common.models.ticket_socket import *
 from common.models.user import *
 
 from .. import db
-from .. import utility
 
 class SellerEventCategory:
     sellerId: int = 0
@@ -278,17 +274,13 @@ class TicketSocketRefreshHistory:
         self.succeeded = succeeded
         self.errorMessage = errorMessage
 
-    def getNames(self):
+    def __getSellerName(self):
         if self.sellerId != None:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
-        if self.userId > 0:
-            user = User()
-            user.getUserById(self.userId)
-            self.userName = user.firstName + " " + user.lastName + " (" + user.username + ")"
 
     def commit(self):
-        self.getNames()
+        self.__getSellerName()
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
                  ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  

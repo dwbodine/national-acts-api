@@ -1,5 +1,3 @@
-import os
-
 from . import db
 from . import exchange_rate_service
 from . import event_service

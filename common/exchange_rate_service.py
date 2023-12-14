@@ -5,14 +5,7 @@ from datetime import datetime
 import time
 
 from . import db
-
-class ExchangeRate:
-    usdRate: float = 1.0
-
-    def __init__(self, exchangeRateId: int, exchangeRateSlug: str, multiplier: float):
-        self.exchangeRateId = exchangeRateId
-        self.exchangeRateSlug = exchangeRateSlug
-        self.multiplier = multiplier
+from common.models.exchange_rate import *
 
 class ExchangeRateService:
     def __init__(self, exchangeRate: ExchangeRate):

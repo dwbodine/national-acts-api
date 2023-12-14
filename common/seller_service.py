@@ -1,10 +1,3 @@
-import os
-import json
-import time
-from datetime import datetime
-import operator
-
-from . import utility
 from . import db
 from common.ticket_socket_service import *
 from common.models.national_acts import *
