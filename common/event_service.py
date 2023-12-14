@@ -81,11 +81,11 @@ class EventService:
                 whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
             
             if start != None and end != None:
-                whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+                whereClause.append("TicketSocketEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
                 data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
             elif end != None:
-                whereClause.append("TicketSocketEvents.EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+                whereClause.append("TicketSocketEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s")
                 data["startDate"] = datetime.now().strftime('%Y-%m-%d')
                 data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
             elif start != None:
@@ -96,7 +96,7 @@ class EventService:
                 data["startDate"] = datetime.now().strftime('%Y-%m-%d')
 
             if excludeStart != None and excludeEnd != None:
-                whereClause.append("TicketSocketEvents.EventDate NOT BETWEEEN %(excludeStart)s AND %(excludeEnd)s")
+                whereClause.append("TicketSocketEvents.EventDate NOT BETWEEN %(excludeStart)s AND %(excludeEnd)s")
                 data["excludeStart"] = datetime.fromtimestamp(excludeStart).strftime('%Y-%m-%d')
                 data["excludeEnd"] = datetime.fromtimestamp(excludeEnd).strftime('%Y-%m-%d')
 
@@ -164,11 +164,11 @@ class EventService:
             externalWhereClause.append("SellerId = %(sellerId)s")
             externalData["sellerId"] = sellerId
         if start != None and end != None:
-            externalWhereClause.append("EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+            externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
             externalData["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
             externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
         elif end != None:
-            externalWhereClause.append("EventDate BETWEEEN %(startDate)s AND %(endDate)s")
+            externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
             externalData["startDate"] = datetime.now().strftime('%Y-%m-%d')
             externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
         elif start != None:
@@ -675,11 +675,11 @@ class EventService:
             whereClause.append("UserId = %(userId)s")
             data["userId"] = userId
         if start != None and end != None:
-            whereClause.append("StartTimer BETWEEEN %(startDate)s AND %(endDate)s")
+            whereClause.append("StartTimer BETWEEN %(startDate)s AND %(endDate)s")
             data["startDate"] = start
             data["endDate"] = end
         elif end != None:
-            whereClause.append("StartTimer BETWEEEN %(startDate)s AND %(endDate)s")
+            whereClause.append("StartTimer BETWEEN %(startDate)s AND %(endDate)s")
             data["startDate"] = int(datetime.now().timestamp() - (24 * 60 * 60))
             data["endDate"] = end
         elif start != None:
