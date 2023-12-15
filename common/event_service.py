@@ -107,9 +107,6 @@ class EventService:
 
         sql = sql.replace('\n', '') 
         
-        print(sql)
-        print(data)
-
         eventRows = db.queryAll(sql, data)
         for row in eventRows:
             eventId = int(row["EventId"])
