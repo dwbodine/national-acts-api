@@ -632,10 +632,13 @@ class EventService:
                                                 eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
                                                 ticketsUpdated, ticketsInserted, ticketsDeactivated, int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
-            if userId != None:
+            if userId != None and userId > 0:
                 userService = UserService()
                 user = userService.getUserById(userId)
-                results.userName = user.userFullname()
+                if user != None:
+                    results.userName = user.userFullname()
+            else:
+                results.userName = "System"
             
             updateSuccess = results.commit()
 
