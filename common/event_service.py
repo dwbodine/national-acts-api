@@ -106,6 +106,9 @@ class EventService:
         sql += " ORDER BY TicketSocketEvents.EventDate ASC, TicketSocketEvents.Title ASC"       
 
         sql = sql.replace('\n', '') 
+        
+        print(sql)
+        print(data)
 
         eventRows = db.queryAll(sql, data)
         for row in eventRows:

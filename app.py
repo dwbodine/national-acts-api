@@ -152,6 +152,7 @@ def getEvents():
    excludeEnd: int = None
    searchTerm: str = None
    showInactive: bool = False
+   showDeleted: bool = False
    tsEventId: int = None
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
@@ -165,11 +166,13 @@ def getEvents():
       excludeEnd = int(request.args.get('excludeEnd'))
    if request.args.get('inactive') != None:
       showInactive = True if int(request.args.get('inactive')) == 1 else False
+   if request.args.get('deleted') != None:
+      showDeleted = True if int(request.args.get('deleted')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))   
    if request.args.get('tsEventId') != None:
       tsEventId = int(request.args.get('tsEventId'))
-   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, excludeStart, excludeEnd)
+   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
 
 @app.route('/eventsAndOrders')
@@ -178,8 +181,11 @@ def getEventsAndOrders():
    sellerId: int = None
    start: int = None
    end: int = None
+   excludeStart: int = None
+   excludeEnd: int = None
    searchTerm: str = None
    showInactive: bool = False
+   showDeleted: bool = False
    tsEventId: int = None
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
@@ -187,13 +193,19 @@ def getEventsAndOrders():
       start = int(request.args.get('start'))
    if request.args.get('end') != None:
       end = int(request.args.get('end'))
+   if request.args.get('excludeStart') != None:
+      excludeStart = int(request.args.get('excludeStart'))
+   if request.args.get('excludeEnd') != None:
+      excludeEnd = int(request.args.get('excludeEnd'))
    if request.args.get('inactive') != None:
       showInactive = True if int(request.args.get('inactive')) == 1 else False
+   if request.args.get('deleted') != None:
+      showDeleted = True if int(request.args.get('deleted')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))
    if request.args.get('tsEventId') != None:
       tsEventId = int(request.args.get('tsEventId'))
-   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId)
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
 
 @app.route('/sellers/<int:userId>')
