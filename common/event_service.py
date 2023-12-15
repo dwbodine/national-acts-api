@@ -223,7 +223,8 @@ class EventService:
                     JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
                     JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                     LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s"""
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s 
+                    ORDER BY TicketSocketOrders.PurchaserLastName ASC, TicketSocketOrders.PurchaserFirstName ASC"""
         data = {
             'ticketSocketEventId': ticketSocketEventId
         }
