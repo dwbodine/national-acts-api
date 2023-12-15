@@ -223,14 +223,16 @@ class EventService:
                     JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
                     JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                     LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s 
-                    ORDER BY TicketSocketOrders.PurchaserLastName ASC, TicketSocketOrders.PurchaserFirstName ASC"""
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s"""
         data = {
             'ticketSocketEventId': ticketSocketEventId
         }
 
         if showDeleted != True:
             sql += """ AND TicketSocketOrders.IsDeleted = 0"""
+            
+            
+        sql += " ORDER BY TicketSocketOrders.PurchaserLastName ASC, TicketSocketOrders.PurchaserFirstName ASC"
 
         rows = db.queryAll(sql, data)
         for row in rows:
