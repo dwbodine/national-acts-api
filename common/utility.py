@@ -1,14 +1,52 @@
 import json
 import re
+import os
 from datetime import datetime
-
 from . import db
+import traceback
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, From, To
 
 class GenericJsonEncoder(json.JSONEncoder):
     def default(self, obj):
         objDict=obj.__dict__
         typeDict={"__type__":type(obj).__name__}
         return {**objDict,**typeDict}
+    
+def sendEmail(toEmailAddress: str, subject: str, htmlContent: str, toName: str = None, ccEmails: list[str] = None):
+    fromEmail = From('info@national-acts.com', 'National Acts VIP')
+    
+    if toName != None and toName != "":
+        toEmail = To(toEmailAddress, toName)    
+    else:
+        toEmail = toEmailAddress    
+    
+    message = Mail(
+        from_email=fromEmail,
+        to_emails=toEmail,
+        subject=subject,
+        html_content=htmlContent)
+    
+    if ccEmails != None:
+        for email in ccEmails:
+            message.add_cc(email)
+   
+    result: str = None
+    try:
+        sendGridKey = os.environ.get('SENDGRID_API_KEY')
+        sg = SendGridAPIClient(sendGridKey)
+        response = sg.send(message)
+        result = {
+            "status": str(response.status_code),
+            "error": None
+        }
+    except Exception as e:
+        result = {
+            "status": "500",
+            "error": str(e) + "\n" + traceback.format_exc() 
+        }
+        
+    return result
     
 def convertToJson(obj: any):
     return json.dumps(obj, indent=4, ensure_ascii=False, cls=GenericJsonEncoder)
