@@ -1,8 +1,8 @@
 import os
 import sys
-from datetime import timedelta
+from datetime import timedelta, timezone
 from flask import Flask, request, jsonify
-from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, unset_jwt_cookies, jwt_required, JWTManager
+from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, verify_jwt_in_request, unset_jwt_cookies, jwt_required, JWTManager
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -26,18 +26,34 @@ application = app
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin',
+   response.headers.add('Access-Control-Allow-Origin',
                          '*')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Allow-Headers',
-                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires') 
-    response.headers.add('Access-Control-Allow-Methods',
-                         'GET,PUT,POST,DELETE')
+   response.headers.add('Access-Control-Allow-Credentials', 'true')
+   response.headers.add('Access-Control-Allow-Headers',
+                         'Content-Type,Authorization,Set-Cookie,Cookie,Cache-Control,Pragma,Expires,x-api-key') 
+   response.headers.add('Access-Control-Allow-Methods',
+                         'GET,PUT,POST,DELETE,OPTIONS')
 
-    response.cache_control.no_cache = True
-    response.cache_control.no_store = True
-    response.cache_control.must_revalidate = True
-    return response
+   response.cache_control.no_cache = True
+   response.cache_control.no_store = True
+   response.cache_control.must_revalidate = True
+    
+   try:
+      # put this line here to prevent exceptions when there is no auth header
+      if request.headers.get("Authorization") != None:
+         exp_timestamp = get_jwt()["exp"]
+         now = datetime.now(timezone.utc)
+         target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+         if target_timestamp > exp_timestamp:
+            access_token = create_access_token(identity=get_jwt_identity())
+            data = response.get_json()
+            if type(data) is dict:
+               data["access_token"] = access_token 
+               response.data = json.dumps(data)
+   except (RuntimeError, KeyError):
+      # Case where there is not a valid JWT. Just return the original respone
+      print('JWT not found')
+   return response
 
 @app.route('/')
 def health():
@@ -45,7 +61,7 @@ def health():
 
 @app.route('/internal/mail', methods=["POST"])
 def sendMail():
-   # secured by separate api key, used only internally
+   # secured by mail api key
    senderKey = str(request.headers.get('x-api-key'))
    apiKey = str(os.environ.get('MAIL_API_KEY'))
    
@@ -67,23 +83,30 @@ def sendMail():
 
 @app.route('/user/login', methods=["POST"])
 def create_token():
-    username = request.json.get("username", None)
-    password = request.json.get("password", None)
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   username = request.json.get("username", None)
+   password = request.json.get("password", None)
     
-    if username == None or password == None:
-        return {"msg", "Bad request"}, 400
+   if username == None or password == None:
+      return {"msg", "Bad request"}, 400
     
-    service = UserService()
-    loginResponse = service.login(username, password)
+   service = UserService()
+   loginResponse = service.login(username, password)
     
-    if loginResponse.errorMessage != None:
-       return {"msg": loginResponse.errorMessage}, 401
-    elif loginResponse.user == None or loginResponse.user.isAuthenticated != True:
-       return {"msg": "Invalid username or password"}, 401    
+   if loginResponse.errorMessage != None:
+      return {"msg": loginResponse.errorMessage}, 401
+   elif loginResponse.user == None or loginResponse.user.isAuthenticated != True:
+      return {"msg": "Invalid username or password"}, 401    
     
-    access_token = create_access_token(identity=username)
-    response = {"access_token": access_token}
-    return convertToJson(response)
+   access_token = create_access_token(identity=username)
+   response = {"access_token": access_token}
+   return convertToJson(response)
 
 @app.route("/logout", methods=["POST"])
 def logout():
@@ -103,6 +126,13 @@ def my_profile():
 
 @app.route("/user/sendPasswordReset", methods=["POST"])
 def sendPasswordReset():
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    username = request.json.get("username", None)
    if username == None:
       return {"msg", "Bad request"}, 400
@@ -112,6 +142,13 @@ def sendPasswordReset():
    
 @app.route("/user/validateResetCode", methods=["POST"])
 def validateResetCode():
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    username = request.json.get("username", None)
    code = request.json.get("code", None)
    if username == None or code == None:
@@ -122,6 +159,13 @@ def validateResetCode():
 
 @app.route("/user/resetPassword", methods=["POST"])
 def resetPassword():
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    username = request.json.get("username", None)
    password = request.json.get("password", None)
    confirmPassword = request.json.get("confirmPassword", None)
@@ -131,19 +175,70 @@ def resetPassword():
       return {"msg", "Bad request"}, 400
    result = service.resetPassword(username, code, password, confirmPassword)
    return convertToJson(result)
-   
-   
-@app.route("/user/<int:userId>")
-def getUser(userId: int = None):
-   if userId <= 0:
-      return None
-   service = UserService()
-   user = service.getUserById(userId)
-   return convertToJson(user)
-      
 
-@app.route('/events')
+@app.route('/user/sellers/<int:userId>')
+def getUserSellers(userId: int):
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   service = SellerService()
+   results = service.getUserSellers(userId)
+   return convertToJson(results)
+
+@app.route('/user/eventsAndOrders')
+def getEventsAndOrders():
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   service = EventService()
+   sellerId: int = None
+   start: int = None
+   end: int = None
+   excludeStart: int = None
+   excludeEnd: int = None
+   searchTerm: str = None
+   showInactive: bool = False
+   showDeleted: bool = False
+   tsEventId: int = None
+   if request.args.get('sellerId') != None:
+      sellerId = int(request.args.get('sellerId'))
+   if request.args.get('start') != None:
+      start = int(request.args.get('start'))
+   if request.args.get('end') != None:
+      end = int(request.args.get('end'))
+   if request.args.get('excludeStart') != None:
+      excludeStart = int(request.args.get('excludeStart'))
+   if request.args.get('excludeEnd') != None:
+      excludeEnd = int(request.args.get('excludeEnd'))
+   if request.args.get('inactive') != None:
+      showInactive = True if int(request.args.get('inactive')) == 1 else False
+   if request.args.get('deleted') != None:
+      showDeleted = True if int(request.args.get('deleted')) == 1 else False
+   if request.args.get('search') != None:
+      searchTerm = str(request.args.get('search'))
+   if request.args.get('tsEventId') != None:
+      tsEventId = int(request.args.get('tsEventId'))
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
+   return convertToJson(results)
+   
+   
+@app.route('/public/events')
 def getEvents():
+   # secured by public api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('PUBLIC_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    service = EventService()
    sellerId: int = None
    start: int = None
@@ -175,44 +270,8 @@ def getEvents():
    results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
 
-@app.route('/eventsAndOrders')
-def getEventsAndOrders():
-   service = EventService()
-   sellerId: int = None
-   start: int = None
-   end: int = None
-   excludeStart: int = None
-   excludeEnd: int = None
-   searchTerm: str = None
-   showInactive: bool = False
-   showDeleted: bool = False
-   tsEventId: int = None
-   if request.args.get('sellerId') != None:
-      sellerId = int(request.args.get('sellerId'))
-   if request.args.get('start') != None:
-      start = int(request.args.get('start'))
-   if request.args.get('end') != None:
-      end = int(request.args.get('end'))
-   if request.args.get('excludeStart') != None:
-      excludeStart = int(request.args.get('excludeStart'))
-   if request.args.get('excludeEnd') != None:
-      excludeEnd = int(request.args.get('excludeEnd'))
-   if request.args.get('inactive') != None:
-      showInactive = True if int(request.args.get('inactive')) == 1 else False
-   if request.args.get('deleted') != None:
-      showDeleted = True if int(request.args.get('deleted')) == 1 else False
-   if request.args.get('search') != None:
-      searchTerm = str(request.args.get('search'))
-   if request.args.get('tsEventId') != None:
-      tsEventId = int(request.args.get('tsEventId'))
-   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
-   return convertToJson(results)
 
-@app.route('/sellers/<int:userId>')
-def getUserSellers(userId: int):
-   service = SellerService()
-   results = service.getUserSellers(userId)
-   return convertToJson(results)
+
 
 @app.route('/internal/getEventsFromService/<int:sellerId>')
 def getEventsFromService(sellerId: int = None):
