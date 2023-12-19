@@ -65,6 +65,9 @@ class EventService:
         else:
             if showDeleted != True:
                 whereClause.append("TicketSocketEvents.IsDeleted = 0")
+            else:
+                showInactive = True
+                
             if showInactive != True:
                 whereClause.append("TicketSocketEvents.IsActive = 1")
             
