@@ -126,6 +126,8 @@ class EventService:
             vipEvent.onSale = True if int(row["OnSale"]) == 1 else False
             vipEvent.isActive = True if int(row["IsActive"]) == 1 else False
             vipEvent.isDeleted = True if int(row["IsDeleted"]) == 1 else False
+            if vipEvent.isDeleted == True:
+                vipEvent.isActive = False
             vipEvent.isVip = True if int(row["IsVip"]) == 1 else False
             if row["ExternalEventId"] != None and row["ExternalEventId"] != '':
                 vipEvent.externalEventId = int(row["ExternalEventId"])
@@ -256,6 +258,8 @@ class EventService:
             order.currencySymbol = str(row["Symbol"])
             order.isActive = True if int(row["IsActive"]) == 1 else False
             order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
+            if order.isDeleted == True:
+                order.isActive = False
             shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
             shirts = []
             if shirtStr != None:
@@ -295,7 +299,39 @@ class EventService:
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
             tickets.append(ticket)
         return tickets
-
+    
+    def disableEvent(self, ticketSocketEventId: int, disabled: bool):
+        sql = """UPDATE TicketSocketEvents SET IsActive=%(isActive)s WHERE Id=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId,
+            'isActive': 0 if disabled == True else 1
+        }
+        return db.update(sql, data)
+    
+    def deleteEvent(self, ticketSocketEventId: int, deleted: bool):
+        sql = """UPDATE TicketSocketEvents SET IsDeleted=%(isDeleted)s WHERE Id=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId,
+            'isDeleted': 1 if deleted == True else 0
+        }
+        return db.update(sql, data)
+    
+    def disableOrder(self, ticketSocketOrderId: int, disabled: bool):
+        sql = """UPDATE TicketSocketOrders SET IsActive=%(isActive)s WHERE Id=%(ticketSocketOrderId)s"""
+        data = {
+            'ticketSocketOrderId': ticketSocketOrderId,
+            'isActive': 0 if disabled == True else 1
+        }
+        return db.update(sql, data)
+    
+    def deleteOrder(self, ticketSocketOrderId: int, deleted: bool):
+        sql = """UPDATE TicketSocketOrders SET IsDeleted=%(isDeleted)s WHERE Id=%(ticketSocketOrderId)s"""
+        data = {
+            'ticketSocketOrderId': ticketSocketOrderId,
+            'isDeleted': 1 if deleted == True else 0
+        }
+        return db.update(sql, data)
+    
     def retrieveTicketSocketEventsForUpdate(self, sellerId: int = None, start: int = None, end: int = None):
         # go get seller information from database
         seller: Seller = None

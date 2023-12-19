@@ -108,13 +108,13 @@ def create_token():
    response = {"access_token": access_token}
    return convertToJson(response)
 
-@app.route("/logout", methods=["POST"])
+@app.route("/user/logout", methods=["POST"])
 def logout():
     response = jsonify({"msg": "logout successful"})
     unset_jwt_cookies(response)
     return response
 
-@app.route('/profile')
+@app.route('/user/profile')
 @jwt_required()
 def my_profile():
     response_body = {
@@ -229,6 +229,85 @@ def getEventsAndOrders():
    results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
    
+@app.route("/user/setEventInactive", methods=["POST"])
+def setEventInactive():
+    # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   ticketSocketEventId = request.json.get("eventId", None)
+   isActive = request.json.get("isActive", None)
+   
+   if ticketSocketEventId == None or isActive == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   disabled: bool = True if int(isActive) == 0 else False
+   service = EventService()
+   result = service.disableEvent(int(ticketSocketEventId), disabled)
+   return convertToJson(result)
+
+@app.route("/user/setEventDeleted", methods=["POST"])
+def setEventDeleted():
+    # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   ticketSocketEventId = request.json.get("eventId", None)
+   isDeleted = request.json.get("isDeleted", None)
+   
+   if ticketSocketEventId == None or isDeleted == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   deleted: bool = True if int(isDeleted) == 1 else False
+   service = EventService()
+   result = service.deleteEvent(int(ticketSocketEventId), deleted)
+   return convertToJson(result)
+
+@app.route("/user/setOrderInactive", methods=["POST"])
+def setOrderInactive():
+    # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   ticketSocketOrderId = request.json.get("orderId", None)
+   isActive = request.json.get("isActive", None)
+   
+   if ticketSocketOrderId == None or isActive == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   disabled: bool = True if int(isActive) == 0 else False
+   service = EventService()
+   result = service.disableOrder(int(ticketSocketOrderId), disabled)
+   return convertToJson(result)
+
+@app.route("/user/setOrderDeleted", methods=["POST"])
+def setOrderDeleted():
+    # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   ticketSocketOrderId = request.json.get("orderId", None)
+   isDeleted = request.json.get("isDeleted", None)
+   
+   if ticketSocketOrderId == None or isDeleted == None:
+      return {"msg": "Bad Request"}, 400 
+   
+   deleted: bool = True if int(isDeleted) == 1 else False
+   service = EventService()
+   result = service.deleteOrder(int(ticketSocketOrderId), deleted)
+   return convertToJson(result)
    
 @app.route('/public/events')
 def getEvents():
