@@ -105,8 +105,15 @@ def create_token():
       return {"msg": "Invalid username or password"}, 401    
     
    access_token = create_access_token(identity=username)
-   response = {"access_token": access_token}
-   return convertToJson(response)
+   
+   if access_token == None:
+      return {"msg": "Unable to create access token"}, 500
+   
+   user: User = loginResponse.user
+   user.token = access_token
+   user.isAuthenticated = True
+   
+   return convertToJson(user)
 
 @app.route("/user/logout", methods=["POST"])
 def logout():
@@ -114,15 +121,14 @@ def logout():
     unset_jwt_cookies(response)
     return response
 
-@app.route('/user/profile')
+@app.route('/user/profile/<int:userId>')
 @jwt_required()
-def my_profile():
-    response_body = {
-        "name": "Nagato",
-        "about" :"Hello! I'm a full stack developer that loves python and javascript"
-    }
-
-    return response_body
+def getUserProfile(userId: int):
+   if userId == None or userId <= 0:
+      return {"msg": "Bad Request"}, 400
+   service = UserService()
+   user = service.getUserById(userId, True)
+   return convertToJson(user)
 
 @app.route("/user/sendPasswordReset", methods=["POST"])
 def sendPasswordReset():

@@ -15,6 +15,7 @@ class User:
     isAdmin: bool = False
     showInactiveEvents: bool = False
     createdAt: str = None
+    token: str = None
     sellers: list[UserSeller] = []
     
     def userFullname(self):
