@@ -81,6 +81,7 @@ class VipOrder(TicketSocketOrder):
     ticketSocketOrderId: int = 0
     isActive: bool = True
     isDeleted: bool = False
+    isRefunded: bool = False
     totalShirts: int = 0
     revenueUsd: float = 0
     exchangeRate: float = 1.0
@@ -93,7 +94,39 @@ class VipOrder(TicketSocketOrder):
 
     def getTotals(self):
         self.totalShirts = len(self.shirts)
-        self.revenueUsd = self.revenue * self.exchangeRate
+        self.__checkOrderRefunded()
+        if self.isRefunded == True:
+            self.isActive = False
+            self.revenueUsd = 0
+        else:
+            self.revenueUsd = self.revenue * self.exchangeRate
+    
+    def __checkOrderRefunded(self):
+        if self.purchaserLastName == None or self.purchaserLastName.strip() == "":
+            return False
+        lastNameLower = self.purchaserLastName.lower()
+        strPos: int = -1
+        if lastNameLower.find("**refund**") >= 0:
+            strPos = lastNameLower.find("**refund**")
+        elif lastNameLower.find("*refund*") >= 0:
+            strPos = lastNameLower.find("*refund*")
+        elif lastNameLower.find("refunded") >= 0:
+            strPos = lastNameLower.find("refunded")
+        elif lastNameLower.find("**chargeback**") >= 0:
+            strPos = lastNameLower.find("**chargeback**")
+        elif lastNameLower.find("*chargeback*") >= 0:
+            strPos = lastNameLower.find("*chargeback*")
+        
+        if strPos >= 0:
+            self.isRefunded = True
+            if strPos > 0:
+                lastName = self.purchaserLastName
+                refundStr = lastName[strPos : len(lastName) - strPos]
+                lastName = lastName.replace(refundStr, "")
+                lastName = lastName.replace("-", "").strip()
+                self.purchaserLastName = refundStr + " - " + lastName
+        else:
+            self.isRefunded = False
             
 
 class VipEvent(TicketSocketEvent):
@@ -181,8 +214,7 @@ class VipEvent(TicketSocketEvent):
         
         if self.externalVipLink != None and self.externalVipLink != "":
             self.ticketSocketUrl = self.externalVipLink
-
-
+       
 class Seller:
     hideInList: bool = False
     isActive: bool = True
