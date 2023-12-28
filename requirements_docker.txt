@@ -1,0 +1,6 @@
+gunicorn==21.2.0
+flask==2.3.3
+flask-jwt-extended==4.6.0
+mysql-connector-python==8.2.0
+pylint==3.0.3
+sendgrid==6.11.0

@@ -1,0 +1,17 @@
+version: '3.4'
+
+services:
+  nationalactsapi:
+    image: nationalactsapi
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 5000:5000
+  nationalactsdb:
+    image: nationalactsdb
+    build:
+      context: .
+      dockerfile: ./MySql.Dockerfile
+    ports:
+      - 3306:3306
