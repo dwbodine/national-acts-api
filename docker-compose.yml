@@ -1,17 +1,47 @@
 version: '3.4'
 
 services:
+  nationalactsdb:
+    image: nationalactsdb
+    restart: always
+    build:
+      context: .
+      dockerfile: ./MySql.Dockerfile
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - app-network
+    ports:
+      - 3306:3306
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    depends_on:
+      - nationalactsdb
+    environment:
+      PMA_HOST: nationalactsdb
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD: All41n14@ll
+    ports:
+      - 8080:80
+    networks:
+      - app-network
+
   nationalactsapi:
     image: nationalactsapi
+    depends_on:
+      - phpmyadmin
     build:
       context: .
       dockerfile: ./Dockerfile
     ports:
       - 5000:5000
-  nationalactsdb:
-    image: nationalactsdb
-    build:
-      context: .
-      dockerfile: ./MySql.Dockerfile
-    ports:
-      - 3306:3306
+
+networks:
+  app-network:
+    driver: bridge
+    
+volumes:
+  db_data:
