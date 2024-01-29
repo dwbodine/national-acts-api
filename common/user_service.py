@@ -40,10 +40,10 @@ class UserService:
                 else:
                     errorMessage = "Incorrect username or password"
                     
-        except Exception as error:
+        except Exception as err:
             user = None
-            errorMessage = "Error occurred during login"
-            print(str(error) + "\n" + traceback.print_exc())
+            errorMessage: str = "Error occurred during login"
+            print(f"Unexpected {err=}, {type(err)=}")
                 
         return UserResponse(user, errorMessage)    
     
@@ -88,10 +88,10 @@ class UserService:
                         errorMessage = "Error occurred during user registration, please contact your administrator"
             else:
                 errorMessage = "Error occurred during user registration, please contact your administrator"
-        except Exception as error:
+        except Exception as err:
             user = None
             errorMessage = "Error occurred during user registration, please contact your administrator"
-            print(str(error) + "\n" + traceback.print_exc())
+            print(f"Unexpected {err=}, {type(err)=}")
         
         return UserResponse(user, errorMessage)
 
@@ -117,10 +117,10 @@ class UserService:
                     errorMessage = "Error occurred during password reset"
             else:
                 errorMessage = "User not found"
-        except Exception as error:
+        except Exception as err:
             user = None
             errorMessage = "Error occurred during password reset"
-            print(str(error) + "\n" + traceback.print_exc())
+            print(f"Unexpected {err=}, {type(err)=}")
         
         return UserResponse(user, errorMessage)
 
@@ -151,10 +151,10 @@ class UserService:
             if row == {}:
                 user = None
                 errorMessage = "Invalid code"
-        except Exception as error:
+        except Exception as err:
             user = None
             errorMessage = "Error occurred during password reset"
-            print(str(error) + "\n" + traceback.print_exc())
+            print(f"Unexpected {err=}, {type(err)=}")
 
         return UserResponse(user, errorMessage)
     

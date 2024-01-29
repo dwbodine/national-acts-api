@@ -3,6 +3,7 @@ version: '3.4'
 services:
   nationalactsdb:
     image: nationalactsdb
+    container_name: nationalactsdb
     restart: always
     build:
       context: .
@@ -16,6 +17,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin
+    container_name: phpmyadmin
     restart: always
     depends_on:
       - nationalactsdb
@@ -31,13 +33,16 @@ services:
 
   nationalactsapi:
     image: nationalactsapi
+    container_name: nationalactsapi
     depends_on:
       - phpmyadmin
     build:
       context: .
       dockerfile: ./Dockerfile
+    networks:
+      - app-network
     ports:
-      - 5000:5000
+      - 5000:5000    
 
 networks:
   app-network:
