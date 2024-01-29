@@ -123,8 +123,27 @@ class EventService:
             vipEvent.displayDate = str(row["DisplayDate"]) if row["DisplayDate"] != None else None
             vipEvent.thumbnail = str(row["Thumbnail"]) if row["Thumbnail"] != None else None
             vipEvent.ticketSocketUrl = str(row["URL"])
+            
+            venueName = str(row["Venue"]) if row["Venue"] != None else None
+            if row["ExternalVenue"] != None:
+                venueName = str(row["ExternalVenue"])
+            address = str(row["Address"]) if row["Address"] != None else None
+            if row["ExternalAddress"] != None:
+                address = str(row["ExternalAddress"])
+            city = str(row["City"]) if row["City"] != None else None
+            if row["ExternalCity"] != None:
+                city = str(row["ExternalCity"])
+            state = str(row["State"]) if row["State"] != None else None
+            if row["ExternalState"] != None:
+                state = str(row["ExternalState"])
+            zip = str(row["Zip"]) if row["Zip"] != None else None
+            if row["ExternalZip"] != None:
+                zip = str(row["ExternalZip"])
             vipCountry = str(row["Country"]) if row["Country"] != None else None
-            venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), vipCountry, '')
+            if row["ExternalCountry"] != None:
+                vipCountry = str(row["ExternalCountry"])
+            
+            venue = TicketSocketVenue(venueName, address, '', city, state, zip, vipCountry, '')
             vipEvent.venue = venue
             vipEvent.onSale = True if int(row["OnSale"]) == 1 else False
             vipEvent.isActive = True if int(row["IsActive"]) == 1 else False

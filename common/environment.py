@@ -9,7 +9,8 @@ def loadEnv():
             env = x.split('=')
             key = env[0].strip()
             val = env[1].strip()
-            os.environ[key] = val       
+            if (key in os.environ) == False:
+                os.environ[key] = val       
         f.close()
 
 
