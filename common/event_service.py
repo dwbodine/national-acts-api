@@ -718,7 +718,7 @@ class EventService:
                 html = errorMessage
             to = "dwbodine@gmail.com"
             toName = "dB"
-            sent = utility.queueEmail(subject, html, to, toName)
+            result = utility.sendEmail(to, subject, html, toName)
             
         return results
         

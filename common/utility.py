@@ -13,6 +13,11 @@ class GenericJsonEncoder(json.JSONEncoder):
         typeDict={"__type__":type(obj).__name__}
         return {**objDict,**typeDict}
     
+class SendEmailResult:
+    def __init__(self, success: bool, error: str = None):
+        self.success = success
+        self.error = error
+    
 def sendEmail(toEmailAddress: str, subject: str, htmlContent: str, toName: str = None, ccEmails: list[str] = None):
     fromEmail = From('info@national-acts.com', 'National Acts VIP')
     
@@ -31,20 +36,14 @@ def sendEmail(toEmailAddress: str, subject: str, htmlContent: str, toName: str =
         for email in ccEmails:
             message.add_cc(email)
    
-    result: str = None
+    result: SendEmailResult = None
     try:
         sendGridKey = os.environ.get('SENDGRID_API_KEY')
         sg = SendGridAPIClient(sendGridKey)
         response = sg.send(message)
-        result = {
-            "status": str(response.status_code),
-            "error": None
-        }
+        result = SendEmailResult(True, None)
     except Exception as e:
-        result = {
-            "status": "500",
-            "error": str(e) + "\n" + traceback.format_exc() 
-        }
+        result = SendEmailResult(False, str(e) + "\n" + traceback.format_exc())
         
     return result
     
@@ -81,18 +80,3 @@ def add_months(current_date, months_to_add):
 def validateEmailAddress(email: str):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
     return re.fullmatch(regex, email)
-
-def queueEmail(subject: str, html: str, toAddress: str, toName: str, ccEmails: str = None):
-    sql = "INSERT INTO MailServiceQueue (ToAddress, ToName, Subject, Message, CcEmails) VALUES (%(toAddress)s, %(toName)s, %(subject)s, %(html)s, %(ccEmails)s)"
-
-    data = {
-        'toAddress': toAddress,
-        'toName': toName,
-        'subject': subject,
-        'html': html,
-        'ccEmails': ccEmails
-    }
-
-    result = db.insert(sql, data)
-
-    return (result > 0)

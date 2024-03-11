@@ -59,28 +59,6 @@ def after_request(response):
 def health():
    return 'All is Well\r\n'
 
-@app.route('/internal/mail', methods=["POST"])
-def sendMail():
-   # secured by mail api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('MAIL_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   toEmail = request.json.get("toEmail", None)
-   toName = request.json.get("toName", None)
-   subject = request.json.get("subject", None)
-   htmlContent = request.json.get("htmlContent", None)
-   ccEmails = request.json.get("ccEmails", None)
-   
-   if toEmail == None or toEmail == "" or subject == None or subject == "" or htmlContent == None or htmlContent == "":
-      return {"msg": "Bad Request"}, 200   
-   
-   result = utility.sendEmail(toEmail, subject, htmlContent, toName, ccEmails)
-           
-   return convertToJson(result)
-
 @app.route('/user/login', methods=["POST"])
 def create_token():
    # secured by user api key
@@ -182,6 +160,40 @@ def resetPassword():
    result = service.resetPassword(username, code, password, confirmPassword)
    return convertToJson(result)
 
+@app.route("/user/resetPasswordSecured", methods=["POST"])
+@jwt_required()
+def resetPasswordSecured():
+   username = request.json.get("username", None)
+   password = request.json.get("password", None)
+   confirmPassword = request.json.get("confirmPassword", None)
+   service = UserService()
+   if username == None or password == None or confirmPassword == None:
+      return {"msg", "Bad request"}, 400
+   result = service.resetPasswordSecured(username, password, confirmPassword)
+   return convertToJson(result)
+
+@app.route("/user/register", methods=["POST"])
+def register():
+   # secured by user api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('USER_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   username = request.json.get("username", None)
+   firstName = request.json.get("firstName", None)
+   lastName = request.json.get("lastName", None)
+   sellerId = request.json.get("sellerId", None)
+   password = request.json.get("password", None)
+   confirmPassword = request.json.get("confirmPassword", None)
+   notes = request.json.get("notes", None)
+   service = UserService()
+   if username == None or password == None or confirmPassword == None or firstName == None or lastName == None or sellerId == None:
+      return {"msg", "Bad request"}, 400
+   result = service.register(username, firstName, lastName, sellerId, password, confirmPassword, notes)
+   return convertToJson(result)
+
 @app.route('/user/sellers/<int:userId>')
 def getUserSellers(userId: int):
    # secured by user api key
@@ -234,6 +246,40 @@ def getEventsAndOrders():
       tsEventId = int(request.args.get('tsEventId'))
    results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
+
+@app.route('/user/eventsAndOrdersSecured')
+@jwt_required()
+def getEventsAndOrdersSecured():
+   service = EventService()
+   sellerId: int = None
+   start: int = None
+   end: int = None
+   excludeStart: int = None
+   excludeEnd: int = None
+   searchTerm: str = None
+   showInactive: bool = False
+   showDeleted: bool = False
+   tsEventId: int = None
+   if request.args.get('sellerId') != None:
+      sellerId = int(request.args.get('sellerId'))
+   if request.args.get('start') != None:
+      start = int(request.args.get('start'))
+   if request.args.get('end') != None:
+      end = int(request.args.get('end'))
+   if request.args.get('excludeStart') != None:
+      excludeStart = int(request.args.get('excludeStart'))
+   if request.args.get('excludeEnd') != None:
+      excludeEnd = int(request.args.get('excludeEnd'))
+   if request.args.get('inactive') != None:
+      showInactive = True if int(request.args.get('inactive')) == 1 else False
+   if request.args.get('deleted') != None:
+      showDeleted = True if int(request.args.get('deleted')) == 1 else False
+   if request.args.get('search') != None:
+      searchTerm = str(request.args.get('search'))
+   if request.args.get('tsEventId') != None:
+      tsEventId = int(request.args.get('tsEventId'))
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
+   return convertToJson(results)
    
 @app.route("/user/setEventInactive", methods=["POST"])
 def setEventInactive():
@@ -244,6 +290,20 @@ def setEventInactive():
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
    
+   ticketSocketEventId = request.json.get("eventId", None)
+   isActive = request.json.get("isActive", None)
+   
+   if ticketSocketEventId == None or isActive == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   disabled: bool = True if int(isActive) == 0 else False
+   service = EventService()
+   result = service.disableEvent(int(ticketSocketEventId), disabled)
+   return convertToJson(result)
+
+@app.route("/user/setEventInactiveSecured", methods=["POST"])
+@jwt_required()
+def setEventInactiveSecured():
    ticketSocketEventId = request.json.get("eventId", None)
    isActive = request.json.get("isActive", None)
    
@@ -275,6 +335,20 @@ def setEventDeleted():
    result = service.deleteEvent(int(ticketSocketEventId), deleted)
    return convertToJson(result)
 
+@app.route("/user/setEventDeletedSecured", methods=["POST"])
+@jwt_required()
+def setEventDeletedSecured():
+   ticketSocketEventId = request.json.get("eventId", None)
+   isDeleted = request.json.get("isDeleted", None)
+   
+   if ticketSocketEventId == None or isDeleted == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   deleted: bool = True if int(isDeleted) == 1 else False
+   service = EventService()
+   result = service.deleteEvent(int(ticketSocketEventId), deleted)
+   return convertToJson(result)
+
 @app.route("/user/setOrderInactive", methods=["POST"])
 def setOrderInactive():
     # secured by user api key
@@ -295,6 +369,20 @@ def setOrderInactive():
    result = service.disableOrder(int(ticketSocketOrderId), disabled)
    return convertToJson(result)
 
+@app.route("/user/setOrderInactiveSecured", methods=["POST"])
+@jwt_required()
+def setOrderInactiveSecured():
+   ticketSocketOrderId = request.json.get("orderId", None)
+   isActive = request.json.get("isActive", None)
+   
+   if ticketSocketOrderId == None or isActive == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   disabled: bool = True if int(isActive) == 0 else False
+   service = EventService()
+   result = service.disableOrder(int(ticketSocketOrderId), disabled)
+   return convertToJson(result)
+
 @app.route("/user/setOrderDeleted", methods=["POST"])
 def setOrderDeleted():
     # secured by user api key
@@ -304,6 +392,20 @@ def setOrderDeleted():
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
    
+   ticketSocketOrderId = request.json.get("orderId", None)
+   isDeleted = request.json.get("isDeleted", None)
+   
+   if ticketSocketOrderId == None or isDeleted == None:
+      return {"msg": "Bad Request"}, 400 
+   
+   deleted: bool = True if int(isDeleted) == 1 else False
+   service = EventService()
+   result = service.deleteOrder(int(ticketSocketOrderId), deleted)
+   return convertToJson(result)
+
+@app.route("/user/setOrderDeletedSecured", methods=["POST"])
+@jwt_required()
+def setOrderDeletedSecured():
    ticketSocketOrderId = request.json.get("orderId", None)
    isDeleted = request.json.get("isDeleted", None)
    
@@ -355,7 +457,18 @@ def getEvents():
    results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd)
    return convertToJson(results)
 
-
+@app.route('/public/sellers')
+def getSellers():
+   # secured by public api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('PUBLIC_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   service = SellerService()
+   results = service.getAllSellers()
+   return convertToJson(results)
 
 
 @app.route('/internal/getEventsFromService/<int:sellerId>')

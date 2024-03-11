@@ -1,7 +1,7 @@
 class UserSeller:
-    def __init__(self, sellerId: int, userSellerId: int):
+    def __init__(self, sellerId: int, sellerName: str):
         self.sellerId = sellerId
-        self.userSellerId = userSellerId
+        self.sellerName = sellerName
 
 class User:
     userId: int = 0

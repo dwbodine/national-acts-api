@@ -108,10 +108,11 @@ class UserService:
                     html = "A password reset request has been requested for you from national-acts.com.\n\n"
                     html += "Please use this security code to confirm your email in our system:\n\n" + str(code)
                     subject = "National Acts VIP - Password Reset"
-                    emailSent = utility.queueEmail(subject, html, username, 'User', None)
-                    if emailSent != True:
+                    toName = user.firstName + " " + user.lastName
+                    result = utility.sendEmail(username, subject, html, toName)
+                    if result.success != True:
                         user = None
-                        errorMessage = "Error occurred during password reset"
+                        errorMessage = "Error occurred during password reset: " + result.error
                 else:
                     user = None
                     errorMessage = "Error occurred during password reset"
@@ -184,7 +185,72 @@ class UserService:
             errorMessage = "Error occurred during password reset"
             
         return UserResponse(user, errorMessage)   
+    
+    def resetPasswordSecured(self, username: str, password: str, confirmPassword: str):
+        passwordError = self.__validatePassword(password, confirmPassword)
+        if passwordError != None:
+            return UserResponse(None, passwordError)
         
+        user = self.__retrieveUserFromDatabase(username=username)
+        errorMessage: str = None        
+        
+        self.__expireAllUserTokens(username)
+        
+        sql = "UPDATE UsersNew SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
+        data = {
+            'username': username,
+            'password': self.__passwordHash(password)
+        }
+        success = db.update(sql, data)     
+        if success != True:
+            user = None
+            errorMessage = "Error occurred during password reset"
+            
+        return UserResponse(user, errorMessage)     
+    
+    def register(self, username: str, firstName: str, lastName: str, sellerId: int, password: str, confirmPassword: str, notes: str = None):
+        passwordError = self.__validatePassword(password, confirmPassword)
+        if passwordError != None:
+            return UserResponse(None, passwordError)
+        
+        user: User = self.getUserByUserName(username=username)
+        
+        if user != None:
+            return UserResponse(None, "There is already a user in the system with that email")
+        
+        errorMessage: str = None        
+        
+        sql = """INSERT INTO UsersNew (Username, FirstName, LastName, Password, Notes) 
+                    VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s)"""
+        data = {
+            'username': username,
+            'firstName': firstName,
+            'lastName': lastName,
+            'password': self.__passwordHash(password),
+            'notes': notes
+        }
+        userId = db.insert(sql, data)
+        
+        if userId <= 0:
+            user = None
+            errorMessage = "Error occurred while registering user"
+            
+        sql2 = """INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"""
+        data2 = {
+            'userId': userId,
+            'sellerId': sellerId
+        }
+        userSellerId = db.insert(sql2, data2)
+        
+        regEmailSent = self.__sendRegistrationEmail(username)
+        
+        if regEmailSent != True:
+            user = None
+            errorMessage = "Error sending registration email, please contact your administrator"
+        
+        user = self.getUserById(userId)        
+            
+        return UserResponse(user, errorMessage)         
     
     def getUserById(self, userId: int, fetchSellers: bool = False):
         return self.__retrieveUserFromDatabase(userId=userId, fetchSellers=fetchSellers)
@@ -270,26 +336,32 @@ class UserService:
                 else:
                     user.showInactiveEvents = True if int(row["ShowInactiveEvents"]) == 1 else False
                 
-                if user.isAdmin == False and fetchSellers == True:
-                    sellers = self.__getUserSellers(userId)
+                if fetchSellers == True:
+                    sellers = self.__getUserSellers(user.userId, user.isAdmin)
                     user.sellers = sellers
         return user
 
-    def __getUserSellers(self, userId: int):
+    def __getUserSellers(self, userId: int, isAdmin: bool):
         sellers: list[UserSeller] = []
         if userId == None or userId <= 0:
             return sellers
         
-        sql = "SELECT * FROM UserSeller WHERE UserId=%(userId)s"
-        data = {
-            'userId': userId
-        }
+        data = {}
+        sql = "SELECT s.SellerId, s.Name FROM Sellers s"
+        if isAdmin == False:
+            sql += " JOIN UserSeller us on us.SellerId = s.SellerId WHERE us.UserId=%(userId)s AND s.Inactive <> 1"            
+            data = {
+                'userId': userId
+            }
+        
+        sql += " ORDER BY s.Name ASC"
+        
         rows = db.queryAll(sql, data)
         
         for row in rows:
             sellerId = int(row["SellerId"])
-            userSellerId = int(row["UserSellerId"])
-            us = UserSeller(sellerId, userSellerId)
+            sellerName = str(row["Name"])
+            us = UserSeller(sellerId, sellerName)
             sellers.append(us)
         return sellers
     
@@ -337,6 +409,8 @@ class UserService:
             #to = "tj@national-acts.com"
             to = "dwbodine@gmail.com"
 
-            emailSent = utility.queueEmail(subject, html, to, "New User Registration", None)
+            result = utility.sendEmail(to, subject, html, "New User Registration")
+            if result.success != True:
+                print(result.error)
 
-        return emailSent
+        return emailSent 

@@ -42,3 +42,18 @@ class SellerService:
                 seller = Seller(sellerId)
                 sellers.append(seller)
         return sellers
+    
+    def getAllSellers(self):
+        sellers: list[Seller] = []
+
+        sql = """SELECT SellerId, Name FROM Sellers WHERE Inactive <> 1 ORDER BY Name"""
+        data = None
+        
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            sellerId = int(row["SellerId"])
+            if sellerId > 0:
+                seller = Seller(sellerId)
+                seller.name = str(row["Name"])
+                sellers.append(seller)
+        return sellers
