@@ -284,14 +284,14 @@ class EventService:
                 order.isActive = False
             shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
             shirts = []
-            if shirtStr != None:
+            if shirtStr != None and shirtStr != '':
                 shirtArray = shirtStr.split("/")
                 for shirt in shirtArray:
                     shirts.append(shirt.strip())
             order.shirts = shirts
             attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
             attendees = []
-            if attendeeStr != None:
+            if attendeeStr != None and attendeeStr != '':
                 attendeeArray = attendeeStr.split("/")
                 for attendee in attendeeArray:
                     attendees.append(attendee.strip())
