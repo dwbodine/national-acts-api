@@ -49208,14 +49208,14 @@ ALTER TABLE `TicketSocketOrderTickets`
 -- Constraints for table `UserEventCategory`
 --
 ALTER TABLE `UserEventCategory`
-  ADD CONSTRAINT `FK_UserEventCategory_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users` (`UserId`);
+  ADD CONSTRAINT `FK_UserEventCategory_UserId` FOREIGN KEY (`UserId`) REFERENCES `UsersNew` (`UserId`);
 
 --
 -- Constraints for table `UserSeller`
 --
 ALTER TABLE `UserSeller`
   ADD CONSTRAINT `FX_UserSeller_SellerId` FOREIGN KEY (`SellerId`) REFERENCES `Sellers` (`SellerId`),
-  ADD CONSTRAINT `FX_UserSeller_UserId` FOREIGN KEY (`UserId`) REFERENCES `Users` (`UserId`);
+  ADD CONSTRAINT `FX_UserSeller_UserId` FOREIGN KEY (`UserId`) REFERENCES `UsersNew` (`UserId`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

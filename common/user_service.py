@@ -242,11 +242,11 @@ class UserService:
         }
         userSellerId = db.insert(sql2, data2)
         
-        regEmailSent = self.__sendRegistrationEmail(username)
+        regEmailResult = self.__sendRegistrationEmail(username)
         
-        if regEmailSent != True:
+        if regEmailResult.success != True:
             user = None
-            errorMessage = "Error sending registration email, please contact your administrator"
+            errorMessage = regEmailResult.error
         
         user = self.getUserById(userId)        
             
@@ -396,7 +396,7 @@ class UserService:
         return None
     
     def __sendRegistrationEmail(self, username: str):
-        emailSent: bool = False
+        result = utility.SendEmailResult(True, None)
         user = self.__retrieveUserFromDatabase(username=username)
         if user != None:            
             html = "<table>"
@@ -410,7 +410,7 @@ class UserService:
             to = "dwbodine@gmail.com"
 
             result = utility.sendEmail(to, subject, html, "New User Registration")
-            if result.success != True:
-                print(result.error)
-
-        return emailSent 
+        else:
+            result.success = False
+            result.error = "Could not find new user in database"
+        return result 

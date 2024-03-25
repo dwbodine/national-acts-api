@@ -155,6 +155,8 @@ class VipEvent(TicketSocketEvent):
     hasShirtData: bool = False
     hasPhoneData: bool = False
     hasNonUSAOrders: bool = False
+    nonUsaCurrencySymbol: str = None
+    nonUsaCurrencyAbbrev: str = None
 
     def getTotals(self):
         totalRevenue: float = 0
@@ -164,6 +166,8 @@ class VipEvent(TicketSocketEvent):
         for order in self.orders:
             if self.hasNonUSAOrders == False and order.currencyAbbrev != "USD":
                 self.hasNonUSAOrders = True
+                self.nonUsaCurrencyAbbrev = order.currencyAbbrev
+                self.nonUsaCurrencySymbol = order.currencySymbol
 
             if self.hasShirtData == False and len(order.shirts) > 0:
                 self.hasShirtData = True
