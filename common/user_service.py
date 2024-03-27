@@ -406,8 +406,8 @@ class UserService:
             html += "</table>"
 
             subject = "New User Registration"
-            #to = "tj@national-acts.com"
-            to = "dwbodine@gmail.com"
+            to = "tj@national-acts.com"
+            #to = "dwbodine@gmail.com"
 
             result = utility.sendEmail(to, subject, html, "New User Registration")
         else:
