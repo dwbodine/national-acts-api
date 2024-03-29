@@ -12,7 +12,8 @@ from common.user_service import *
 
 class EventService:
     def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, 
-                           searchTerm: str = None, tsEventId: int = None, showDeleted: bool = False, excludeStart: int = None, excludeEnd: int = None):
+                           searchTerm: str = None, tsEventId: int = None, showDeleted: bool = False, excludeStart: int = None, excludeEnd: int = None,
+                           excludeExternal: bool = False):
         events: list[VipEvent] = []
         
         sellerEventCategoryIds: list[int] = []
@@ -151,7 +152,7 @@ class EventService:
             if vipEvent.isDeleted == True:
                 vipEvent.isActive = False
             vipEvent.isVip = True if int(row["IsVip"]) == 1 else False
-            if row["ExternalEventId"] != None and row["ExternalEventId"] != '':
+            if row["ExternalEventId"] != None and row["ExternalEventId"] != '' and excludeExternal != True:
                 vipEvent.externalEventId = int(row["ExternalEventId"])
                 vipEvent.externalSellerId = int(row["ExternalSellerId"])
                 vipEvent.externalTitle = str(row["ExternalTitle"])
@@ -174,65 +175,66 @@ class EventService:
             
             events.append(vipEvent)            
 
-        # get external events without matching TicketSocketEvents
-        externalSql = """SELECT * FROM ExternalEventsNew WHERE """
-        externalData = {}
+        # if not excluded, get external events without matching TicketSocketEvents
+        if excludeExternal != True:
+            externalSql = """SELECT * FROM ExternalEventsNew WHERE """
+            externalData = {}
+            
+            externalWhereClause: list[str] = []        
+            if showInactive != True:
+                externalWhereClause.append("IsActive = 1")
+            if searchTerm != None and len(searchTerm) > 0:
+                externalWhereClause.append("""MATCH (Title, Venue, Address, City, State, Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
+                externalData["searchTerm"] = '*' + searchTerm + '*'
+            if sellerId != None:
+                externalWhereClause.append("SellerId = %(sellerId)s")
+                externalData["sellerId"] = sellerId
+            if start != None and end != None:
+                externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
+                externalData["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+                externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            elif end != None:
+                externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
+                externalData["startDate"] = datetime.now().strftime('%Y-%m-%d')
+                externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            elif start != None:
+                externalWhereClause.append("EventDate >= %(startDate)s")
+                externalData["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+            else:
+                externalWhereClause.append("EventDate >= %(startDate)s")
+                externalData["startDate"] = datetime.now().strftime('%Y-%m-%d')
+            
+            if len(externalWhereClause) > 0:
+                externalSql += " AND ".join(externalWhereClause)
+                        
+            externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId FROM ExternalEventsNew
+                JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
+                JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
+                JOIN TicketSocketEvents ON TicketSocketEvents.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
+                ORDER BY EventDate ASC, Title ASC"""
         
-        externalWhereClause: list[str] = []        
-        if showInactive != True:
-            externalWhereClause.append("IsActive = 1")
-        if searchTerm != None and len(searchTerm) > 0:
-            externalWhereClause.append("""MATCH (Title, Venue, Address, City, State, Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
-            externalData["searchTerm"] = '*' + searchTerm + '*'
-        if sellerId != None:
-            externalWhereClause.append("SellerId = %(sellerId)s")
-            externalData["sellerId"] = sellerId
-        if start != None and end != None:
-            externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
-            externalData["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-            externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
-        elif end != None:
-            externalWhereClause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
-            externalData["startDate"] = datetime.now().strftime('%Y-%m-%d')
-            externalData["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
-        elif start != None:
-            externalWhereClause.append("EventDate >= %(startDate)s")
-            externalData["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-        else:
-            externalWhereClause.append("EventDate >= %(startDate)s")
-            externalData["startDate"] = datetime.now().strftime('%Y-%m-%d')
-        
-        if len(externalWhereClause) > 0:
-            externalSql += " AND ".join(externalWhereClause)
-                    
-        externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId FROM ExternalEventsNew
-            JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
-            JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
-            JOIN TicketSocketEvents ON TicketSocketEvents.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
-            ORDER BY EventDate ASC, Title ASC"""
-    
-        externalSql = externalSql.replace('\n', '')
-        
-        externalEventRows = db.queryAll(externalSql, externalData)
-        for row in externalEventRows:
-            eventId = int(row["EventId"])
-            vipEvent = VipEvent(eventId, str(row["Title"]))
-            vipEvent.isExternal = True
-            vipEvent.eventDate = str(row["EventDate"])
-            vipEvent.thumbnail = str(row["Thumbnail"])
-            vipEvent.ticketSocketUrl = str(row["URL"])
-            venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), str(row["Country"]), '')
-            vipEvent.venue = venue
-            vipEvent.isActive = True if int(row["IsActive"]) == 1 else False
-            vipEvent.externalEventId = int(row["EventId"])
-            vipEvent.externalSellerId = int(row["SellerId"])
-            vipEvent.disableLinkButton = str(row["DisableLinkButton"])
-            vipEvent.disableLinkReason = str(row["DisableLinkReason"])
-            vipEvent.externalVipLink = str(row["ExternalVipLink"])
-            vipEvent.isVip = True if (vipEvent.externalVipLink != None and vipEvent.externalVipLink != "") else False
-            vipEvent.disableVipLinkButton = str(row["DisableVipLinkButton"])
-            vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
-            events.append(vipEvent)
+            externalSql = externalSql.replace('\n', '')
+            
+            externalEventRows = db.queryAll(externalSql, externalData)
+            for row in externalEventRows:
+                eventId = int(row["EventId"])
+                vipEvent = VipEvent(eventId, str(row["Title"]))
+                vipEvent.isExternal = True
+                vipEvent.eventDate = str(row["EventDate"])
+                vipEvent.thumbnail = str(row["Thumbnail"])
+                vipEvent.ticketSocketUrl = str(row["URL"])
+                venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), str(row["Country"]), '')
+                vipEvent.venue = venue
+                vipEvent.isActive = True if int(row["IsActive"]) == 1 else False
+                vipEvent.externalEventId = int(row["EventId"])
+                vipEvent.externalSellerId = int(row["SellerId"])
+                vipEvent.disableLinkButton = str(row["DisableLinkButton"])
+                vipEvent.disableLinkReason = str(row["DisableLinkReason"])
+                vipEvent.externalVipLink = str(row["ExternalVipLink"])
+                vipEvent.isVip = True if (vipEvent.externalVipLink != None and vipEvent.externalVipLink != "") else False
+                vipEvent.disableVipLinkButton = str(row["DisableVipLinkButton"])
+                vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
+                events.append(vipEvent)
 
         events.sort(key = operator.attrgetter('eventDate', 'title', 'externalEventId'))
 
