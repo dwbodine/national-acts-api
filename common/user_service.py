@@ -43,7 +43,7 @@ class UserService:
         except Exception as err:
             user = None
             errorMessage: str = "Error occurred during login"
-            print(f"Unexpected {err=}, {type(err)=}")
+            utility.logMessage(f"Unexpected {err=}, {type(err)=}")
                 
         return UserResponse(user, errorMessage)    
     
@@ -91,7 +91,7 @@ class UserService:
         except Exception as err:
             user = None
             errorMessage = "Error occurred during user registration, please contact your administrator"
-            print(f"Unexpected {err=}, {type(err)=}")
+            utility.logMessage(f"Unexpected {err=}, {type(err)=}")
         
         return UserResponse(user, errorMessage)
 
@@ -121,7 +121,7 @@ class UserService:
         except Exception as err:
             user = None
             errorMessage = "Error occurred during password reset"
-            print(f"Unexpected {err=}, {type(err)=}")
+            utility.logMessage(f"Unexpected {err=}, {type(err)=}")
         
         return UserResponse(user, errorMessage)
 
@@ -146,8 +146,6 @@ class UserService:
                 'userId': userId,
                 'code': code
             }
-            print(sql)
-            print(data)
             row = db.queryOne(sql, data)
             if row == {}:
                 user = None
@@ -155,7 +153,7 @@ class UserService:
         except Exception as err:
             user = None
             errorMessage = "Error occurred during password reset"
-            print(f"Unexpected {err=}, {type(err)=}")
+            utility.logMessage(f"Unexpected {err=}, {type(err)=}")
 
         return UserResponse(user, errorMessage)
     

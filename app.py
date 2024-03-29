@@ -52,7 +52,7 @@ def after_request(response):
                response.data = json.dumps(data)
    except (RuntimeError, KeyError):
       # Case where there is not a valid JWT. Just return the original respone
-      print('JWT not found')
+      utility.logMessage('JWT not found')
    return response
 
 @app.route('/')
@@ -517,12 +517,26 @@ def getCategories(ticketSocketId):
 
 @app.route('/internal/updateAllEventsFromService')
 def updateAllEventsFromService():
+   # secured by internal api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    service = UpdateService()
    results = service.updateAllEventsFromTicketSocket()
    return convertToJson(results)
 
 @app.route('/internal/updateAllExchangeRates')
 def updateAllExchangeRates():
+   # secured by internal api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
    service = UpdateService()
    rates = service.updateAllExchangeRates()
    return convertToJson(rates)

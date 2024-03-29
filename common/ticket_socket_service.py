@@ -131,7 +131,7 @@ class TicketSocketService:
             'Authorization': 'Bearer ' + self.token
         }    
 
-        conn = http.client.HTTPSConnection(self.serviceUrl)
+        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
         conn.request('GET', url, headers=headers)
         response = conn.getresponse() 
 
@@ -290,7 +290,7 @@ class TicketSocketService:
             'Content-type': 'application/json;charset=UTF-8',
             'Authorization': 'Bearer ' + self.token
         } 
-        conn = http.client.HTTPSConnection(self.serviceUrl)
+        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
 
         # loop through and append orders
         orders = []
@@ -435,7 +435,7 @@ class TicketSocketService:
             'Authorization': 'Bearer ' + self.token
         }    
 
-        conn = http.client.HTTPSConnection(self.serviceUrl)
+        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
         conn.request('GET', url, headers=headers)
         response = conn.getresponse() 
 

@@ -315,7 +315,7 @@ class TicketSocketRefreshHistory:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
 
-    def commit(self):
+    def commit(self, cnx = None):
         self.__getSellerName()
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
@@ -351,4 +351,4 @@ class TicketSocketRefreshHistory:
             'ticketsDeactivated': self.ticketsDeactivated
         }
 
-        return (db.insert(sql, data) > 0)
+        return (db.insert(sql, data, cnx) > 0)

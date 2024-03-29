@@ -385,7 +385,7 @@ class EventService:
                 else:
                     continue
 
-            events = tss.getEventsAndOrders(eventCategoryId, start, end)            
+            events = tss.getEventsAndOrders(eventCategoryId, start, end)    
 
             if len(events) > 0:
                 for event in events:
@@ -419,6 +419,7 @@ class EventService:
         return allEvents
 
     def refreshDatabaseFromTicketSocket(self, sellerId: int = None, start: int = None, end: int = None, userId: int = 0):
+        #utility.logMessage('starting TS update')
         updateSuccess: bool = True
         errorMessage: str = None
         
@@ -444,12 +445,24 @@ class EventService:
         results: TicketSocketRefreshHistory = None
 
         try:
+            utility.logMessage('retrieving events from TicketSocket Service')
             allEvents = self.retrieveTicketSocketEventsForUpdate(sellerId, start, end)
+            #utility.logMessage('events retrieved')
+            
+            serviceTimer = time.time()
+            serviceDuration = serviceTimer - startTimer
+            utility.logMessage('Service fetch done in ' + str(serviceDuration) + ' seconds')
 
             # get total number of events grabbed from service
             totalEventsFromService = len(allEvents)        
 
             if totalEventsFromService > 0:
+                
+                utility.logMessage('starting database update - opening connection')
+                # get one database connection
+                cnx = db.getDbConnection()
+                
+                #utility.logMessage('processing events')
                 serviceEvents: list[int] = []
                 for evt in allEvents:
                     if evt.sellerEventCategoryId <= 0:
@@ -487,7 +500,7 @@ class EventService:
                         'sellerEventCategoryId': evt.sellerEventCategoryId
                     }
 
-                    existingEvent = db.queryOne(eventSql, data)
+                    existingEvent = db.queryOne(eventSql, data, cnx)
 
                     eventSuccess: bool = False
                     ticketSocketEventId: int = 0
@@ -502,7 +515,7 @@ class EventService:
                                 Address=%(address)s, City=%(city)s, State=%(state)s, 
                                 Zip=%(zip)s, Country=%(country)s, OnSale=%(onsale)s, 
                                 Thumbnail=%(thumbnail)s, DisplayDate=%(displayDate)s, IsVip=%(isVip)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                        eventSuccess = db.update(sql, eventData)
+                        eventSuccess = db.update(sql, eventData, cnx)
                     else:
                         eventAddNew = True
                         # insert new event
@@ -514,7 +527,7 @@ class EventService:
                                     VALUES (%(sellerEventCategoryId)s, %(eventId)s, %(title)s, %(eventDate)s, %(utcTime)s, 
                                     %(url)s, %(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s, 
                                     %(onsale)s, %(thumbnail)s, %(displayDate)s, %(isVip)s)"""
-                        ticketSocketEventId = db.insert(sql, eventData)
+                        ticketSocketEventId = db.insert(sql, eventData, cnx)
                         eventSuccess = (ticketSocketEventId > 0)                
 
                     # if the update succeeded, update counters
@@ -563,7 +576,7 @@ class EventService:
                                 'orderId': order.id
                             }
 
-                            existingOrder = db.queryOne(orderSql, data)
+                            existingOrder = db.queryOne(orderSql, data, cnx)
 
                             orderSuccess: bool = False
                             ticketSocketOrderId: int = 0
@@ -577,7 +590,7 @@ class EventService:
                                         Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
                                         PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, 
                                         LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                                orderSuccess = db.update(sql, orderData)
+                                orderSuccess = db.update(sql, orderData, cnx)
                             else:
                                 orderAddNew = True
                                 #insert new order
@@ -587,7 +600,7 @@ class EventService:
                                                 AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue) 
                                                 VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
                                                 %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s)"""
-                                ticketSocketOrderId = db.insert(sql, orderData)
+                                ticketSocketOrderId = db.insert(sql, orderData, cnx)
                                 orderSuccess = (ticketSocketOrderId > 0)
 
                             # if the update succeeded, update counters
@@ -627,7 +640,7 @@ class EventService:
                                         'ticketId': ticket.id
                                     }
 
-                                    existingTicket = db.queryOne(ticketSql, data)
+                                    existingTicket = db.queryOne(ticketSql, data, cnx)
 
                                     ticketSuccess: bool = False
                                     ticketSocketOrderTicketId: int = 0
@@ -640,7 +653,7 @@ class EventService:
                                         
                                         sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, 
                                                 LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                                        ticketSuccess = db.update(sql, ticketData)
+                                        ticketSuccess = db.update(sql, ticketData, cnx)
                                     else:
                                         #insert new ticket
                                         ticketAddNew = True
@@ -671,7 +684,7 @@ class EventService:
                                     sql = """UPDATE TicketSocketOrderTickets Set IsActive=0 
                                             WHERE TicketSocketOrderId=%(ticketSocketOrderId)s AND TicketId NOT IN """ + orderTicketStr
 
-                                    inactiveTickets = db.update(sql, orderTicketData)
+                                    inactiveTickets = db.update(sql, orderTicketData, cnx)
                                     ticketsDeactivated += inactiveTickets
                                 
                                 # find any orders not returned by the service and mark as inactive
@@ -683,11 +696,14 @@ class EventService:
                             sql = """UPDATE TicketSocketOrders Set IsActive=0 
                                     WHERE TicketSocketEventId=%(ticketSocketEventId)s AND OrderId NOT IN """ + eventOrderStr
     
-                            inactiveOrders = db.update(sql, eventOrderData)
+                            inactiveOrders = db.update(sql, eventOrderData, cnx)
                             ordersDeactivated += inactiveOrders
 
             endTimer = time.time()
-            duration = endTimer - startTimer              
+            duration = endTimer - startTimer  
+            
+            databaseDuration = endTimer - serviceTimer            
+            utility.logMessage('database update complete in ' + str(databaseDuration) + ' seconds')            
                                     
             results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, 
                                                 eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
@@ -701,12 +717,15 @@ class EventService:
             else:
                 results.userName = "System"
             
-            updateSuccess = results.commit()
+            updateSuccess = results.commit(cnx)
+            
+            if cnx != None and cnx.is_connected:
+                cnx.close()
 
         except Exception as error:
             updateSuccess = False
             errorMessage: str = str(error) + "\n" + traceback.format_exc()
-            print(errorMessage)
+            utility.logMessage(errorMessage)
             
 
         # alert dB if it failed

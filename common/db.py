@@ -1,15 +1,22 @@
 import os
 import mysql.connector
+import mysql.connector.connection
 
-def __getDbConnection():
+def getDbConnection():
     return mysql.connector.connect(user=os.getenv('DB_USER'), 
                                    password=os.getenv('DB_PASSWORD'),
                                    host=os.getenv('DB_HOST'),
-                                   database=os.getenv('DB_DB'))
+                                   database=os.getenv('DB_DB'),
+                                   connection_timeout=3600)
 
-def queryAll(sql: str, jsonData = None):    
+def queryAll(sql: str, jsonData = None, cnx = None):    
     rows = []
-    cnx = __getDbConnection()
+    keepAlive = True
+    
+    if (cnx == None):
+        cnx = getDbConnection()
+        keepAlive = False
+        
     cursor = cnx.cursor()
 
     if jsonData != None:
@@ -23,13 +30,20 @@ def queryAll(sql: str, jsonData = None):
         rows.append(row)
 
     cursor.close()
-    cnx.close()
+
+    if keepAlive == False:
+        cnx.close()
 
     return rows
 
-def queryOne(sql: str, jsonData):    
+def queryOne(sql: str, jsonData, cnx = None):    
     row = {}
-    cnx = __getDbConnection()
+    keepAlive = True
+    
+    if (cnx == None):
+        cnx = getDbConnection()
+        keepAlive = False
+        
     cursor = cnx.cursor()
 
     cursor.execute(sql, jsonData)
@@ -39,7 +53,9 @@ def queryOne(sql: str, jsonData):
         row = __convertCursorRowToDictionary(cursorRow, cursor)
 
     cursor.close()
-    cnx.close()
+    
+    if keepAlive == False:
+        cnx.close()
 
     return row
 
@@ -57,8 +73,13 @@ def __convertCursorRowToDictionary(cursorRow: any, cursor: any):
     return row
 
 
-def update(sql: str, jsonData = None):
-    cnx = __getDbConnection()
+def update(sql: str, jsonData = None, cnx = None):
+    keepAlive = True
+    
+    if (cnx == None):
+        cnx = getDbConnection()
+        keepAlive = False
+        
     cursor = cnx.cursor()
         
     if jsonData != None:
@@ -71,12 +92,19 @@ def update(sql: str, jsonData = None):
     cnx.commit()
 
     cursor.close()
-    cnx.close()
+    
+    if keepAlive == False:
+        cnx.close()
 
     return count > 0
 
-def insert(sql: str, jsonData = None):
-    cnx = __getDbConnection()
+def insert(sql: str, jsonData = None, cnx = None):
+    keepAlive = True
+    
+    if (cnx == None):
+        cnx = getDbConnection()
+        keepAlive = False
+        
     cursor = cnx.cursor()
         
     if jsonData != None:
@@ -89,12 +117,19 @@ def insert(sql: str, jsonData = None):
     newId = cursor.lastrowid
 
     cursor.close()
-    cnx.close()
+    
+    if keepAlive == False:
+        cnx.close()
 
     return newId
 
-def delete(sql: str, jsonData = None):
-    cnx = __getDbConnection()
+def delete(sql: str, jsonData = None, cnx = None):
+    keepAlive = True
+    
+    if (cnx == None):
+        cnx = getDbConnection()
+        keepAlive = False
+        
     cursor = cnx.cursor()
         
     if jsonData != None:
@@ -107,7 +142,9 @@ def delete(sql: str, jsonData = None):
     cnx.commit()
 
     cursor.close()
-    cnx.close()
+    
+    if keepAlive == False:
+        cnx.close()
 
     return count > 0
 

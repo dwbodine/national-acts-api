@@ -80,3 +80,7 @@ def add_months(current_date, months_to_add):
 def validateEmailAddress(email: str):
     regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
     return re.fullmatch(regex, email)
+
+def logMessage(msg: str):
+    dateStr = datetime.now().isoformat()
+    print('[' + dateStr + '] ' + msg)
