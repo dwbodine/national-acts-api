@@ -208,11 +208,11 @@ class EventService:
         externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId FROM ExternalEventsNew
             JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
             JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
-            JOIN TicketSocketEvents ON SellerEventCategory.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
+            JOIN TicketSocketEvents ON TicketSocketEvents.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
             ORDER BY EventDate ASC, Title ASC"""
     
         externalSql = externalSql.replace('\n', '')
-
+        
         externalEventRows = db.queryAll(externalSql, externalData)
         for row in externalEventRows:
             eventId = int(row["EventId"])
