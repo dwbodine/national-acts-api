@@ -222,7 +222,7 @@ class EventService:
                 vipEvent.isExternal = True
                 vipEvent.eventDate = str(row["EventDate"])
                 vipEvent.thumbnail = str(row["Thumbnail"])
-                vipEvent.ticketSocketUrl = str(row["URL"])
+                vipEvent.externalUrl = str(row["URL"])
                 venue = TicketSocketVenue(str(row["Venue"]), str(row["Address"]), '', str(row["City"]), str(row["State"]), str(row["Zip"]), str(row["Country"]), '')
                 vipEvent.venue = venue
                 vipEvent.isActive = True if int(row["IsActive"]) == 1 else False
