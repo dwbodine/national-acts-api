@@ -32,29 +32,29 @@ class EventService:
             searchTerm = None
 
         sql = """SELECT TicketSocketEvents.*, 
-                    ExternalEventsNew.EventId AS ExternalEventId, 
-                    ExternalEventsNew.SellerId AS ExternalSellerId, 
-                    ExternalEventsNew.Title AS ExternalTitle, 
-                    ExternalEventsNew.Thumbnail AS ExternalThumbnail, 
-                    ExternalEventsNew.URL AS ExternalUrl, 
-                    ExternalEventsNew.Venue AS ExternalVenue, 
-                    ExternalEventsNew.Address AS ExternalAddress, 
-                    ExternalEventsNew.City AS ExternalCity, 
-                    ExternalEventsNew.State AS ExternalState, 
-                    ExternalEventsNew.Zip AS ExternalZip, 
-                    ExternalEventsNew.Country AS ExternalCountry, 
-                    ExternalEventsNew.DisableLinkButton, 
-                    ExternalEventsNew.DisableLinkReason, 
-                    ExternalEventsNew.ExternalVipLink, 
-                    ExternalEventsNew.DisableVipLinkButton, 
-                    ExternalEventsNew.DisableVipLinkReason
+                    ExternalEvents.EventId AS ExternalEventId, 
+                    ExternalEvents.SellerId AS ExternalSellerId, 
+                    ExternalEvents.Title AS ExternalTitle, 
+                    ExternalEvents.Thumbnail AS ExternalThumbnail, 
+                    ExternalEvents.URL AS ExternalUrl, 
+                    ExternalEvents.Venue AS ExternalVenue, 
+                    ExternalEvents.Address AS ExternalAddress, 
+                    ExternalEvents.City AS ExternalCity, 
+                    ExternalEvents.State AS ExternalState, 
+                    ExternalEvents.Zip AS ExternalZip, 
+                    ExternalEvents.Country AS ExternalCountry, 
+                    ExternalEvents.DisableLinkButton, 
+                    ExternalEvents.DisableLinkReason, 
+                    ExternalEvents.ExternalVipLink, 
+                    ExternalEvents.DisableVipLinkButton, 
+                    ExternalEvents.DisableVipLinkReason
                  FROM TicketSocketEvents 
                  JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
-            LEFT JOIN ExternalEventsNew ON ExternalEventsNew.SellerId = Sellers.SellerId AND TicketSocketEvents.EventDate = ExternalEventsNew.EventDate """
+            LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND TicketSocketEvents.EventDate = ExternalEvents.EventDate """
         
         if tsEventId == None and showInactive != True:
-            sql += " AND ExternalEventsNew.IsActive = 1"
+            sql += " AND ExternalEvents.IsActive = 1"
 
         sql += " WHERE "
         data = {}
@@ -177,7 +177,7 @@ class EventService:
 
         # if not excluded, get external events without matching TicketSocketEvents
         if excludeExternal != True:
-            externalSql = """SELECT * FROM ExternalEventsNew WHERE """
+            externalSql = """SELECT * FROM ExternalEvents WHERE """
             externalData = {}
             
             externalWhereClause: list[str] = []        
@@ -207,10 +207,10 @@ class EventService:
             if len(externalWhereClause) > 0:
                 externalSql += " AND ".join(externalWhereClause)
                         
-            externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEventsNew.EventId FROM ExternalEventsNew
-                JOIN Sellers ON Sellers.SellerId = ExternalEventsNew.SellerId 
+            externalSql += """ AND EventId NOT IN (SELECT DISTINCT ExternalEvents.EventId FROM ExternalEvents
+                JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId 
                 JOIN SellerEventCategory ON SellerEventCategory.SellerId = Sellers.SellerId 
-                JOIN TicketSocketEvents ON TicketSocketEvents.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEventsNew.EventDate = TicketSocketEvents.EventDate) 
+                JOIN TicketSocketEvents ON TicketSocketEvents.SellerEventCategoryId = SellerEventCategory.SellerEventCategoryId AND ExternalEvents.EventDate = TicketSocketEvents.EventDate) 
                 ORDER BY EventDate ASC, Title ASC"""
         
             externalSql = externalSql.replace('\n', '')
