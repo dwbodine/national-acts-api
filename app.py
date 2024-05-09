@@ -568,5 +568,28 @@ def getUpdateHistory():
    logs = service.getTicketSocketRefreshHistory(sellerId, start, end, userId, limit)
    return convertToJson(logs)
 
+@app.route('/internal/mail', methods=["POST"])
+def sendMail():
+   # secured by mail api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('MAIL_API_KEY'))
+
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+
+   toEmail = request.json.get("toEmail", None)
+   toName = request.json.get("toName", None)
+   subject = request.json.get("subject", None)
+   htmlContent = request.json.get("htmlContent", None)
+   ccEmails = request.json.get("ccEmails", None)
+
+   if toEmail == None or toEmail == "" or subject == None or subject == "" or htmlContent == None or htmlContent == "":
+      return {"msg": "Bad Request"}, 200   
+
+   result = utility.sendEmail(toEmail, subject, htmlContent, toName, ccEmails)
+
+   return convertToJson(result)
+
+
 if __name__ == "__main__":
     app.run()
