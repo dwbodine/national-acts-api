@@ -157,13 +157,17 @@ class VipEvent(TicketSocketEvent):
     hasNonUSAOrders: bool = False
     nonUsaCurrencySymbol: str = None
     nonUsaCurrencyAbbrev: str = None
+    numTicketsRefunded: int = 0
 
     def getTotals(self):
         totalRevenue: float = 0
         totalTickets: int = 0
         totalShirts: int = 0
+        totalTicketsRefunded: int = 0
         shirtd: dict() = {}
         for order in self.orders:
+            if order.isRefunded:
+                totalTicketsRefunded += order.numTickets
             if self.hasNonUSAOrders == False and order.currencyAbbrev != "USD":
                 self.hasNonUSAOrders = True
                 self.nonUsaCurrencyAbbrev = order.currencyAbbrev
@@ -188,6 +192,7 @@ class VipEvent(TicketSocketEvent):
         self.totalRevenue = totalRevenue
         self.totalTickets = totalTickets
         self.totalShirts = totalShirts
+        self.numTicketsRefunded = totalTicketsRefunded
         
         shirtSales: list[ShirtSales] = []
         for size in shirtd:
