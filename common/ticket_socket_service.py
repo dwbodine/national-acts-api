@@ -231,6 +231,10 @@ class TicketSocketService:
                     country = utility.fixMagicQuotes(item['venueCountry'])
                 elif customFields != {} and 'venueCountry' in customFields:
                     country = utility.fixMagicQuotes(customFields['venueCountry'])
+                    
+                formatPhones: bool = True
+                if country != '' and country != 'USA' and country != 'United States':
+                    formatPhones = False
 
                 timezone = ''
                 if customFields != {} and 'timezone' in customFields:
@@ -269,13 +273,13 @@ class TicketSocketService:
                     eventTime: int = event.utcTime + (self.utcOffsetHours * 60 * 60)         
                     event.eventDate = datetime.fromtimestamp(eventTime).strftime('%Y-%m-%d')
 
-                event.orders = self.getOrdersFromEventId(event.id)       
+                event.orders = self.getOrdersFromEventId(event.id, formatPhones)       
                 
                 self.events.append(event)
 
         return self.events
     
-    def getOrdersFromEventId(self, eventId: int):
+    def getOrdersFromEventId(self, eventId: int, formatPhoneNumbers: bool):
         # get list of orderIds first
         orderIds = self.getOrderIdsFromEventId(eventId)
 
@@ -392,7 +396,10 @@ class TicketSocketService:
                                     
                                 if answer != '':
                                     if question.find('phone') >= 0 and order.phone == '':
-                                        order.phone = utility.formatPhone(answer)
+                                        if formatPhoneNumbers:
+                                            order.phone = utility.formatPhone(answer)
+                                        else:
+                                            order.phone = answer
                                     elif question.find('shirt') >= 0:
                                         orderShirts.append(answer)
 
