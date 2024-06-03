@@ -73,8 +73,8 @@ class VipTicket(TicketSocketTicket):
     ticketSocketOrderTicketId: int = 0
     isActive: bool = True
 
-    def __init__(self, id: int, ticketType: str, price: float):
-        super().__init__(id, ticketType, price)
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float):
+        super().__init__(id, ticketType, price, serviceFee)
 
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
@@ -132,6 +132,7 @@ class VipOrder(TicketSocketOrder):
 class VipEvent(TicketSocketEvent):
     ticketSocketEventId: int = 0
     totalRevenue: float = 0
+    totalServiceFees: float = 0
     totalTickets: int = 0
     totalShirts: int = 0
     shirtSales: list[ShirtSales] = []
@@ -161,6 +162,7 @@ class VipEvent(TicketSocketEvent):
 
     def getTotals(self):
         totalRevenue: float = 0
+        totalServiceFees: float = 0
         totalTickets: int = 0
         totalShirts: int = 0
         totalTicketsRefunded: int = 0
@@ -179,17 +181,21 @@ class VipEvent(TicketSocketEvent):
             if self.hasPhoneData == False and order.phone != None and len(order.phone) > 0:
                 self.hasPhoneData = True
                 
-            totalRevenue += order.revenueUsd
-            totalTickets += order.numTickets
-            if len(order.shirts) > 0:
-                totalShirts += len(order.shirts)
-                for size in order.shirts:
-                    if size in shirtd:
-                        shirtd[size] = int(shirtd[size]) + 1
-                    else:
-                        shirtd[size] = 1
+            if order.isDeleted != True:
+                totalRevenue += order.revenueUsd
+                totalServiceFees += order.serviceFees
+                totalTickets += order.numTickets
+                
+                if len(order.shirts) > 0:
+                    totalShirts += len(order.shirts)
+                    for size in order.shirts:
+                        if size in shirtd:
+                            shirtd[size] = int(shirtd[size]) + 1
+                        else:
+                            shirtd[size] = 1
 
         self.totalRevenue = totalRevenue
+        self.totalServiceFees = totalServiceFees
         self.totalTickets = totalTickets
         self.totalShirts = totalShirts
         self.numTicketsRefunded = totalTicketsRefunded

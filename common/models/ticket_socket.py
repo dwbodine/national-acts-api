@@ -17,10 +17,11 @@ class TicketSocketVenue:
         self.timezone = timezone
 
 class TicketSocketTicket:
-    def __init__(self, id: int, ticketType: str, price: float):
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float):
         self.id = id
         self.ticketType = ticketType
-        self.price = price    
+        self.price = price
+        self.serviceFee = serviceFee
 
 class TicketSocketOrder:
     eventId: int = 0
@@ -35,7 +36,8 @@ class TicketSocketOrder:
     purchaseTimestamp: str = ''
     email: str = ''
     attendeeNames: list[str] = []
-    revenue: float = ''
+    revenue: float = 0
+    serviceFees: float = 0
     cancelled: bool = False
     deleted: bool = False
 

@@ -333,6 +333,7 @@ class TicketSocketService:
 
                 order.numTickets = numTickets
                 orderRevenue: float = 0
+                orderServiceFees: float = 0
                 orderTickets = []
                 orderAttendeeNames = []
                 orderShirts = []
@@ -414,20 +415,25 @@ class TicketSocketService:
                         ticketType: str = ''
                         if 'ticketTypeName' in item:
                             ticketType = item['ticketTypeName']
+                        serviceFee: float = 0
+                        if 'fee1Amount' in item:
+                            serviceFee = float(item['fee1Amount'])
 
                         if ticketId == 0 or ticketType == '':
                             continue
                         
-                        ticket = TicketSocketTicket(ticketId, ticketType, price)
+                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee)
                         orderTickets.append(ticket)
 
                         orderRevenue += price
+                        orderServiceFees += serviceFee
 
                 if len(orderTickets) > 0:
                     order.tickets = orderTickets
                     order.shirts = orderShirts
                     order.attendeeNames = orderAttendeeNames
                     order.revenue = orderRevenue
+                    order.serviceFees = orderServiceFees
 
                     orders.append(order)
 

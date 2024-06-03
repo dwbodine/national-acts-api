@@ -277,6 +277,7 @@ class EventService:
             order.purchaserLastName = str(row["PurchaserLastName"]) if row["PurchaserLastName"] != None else None
             order.purchaserFirstName = str(row["PurchaserFirstName"]) if row["PurchaserFirstName"] != None else None
             order.revenue = float(row["Revenue"])
+            order.serviceFees = float(row["ServiceFees"])
             order.exchangeRate = float(row["ExchangeRate"])
             order.currencyAbbrev = str(row["CurrencyAbbrev"])
             order.currencySymbol = str(row["Symbol"])
@@ -317,7 +318,7 @@ class EventService:
             ticketId: int = 0
             if row["TicketId"] != None and row["TicketId"] != '':
                 ticketId = int(row["TicketId"])
-            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]))
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]))
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
@@ -567,7 +568,8 @@ class EventService:
                                 'purchaserLastName': order.purchaserLastName.strip() if order.purchaserLastName != None else None,
                                 'purchaserFirstName': order.purchaserFirstName.strip() if order.purchaserFirstName != None else None,
                                 'email': order.email.strip() if order.email != None else None,
-                                'revenue': order.revenue
+                                'revenue': order.revenue,
+                                'serviceFees': order.serviceFees
                             }
 
                             # determine if order already exists
@@ -590,7 +592,7 @@ class EventService:
                                 orderData['id'] = ticketSocketOrderId
                                 sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s, 
                                         Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
-                                        PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, 
+                                        PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, Email=%(email)s, Revenue=%(revenue)s, ServiceFees=%(serviceFees)s, 
                                         LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                 orderSuccess = db.update(sql, orderData, cnx)
                             else:
@@ -599,9 +601,9 @@ class EventService:
                                 orderData['orderId'] = int(order.id)
                                 orderData['ticketSocketEventId'] = ticketSocketEventId
                                 sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, Phone, Shirts, 
-                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue) 
+                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, Email, Revenue, ServiceFees) 
                                                 VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
-                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s)"""
+                                                %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(email)s, %(revenue)s, %(serviceFees)s)"""
                                 ticketSocketOrderId = db.insert(sql, orderData, cnx)
                                 orderSuccess = (ticketSocketOrderId > 0)
 
@@ -631,7 +633,8 @@ class EventService:
                                     # compile ticket data for update
                                     ticketData = {
                                         'price': ticket.price if ticket.price != None else 0,
-                                        'ticketType': ticket.ticketType.strip()
+                                        'ticketType': ticket.ticketType.strip(),
+                                        'serviceFee': ticket.serviceFee if ticket.serviceFee != None else 0
                                     }
 
                                     # determine if ticket already exists
@@ -653,7 +656,7 @@ class EventService:
                                         ticketSocketOrderTicketId = int(existingTicket['Id'])
                                         ticketData['id'] = ticketSocketOrderTicketId
                                         
-                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, 
+                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, ServiceFee=%(serviceFee)s
                                                 LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticketSuccess = db.update(sql, ticketData, cnx)
                                     else:
@@ -661,8 +664,8 @@ class EventService:
                                         ticketAddNew = True
                                         ticketData['ticketId'] = int(ticket.id)
                                         ticketData['ticketSocketOrderId'] = ticketSocketOrderId
-                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price) 
-                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s)"""
+                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price, ServiceFee) 
+                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s, %(serviceFee)s)"""
                                         ticketSocketOrderTicketId = db.insert(sql, ticketData)
                                         ticketSuccess = (ticketSocketOrderTicketId > 0)
 
