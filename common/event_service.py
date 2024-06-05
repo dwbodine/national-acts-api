@@ -656,7 +656,7 @@ class EventService:
                                         ticketSocketOrderTicketId = int(existingTicket['Id'])
                                         ticketData['id'] = ticketSocketOrderTicketId
                                         
-                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, ServiceFee=%(serviceFee)s
+                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, ServiceFee=%(serviceFee)s, 
                                                 LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticketSuccess = db.update(sql, ticketData, cnx)
                                     else:
