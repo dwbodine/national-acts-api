@@ -84,6 +84,7 @@ class VipOrder(TicketSocketOrder):
     isRefunded: bool = False
     totalShirts: int = 0
     revenueUsd: float = 0
+    serviceFeesUsd: float = 0
     exchangeRate: float = 1.0
     currencySymbol: str = None
     currencyAbbrev: str = None
@@ -98,8 +99,10 @@ class VipOrder(TicketSocketOrder):
         if self.isRefunded == True:
             self.isActive = False
             self.revenueUsd = 0
+            self.serviceFeesUsd = 0
         else:
             self.revenueUsd = self.revenue * self.exchangeRate
+            self.serviceFeesUsd = self.serviceFees * self.exchangeRate
     
     def __checkOrderRefunded(self):
         if self.purchaserLastName == None or self.purchaserLastName.strip() == "":
@@ -183,7 +186,7 @@ class VipEvent(TicketSocketEvent):
                 
             if order.isDeleted != True:
                 totalRevenue += order.revenueUsd
-                totalServiceFees += order.serviceFees
+                totalServiceFees += order.serviceFeesUsd
                 totalTickets += order.numTickets
                 
                 if len(order.shirts) > 0:
