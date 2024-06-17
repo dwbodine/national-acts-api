@@ -168,7 +168,7 @@ class EventService:
                 vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
 
             if getOrders == True:
-                orders = self.__getOrdersFromEventId(ticketSocketEventId, showDeleted)
+                orders = self.__getOrdersFromEventId(ticketSocketEventId, showInactive, showDeleted)
                 vipEvent.orders = orders
             
             vipEvent.getTotals()
@@ -240,7 +240,7 @@ class EventService:
 
         return events
 
-    def __getOrdersFromEventId(self, ticketSocketEventId: int, showDeleted: bool = False):
+    def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False):
         orders: list[VipOrder] = []
         sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.* 
                     FROM TicketSocketOrders
@@ -256,6 +256,9 @@ class EventService:
 
         if showDeleted != True:
             sql += """ AND TicketSocketOrders.IsDeleted = 0"""
+            
+        if showInactive != True:
+            sql += """ AND TicketSocketOrders.IsActive = 1"""
             
             
         sql += " ORDER BY TicketSocketOrders.PurchaserLastName ASC, TicketSocketOrders.PurchaserFirstName ASC"

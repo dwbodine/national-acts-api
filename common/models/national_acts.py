@@ -96,11 +96,7 @@ class VipOrder(TicketSocketOrder):
     def getTotals(self):
         self.totalShirts = len(self.shirts)
         self.__checkOrderRefunded()
-        if self.isRefunded == True:
-            self.isActive = False
-            self.revenueUsd = 0
-            self.serviceFeesUsd = 0
-        else:
+        if self.isRefunded != True:
             self.revenueUsd = self.revenue * self.exchangeRate
             self.serviceFeesUsd = self.serviceFees * self.exchangeRate
     

@@ -306,12 +306,18 @@ class UserService:
         data = {}
         user: User = None
         if userId != None and userId > 0:
-            sql = "SELECT * FROM UsersNew WHERE UserId=%(userId)s"
+            sql = """SELECT UsersNew.*, COALESCE(UserRole.RoleId, 2) AS RoleId
+                        FROM UsersNew 
+                        LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
+                        WHERE UsersNew.UserId=%(userId)s"""
             data = {
                 'userId': userId
             }
         elif username != None and username != "":
-            sql = "SELECT * FROM UsersNew WHERE Username=%(username)s"
+            sql = """SELECT UsersNew.*, COALESCE(UserRole.RoleId, 2) AS RoleId 
+                        FROM UsersNew 
+                        LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
+                        WHERE UsersNew.Username=%(username)s"""
             data = {
                 'username': username
             }
@@ -321,21 +327,22 @@ class UserService:
             if row != {}:
                 user = User()
                 user.userId = int(row["UserId"])
+                user.role = int(row["RoleId"])
+                isAdmin: bool = (user.role == 1)
                 user.username = str(row["Username"])
                 user.firstName = str(row["FirstName"])
                 user.lastName = str(row["LastName"])
-                user.isActive = True if int(row["IsActive"]) == 1 else False
-                user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
+                user.isActive = True if int(row["IsActive"]) == 1 else False                
                 user.notes = str(row["Notes"])
                 createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
                 user.createdAt = createdAt.strftime("%m/%d/%Y")
-                if user.isAdmin == True:
+                if isAdmin:
                     user.showInactiveEvents = True
                 else:
                     user.showInactiveEvents = True if int(row["ShowInactiveEvents"]) == 1 else False
                 
                 if fetchSellers == True:
-                    sellers = self.__getUserSellers(user.userId, user.isAdmin)
+                    sellers = self.__getUserSellers(user.userId, isAdmin)
                     user.sellers = sellers
         return user
 

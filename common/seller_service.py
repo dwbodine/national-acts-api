@@ -10,9 +10,10 @@ class SellerService:
         sql = """SELECT SellerId, Name FROM Sellers ORDER BY Name"""
         data = None
         if userId != None:
-            userSql = """SELECT IF(UserId > 0, 1, 0) AS IsValid, COALESCE(IsAdmin, 0) AS IsAdmin
+            userSql = """SELECT IF(Users.UserId > 0, 1, 0) AS IsValid, COALESCE(UserRole.RoleId, 2) AS RoleId
                             FROM Users
-                            WHERE UserId=%(userId)s"""
+                            LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
+                            WHERE Users.UserId=%(userId)s"""
             userData = {
                 'userId': userId
             }
@@ -20,7 +21,7 @@ class SellerService:
 
             if user != {}:
                 isValid: bool = True if int(user['IsValid']) == 1 else False
-                isAdmin: bool = True if int(user['IsAdmin']) == 1 else False
+                isAdmin: bool = True if int(user['RoleId']) == 1 else False
                 if isValid == False:
                     return []
                 if isAdmin == False:

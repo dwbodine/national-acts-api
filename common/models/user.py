@@ -1,3 +1,5 @@
+from enum import Enum
+
 class UserSeller:
     def __init__(self, sellerId: int, sellerName: str):
         self.sellerId = sellerId
@@ -5,6 +7,7 @@ class UserSeller:
 
 class User:
     userId: int = 0
+    role: int = 2
     username: str = None
     password: str = None
     isAuthenticated: bool = False
@@ -12,7 +15,6 @@ class User:
     lastName: str = None
     notes: str = None
     isActive: bool = False
-    isAdmin: bool = False
     showInactiveEvents: bool = False
     createdAt: str = None
     token: str = None

@@ -3,6 +3,6 @@ FROM mariadb:10.6.16
 ENV MYSQL_ROOT_PASSWORD=All41n14@ll \
     MYSQL_DATABASE=nationalacts20
 
-COPY ./nationalacts_2024-06-06.sql /docker-entrypoint-initdb.d/
+COPY ./nationalacts_2024-06-16.sql /docker-entrypoint-initdb.d/
 
 EXPOSE 3306
