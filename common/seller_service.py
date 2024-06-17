@@ -12,7 +12,7 @@ class SellerService:
         if userId != None:
             userSql = """SELECT IF(Users.UserId > 0, 1, 0) AS IsValid, COALESCE(UserRole.RoleId, 2) AS RoleId
                             FROM Users
-                            LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
+                            LEFT JOIN UserRole ON Users.UserId = UserRole.UserId 
                             WHERE Users.UserId=%(userId)s"""
             userData = {
                 'userId': userId
