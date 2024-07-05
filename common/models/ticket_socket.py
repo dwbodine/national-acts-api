@@ -15,13 +15,22 @@ class TicketSocketVenue:
         self.postalCode = postalCode
         self.country = country
         self.timezone = timezone
+        
+class TicketSocketTicketType:
+    def __init__(self, eventId: int, ticketTypeId: int, ticketTypeName: str, totalAvailable: int, isActive: bool):
+        self.eventId = eventId
+        self.ticketTypeId = ticketTypeId
+        self.ticketTypeName = ticketTypeName
+        self.totalAvailable = totalAvailable
+        self.isActive = isActive
 
 class TicketSocketTicket:
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float):
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int):
         self.id = id
         self.ticketType = ticketType
         self.price = price
         self.serviceFee = serviceFee
+        self.ticketTypeId = ticketTypeId
 
 class TicketSocketOrder:
     eventId: int = 0
@@ -55,6 +64,7 @@ class TicketSocketEvent:
     onSale: bool = True
     thumbnail: str = ''
     ticketSocketUrl: str = ''
+    ticketTypes: list[TicketSocketTicketType] = []
 
     def __init__(self, id: int, title: str):
         self.id = id

@@ -3,6 +3,7 @@ import json
 import http.client
 import time
 from datetime import datetime
+from typing import Any
 
 from . import utility
 from . import db
@@ -112,7 +113,7 @@ class TicketSocketService:
         return self.categories
     
     def getEventsAndOrders(self, eventCategoryId: int = None, unixStart: int = None, unixEnd: int = None):
-        url = '/api/v1/events?includeEnded=true&includeOffSale=true&limit=9999'
+        url = '/api/v1/events?includeEnded=true&includeOffSale=true&includeTicketTypes=true&limit=9999'
 
         if eventCategoryId != None and eventCategoryId > 0:
             url += '&category=' + str(eventCategoryId)
@@ -272,12 +273,38 @@ class TicketSocketService:
                 except:
                     eventTime: int = event.utcTime + (self.utcOffsetHours * 60 * 60)         
                     event.eventDate = datetime.fromtimestamp(eventTime).strftime('%Y-%m-%d')
+                    
+                    
+                # ticket types
+                ticketTypes = []
+                if 'ticketTypes' in item:
+                    ticketTypes = self.getTicketTypesFromEvent(item['ticketTypes'])
+                event.ticketTypes = ticketTypes                
 
+                # orders
                 event.orders = self.getOrdersFromEventId(event.id, formatPhones)       
                 
                 self.events.append(event)
 
         return self.events
+    
+    def getTicketTypesFromEvent(self, ticketTypes: list[Any]):
+        if len(ticketTypes) <= 0:
+            return []
+        
+        ttypes: list[TicketSocketTicketType] = []
+        for item in ticketTypes:
+            id = int(item['id'])
+            name = str(item['name'])
+            eventId = int(item['eventId'])
+            totalAvailable = int(item['quantity'])
+            isActive: bool = True
+            if 'deleted' in item:
+                isActive = (int(item['deleted']) == 0)
+            ttype = TicketSocketTicketType(eventId, id, name, totalAvailable, isActive)
+            ttypes.append(ttype)
+            
+        return ttypes
     
     def getOrdersFromEventId(self, eventId: int, formatPhoneNumbers: bool):
         # get list of orderIds first
@@ -418,11 +445,14 @@ class TicketSocketService:
                         serviceFee: float = 0
                         if 'fee1Amount' in item:
                             serviceFee = float(item['fee1Amount'])
+                        ticketTypeId: int = 0
+                        if 'typeId' in item:
+                            ticketTypeId = int(item['typeId'])
 
                         if ticketId == 0 or ticketType == '':
                             continue
                         
-                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee)
+                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId)
                         orderTickets.append(ticket)
 
                         orderRevenue += price

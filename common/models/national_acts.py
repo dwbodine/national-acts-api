@@ -73,8 +73,8 @@ class VipTicket(TicketSocketTicket):
     ticketSocketOrderTicketId: int = 0
     isActive: bool = True
 
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float):
-        super().__init__(id, ticketType, price, serviceFee)
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int):
+        super().__init__(id, ticketType, price, serviceFee, ticketTypeId)
 
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
@@ -158,6 +158,7 @@ class VipEvent(TicketSocketEvent):
     nonUsaCurrencySymbol: str = None
     nonUsaCurrencyAbbrev: str = None
     numTicketsRefunded: int = 0
+    hasTicketTypeData: bool = False
 
     def getTotals(self):
         totalRevenue: float = 0
@@ -198,6 +199,8 @@ class VipEvent(TicketSocketEvent):
         self.totalTickets = totalTickets
         self.totalShirts = totalShirts
         self.numTicketsRefunded = totalTicketsRefunded
+        
+        self.hasTicketTypeData = (len(self.ticketTypes) > 0)
         
         shirtSales: list[ShirtSales] = []
         for size in shirtd:
@@ -291,15 +294,17 @@ class TicketSocketRefreshHistory:
     sellerName: str = None
     userName: str = None
 
-    def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int],
+    def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int], ticketTypesFailed: list[int], 
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
                   ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
+                  ticketTypesUpdated: int, ticketTypesInserted: int, ticketTypesDeactivated: int, 
                   startTimer: int, endTimer: int, duration: float, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
                   errorMessage: str = None):
         self.serviceEventsSkipped = serviceEventsSkipped
         self.eventsFailed = eventsFailed
         self.ordersFailed = ordersFailed
         self.ticketsFailed = ticketsFailed
+        self.ticketTypesFailed = ticketTypesFailed
         self.totalEventsFromService = totalEventsFromService
         self.eventsUpdated = eventsUpdated
         self.eventsInserted = eventsInserted
@@ -310,6 +315,9 @@ class TicketSocketRefreshHistory:
         self.ticketsUpdated = ticketsUpdated
         self.ticketsInserted = ticketsInserted
         self.ticketsDeactivated = ticketsDeactivated
+        self.ticketTypesUpdated = ticketTypesUpdated
+        self.ticketTypesInserted = ticketTypesInserted
+        self.ticketTypesDeactivated = ticketTypesDeactivated
         self.userId = userId
         self.sellerId = sellerId
         self.start = start
@@ -329,11 +337,13 @@ class TicketSocketRefreshHistory:
         self.__getSellerName()
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
-                 ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
-                 OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated) VALUES (%(userId)s, %(sellerId)s, 
+                 ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TicketTypesFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
+                 OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated, 
+                 TicketTypesUpdated, TicketTypesInserted, TicketTypesDeactivated) VALUES (%(userId)s, %(sellerId)s, 
                  %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s, %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
-                 %(ordersFailed)s, %(ticketsFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
-                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s)"""
+                 %(ordersFailed)s, %(ticketsFailed)s, %(ticketTypesFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
+                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s, 
+                 %(ticketTypesUpdated)s, %(ticketTypesInserted)s, %(ticketTypesDeactivated)s)"""
         
         data = {
             'userId': self.userId,
@@ -346,9 +356,10 @@ class TicketSocketRefreshHistory:
             'success': 1 if self.succeeded == True else 0,
             'errorMessage': self.errorMessage,
             'serviceEventsSkipped': ", ".join(self.serviceEventsSkipped),
-            'eventsFailed': ", ".join(self.eventsFailed),
-            'ordersFailed': ", ".join(self.ordersFailed),
-            'ticketsFailed': ", ".join(self.ticketsFailed),
+            'eventsFailed': ", ".join(str(v) for v in self.eventsFailed),
+            'ordersFailed': ", ".join(str(v) for v in self.ordersFailed),
+            'ticketsFailed': ", ".join(str(v) for v in self.ticketsFailed),
+            'ticketTypesFailed': ", ".join(str(v) for v in self.ticketTypesFailed),
             'totalEventsFromService': self.totalEventsFromService,
             'eventsUpdated': self.eventsUpdated,
             'eventsInserted': self.eventsInserted,
@@ -358,7 +369,10 @@ class TicketSocketRefreshHistory:
             'ordersDeleted': self.ordersDeleted,
             'ticketsUpdated': self.ticketsUpdated,
             'ticketsInserted': self.ticketsInserted, 
-            'ticketsDeactivated': self.ticketsDeactivated
+            'ticketsDeactivated': self.ticketsDeactivated,
+            'ticketTypesUpdated': self.ticketTypesUpdated,
+            'ticketTypesInserted': self.ticketTypesInserted, 
+            'ticketTypesDeactivated': self.ticketTypesDeactivated
         }
 
         return (db.insert(sql, data, cnx) > 0)

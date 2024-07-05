@@ -168,6 +168,8 @@ class EventService:
                 vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
 
             if getOrders == True:
+                ticketTypes = self.__getTicketTypesFromEventId(ticketSocketEventId)
+                vipEvent.ticketTypes = ticketTypes
                 orders = self.__getOrdersFromEventId(ticketSocketEventId, showInactive, showDeleted)
                 vipEvent.orders = orders
             
@@ -239,6 +241,28 @@ class EventService:
         events.sort(key = operator.attrgetter('eventDate', 'title', 'externalEventId'))
 
         return events
+
+    def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
+        ticketTypes: list[TicketSocketTicketType] = []
+        
+        sql = """SELECT TicketSocketTicketTypes.* 
+                    FROM TicketSocketTicketTypes
+                    WHERE TicketSocketTicketTypes.TicketSocketEventId=%(ticketSocketEventId)s 
+                    ORDER BY TicketSocketTicketTypes.TicketTypeName"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId
+        }           
+        
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            id = int(row["TicketSocketTicketTypeId"])
+            name = str(row["TicketTypeName"])
+            total = int(row["TotalAvailable"])
+            isActive: bool = (int(row["IsActive"]) == 1)
+            ticketType = TicketSocketTicketType(ticketSocketEventId, id, name, total, isActive)
+            ticketTypes.append(ticketType)
+        
+        return ticketTypes
 
     def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False):
         orders: list[VipOrder] = []
@@ -321,7 +345,7 @@ class EventService:
             ticketId: int = 0
             if row["TicketId"] != None and row["TicketId"] != '':
                 ticketId = int(row["TicketId"])
-            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]))
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]))
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
@@ -437,6 +461,7 @@ class EventService:
         serviceEventsSkipped: list[str] = []
         eventsFailed: list[int] = []
         ordersFailed: list[int] = []
+        ticketTypesFailed: list[int] = []
         ticketsFailed: list[int] = []    
         totalEventsFromService: int = 0
         eventsUpdated: int = 0
@@ -448,6 +473,9 @@ class EventService:
         ticketsUpdated: int = 0
         ticketsInserted: int = 0
         ticketsDeactivated: int = 0
+        ticketTypesUpdated: int = 0
+        ticketTypesInserted: int = 0
+        ticketTypesDeactivated: int = 0
         results: TicketSocketRefreshHistory = None
 
         try:
@@ -547,6 +575,67 @@ class EventService:
                         eventsFailed.append(evt.id)
                         continue
                     
+                    if ticketSocketEventId and len(evt.ticketTypes) > 0:
+                        eventTicketTypes: list[int] = []
+                        for ticketType in evt.ticketTypes:
+                            eventTicketTypes.append(ticketType.ticketTypeId)
+                            
+                            ticketTypeData = {
+                                'ticketSocketTicketTypeId': ticketType.ticketTypeId,
+                                'ticketSocketEventId': ticketSocketEventId,
+                                'ticketTypeName': ticketType.ticketTypeName,
+                                'totalAvailable': ticketType.totalAvailable,
+                                'isActive': 1 if ticketType.isActive else 0
+                            }
+                            
+                            ticketTypeSql = """SELECT * FROM TicketSocketTicketTypes WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
+                            ticketTypeSqlData = {
+                                'ticketSocketTicketTypeId': ticketType.ticketTypeId,
+                                'ticketSocketEventId': ticketSocketEventId
+                            }
+                            
+                            existingTicketType = db.queryOne(ticketTypeSql, ticketTypeSqlData, cnx)
+                            
+                            ticketTypeSuccess: bool = False
+                            ticketSocketTypeId: int = 0
+                            ticketTypeAddNew: bool = False
+                            
+                            if existingTicketType != {}:
+                                #update existing ticket type
+                                sql = """UPDATE TicketSocketTicketTypes SET TicketTypeName=%(ticketTypeName)s, TotalAvailable=%(totalAvailable)s, IsActive=%(isActive)s, 
+                                            LastUpdate=CURRENT_TIMESTAMP 
+                                            WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
+                                ticketTypeSuccess = db.update(sql, ticketTypeData, cnx)
+                            else:
+                                ticketTypeAddNew = True
+                                #insert new ticket type
+                                sql = """INSERT INTO TicketSocketTicketTypes (TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable, IsActive)  
+                                                VALUES (%(ticketSocketTicketTypeId)s, %(ticketSocketEventId)s, %(ticketTypeName)s, %(totalAvailable)s, %(isActive)s)"""
+                                ticketSocketTypeId = db.insert(sql, ticketTypeData, cnx)
+                                ticketTypeSuccess = (ticketSocketTypeId > 0)
+                                
+                            # if the update succeeded, update counters
+                            if ticketTypeSuccess:
+                                if ticketTypeAddNew:
+                                    ticketTypesInserted += 1
+                                else:
+                                    ticketTypesUpdated += 1
+                            else:
+                                # if that failed, mark it
+                                ticketTypesFailed.append(ticketType.ticketTypeId)
+                                
+                        # find any ticket types not returned by the service and mark as inactive
+                        if len(eventTicketTypes) > 0:
+                            eventTicketTypeData = {
+                                'ticketSocketEventId': ticketType.eventId
+                            }
+                            eventTicketStr = db.convertListToParameters(eventTicketTypes, eventTicketTypeData, 'eventTicketType')
+                            sql = """UPDATE TicketSocketTicketTypes Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
+                                    WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId NOT IN """ + eventTicketStr
+
+                            inactiveTicketTypes = db.update(sql, eventTicketTypeData, cnx)
+                            ticketTypesDeactivated += inactiveTicketTypes
+                    
                     if ticketSocketEventId and len(evt.orders) > 0:
                         eventOrders: list[int] = []
                         for order in evt.orders:
@@ -620,7 +709,7 @@ class EventService:
                                 # if that failed, just mark it failed and skip orders
                                 ordersFailed.append(order.id)
                                 continue
-
+                            
                             if ticketSocketOrderId and len(order.tickets) > 0:
                                 orderTickets: list[int] = []
 
@@ -695,7 +784,10 @@ class EventService:
                                     inactiveTickets = db.update(sql, orderTicketData, cnx)
                                     ticketsDeactivated += inactiveTickets
                                 
-                                # find any orders not returned by the service and mark as inactive
+                        
+                        
+                        
+                        # find any orders not returned by the service and mark as inactive
                         if len(eventOrders) > 0:
                             eventOrderData = {
                                 'ticketSocketEventId': ticketSocketEventId
@@ -713,9 +805,10 @@ class EventService:
             databaseDuration = endTimer - serviceTimer            
             utility.logMessage('database update complete in ' + str(databaseDuration) + ' seconds')            
                                     
-            results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, 
+            results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, 
                                                 eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
-                                                ticketsUpdated, ticketsInserted, ticketsDeactivated, int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
+                                                ticketsUpdated, ticketsInserted, ticketsDeactivated, ticketTypesUpdated, ticketTypesInserted, ticketTypesDeactivated, 
+                                                int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
             if userId != None and userId > 0:
                 userService = UserService()
@@ -810,6 +903,7 @@ class EventService:
             eventsFailed = str(row["EventsFailed"])
             ordersFailed = str(row["OrdersFailed"])
             ticketsFailed = str(row["TicketsFailed"])
+            ticketTypesFailed = str(row["TicketTypesFailed"])
             totalEventsFromService = int(row["TotalEventsFromService"])
             eventsUpdated = int(row["EventsUpdated"])
             eventsInserted = int(row["EventsInserted"])
@@ -820,10 +914,15 @@ class EventService:
             ticketsUpdated = int(row["TicketsUpdated"])
             ticketsInserted = int(row["TicketsInserted"])
             ticketsDeactivated = int(row["TicketsDeactivated"])
+            ticketTypesUpdated = int(row["TicketTypesUpdated"])
+            ticketTypesInserted = int(row["TicketTypesInserted"])
+            ticketTypesDeactivated = int(row["TicketTypesDeactivated"])
 
-            history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, totalEventsFromService, eventsUpdated, 
+
+            history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, eventsUpdated, 
                                                  eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
-                                                 ticketsDeactivated, startTimer, endTimer, duration, userId, sellerId, start, end, succeeded, errorMessage)
+                                                 ticketsDeactivated, ticketTypesUpdated, ticketTypesInserted, ticketTypesDeactivated, 
+                                                 startTimer, endTimer, duration, userId, sellerId, start, end, succeeded, errorMessage)
             history.sellerName = sellerName
             history.userName = userName
             logs.append(history)
