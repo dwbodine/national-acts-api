@@ -496,7 +496,6 @@ class EventService:
                 # get one database connection
                 cnx = db.getDbConnection()
                 
-                #utility.logMessage('processing events')
                 serviceEvents: list[int] = []
                 for evt in allEvents:
                     if evt.sellerEventCategoryId <= 0:
@@ -612,7 +611,7 @@ class EventService:
                                 sql = """INSERT INTO TicketSocketTicketTypes (TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable, IsActive)  
                                                 VALUES (%(ticketSocketTicketTypeId)s, %(ticketSocketEventId)s, %(ticketTypeName)s, %(totalAvailable)s, %(isActive)s)"""
                                 ticketSocketTypeId = db.insert(sql, ticketTypeData, cnx)
-                                ticketTypeSuccess = (ticketSocketTypeId > 0)
+                                ticketTypeSuccess = (ticketType.ticketTypeId > 0)
                                 
                             # if the update succeeded, update counters
                             if ticketTypeSuccess:
