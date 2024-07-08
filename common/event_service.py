@@ -53,8 +53,11 @@ class EventService:
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
             LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND TicketSocketEvents.EventDate = ExternalEvents.EventDate """
         
-        if tsEventId == None and showInactive != True:
-            sql += " AND ExternalEvents.IsActive = 1"
+        if tsEventId == None:
+            if showInactive == True:
+                sql += " AND ExternalEvents.IsActive = 0"
+            else:
+                sql += " AND ExternalEvents.IsActive = 1"
 
         sql += " WHERE "
         data = {}
@@ -69,7 +72,9 @@ class EventService:
             else:
                 showInactive = True
                 
-            if showInactive != True:
+            if showInactive == True:
+                whereClause.append("TicketSocketEvents.IsActive = 0")
+            else:
                 whereClause.append("TicketSocketEvents.IsActive = 1")
             
             if searchTerm != None and len(searchTerm) > 0:
@@ -183,8 +188,11 @@ class EventService:
             externalData = {}
             
             externalWhereClause: list[str] = []        
-            if showInactive != True:
+            if showInactive == True:
+                externalWhereClause.append("IsActive = 0")
+            else:
                 externalWhereClause.append("IsActive = 1")
+                
             if searchTerm != None and len(searchTerm) > 0:
                 externalWhereClause.append("""MATCH (Title, Venue, Address, City, State, Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
                 externalData["searchTerm"] = '*' + searchTerm + '*'
