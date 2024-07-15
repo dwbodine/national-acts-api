@@ -352,7 +352,7 @@ class UserService:
             return sellers
         
         data = {}
-        sql = "SELECT s.SellerId, s.Name FROM Sellers s"
+        sql = "SELECT s.SellerId, s.Name, s.SellerTypeId FROM Sellers s"
         if isAdmin == False:
             sql += " JOIN UserSeller us on us.SellerId = s.SellerId WHERE us.UserId=%(userId)s AND s.Inactive <> 1"            
             data = {
@@ -366,7 +366,8 @@ class UserService:
         for row in rows:
             sellerId = int(row["SellerId"])
             sellerName = str(row["Name"])
-            us = UserSeller(sellerId, sellerName)
+            sellerType = int(row["SellerTypeId"])
+            us = UserSeller(sellerId, sellerName, sellerType)
             sellers.append(us)
         return sellers
     

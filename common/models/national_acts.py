@@ -235,6 +235,8 @@ class VipEvent(TicketSocketEvent):
 class Seller:
     hideInList: bool = False
     isActive: bool = True
+    name: str = None
+    sellerType: int = 1
 
     sellerEventCategories: list[SellerEventCategory] = []
 
@@ -252,6 +254,7 @@ class Seller:
         row = db.queryOne(sql, data)
         if row != {}:
             self.name = str(row['Name'])
+            self.sellerType = int(row["SellerTypeId"])
             self.hideInList = int(row['HideInList']) == 1
             self.isActive = int(row['Inactive']) != 1
             self.__getSellerEventCategories()

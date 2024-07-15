@@ -25,7 +25,7 @@ class SellerService:
                 if isValid == False:
                     return []
                 if isAdmin == False:
-                    sql = """SELECT COALESCE(Sellers.SellerId, 0) AS SellerId, Sellers.Name
+                    sql = """SELECT COALESCE(Sellers.SellerId, 0) AS SellerId, Sellers.Name  
                                 FROM Sellers
                                 LEFT JOIN UserSeller ON UserSeller.SellerId=Sellers.SellerId
                                 WHERE UserSeller.UserId=%(userId)s 
@@ -55,6 +55,5 @@ class SellerService:
             sellerId = int(row["SellerId"])
             if sellerId > 0:
                 seller = Seller(sellerId)
-                seller.name = str(row["Name"])
                 sellers.append(seller)
         return sellers

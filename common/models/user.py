@@ -1,9 +1,10 @@
 from enum import Enum
 
 class UserSeller:
-    def __init__(self, sellerId: int, sellerName: str):
+    def __init__(self, sellerId: int, sellerName: str, sellerType: int):
         self.sellerId = sellerId
         self.sellerName = sellerName
+        self.sellerType = sellerType
 
 class User:
     userId: int = 0
