@@ -79,8 +79,8 @@ class ExchangeRateService:
                 if id > 0:
                     existingRate = currentRate
             elif currentRate != existingRate:
-                sql2 = """UPDATE ExchangeRateHistory SET USDRate=".$currentRate.", LastUpdated=CURRENT_TIMESTAMP 
-                          WHERE ExchangeRateId=".$exchangeRateId." AND MidnightDate=".$midnightDate"""
+                sql2 = """UPDATE ExchangeRateHistory SET USDRate=%(currentRate)s, LastUpdated=CURRENT_TIMESTAMP 
+                          WHERE ExchangeRateId=%(exchangeRateId)s AND MidnightDate=%(midnightDate)s"""
                 
                 data2 = {
                     'exchangeRateId': self.exchangeRate.exchangeRateId,
