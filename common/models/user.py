@@ -1,14 +1,15 @@
 from enum import Enum
 
 class UserSeller:
+    permissions: list[int] = []
     def __init__(self, sellerId: int, sellerName: str, sellerType: int):
         self.sellerId = sellerId
         self.sellerName = sellerName
         self.sellerType = sellerType
-
+        
 class User:
     userId: int = 0
-    role: int = 2
+    isAdmin: bool = False
     username: str = None
     password: str = None
     isAuthenticated: bool = False
@@ -16,7 +17,6 @@ class User:
     lastName: str = None
     notes: str = None
     isActive: bool = False
-    showInactiveEvents: bool = False
     createdAt: str = None
     token: str = None
     sellers: list[UserSeller] = []

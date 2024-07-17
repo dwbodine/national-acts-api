@@ -306,17 +306,15 @@ class UserService:
         data = {}
         user: User = None
         if userId != None and userId > 0:
-            sql = """SELECT UsersNew.*, COALESCE(UserRole.RoleId, 2) AS RoleId
+            sql = """SELECT UsersNew.*
                         FROM UsersNew 
-                        LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
                         WHERE UsersNew.UserId=%(userId)s"""
             data = {
                 'userId': userId
             }
         elif username != None and username != "":
-            sql = """SELECT UsersNew.*, COALESCE(UserRole.RoleId, 2) AS RoleId 
+            sql = """SELECT UsersNew.* 
                         FROM UsersNew 
-                        LEFT JOIN UserRole ON UsersNew.UserId = UserRole.UserId 
                         WHERE UsersNew.Username=%(username)s"""
             data = {
                 'username': username
@@ -327,8 +325,7 @@ class UserService:
             if row != {}:
                 user = User()
                 user.userId = int(row["UserId"])
-                user.role = int(row["RoleId"])
-                isAdmin: bool = (user.role == 1)
+                user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
                 user.username = str(row["Username"])
                 user.firstName = str(row["FirstName"])
                 user.lastName = str(row["LastName"])
@@ -336,14 +333,11 @@ class UserService:
                 user.notes = str(row["Notes"])
                 createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
                 user.createdAt = createdAt.strftime("%m/%d/%Y")
-                if isAdmin:
-                    user.showInactiveEvents = True
-                else:
-                    user.showInactiveEvents = True if int(row["ShowInactiveEvents"]) == 1 else False
                 
                 if fetchSellers == True:
-                    sellers = self.__getUserSellers(user.userId, isAdmin)
+                    sellers = self.__getUserSellers(user.userId, user.isAdmin)
                     user.sellers = sellers
+                    
         return user
 
     def __getUserSellers(self, userId: int, isAdmin: bool):
@@ -352,25 +346,54 @@ class UserService:
             return sellers
         
         data = {}
-        sql = "SELECT s.SellerId, s.Name, s.SellerTypeId FROM Sellers s"
+        sql = ""
         if isAdmin == False:
-            sql += " JOIN UserSeller us on us.SellerId = s.SellerId WHERE us.UserId=%(userId)s AND s.Inactive <> 1"            
+            sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId 
+                        FROM Sellers
+                        JOIN UserSeller on UserSeller.SellerId = Sellers.SellerId 
+                        WHERE UserSeller.UserId=%(userId)s AND Sellers.Inactive <> 1
+                        ORDER BY Sellers.Name ASC"""            
             data = {
                 'userId': userId
             }
-        
-        sql += " ORDER BY s.Name ASC"
+        else:
+            sql = "SELECT 0 as UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId FROM Sellers ORDER BY Sellers.Name ASC"
         
         rows = db.queryAll(sql, data)
         
         for row in rows:
+            userSellerId = int(row["UserSellerId"])
             sellerId = int(row["SellerId"])
             sellerName = str(row["Name"])
             sellerType = int(row["SellerTypeId"])
             us = UserSeller(sellerId, sellerName, sellerType)
+            if isAdmin == False:
+                permissions = self.__getUserSellerPermissions(userSellerId)
+                us.permissions = permissions
             sellers.append(us)
+            
         return sellers
     
+    def __getUserSellerPermissions(self, userSellerId: int):
+        permissions: list[int] = []
+        if userSellerId == None or userSellerId <= 0:
+            return permissions
+        
+        sql = """SELECT Permissions.PermissionId FROM Permissions
+                    JOIN RolePermissions ON RolePermissions.PermissionId = Permissions.PermissionId 
+                    JOIN UserSellerRole ON UserSellerRole.RoleId = RolePermissions.RoleId 
+                    WHERE UserSellerRole.UserSellerId=%(userSellerId)s  ORDER BY Permissions.PermissionId"""
+        data = {
+            'userSellerId': userSellerId
+        }
+        
+        rows = db.queryAll(sql, data)
+        
+        for row in rows:
+            permissionId = int(row["PermissionId"])
+            permissions.append(permissionId)
+            
+        return permissions
     
     def __validateUserName(self, username: str):
         if username == None or username.strip() == "":
