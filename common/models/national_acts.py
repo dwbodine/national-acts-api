@@ -99,6 +99,12 @@ class VipOrder(TicketSocketOrder):
         if self.isRefunded != True:
             self.revenueUsd = self.revenue * self.exchangeRate
             self.serviceFeesUsd = self.serviceFees * self.exchangeRate
+        if self.numTickets > 0:
+            i = 0
+            for ticket in self.tickets:
+                if len(self.attendeeNames) >= (i + 1):
+                    ticket.attendeeName = self.attendeeNames[i]
+                i += 1
     
     def __checkOrderRefunded(self):
         if self.purchaserLastName == None or self.purchaserLastName.strip() == "":
@@ -133,6 +139,7 @@ class VipEvent(TicketSocketEvent):
     totalRevenue: float = 0
     totalServiceFees: float = 0
     totalTickets: int = 0
+    totalCheckedIn: int = 0
     totalShirts: int = 0
     shirtSales: list[ShirtSales] = []
     isActive: bool = True
@@ -166,6 +173,7 @@ class VipEvent(TicketSocketEvent):
         totalTickets: int = 0
         totalShirts: int = 0
         totalTicketsRefunded: int = 0
+        totalCheckedIn: int = 0
         shirtd: dict() = {}
         for order in self.orders:
             if order.isRefunded:
@@ -186,6 +194,11 @@ class VipEvent(TicketSocketEvent):
                 totalServiceFees += order.serviceFeesUsd
                 totalTickets += order.numTickets
                 
+                if len(order.tickets) > 0:
+                    for ticket in order.tickets:
+                        if ticket.isCheckedIn:
+                            totalCheckedIn += 1
+                
                 if len(order.shirts) > 0:
                     totalShirts += len(order.shirts)
                     for size in order.shirts:
@@ -197,6 +210,7 @@ class VipEvent(TicketSocketEvent):
         self.totalRevenue = totalRevenue
         self.totalServiceFees = totalServiceFees
         self.totalTickets = totalTickets
+        self.totalCheckedIn = totalCheckedIn
         self.totalShirts = totalShirts
         self.numTicketsRefunded = totalTicketsRefunded
         

@@ -421,6 +421,20 @@ def setOrderDeletedSecured():
    service = EventService()
    result = service.deleteOrder(int(ticketSocketOrderId), deleted)
    return convertToJson(result)
+
+@app.route("/user/setTicketCheckinSecured", methods=["POST"])
+@jwt_required()
+def setTicketCheckinSecured():
+   ticketSocketOrderTicketId = request.json.get("ticketId", None)
+   isCheckedIn = request.json.get("isCheckedIn", None)
+   
+   if ticketSocketOrderTicketId == None or isCheckedIn == None:
+      return {"msg": "Bad Request"}, 400   
+   
+   checkedIn: bool = True if int(isCheckedIn) == 1 else False
+   service = EventService()
+   result = service.checkInTicket(ticketSocketOrderTicketId, checkedIn)
+   return convertToJson(result)
    
 @app.route('/public/events')
 def getEvents():

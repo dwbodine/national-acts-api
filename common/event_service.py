@@ -357,6 +357,7 @@ class EventService:
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
+            ticket.isCheckedIn = True if int(row["IsCheckedIn"]) == 1 else False
             tickets.append(ticket)
         return tickets
     
@@ -369,7 +370,7 @@ class EventService:
         return db.update(sql, data)
     
     def deleteEvent(self, ticketSocketEventId: int, deleted: bool):
-        sql = """UPDATE TicketSocketEvents SET IsDeleted=%(isDeleted)s WHERE Id=%(ticketSocketEventId)s"""
+        sql = """UPDATE TicketSocketEvents SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
         data = {
             'ticketSocketEventId': ticketSocketEventId,
             'isDeleted': 1 if deleted == True else 0
@@ -377,7 +378,7 @@ class EventService:
         return db.update(sql, data)
     
     def disableOrder(self, ticketSocketOrderId: int, disabled: bool):
-        sql = """UPDATE TicketSocketOrders SET IsActive=%(isActive)s WHERE Id=%(ticketSocketOrderId)s"""
+        sql = """UPDATE TicketSocketOrders SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
         data = {
             'ticketSocketOrderId': ticketSocketOrderId,
             'isActive': 0 if disabled == True else 1
@@ -385,10 +386,18 @@ class EventService:
         return db.update(sql, data)
     
     def deleteOrder(self, ticketSocketOrderId: int, deleted: bool):
-        sql = """UPDATE TicketSocketOrders SET IsDeleted=%(isDeleted)s WHERE Id=%(ticketSocketOrderId)s"""
+        sql = """UPDATE TicketSocketOrders SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
         data = {
             'ticketSocketOrderId': ticketSocketOrderId,
             'isDeleted': 1 if deleted == True else 0
+        }
+        return db.update(sql, data)
+    
+    def checkInTicket(self, ticketSocketOrderTicketId: int, checkedIn: bool):
+        sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=%(checkedIn)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderTicketId)s"""
+        data = {
+            'ticketSocketOrderTicketId': ticketSocketOrderTicketId,
+            'checkedIn': 1 if checkedIn == True else 0
         }
         return db.update(sql, data)
     
