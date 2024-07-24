@@ -124,6 +124,8 @@ class VipOrder(TicketSocketOrder):
         
         if strPos >= 0:
             self.isRefunded = True
+            self.revenue = 0
+            self.revenueUsd = 0
             if strPos > 0:
                 lastName = self.purchaserLastName
                 refundStr = lastName[strPos : len(lastName) - strPos]
