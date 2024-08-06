@@ -649,9 +649,6 @@ class EventService:
                             updateSql = """UPDATE TicketSocketTicketTypes Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
                                     WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId NOT IN """ + eventTicketStr
                                     
-                            utility.logMessage(updateSql)
-                            utility.logMessage(utility.convertToJson(eventTicketTypeData))
-
                             inactiveTicketTypes = db.update(updateSql, eventTicketTypeData, cnx)
                             ticketTypesDeactivated += inactiveTicketTypes
                     
