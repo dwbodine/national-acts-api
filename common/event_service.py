@@ -628,7 +628,7 @@ class EventService:
                                 sql = """INSERT INTO TicketSocketTicketTypes (TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable, IsActive)  
                                                 VALUES (%(ticketSocketTicketTypeId)s, %(ticketSocketEventId)s, %(ticketTypeName)s, %(totalAvailable)s, %(isActive)s)"""
                                 ticketSocketTypeId = db.insert(sql, ticketTypeData, cnx)
-                                ticketTypeSuccess = (ticketType.ticketTypeId > 0)
+                                ticketTypeSuccess = (ticketSocketTypeId > 0)
                                 
                             # if the update succeeded, update counters
                             if ticketTypeSuccess:
@@ -643,13 +643,16 @@ class EventService:
                         # find any ticket types not returned by the service and mark as inactive
                         if len(eventTicketTypes) > 0:
                             eventTicketTypeData = {
-                                'ticketSocketEventId': ticketType.eventId
+                                'ticketSocketEventId': ticketSocketEventId
                             }
                             eventTicketStr = db.convertListToParameters(eventTicketTypes, eventTicketTypeData, 'eventTicketType')
-                            sql = """UPDATE TicketSocketTicketTypes Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
+                            updateSql = """UPDATE TicketSocketTicketTypes Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
                                     WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId NOT IN """ + eventTicketStr
+                                    
+                            utility.logMessage(updateSql)
+                            utility.logMessage(utility.convertToJson(eventTicketTypeData))
 
-                            inactiveTicketTypes = db.update(sql, eventTicketTypeData, cnx)
+                            inactiveTicketTypes = db.update(updateSql, eventTicketTypeData, cnx)
                             ticketTypesDeactivated += inactiveTicketTypes
                     
                     if ticketSocketEventId and len(evt.orders) > 0:
