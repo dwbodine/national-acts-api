@@ -353,7 +353,7 @@ class EventService:
             ticketId: int = 0
             if row["TicketId"] != None and row["TicketId"] != '':
                 ticketId = int(row["TicketId"])
-            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]), str(row["BarCode"]), int(row["AvailableScans"]), str(row["PurchaseLocation"]))
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]), str(row["BarCode"]), int(row["AvailableScans"]), str(row["PurchaseLocation"]), int(row["ScannedTimestamp"]))
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
@@ -747,7 +747,8 @@ class EventService:
                                         'serviceFee': ticket.serviceFee if ticket.serviceFee != None else 0,
                                         'availableScans': ticket.availableScans,
                                         'barcode': ticket.barcode,
-                                        'purchaseLocation': ticket.purchaseLocation
+                                        'purchaseLocation': ticket.purchaseLocation,
+                                        'scannedTimestamp': ticket.scannedTimestamp
                                     }
 
                                     # determine if ticket already exists
@@ -767,19 +768,24 @@ class EventService:
                                     if existingTicket != {}:
                                         #update existing ticket
                                         ticketSocketOrderTicketId = int(existingTicket['Id'])
+                                        isCheckedIn = int(existingTicket['IsCheckedIn'])
+                                        if isCheckedIn != 1:
+                                            isCheckedIn = 1 if ticket.scannedTimestamp != 0 else 0
                                         ticketData['id'] = ticketSocketOrderTicketId
+                                        ticketData['isCheckedIn'] = isCheckedIn
                                         
                                         sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, ServiceFee=%(serviceFee)s, 
                                                 BarCode=%(barcode)s, AvailableScans=%(availableScans)s, PurchaseLocation=%(purchaseLocation)s, 
-                                                LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                                ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticketSuccess = db.update(sql, ticketData, cnx)
                                     else:
                                         #insert new ticket
                                         ticketAddNew = True
                                         ticketData['ticketId'] = int(ticket.id)
                                         ticketData['ticketSocketOrderId'] = ticketSocketOrderId
-                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price, ServiceFee, BarCode, AvailableScans, PurchaseLocation) 
-                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s)"""
+                                        ticketData['isCheckedIn'] = 1 if ticket.scannedTimestamp != 0 else 0
+                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price, ServiceFee, BarCode, AvailableScans, PurchaseLocation, ScannedTimestamp, IsCheckedIn) 
+                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s, %(isCheckedIn)s)"""
                                         ticketSocketOrderTicketId = db.insert(sql, ticketData)
                                         ticketSuccess = (ticketSocketOrderTicketId > 0)
 

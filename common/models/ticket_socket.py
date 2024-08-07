@@ -27,7 +27,7 @@ class TicketSocketTicketType:
 class TicketSocketTicket:
     attendeeName: str = None
     isCheckedIn: bool = False
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str):
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int):
         self.id = id
         self.ticketType = ticketType
         self.price = price
@@ -36,6 +36,7 @@ class TicketSocketTicket:
         self.barcode = barcode
         self.availableScans = availableScans
         self.purchaseLocation = purchaseLocation
+        self.scannedTimestamp = scannedTimestamp
 
 class TicketSocketOrder:
     eventId: int = 0

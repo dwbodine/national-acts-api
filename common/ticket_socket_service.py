@@ -457,11 +457,14 @@ class TicketSocketService:
                         purchaseLocation: str = ''
                         if 'purchaseLocation' in item:
                             purchaseLocation = str(item['purchaseLocation'])
+                        scannedTimestamp: int = 0
+                        if 'scannedTimestamp' in item:
+                            scannedTimestamp = int(item['scannedTimestamp'])
 
                         if ticketId == 0 or ticketType == '':
                             continue
                         
-                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation)
+                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp)
                         orderTickets.append(ticket)
 
                         orderRevenue += price

@@ -73,8 +73,8 @@ class VipTicket(TicketSocketTicket):
     ticketSocketOrderTicketId: int = 0
     isActive: bool = True
 
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str):
-        super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation)
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int):
+        super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp)
 
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
