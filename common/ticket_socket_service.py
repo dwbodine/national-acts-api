@@ -448,11 +448,20 @@ class TicketSocketService:
                         ticketTypeId: int = 0
                         if 'typeId' in item:
                             ticketTypeId = int(item['typeId'])
+                        barcode: str = ''
+                        if 'barcode' in item:
+                            barcode = str(item['barcode'])
+                        availableScans: int = 0
+                        if 'availableScans' in item:
+                            availableScans = int(item['availableScans'])
+                        purchaseLocation: str = ''
+                        if 'purchaseLocation' in item:
+                            purchaseLocation = str(item['purchaseLocation'])
 
                         if ticketId == 0 or ticketType == '':
                             continue
                         
-                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId)
+                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation)
                         orderTickets.append(ticket)
 
                         orderRevenue += price

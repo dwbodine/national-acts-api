@@ -604,6 +604,19 @@ def sendMail():
 
    return convertToJson(result)
 
+@app.route('/external/checkin')
+def checkin():
+   utility.logMessage('Webhook activated - GET')
+   args = utility.convertToJson(request.args)
+   utility.logMessage(args)
+   return convertToJson(True)
+
+@app.route('/external/checkin', methods=["POST"])
+def checkinPost():
+   utility.logMessage('Webhook activated - POST')
+   body = utility.convertToJson(request.json)
+   utility.logMessage(body)
+   return convertToJson(True)
 
 if __name__ == "__main__":
     app.run()

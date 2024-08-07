@@ -353,7 +353,7 @@ class EventService:
             ticketId: int = 0
             if row["TicketId"] != None and row["TicketId"] != '':
                 ticketId = int(row["TicketId"])
-            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]))
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]), str(row["BarCode"]), int(row["AvailableScans"]), str(row["PurchaseLocation"]))
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
@@ -589,6 +589,7 @@ class EventService:
                     else:
                         # if that failed, just mark it failed and skip orders
                         eventsFailed.append(evt.id)
+                        updateSuccess = False
                         continue
                     
                     if ticketSocketEventId and len(evt.ticketTypes) > 0:
@@ -724,6 +725,7 @@ class EventService:
                             else:
                                 # if that failed, just mark it failed and skip orders
                                 ordersFailed.append(order.id)
+                                updateSuccess = False
                                 continue
                             
                             if ticketSocketOrderId and len(order.tickets) > 0:
@@ -742,7 +744,10 @@ class EventService:
                                     ticketData = {
                                         'price': ticket.price if ticket.price != None else 0,
                                         'ticketType': ticket.ticketType.strip(),
-                                        'serviceFee': ticket.serviceFee if ticket.serviceFee != None else 0
+                                        'serviceFee': ticket.serviceFee if ticket.serviceFee != None else 0,
+                                        'availableScans': ticket.availableScans,
+                                        'barcode': ticket.barcode,
+                                        'purchaseLocation': ticket.purchaseLocation
                                     }
 
                                     # determine if ticket already exists
@@ -765,6 +770,7 @@ class EventService:
                                         ticketData['id'] = ticketSocketOrderTicketId
                                         
                                         sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, Price=%(price)s, ServiceFee=%(serviceFee)s, 
+                                                BarCode=%(barcode)s, AvailableScans=%(availableScans)s, PurchaseLocation=%(purchaseLocation)s, 
                                                 LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticketSuccess = db.update(sql, ticketData, cnx)
                                     else:
@@ -772,8 +778,8 @@ class EventService:
                                         ticketAddNew = True
                                         ticketData['ticketId'] = int(ticket.id)
                                         ticketData['ticketSocketOrderId'] = ticketSocketOrderId
-                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price, ServiceFee) 
-                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s, %(serviceFee)s)"""
+                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, Price, ServiceFee, BarCode, AvailableScans, PurchaseLocation) 
+                                                VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(price)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s)"""
                                         ticketSocketOrderTicketId = db.insert(sql, ticketData)
                                         ticketSuccess = (ticketSocketOrderTicketId > 0)
 
@@ -786,6 +792,7 @@ class EventService:
                                     else:
                                         # if that failed, just mark it failed and skip orders
                                         ticketsFailed.append(ticket.id)
+                                        updateSuccess = False
                                         continue
                                 
                                 # find any tickets not returned by the service and mark as inactive
@@ -834,7 +841,7 @@ class EventService:
             else:
                 results.userName = "System"
             
-            updateSuccess = results.commit(cnx)
+            results.commit(cnx)
             
             if cnx != None and cnx.is_connected:
                 cnx.close()
