@@ -21,7 +21,7 @@ class UserService:
                 
             if isValidInput:
                 #check to see if they exist first and pull data
-                sql = "SELECT Password, RequireResetPassword FROM UsersNew WHERE Username=%(username)s"
+                sql = "SELECT Password, RequireResetPassword FROM Users WHERE Username=%(username)s"
                 data = {
                     'username': username
                 }
@@ -68,7 +68,7 @@ class UserService:
             errorMessage: str = None        
             
             hashedPassword = self.__passwordHash(password)
-            sql = "INSERT INTO UsersNew (Username, Password, FirstName, LastName) VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s)"
+            sql = "INSERT INTO Users (Username, Password, FirstName, LastName) VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s)"
             data = {
                 'username': username,
                 'password': hashedPassword, 
@@ -172,7 +172,7 @@ class UserService:
         
         self.__expireAllUserTokens(username)
         
-        sql = "UPDATE UsersNew SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
+        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
         data = {
             'username': username,
             'password': self.__passwordHash(password)
@@ -194,7 +194,7 @@ class UserService:
         
         self.__expireAllUserTokens(username)
         
-        sql = "UPDATE UsersNew SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
+        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
         data = {
             'username': username,
             'password': self.__passwordHash(password)
@@ -218,7 +218,7 @@ class UserService:
         
         errorMessage: str = None        
         
-        sql = """INSERT INTO UsersNew (Username, FirstName, LastName, Password, Notes) 
+        sql = """INSERT INTO Users (Username, FirstName, LastName, Password, Notes) 
                     VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s)"""
         data = {
             'username': username,
@@ -257,7 +257,7 @@ class UserService:
         return self.__retrieveUserFromDatabase(username=username, fetchSellers=fetchSellers)
     
     def __expireAllUserTokens(self, username: str):
-        expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1 WHERE UserId IN (SELECT UserId FROM UsersNew WHERE Username=%(username)s)"
+        expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1 WHERE UserId IN (SELECT UserId FROM Users WHERE Username=%(username)s)"
         expireData = {
             'username': username
         }
@@ -306,16 +306,16 @@ class UserService:
         data = {}
         user: User = None
         if userId != None and userId > 0:
-            sql = """SELECT UsersNew.*
-                        FROM UsersNew 
-                        WHERE UsersNew.UserId=%(userId)s"""
+            sql = """SELECT Users.*
+                        FROM Users 
+                        WHERE Users.UserId=%(userId)s"""
             data = {
                 'userId': userId
             }
         elif username != None and username != "":
-            sql = """SELECT UsersNew.* 
-                        FROM UsersNew 
-                        WHERE UsersNew.Username=%(username)s"""
+            sql = """SELECT Users.* 
+                        FROM Users 
+                        WHERE Users.Username=%(username)s"""
             data = {
                 'username': username
             }
@@ -402,7 +402,7 @@ class UserService:
         if utility.validateEmailAddress(username) == False:
             return "Username must be a valid email address"
     
-        sql = "SELECT UserId FROM UsersNew WHERE Username = %(username)s"
+        sql = "SELECT UserId FROM Users WHERE Username = %(username)s"
         data = {
             'username': username
         }
