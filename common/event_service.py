@@ -129,6 +129,7 @@ class EventService:
             vipEvent.displayDate = str(row["DisplayDate"]) if row["DisplayDate"] != None else None
             vipEvent.thumbnail = str(row["Thumbnail"]) if row["Thumbnail"] != None else None
             vipEvent.ticketSocketUrl = str(row["URL"])
+            vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
             
             venueName = str(row["Venue"]) if row["Venue"] != None else None
             if row["ExternalVenue"] != None:
@@ -244,6 +245,7 @@ class EventService:
                 vipEvent.isVip = True if (vipEvent.externalVipLink != None and vipEvent.externalVipLink != "") else False
                 vipEvent.disableVipLinkButton = str(row["DisableVipLinkButton"])
                 vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
+                vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
                 events.append(vipEvent)
 
         events.sort(key = operator.attrgetter('eventDate', 'title', 'externalEventId'))
