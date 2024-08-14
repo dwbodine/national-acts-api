@@ -256,6 +256,276 @@ class UserService:
     def getUserByUserName(self, username: str, fetchSellers: bool = False):
         return self.__retrieveUserFromDatabase(username=username, fetchSellers=fetchSellers)
     
+    def getAllUsers(self):
+        users: list[User] = []
+        sql: str = """SELECT Users.* FROM Users"""
+        rows = db.queryAll(sql)
+        for row in rows:
+            user = User()
+            user.userId = int(row["UserId"])
+            user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
+            user.username = str(row["Username"])
+            user.firstName = str(row["FirstName"])
+            user.lastName = str(row["LastName"])
+            user.isActive = True if int(row["IsActive"]) == 1 else False                
+            user.notes = str(row["Notes"])
+            createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
+            user.createdAt = createdAt.strftime("%m/%d/%Y")
+            
+            sellers = self.__getUserSellers(user.userId, user.isAdmin)
+            user.sellers = sellers
+            if user.isAdmin:
+                user.category = "Admin"
+            elif len(user.sellers) > 1:
+                user.category = "Multiple"
+            elif len(user.sellers) > 0:
+                user.category = user.sellers[0].sellerName    
+            users.append(user)            
+        return users
+    
+    def getAllPermissions(self):
+        permissions: list[Permission] = []
+        sql = """SELECT * FROM Permissions"""
+        rows = db.queryAll(sql)
+        for row in rows:
+            permissionId = int(row["PermissionId"])
+            name = str(row["PermissionName"])
+            permission = Permission(permissionId, name)
+            permissions.append(permission)
+        return permissions
+    
+    def getAllRoles(self):
+        roles: list[Role] = []
+        sql = """SELECT * FROM Roles"""
+        rows = db.queryAll(sql)
+        for row in rows:
+            roleId = int(row["RoleId"])
+            name = str(row["RoleName"])
+            role = Role(roleId, name)
+            permissions = self.__getPermissionsForRole(roleId)
+            role.permissions = permissions
+            roles.append(role)
+        return roles  
+    
+    def getRoleById(self, roleId: int):
+        role: Role = None
+        sql = """SELECT * FROM Roles WHERE RoleId=%(roleId)s"""
+        data = {
+            'roleId': roleId
+        }
+        row = db.queryOne(sql, data)
+        if row != {}:
+            roleId = int(row["RoleId"])
+            name = str(row["RoleName"])
+            role = Role(roleId, name)
+            permissions = self.__getPermissionsForRole(roleId)
+            role.permissions = permissions
+        return role
+    
+    def updateRole(self, roleToUpdate: Role):
+        success: bool = True
+        if roleToUpdate == None:
+            return False
+        existingRole: Role = self.getRoleById(roleToUpdate.roleId)
+        if existingRole != None:
+            roleId = existingRole.roleId
+            updateSql = """UPDATE Roles SET RoleName=%(name)s, LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
+            updateData = {
+                'name': roleToUpdate.name,
+                'roleId': roleId
+            }
+            success = db.update(updateSql, updateData)
+            if success == True:
+                success = self.__assignPermissionsToRole(roleId, roleToUpdate.permissions)
+        else:
+            insertSql = """INSERT INTO Roles (RoleName) VALUES (%(name)s)"""    
+            insertData = {
+                'name': roleToUpdate.name
+            }
+            roleId = db.insert(insertSql, insertData)
+            if roleId > 1:
+                success = self.__assignPermissionsToRole(roleId, roleToUpdate.permissions)
+        return success            
+            
+    def updateUser(self, userToUpdate: User):
+        success: bool = True
+        if userToUpdate == None or userToUpdate.userId == None or userToUpdate.userId <= 0:
+            return False
+        userId: int = userToUpdate.userId
+        existingUser: User = self.__retrieveUserFromDatabase(userId=userId)
+        if existingUser != None:
+            username = existingUser.username
+            if userToUpdate.username != None and userToUpdate.username != "":
+                username = userToUpdate.username
+            sendTextReset = userToUpdate.sendTextReset
+            if userToUpdate.mobile == None or userToUpdate.mobile == "":
+                sendTextReset = False
+            updateSql = """UPDATE Users SET IsAdmin=%(isAdmin)s, 
+                           Username=%(username)s, 
+                           FirstName=%(firstName)s, 
+                           LastName=%(lastName)s, 
+                           Mobile=%(mobile)s,
+                           Notes=%(notes)s, 
+                           IsActive=%(isActive)s, 
+                           RequireResetPassword=%(requireResetPassword)s, 
+                           SendEmailReset=%(sendEmailReset)s,
+                           SendTextReset=%(sendTextReset)s, 
+                           LastUpdate=CURRENT_TIMESTAMP 
+                           WHERE UserId=%(userId)s"""
+            updateData = {
+                'isAdmin': 1 if userToUpdate.isAdmin else 0, 
+                'username': username, 
+                'firstName': userToUpdate.firstName,
+                'lastName': userToUpdate.lastName,
+                'mobile': userToUpdate.mobile,
+                'notes': userToUpdate.notes,
+                'isActive': 1 if userToUpdate.isActive else 0,
+                'requireResetPassword': 1 if userToUpdate.requireResetPassword else 0, 
+                'sendEmailReset': 1 if userToUpdate.sendEmailReset else 0, 
+                'sendTextReset': 1 if sendTextReset else 0, 
+                'userId': userId
+            }
+            success = db.update(updateSql, updateData)
+            if success == True:
+                success = self.__assignUserToSellers(userId, userToUpdate.isAdmin, userToUpdate.sellers)
+        else:
+            success = False                
+        return success
+                
+    def __getPermissionsForRole(self, roleId: int):
+        permissions: list[Permission] = []
+        sql = """SELECT Permissions.PermissionId, Permissions.PermissionName 
+                 FROM Permissions 
+                 JOIN RolePermissions ON RolePermissions.PermissionId = Permissions.PermissionId 
+                 WHERE RolePermissions.RoleId=%(roleId)s"""
+        data = {
+            'roleId': roleId
+        }
+        rows = db.queryAll(sql)
+        for row in rows:
+            permissionId = int(row["PermissionId"])
+            name = int(row["PermissionName"])
+            permission = Permission(permissionId, name)
+            permissions.append(permission)
+        return permissions
+    
+    def __assignUserToSellers(self, userId: int, isAdmin: bool, newSellers: list[UserSeller]):
+        success: bool = True
+        existingUser: User = self.__retrieveUserFromDatabase(userId=userId, fetchSellers=True)
+        if existingUser != None:
+            if isAdmin == True:
+                currentUsSql = """SELECT * FROM UserSeller WHERE UserId=%(userId)s"""
+                currentUsData = {
+                    'userId': userId
+                }
+                rows = db.queryAll(currentUsSql, currentUsData)
+                for row in rows:
+                    userSellerId = int(row["UserSellerId"])
+                    deleteRoleSql = """DELETE FROM UserSellerRole WHERE UserSellerId=%(userSellerId)s"""
+                    deleteRoleData = {
+                        'userSellerId': userSellerId
+                    }
+                    success = db.delete(deleteRoleSql, deleteRoleData)
+                deleteSellerSql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
+                deleteSellerData = {
+                    'userId': userId
+                }
+                success = db.delete(deleteSellerSql, deleteSellerData)
+            else:
+                newSellerIds = [seller.sellerId for seller in newSellers]
+                for existingSeller in existingUser.sellers:
+                    existingSellerId = existingSeller.sellerId
+                    if existingSellerId in newSellerIds:
+                        newSeller: UserSeller = self.__getUserSellerFromListById(newSellers, existingSellerId)
+                        if existingSeller.roleId != newSeller.roleId:
+                            updateRoleSql = """UPDATE UserSellerRole SET RoleId=%(roleId)s WHERE UserSellerId=%(userSellerId)s"""
+                            updateRoleData = {
+                                'roleId': newSeller.roleId,
+                                'userSellerId': existingSellerId
+                            }
+                            success = db.update(updateRoleSql, updateRoleData)
+                        newSellerIds.remove(existingSellerId)
+                    else:
+                        deleteRoleSql = """DELETE FROM UserSellerRole WHERE UserSellerId=%(userSellerId)s"""
+                        deleteRoleData = {
+                            'userSellerId': existingSellerId
+                        }
+                        success = db.delete(deleteRoleSql, deleteRoleData)
+                        deleteSellerSql = """DELETE FROM UserSeller WHERE UserSellerId=%(userSellerId)s"""
+                        deleteSellerData = {
+                            'userSellerId': existingSellerId
+                        }
+                        success = db.delete(deleteSellerSql, deleteSellerData)
+                if newSellerIds.count > 0:
+                    for newSellerId in newSellerIds:
+                        if newSellerId > 0:
+                            newSeller: UserSeller = self.__getUserSellerFromListById(newSellers, newSellerId)
+                            if newSeller != None:
+                                insertSellerSql = """INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"""
+                                insertSellerData = {
+                                    'userId': userId,
+                                    'sellerId': newSellerId
+                                }
+                                userSellerId = db.insert(insertSellerSql, insertSellerData)
+                                if userSellerId > 0:
+                                    insertRoleSql = """INSERT INTO UserSellerRole (UserSellerId, RoleId) VALUES (%(userSellerId)s, %(roleId)s)"""
+                                    insertRoleData = {
+                                        'userSellerId': userSellerId,
+                                        'roleId': newSeller.roleId
+                                    }
+                                    userSellerId = db.insert(insertRoleSql, insertRoleData)
+                                    success = (userSellerId > 0)
+        else:
+            success = False
+        return success
+                        
+    def __assignPermissionsToRole(self, roleId: int, newPermissions: list[Permission]):
+        existingRole = self.getRoleById(roleId)
+        success: bool = True
+        if existingRole != None:
+            newPermissionIds = [permission.permissionId for permission in newPermissions]
+            for existingPermission in existingRole.permissions:
+                existingPermissionId = existingPermission.permissionId
+                if existingPermissionId in newPermissionIds:
+                    newPermission: Permission = self.__getPermissionFromListById(newPermissions, existingPermissionId)
+                    newPermissionIds.remove(existingPermissionId)
+                else:
+                    deleteRoleSql = """DELETE FROM RolePermissions WHERE RoleId=%(roleId)s AND PermissionId=%(permissionId)s"""
+                    deleteRoleData = {
+                        'permissionId': existingPermissionId,
+                        'roleId': roleId
+                    }
+                    success = db.delete(deleteRoleSql, deleteRoleData)
+            if newPermissions.count > 0:
+                for newPermissionId in newPermissions:
+                    if newPermissionId > 0:
+                        newPermission: Permission = self.__getPermissionFromListById(newPermissions, newPermissionId)
+                        if newPermission != None:
+                            insertPermissionSql = """INSERT INTO RolePermissions (RoleId, PermissionId) VALUES (%(roleId)s, %(permissionId)s)"""
+                            insertPermissionData = {
+                                'roleId': roleId,
+                                'permissionId': newPermissionId
+                            }
+                            rolePermissionId = db.insert(insertPermissionSql, insertPermissionData)
+                            success = (rolePermissionId > 0)
+        return success
+            
+    def __getUserSellerFromListById(sellers: list[UserSeller], userSellerId: int):
+        userSeller: UserSeller = None
+        for seller in sellers:
+            if seller.sellerId == userSellerId:
+                userSeller = seller
+                break
+        return userSeller
+    
+    def __getPermissionFromListById(permissions: list[Permission], permissionId: int):
+        permission: Permission = None
+        for p in permissions:
+            if p.permissionId == permissionId:
+                permission = p
+                break
+        return permission
+    
     def __expireAllUserTokens(self, username: str):
         expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1 WHERE UserId IN (SELECT UserId FROM Users WHERE Username=%(username)s)"
         expireData = {
@@ -288,8 +558,6 @@ class UserService:
             return code
         else:
             return 0    
-
-    
     
     def __passwordverify(self, password: str, hashedPassword: str):
         hPass = self.__passwordHash(password)
@@ -331,12 +599,24 @@ class UserService:
                 user.lastName = str(row["LastName"])
                 user.isActive = True if int(row["IsActive"]) == 1 else False                
                 user.notes = str(row["Notes"])
+                user.mobile = str(row["Mobile"])
+                user.requireResetPassword = True if int(row["RequireResetPassword"]) else False
+                user.sendEmailReset = True if int(row["SendEmailReset"]) else False 
+                user.sendTextReset = True if int(row["SendTextReset"]) else False 
                 createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
+                lastUpdate = datetime.fromisoformat(str(row["LastUpdate"]))
                 user.createdAt = createdAt.strftime("%m/%d/%Y")
+                user.lastUpdate = lastUpdate.strftime("%m/%d/%Y")
                 
                 if fetchSellers == True:
                     sellers = self.__getUserSellers(user.userId, user.isAdmin)
                     user.sellers = sellers
+                    if user.isAdmin:
+                        user.category = "Admin"
+                    elif len(user.sellers) > 1:
+                        user.category = "Multiple"
+                    elif len(user.sellers) > 0:
+                        user.category = user.sellers[0].sellerName    
                     
         return user
 
@@ -348,16 +628,17 @@ class UserService:
         data = {}
         sql = ""
         if isAdmin == False:
-            sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId 
+            sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId, UserSellerRole.RoleId 
                         FROM Sellers
                         JOIN UserSeller on UserSeller.SellerId = Sellers.SellerId 
+                        LEFT JOIN UserSellerRole on UserSellerRole.UserSellerId = UserSeller.UserSellerId 
                         WHERE UserSeller.UserId=%(userId)s AND Sellers.Inactive <> 1
                         ORDER BY Sellers.Name ASC"""            
             data = {
                 'userId': userId
             }
         else:
-            sql = "SELECT 0 as UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId FROM Sellers ORDER BY Sellers.Name ASC"
+            sql = "SELECT 0 as UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId, 1 AS RoleId FROM Sellers ORDER BY Sellers.Name ASC"
         
         rows = db.queryAll(sql, data)
         
@@ -366,7 +647,8 @@ class UserService:
             sellerId = int(row["SellerId"])
             sellerName = str(row["Name"])
             sellerType = int(row["SellerTypeId"])
-            us = UserSeller(sellerId, sellerName, sellerType)
+            roleId = int(row["RoleId"])
+            us = UserSeller(sellerId, sellerName, sellerType, roleId)
             if isAdmin == False:
                 permissions = self.__getUserSellerPermissions(userSellerId)
                 us.permissions = permissions
@@ -376,13 +658,14 @@ class UserService:
     
     def __getUserSellerPermissions(self, userSellerId: int):
         permissions: list[int] = []
-        if userSellerId == None or userSellerId <= 0:
+        if userSellerId == None or userSellerId <= 1:
             return permissions
         
         sql = """SELECT Permissions.PermissionId FROM Permissions
                     JOIN RolePermissions ON RolePermissions.PermissionId = Permissions.PermissionId 
                     JOIN UserSellerRole ON UserSellerRole.RoleId = RolePermissions.RoleId 
-                    WHERE UserSellerRole.UserSellerId=%(userSellerId)s  ORDER BY Permissions.PermissionId"""
+                    WHERE UserSellerRole.UserSellerId=%(userSellerId)s 
+                    ORDER BY Permissions.PermissionId"""
         data = {
             'userSellerId': userSellerId
         }

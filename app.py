@@ -55,6 +55,19 @@ def after_request(response):
       utility.logMessage('JWT not found')
    return response
 
+def __isAdminLoggedIn():
+   isAdmin: bool = False
+   try:
+      # put this line here to prevent exceptions when there is no auth header
+      if request.headers.get("Authorization") != None:
+         username = get_jwt()["sub"]
+         service = UserService()
+         user = service.getUserByUserName(username)
+         isAdmin = user.isAdmin
+   except:
+      isAdmin = False
+   return isAdmin
+
 @app.route('/')
 def health():
    return 'All is Well\r\n'
@@ -617,6 +630,79 @@ def checkinPost():
    body = utility.convertToJson(request.json)
    utility.logMessage(body)
    return convertToJson(True)
+
+@app.route('/admin/users')
+@jwt_required()
+def getAllUsers():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   service = UserService()
+   users = service.getAllUsers()
+   return convertToJson(users)   
+
+@app.route('/admin/roles')
+@jwt_required()
+def getAllRoles():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   service = UserService()
+   roles = service.getAllRoles()
+   return convertToJson(roles) 
+
+@app.route('/admin/roles/<int:roleId>')
+@jwt_required()
+def getRoleById(roleId):
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   if roleId == None or roleId <= 1:
+      return {"msg": "Bad Request"}, 400 
+   
+   service = UserService()
+   role = service.getRoleById(roleId)
+   return convertToJson(role) 
+
+@app.route('/admin/permissions')
+@jwt_required()
+def getAllPermissions():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   service = UserService()
+   permissions = service.getAllPermissions()
+   return convertToJson(permissions) 
+
+@app.route('/admin/updateRole', methods=["POST"])
+@jwt_required()
+def updateRole():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   role: Role = request.get_json()
+   
+   service = UserService()
+   success = service.updateRole(role)
+   return convertToJson(success) 
+
+@app.route('/admin/updateUser', methods=["POST"])
+@jwt_required()
+def updateUser():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   user: User = request.get_json()
+   
+   service = UserService()
+   success = service.updateUser(user)
+   return convertToJson(success) 
 
 if __name__ == "__main__":
     app.run()
