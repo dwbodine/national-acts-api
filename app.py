@@ -57,16 +57,22 @@ def after_request(response):
 
 def __isAdminLoggedIn():
    isAdmin: bool = False
+   user = __getUserFromJwt()
+   if user != None:
+      isAdmin = user.isAdmin
+   return isAdmin
+
+def __getUserFromJwt():
+   user: User = None
    try:
       # put this line here to prevent exceptions when there is no auth header
       if request.headers.get("Authorization") != None:
          username = get_jwt()["sub"]
          service = UserService()
          user = service.getUserByUserName(username)
-         isAdmin = user.isAdmin
    except:
-      isAdmin = False
-   return isAdmin
+      user = None
+   return user
 
 @app.route('/')
 def health():
@@ -703,6 +709,51 @@ def updateUser():
    service = UserService()
    success = service.updateUser(user)
    return convertToJson(success) 
+
+@app.route('/internal/logUserActivity', methods=["POST"])
+@jwt_required()
+def logUserActivity():
+   success: bool = False
+   user = __getUserFromJwt()
+   activityType = request.json.get("activityType")
+   activityData = request.json.get("activityData")
+   
+   if user != None and activityType != None:
+      userId = user.userId     
+      
+      service = UserService()
+      data: str = str(activityData) if activityData != None else ''
+      success = service.logUserActivity(userId, int(activityType), data)
+   return convertToJson(success)
+
+@app.route('/dashboard/getUserActivity', methods=["POST"])
+@jwt_required()
+def getUserActivity():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   start = request.json.get("start")
+   end = request.json.get("end")
+   userId = request.json.get("userId")
+   activityType = request.json.get("activityType")
+   
+   if start == None or end == None:
+      return {"msg": "Bad Request"}, 400
+   
+   service = UserService()
+   activities: list[UserActivity] = []
+   if userId != None and activityType != None:
+      activities = service.getUserActivity(start, end, int(userId), int(activityType))
+   elif userId != None:
+      activities = service.getUserActivity(start, end, int(userId), None)
+   elif activityType != None:
+      activities = service.getUserActivity(start, end, None, int(activityType))
+   else:
+      activities = service.getUserActivity(start, end)
+   return convertToJson(activities)
+      
+      
 
 if __name__ == "__main__":
     app.run()

@@ -1,15 +1,15 @@
 from enum import Enum
 
 class Permission:
-    def __init__(self, permissionId: int, name: str):
+    def __init__(self, permissionId: int, permissionName: str):
         self.permissionId = permissionId
-        self.name = name
+        self.permissionName = permissionName
         
 class Role:
     permissions: list[Permission] = []
-    def __init__(self, roleId: int, name: str):
+    def __init__(self, roleId: int, roleName: str):
         self.roleId = roleId
-        self.name = name
+        self.roleName = roleName
 
 class UserSeller:
     permissions: list[int] = []
@@ -18,6 +18,15 @@ class UserSeller:
         self.sellerName = sellerName
         self.sellerType = sellerType
         self.roleId = roleId
+        
+class UserActivity:
+    def __init__(self, userId: int, activityType: int, activityData: str, activityTime: str, activityName: str, username: str):
+        self.userId = userId
+        self.activityType = activityType
+        self.activityData = activityData 
+        self.activityTime = activityTime
+        self.activityName = activityName
+        self.username = username
         
 class User:
     userId: int = 0
