@@ -3,6 +3,8 @@ import sys
 from datetime import timedelta, timezone
 from flask import Flask, request, jsonify
 from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, verify_jwt_in_request, unset_jwt_cookies, jwt_required, JWTManager
+import json
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -20,7 +22,7 @@ loadEnv()
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.getenv('SECRET_KEY')
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 application = app
 
@@ -691,10 +693,27 @@ def updateRole():
    if isAdmin == False:
       return {"msg": "Unauthorized"}, 401
    
-   role: Role = request.get_json()
+   data = convertToJson(request.get_json())
+   
+   role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
    
    service = UserService()
    success = service.updateRole(role)
+   return convertToJson(success) 
+
+@app.route('/admin/deleteRoles', methods=["POST"])
+@jwt_required()
+def deleteRoles():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   data = convertToJson(request.get_json())
+   
+   roleIds: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+   
+   service = UserService()
+   success = service.deleteRoles(roleIds)
    return convertToJson(success) 
 
 @app.route('/admin/updateUser', methods=["POST"])
@@ -704,7 +723,9 @@ def updateUser():
    if isAdmin == False:
       return {"msg": "Unauthorized"}, 401
    
-   user: User = request.get_json()
+   data = convertToJson(request.get_json())
+   
+   user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
    
    service = UserService()
    success = service.updateUser(user)
@@ -737,20 +758,22 @@ def getUserActivity():
    end = request.json.get("end")
    userId = request.json.get("userId")
    activityType = request.json.get("activityType")
+   filterAdmins = request.json.get("filterAdmins")
    
    if start == None or end == None:
       return {"msg": "Bad Request"}, 400
    
    service = UserService()
    activities: list[UserActivity] = []
+   filterAdminVal: bool = True if filterAdmins != None else False
    if userId != None and activityType != None:
-      activities = service.getUserActivity(start, end, int(userId), int(activityType))
+      activities = service.getUserActivity(start, end, int(userId), int(activityType), filterAdmins=filterAdminVal)
    elif userId != None:
-      activities = service.getUserActivity(start, end, int(userId), None)
+      activities = service.getUserActivity(start, end, int(userId), filterAdmins=filterAdminVal)
    elif activityType != None:
-      activities = service.getUserActivity(start, end, None, int(activityType))
+      activities = service.getUserActivity(start, end, activityType=int(activityType), filterAdmins=filterAdminVal)
    else:
-      activities = service.getUserActivity(start, end)
+      activities = service.getUserActivity(start, end, filterAdmins=filterAdminVal)
    return convertToJson(activities)
       
       
