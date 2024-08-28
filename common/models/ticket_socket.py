@@ -47,6 +47,10 @@ class TicketSocketOrder:
     shirts: list[str] = []
     purchaserFirstName: str = ''
     purchaserLastName: str = ''
+    purchaserCity: str = None
+    purchaserState: str = None
+    purchaserZipCode: str = None
+    purchaserCountry: str = None
     purchaseDate: str = ''
     purchaseTimestamp: str = ''
     email: str = ''

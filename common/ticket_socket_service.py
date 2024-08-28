@@ -383,6 +383,14 @@ class TicketSocketService:
                             order.purchaserFirstName = utility.fixMagicQuotes(item['billing_firstName'])
                         if order.purchaserLastName == '' and 'billing_lastName' in item:
                             order.purchaserLastName = utility.fixMagicQuotes(item['billing_lastName'])
+                        if order.purchaserCity == None and 'billing_city' in item:
+                            order.purchaserCity = utility.fixMagicQuotes(item['billing_city'])
+                        if order.purchaserState == None and 'billing_state' in item:
+                            order.purchaserState = utility.fixMagicQuotes(item['billing_state'])
+                        if order.purchaserZipCode == None and 'billing_zip' in item:
+                            order.purchaserZipCode = utility.fixMagicQuotes(item['billing_zip'])
+                        if order.purchaserCountry == None and 'billing_country' in item:
+                            order.purchaserCountry = utility.fixMagicQuotes(item['billing_country'])
                         if order.purchaseDate == '' and 'purchaseDate' in item:
                             # datetime is not serializable in python, convert it to ISO-compatible string
                             purchaseDate = datetime.fromtimestamp(float(item['purchaseDate']))
