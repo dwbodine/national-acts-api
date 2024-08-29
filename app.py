@@ -731,6 +731,22 @@ def updateUser():
    success = service.updateUser(user)
    return convertToJson(success) 
 
+@app.route('/admin/deleteUser', methods=["POST"])
+@jwt_required()
+def deleteUser():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   userId = request.json.get("userId", None)
+   
+   if userId == None:
+      return {"msg": "Bad Request"}, 400
+   
+   service = UserService()
+   success = service.deleteUser(userId)
+   return convertToJson(success) 
+
 @app.route('/internal/logUserActivity', methods=["POST"])
 @jwt_required()
 def logUserActivity():

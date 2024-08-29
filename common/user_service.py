@@ -414,6 +414,27 @@ class UserService:
             success = False                
         return success
     
+    def deleteUser(self, userId: int):
+        success: bool = False
+        data = {
+            'userId': userId
+        }
+        
+        try:
+            userSellerSql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
+            success = db.delete(userSellerSql, data)   
+            
+            userActivitySql = """DELETE FROM UserActivity WHERE UserId=%(userId)s"""
+            success = db.delete(userActivitySql, data)   
+            
+            userSql = """DELETE FROM Users WHERE UserId=%(userId)s"""
+            success = db.delete(userSql, data)
+        except Exception as err:
+            success = False
+            utility.logMessage(f"Unexpected {err=}, {type(err)=}")
+            
+        return success
+    
     def logUserActivity(self, userId: int, activityId: int, activityData: str):
         sql = ""
         data = {
