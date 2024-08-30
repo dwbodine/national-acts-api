@@ -168,6 +168,7 @@ class VipEvent(TicketSocketEvent):
     numTicketsRefunded: int = 0
     hasTicketTypeData: bool = False
     isAddedToBandsInTown: bool = False
+    sellerName: str = ''
 
     def getTotals(self):
         totalRevenue: float = 0
