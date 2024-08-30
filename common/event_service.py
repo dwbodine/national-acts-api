@@ -78,9 +78,7 @@ class EventService:
             elif ignoreFlags != True:
                 whereClause.append("TicketSocketEvents.IsActive = 1")
                 
-            if showHidden == True:
-                whereClause.append("TicketSocketEvents.IsHidden = 1")
-            elif ignoreFlags != True:
+            if showHidden != True and ignoreFlags != True:
                 whereClause.append("TicketSocketEvents.IsHidden = 0")
             
             if searchTerm != None and len(searchTerm) > 0:
@@ -205,9 +203,7 @@ class EventService:
             elif ignoreFlags != True:
                 externalWhereClause.append("ExternalEvents.IsActive = 1")
             
-            if showHidden == True:
-                externalWhereClause.append("ExternalEvents.IsHidden = 1")
-            elif ignoreFlags != True:
+            if showHidden != True and ignoreFlags != True:
                 externalWhereClause.append("ExternalEvents.IsHidden = 0")
                 
             if searchTerm != None and len(searchTerm) > 0:
@@ -310,7 +306,7 @@ class EventService:
             sql += """ AND TicketSocketOrders.IsDeleted = 0"""
             
         if showHidden != True and ignoreFlags != True:
-            sql += """ AND TicketSocketOrders.IsHidden = 1"""
+            sql += """ AND TicketSocketOrders.IsHidden = 0"""
             
         if showInactive != True and ignoreFlags != True:
             sql += """ AND TicketSocketOrders.IsActive = 1"""
