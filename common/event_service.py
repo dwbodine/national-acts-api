@@ -13,7 +13,7 @@ from common.user_service import *
 class EventService:
     def getEventsAndOrders(self, getOrders: bool = False, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, 
                            searchTerm: str = None, tsEventId: int = None, showDeleted: bool = False, excludeStart: int = None, excludeEnd: int = None,
-                           excludeExternal: bool = False):
+                           excludeExternal: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
         events: list[VipEvent] = []
         
         sellerEventCategoryIds: list[int] = []
@@ -57,7 +57,7 @@ class EventService:
         if tsEventId == None:
             if showInactive == True:
                 sql += " AND ExternalEvents.IsActive = 0"
-            else:
+            elif ignoreFlags != True:
                 sql += " AND ExternalEvents.IsActive = 1"
 
         sql += " WHERE "
@@ -70,13 +70,18 @@ class EventService:
         else:
             if showDeleted != True:
                 whereClause.append("TicketSocketEvents.IsDeleted = 0")
-            else:
+            elif ignoreFlags != True:
                 showInactive = True
                 
             if showInactive == True:
                 whereClause.append("TicketSocketEvents.IsActive = 0")
-            else:
+            elif ignoreFlags != True:
                 whereClause.append("TicketSocketEvents.IsActive = 1")
+                
+            if showHidden == True:
+                whereClause.append("TicketSocketEvents.IsHidden = 1")
+            elif ignoreFlags != True:
+                whereClause.append("TicketSocketEvents.IsHidden = 0")
             
             if searchTerm != None and len(searchTerm) > 0:
                 whereClause.append("""MATCH (TicketSocketEvents.Title, 
@@ -132,6 +137,7 @@ class EventService:
             vipEvent.thumbnail = str(row["Thumbnail"]) if row["Thumbnail"] != None else None
             vipEvent.ticketSocketUrl = str(row["URL"])
             vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
+            vipEvent.isHidden = True if int(row["IsHidden"]) == 1 else False
             
             venueName = str(row["Venue"]) if row["Venue"] != None else None
             if row["ExternalVenue"] != None:
@@ -178,7 +184,7 @@ class EventService:
             if getOrders == True:
                 ticketTypes = self.__getTicketTypesFromEventId(ticketSocketEventId)
                 vipEvent.ticketTypes = ticketTypes
-                orders = self.__getOrdersFromEventId(ticketSocketEventId, showInactive, showDeleted)
+                orders = self.__getOrdersFromEventId(ticketSocketEventId, showInactive, showDeleted, showHidden, ignoreFlags)
                 vipEvent.orders = orders
             
             vipEvent.getTotals()
@@ -196,8 +202,13 @@ class EventService:
             externalWhereClause: list[str] = []        
             if showInactive == True:
                 externalWhereClause.append("ExternalEvents.IsActive = 0")
-            else:
+            elif ignoreFlags != True:
                 externalWhereClause.append("ExternalEvents.IsActive = 1")
+            
+            if showHidden == True:
+                externalWhereClause.append("ExternalEvents.IsHidden = 1")
+            elif ignoreFlags != True:
+                externalWhereClause.append("ExternalEvents.IsHidden = 0")
                 
             if searchTerm != None and len(searchTerm) > 0:
                 externalWhereClause.append("""MATCH (ExternalEvents.Title, ExternalEvents.Venue, ExternalEvents.Address, ExternalEvents.City, ExternalEvents.State, ExternalEvents.Country) AGAINST (%(searchTerm)s IN BOOLEAN MODE)""")
@@ -252,6 +263,7 @@ class EventService:
                 vipEvent.disableVipLinkButton = str(row["DisableVipLinkButton"])
                 vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
                 vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
+                vipEvent.isHidden = True if int(row["IsHidden"]) == 1 else False
                 events.append(vipEvent)
 
         events.sort(key = operator.attrgetter('eventDate', 'title', 'externalEventId'))
@@ -280,7 +292,7 @@ class EventService:
         
         return ticketTypes
 
-    def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False):
+    def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
         orders: list[VipOrder] = []
         sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.* 
                     FROM TicketSocketOrders
@@ -294,10 +306,13 @@ class EventService:
             'ticketSocketEventId': ticketSocketEventId
         }
 
-        if showDeleted != True:
+        if showDeleted != True and ignoreFlags != True:
             sql += """ AND TicketSocketOrders.IsDeleted = 0"""
             
-        if showInactive != True:
+        if showHidden != True and ignoreFlags != True:
+            sql += """ AND TicketSocketOrders.IsHidden = 1"""
+            
+        if showInactive != True and ignoreFlags != True:
             sql += """ AND TicketSocketOrders.IsActive = 1"""
             
             
@@ -330,6 +345,7 @@ class EventService:
             order.currencySymbol = str(row["Symbol"])
             order.isActive = True if int(row["IsActive"]) == 1 else False
             order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
+            order.isHidden = True if int(row["IsHidden"]) == 1 else False
             if order.isDeleted == True:
                 order.isActive = False
             shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
@@ -405,6 +421,22 @@ class EventService:
         }
         return db.update(sql, data)
     
+    def hideEvent(self, ticketSocketEventId: int, hidden: bool):
+        sql = """UPDATE TicketSocketEvents SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId,
+            'isHidden': 1 if hidden == True else 0
+        }
+        return db.update(sql, data)
+    
+    def hideOrder(self, ticketSocketOrderId: int, hidden: bool):
+        sql = """UPDATE TicketSocketOrders SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
+        data = {
+            'ticketSocketOrderId': ticketSocketOrderId,
+            'isHidden': 1 if hidden == True else 0
+        }
+        return db.update(sql, data)
+    
     def checkInTicket(self, ticketSocketOrderTicketId: int, checkedIn: bool):
         sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=%(checkedIn)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderTicketId)s"""
         data = {
@@ -412,6 +444,64 @@ class EventService:
             'checkedIn': 1 if checkedIn == True else 0
         }
         return db.update(sql, data)
+    
+    def updateEvent(self, eventToUpdate: VipEvent):
+        success: bool = True
+        if eventToUpdate == None or eventToUpdate.ticketSocketEventId <= 0:
+            return False
+        
+        ticketSocketEventId: int = eventToUpdate.ticketSocketEventId
+        sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId
+        }
+        existingEvent: VipEvent = db.queryOne(sql, data)
+        
+        if existingEvent != None:
+            updateSql = """UPDATE TicketSocketEvents 
+                            SET IsActive=%(isActive)s, 
+                            IsDeleted=%(isDeleted)s, 
+                            IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
+                            IsHidden=%(isHidden)s, 
+                            LastUpdate=CURRENT_TIMESTAMP 
+                            WHERE Id=%(ticketSocketEventId)s"""
+            updateData = {
+                'ticketSocketEventId': ticketSocketEventId,
+                'isActive': 1 if eventToUpdate.isActive == True else 0,
+                'isDeleted': 1 if eventToUpdate.isDeleted else 0,
+                'isAddedToBandsInTown': 1 if eventToUpdate.isAddedToBandsInTown else 0,
+                'isHidden': 1 if eventToUpdate.isHidden else 0
+            }
+            success = db.update(updateSql, updateData)
+        return success   
+    
+    def updateOrder(self, orderToUpdate: VipOrder):
+        success: bool = True
+        if orderToUpdate == None or orderToUpdate.ticketSocketOrderId <= 0:
+            return False
+        
+        ticketSocketOrderId: int = orderToUpdate.ticketSocketOrderId
+        sql = """SELECT * FROM TicketSocketOrders WHERE Id=%(ticketSocketOrderId)s"""
+        data = {
+            'ticketSocketOrderId': ticketSocketOrderId
+        }
+        existingOrder: VipOrder = db.queryOne(sql, data)
+        
+        if existingOrder != None:
+            updateSql = """UPDATE TicketSocketOrders 
+                            SET IsActive=%(isActive)s, 
+                            IsDeleted=%(isDeleted)s, 
+                            IsHidden=%(isHidden)s, 
+                            LastUpdate=CURRENT_TIMESTAMP 
+                            WHERE Id=%(ticketSocketOrderId)s"""
+            updateData = {
+                'ticketSocketOrderId': ticketSocketOrderId,
+                'isActive': 1 if orderToUpdate.isActive else 0,
+                'isDeleted': 1 if orderToUpdate.isDeleted else 0,
+                'isHidden': 1 if orderToUpdate.isHidden else 0
+            }
+            success = db.update(updateSql, updateData)
+        return success      
     
     def retrieveTicketSocketEventsForUpdate(self, sellerId: int = None, start: int = None, end: int = None):
         # go get seller information from database

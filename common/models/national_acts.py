@@ -89,6 +89,7 @@ class VipOrder(TicketSocketOrder):
     currencySymbol: str = None
     currencyAbbrev: str = None
     tickets: list[VipTicket] = []
+    isHidden: bool = False
 
     def __init__(self, id: int, eventId: int):
         super().__init__(id, eventId)
@@ -169,6 +170,7 @@ class VipEvent(TicketSocketEvent):
     hasTicketTypeData: bool = False
     isAddedToBandsInTown: bool = False
     sellerName: str = ''
+    isHidden: bool = False
 
     def getTotals(self):
         totalRevenue: float = 0
