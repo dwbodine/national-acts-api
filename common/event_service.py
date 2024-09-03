@@ -604,12 +604,12 @@ class EventService:
 
             # get total number of events grabbed from service
             totalEventsFromService = len(allEvents)        
+            
+            utility.logMessage('starting database update - opening connection')
+            # get one database connection
+            cnx = db.getDbConnection()
 
             if totalEventsFromService > 0:
-                
-                utility.logMessage('starting database update - opening connection')
-                # get one database connection
-                cnx = db.getDbConnection()
                 
                 serviceEvents: list[int] = []
                 for evt in allEvents:
@@ -933,7 +933,9 @@ class EventService:
     
                             inactiveOrders = db.update(sql, eventOrderData, cnx)
                             ordersDeactivated += inactiveOrders
-
+            else:
+                updateSuccess = True
+                
             endTimer = time.time()
             duration = endTimer - startTimer  
             
