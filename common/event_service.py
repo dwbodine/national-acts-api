@@ -68,18 +68,19 @@ class EventService:
             whereClause.append("TicketSocketEvents.Id = %(eventId)s")
             data["eventId"] = tsEventId        
         else:
-            if showDeleted != True:
-                whereClause.append("TicketSocketEvents.IsDeleted = 0")
-            elif ignoreFlags != True:
-                showInactive = True
-                
-            if showInactive == True:
-                whereClause.append("TicketSocketEvents.IsActive = 0")
-            elif ignoreFlags != True:
-                whereClause.append("TicketSocketEvents.IsActive = 1")
-                
-            if showHidden != True and ignoreFlags != True:
-                whereClause.append("TicketSocketEvents.IsHidden = 0")
+            if ignoreFlags != True:
+                if showDeleted != True:
+                    whereClause.append("TicketSocketEvents.IsDeleted = 0")
+                else:
+                    showInactive = True
+                    
+                if showInactive == True:
+                    whereClause.append("TicketSocketEvents.IsActive = 0")
+                else:
+                    whereClause.append("TicketSocketEvents.IsActive = 1")
+                    
+                if showHidden != True:
+                    whereClause.append("TicketSocketEvents.IsHidden = 0")
             
             if searchTerm != None and len(searchTerm) > 0:
                 whereClause.append("""MATCH (TicketSocketEvents.Title, 
