@@ -51,6 +51,7 @@ class TicketSocketOrder:
     purchaserState: str = None
     purchaserZipCode: str = None
     purchaserCountry: str = None
+    purchaserIpAddress: str = None
     purchaseDate: str = ''
     purchaseTimestamp: str = ''
     email: str = ''

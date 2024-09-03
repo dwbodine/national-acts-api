@@ -391,6 +391,8 @@ class TicketSocketService:
                             order.purchaserZipCode = utility.fixMagicQuotes(item['billing_zip'])
                         if order.purchaserCountry == None and 'billing_country' in item:
                             order.purchaserCountry = utility.fixMagicQuotes(item['billing_country'])
+                        if order.purchaserIpAddress == None and 'remoteAddr' in item:
+                            order.purchaserIpAddress = utility.fixMagicQuotes(item['remoteAddr'])
                         if order.purchaseDate == '' and 'purchaseDate' in item:
                             # datetime is not serializable in python, convert it to ISO-compatible string
                             purchaseDate = datetime.fromtimestamp(float(item['purchaseDate']))

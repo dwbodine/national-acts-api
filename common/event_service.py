@@ -334,6 +334,7 @@ class EventService:
             order.purchaserState = str(row["PurchaserState"]) if row["PurchaserState"] != None else None
             order.purchaserZipCode = str(row["PurchaserZip"]) if row["PurchaserZip"] != None else None
             order.purchaserCountry = str(row["PurchaserCountry"]) if row["PurchaserCountry"] != None else None
+            order.purchaserIpAddress = str(row["PurchaserIpAddress"]) if row["PurchaserIpAddress"] != None else None
             order.revenue = float(row["Revenue"])
             order.serviceFees = float(row["ServiceFees"])
             order.exchangeRate = float(row["ExchangeRate"])
@@ -778,6 +779,7 @@ class EventService:
                                 'purchaserState': order.purchaserState.strip() if (order.purchaserState != None and order.purchaserState != '') else None,
                                 'purchaserZip': order.purchaserZipCode.strip() if (order.purchaserZipCode != None and order.purchaserZipCode != '') else None,
                                 'purchaserCountry': order.purchaserCountry.strip() if (order.purchaserCountry != None and order.purchaserCountry != '') else None,
+                                'purchaserIpAddress': order.purchaserIpAddress.strip() if (order.purchaserIpAddress != None and order.purchaserIpAddress != '') else None,
                                 'email': order.email.strip() if order.email != None else None,
                                 'revenue': order.revenue,
                                 'serviceFees': order.serviceFees
@@ -804,7 +806,7 @@ class EventService:
                                 sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s, 
                                         Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
                                         PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, PurchaserCity=%(purchaserCity)s, 
-                                        PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s, PurchaserCountry=%(purchaserCountry)s, 
+                                        PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s, PurchaserCountry=%(purchaserCountry)s, PurchaserIpAddress=%(purchaserIpAddress)s, 
                                         Email=%(email)s, Revenue=%(revenue)s, ServiceFees=%(serviceFees)s, 
                                         LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                 orderSuccess = db.update(sql, orderData, cnx)
@@ -815,10 +817,10 @@ class EventService:
                                 orderData['ticketSocketEventId'] = ticketSocketEventId
                                 sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, Phone, Shirts, 
                                                 AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState, PurchaserZip, PurchaserCountry, 
-                                                Email, Revenue, ServiceFees) 
+                                                PurchaserIpAddress, Email, Revenue, ServiceFees) 
                                                 VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
                                                 %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(purchaserCity)s, %(purchaserState)s, 
-                                                %(purchaserZip)s, %(purchaserCountry)s, %(email)s, %(revenue)s, %(serviceFees)s)"""
+                                                %(purchaserZip)s, %(purchaserCountry)s, %(purchaserIpAddress)s,  %(email)s, %(revenue)s, %(serviceFees)s)"""
                                 ticketSocketOrderId = db.insert(sql, orderData, cnx)
                                 orderSuccess = (ticketSocketOrderId > 0)
 
