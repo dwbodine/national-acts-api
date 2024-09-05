@@ -79,6 +79,9 @@ class VipTicket(TicketSocketTicket):
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
     ticketSocketOrderId: int = 0
+    sellerName: str = None
+    eventTitle: str = None
+    eventDate: str = None
     isActive: bool = True
     isDeleted: bool = False
     isRefunded: bool = False
@@ -250,7 +253,7 @@ class VipEvent(TicketSocketEvent):
         
         if self.externalVipLink != None and self.externalVipLink != "":
             self.ticketSocketUrl = self.externalVipLink
-       
+      
 class Seller:
     hideInList: bool = False
     isActive: bool = True

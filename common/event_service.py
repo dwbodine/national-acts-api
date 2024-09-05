@@ -267,6 +267,130 @@ class EventService:
 
         return events
 
+    def getOrders(self, sellerId: int = None, start: int = None, end: int = None, showInactive: bool = False, 
+                           showDeleted: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
+        orders: list[VipOrder] = []
+        
+        sellerEventCategoryIds: list[int] = []
+        if sellerId != None:
+            seller = Seller(sellerId)
+            sellerEventCategoryIds = seller.getSellerEventCategoryIds()
+            # prevent against returning every event in the database
+            if len(sellerEventCategoryIds) == 0: 
+                return []
+
+        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.*, 
+                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName  
+                    FROM TicketSocketOrders
+                    JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+                    JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId 
+                    JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
+                    JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
+                    LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate"""        
+
+        sql += " WHERE "
+        data = {}
+
+        whereClause: list[str] = []       
+        
+        if ignoreFlags != True:
+            if showDeleted != True:
+                whereClause.append("TicketSocketOrders.IsDeleted = 0")
+            else:
+                showInactive = True
+                
+            if showInactive == True:
+                whereClause.append("TicketSocketOrders.IsActive = 0")
+            else:
+                whereClause.append("TicketSocketOrders.IsActive = 1")
+                
+            if showHidden != True:
+                whereClause.append("TicketSocketOrders.IsHidden = 0")
+        
+        if len(sellerEventCategoryIds) > 0:
+            sellerEventCategoryIdStr = db.convertListToParameters(sellerEventCategoryIds, data, 'sellerEventCategoryId')
+            whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
+        
+        if start != None and end != None:
+            whereClause.append("TicketSocketOrders.PurchaseDate BETWEEN %(startDate)s AND %(endDate)s")
+            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+        elif end != None:
+            whereClause.append("TicketSocketOrders.PurchaseDate BETWEEN %(startDate)s AND %(endDate)s")
+            data["startDate"] = datetime.now().strftime('%Y-%m-%d')
+            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+        elif start != None:
+            whereClause.append("TicketSocketOrders.PurchaseDate >= %(startDate)s")
+            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+        elif getOrders == False or sellerId == None:
+            whereClause.append("TicketSocketOrders.PurchaseDate >= %(startDate)s")
+            data["startDate"] = datetime.now().strftime('%Y-%m-%d')
+
+        if len(whereClause) > 0:
+            sql += " AND ".join(whereClause)
+
+        sql += " ORDER BY TicketSocketOrders.PurchaseDate ASC, TicketSocketEvents.EventDate ASC, TicketSocketEvents.Title ASC"       
+
+        sql = sql.replace('\n', '') 
+        
+        orderRows = db.queryAll(sql, data)
+        for row in orderRows:
+            orderId = int(row["OrderId"])
+            eventId = int(row["EventId"])
+            ticketSocketOrderId = int(row["Id"])
+            order = VipOrder(orderId, eventId)
+            order.eventTitle = str(row["EventTitle"])
+            order.eventDate = str(row["EventDate"])
+            order.sellerName = str(row["SellerName"])
+            order.ticketSocketEventId = int(row["TicketSocketEventId"])
+            order.ticketSocketOrderId = ticketSocketOrderId
+            order.numTickets = int(row["NumTickets"])
+            order.purchaseDate = str(row["PurchaseDate"])
+            order.purchaseTimestamp = str(row["PurchaseTimestamp"])
+            order.userId = int(row["UserId"])
+            order.phone = str(row["Phone"]) if row["Phone"] != None else None
+            order.email = str(row["Email"]) if row["Email"] != None else None
+            order.purchaserLastName = str(row["PurchaserLastName"]) if row["PurchaserLastName"] != None else None
+            order.purchaserFirstName = str(row["PurchaserFirstName"]) if row["PurchaserFirstName"] != None else None
+            order.purchaserCity = str(row["PurchaserCity"]) if row["PurchaserCity"] != None else None
+            order.purchaserState = str(row["PurchaserState"]) if row["PurchaserState"] != None else None
+            order.purchaserZipCode = str(row["PurchaserZip"]) if row["PurchaserZip"] != None else None
+            order.purchaserCountry = str(row["PurchaserCountry"]) if row["PurchaserCountry"] != None else None
+            order.purchaserIpAddress = str(row["PurchaserIpAddress"]) if row["PurchaserIpAddress"] != None else None
+            order.revenue = float(row["Revenue"])
+            order.serviceFees = float(row["ServiceFees"])
+            order.exchangeRate = float(row["ExchangeRate"])
+            order.currencyAbbrev = str(row["CurrencyAbbrev"])
+            order.currencySymbol = str(row["Symbol"])
+            order.isActive = True if int(row["IsActive"]) == 1 else False
+            order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
+            order.isHidden = True if int(row["IsHidden"]) == 1 else False
+            if order.isDeleted == True:
+                order.isActive = False
+            shirtStr = str(row["Shirts"]).strip() if row["Shirts"] != None else None
+            shirts = []
+            if shirtStr != None and shirtStr != '':
+                shirtArray = shirtStr.split("/")
+                for shirt in shirtArray:
+                    shirts.append(shirt.strip())
+            order.shirts = shirts
+            attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
+            attendees = []
+            if attendeeStr != None and attendeeStr != '':
+                attendeeArray = attendeeStr.split("/")
+                for attendee in attendeeArray:
+                    attendees.append(attendee.strip())
+            attendees.sort()
+            order.attendeeNames = attendees
+            tickets = self.__getTicketsFromOrderId(ticketSocketOrderId)
+            order.tickets = tickets
+            order.getTotals()
+            orders.append(order)
+        return orders
+
+    
     def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
         ticketTypes: list[TicketSocketTicketType] = []
         
@@ -291,10 +415,12 @@ class EventService:
 
     def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
         orders: list[VipOrder] = []
-        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.* 
+        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.*, 
+                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
-                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
+                    JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId 
                     JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
                     JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                     LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
@@ -321,6 +447,9 @@ class EventService:
             eventId = int(row["EventId"])
             ticketSocketOrderId = int(row["Id"])
             order = VipOrder(orderId, eventId)
+            order.eventTitle = str(row["EventTitle"])
+            order.eventDate = str(row["EventDate"])
+            order.sellerName = str(row["SellerName"])
             order.ticketSocketEventId = ticketSocketEventId
             order.ticketSocketOrderId = ticketSocketOrderId
             order.numTickets = int(row["NumTickets"])

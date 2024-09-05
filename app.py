@@ -315,6 +315,34 @@ def getEventsAndOrdersSecured():
       ignoreFlags = True if int(request.args.get('ignoreFlags')) == 1 else False
    results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd, excludeExternal, showHidden, ignoreFlags)
    return convertToJson(results)
+
+@app.route('/user/ordersSecured')
+@jwt_required()
+def ordersSecured():
+   service = EventService()
+   sellerId: int = None
+   start: int = None
+   end: int = None
+   showInactive: bool = False
+   showDeleted: bool = False
+   showHidden: bool = False
+   ignoreFlags: bool = False
+   if request.args.get('sellerId') != None:
+      sellerId = int(request.args.get('sellerId'))
+   if request.args.get('start') != None:
+      start = int(request.args.get('start'))
+   if request.args.get('end') != None:
+      end = int(request.args.get('end'))
+   if request.args.get('inactive') != None:
+      showInactive = True if int(request.args.get('inactive')) == 1 else False
+   if request.args.get('deleted') != None:
+      showDeleted = True if int(request.args.get('deleted')) == 1 else False
+   if request.args.get('hidden') != None:
+      showHidden = True if int(request.args.get('hidden')) == 1 else False
+   if request.args.get('ignoreFlags') != None:
+      ignoreFlags = True if int(request.args.get('ignoreFlags')) == 1 else False
+   results = service.getOrders(sellerId, start, end, showInactive, showDeleted, showHidden, ignoreFlags)
+   return convertToJson(results)
    
 @app.route("/user/setEventInactive", methods=["POST"])
 def setEventInactive():
