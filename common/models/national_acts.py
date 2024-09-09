@@ -81,6 +81,9 @@ class VipOrder(TicketSocketOrder):
     ticketSocketOrderId: int = 0
     sellerName: str = None
     eventTitle: str = None
+    eventCity: str = None
+    eventState: str = None
+    eventCountry: str = None
     eventDate: str = None
     isActive: bool = True
     isDeleted: bool = False
