@@ -273,6 +273,7 @@ class UserService:
             user.requireResetPassword = True if int(row["RequireResetPassword"]) == 1 else False
             user.sendEmailReset = True if int(row["SendEmailReset"]) == 1 else False
             user.sendTextReset = True if int(row["SendTextReset"]) == 1 else False
+            user.disableCheckIn = True if int(row["DisableCheckIn"]) == 1 else False
             createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
             lastUpdate = datetime.fromisoformat(str(row["LastUpdate"]))
             user.createdAt = createdAt.strftime("%m/%d/%Y")
@@ -392,6 +393,7 @@ class UserService:
                            RequireResetPassword=%(requireResetPassword)s, 
                            SendEmailReset=%(sendEmailReset)s,
                            SendTextReset=%(sendTextReset)s, 
+                           DisableCheckIn=%(disableCheckin)s, 
                            LastUpdate=CURRENT_TIMESTAMP 
                            WHERE UserId=%(userId)s"""
             updateData = {
@@ -404,6 +406,7 @@ class UserService:
                 'isActive': 1 if userToUpdate.isActive else 0,
                 'requireResetPassword': 1 if userToUpdate.requireResetPassword else 0, 
                 'sendEmailReset': 1 if userToUpdate.sendEmailReset else 0, 
+                'disableCheckin': 1 if userToUpdate.disableCheckIn else 0,
                 'sendTextReset': 1 if sendTextReset else 0, 
                 'userId': userId
             }
@@ -531,7 +534,7 @@ class UserService:
                 deleteSellerData = {
                     'userId': userId
                 }
-                success = db.delete(deleteSellerSql, deleteSellerData)
+                db.delete(deleteSellerSql, deleteSellerData)
             else:
                 newSellerIds = [seller.sellerId for seller in newSellers]
                 for existingSeller in existingUser.sellers:
@@ -691,6 +694,7 @@ class UserService:
                 user.requireResetPassword = True if int(row["RequireResetPassword"]) else False
                 user.sendEmailReset = True if int(row["SendEmailReset"]) else False 
                 user.sendTextReset = True if int(row["SendTextReset"]) else False 
+                user.disableCheckIn = True if int(row["DisableCheckIn"]) else False 
                 createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
                 lastUpdate = datetime.fromisoformat(str(row["LastUpdate"]))
                 user.createdAt = createdAt.strftime("%m/%d/%Y")

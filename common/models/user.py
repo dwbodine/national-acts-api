@@ -46,6 +46,7 @@ class User:
     lastUpdate: str = None
     sendEmailReset: bool = False
     sendTextReset: bool = False
+    disableCheckIn: bool = False
     sellers: list[UserSeller] = []
     
     def userFullname(self):
