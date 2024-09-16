@@ -280,7 +280,7 @@ class EventService:
                 return []
 
         sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.*, 
-                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName, 
+                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName, Sellers.SellerId, 
                     TicketSocketEvents.City AS EventCity, TicketSocketEvents.State AS EventState, TicketSocketEvents.Country AS EventCountry 
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
@@ -348,6 +348,7 @@ class EventService:
             order.eventCountry = str(row["EventCountry"])
             order.eventDate = str(row["EventDate"])
             order.sellerName = str(row["SellerName"])
+            order.sellerId = int(row["SellerId"])
             order.ticketSocketEventId = int(row["TicketSocketEventId"])
             order.ticketSocketOrderId = ticketSocketOrderId
             order.numTickets = int(row["NumTickets"])
@@ -420,7 +421,7 @@ class EventService:
     def __getOrdersFromEventId(self, ticketSocketEventId: int, showInactive: bool = False, showDeleted: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
         orders: list[VipOrder] = []
         sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate, ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, TicketSocketOrders.*, 
-                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName, 
+                    TicketSocketEvents.Title as EventTitle, TicketSocketEvents.EventDate, Sellers.Name AS SellerName, Sellers.SellerId, 
                     TicketSocketEvents.City AS EventCity, TicketSocketEvents.State AS EventState, TicketSocketEvents.Country AS EventCountry 
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
@@ -458,6 +459,7 @@ class EventService:
             order.eventCountry = str(row["EventCountry"])
             order.eventDate = str(row["EventDate"])
             order.sellerName = str(row["SellerName"])
+            order.sellerId = int(row["SellerId"])
             order.ticketSocketEventId = ticketSocketEventId
             order.ticketSocketOrderId = ticketSocketOrderId
             order.numTickets = int(row["NumTickets"])

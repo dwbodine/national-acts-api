@@ -80,6 +80,7 @@ class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
     ticketSocketOrderId: int = 0
     sellerName: str = None
+    sellerId: int = 0
     eventTitle: str = None
     eventCity: str = None
     eventState: str = None
