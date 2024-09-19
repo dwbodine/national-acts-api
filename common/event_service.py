@@ -414,7 +414,7 @@ class EventService:
         
         start = datetime.strptime(f'{currentYear}-01-01 00:00:00', '%Y-%m-%d %H:%M:%S').timestamp()
         
-        orders = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
+        orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
         dashTotals.orders = len(orders)
         
         for order in orders:
@@ -432,6 +432,8 @@ class EventService:
             orderData.ticketRevenueUsd += order.revenueUsd
             orderData.serviceFeesRevenueUsd += order.serviceFeesUsd
             orderData.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)   
+            if order.isDeleted != True and order.isRefunded == True:
+                orderData.ticketsRefunded += order.numTickets
             
             if foundIndex >= 0:
                 dailyOrderData[foundIndex] = orderData
@@ -442,6 +444,7 @@ class EventService:
             dashTotals.ticketRevenueUsd += order.revenueUsd
             dashTotals.serviceFeesRevenueUsd += order.serviceFeesUsd
             dashTotals.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)
+            dashTotals.ticketsRefunded += orderData.ticketsRefunded
         
         dashTotals.dailyOrderData = dailyOrderData
         return dashTotals

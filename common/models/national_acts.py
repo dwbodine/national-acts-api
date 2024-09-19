@@ -263,6 +263,7 @@ class VipEvent(TicketSocketEvent):
 class DailyOrderData:
     orders: int = 0
     tickets: int = 0
+    ticketsRefunded: int = 0
     ticketRevenueUsd: float = 0
     serviceFeesRevenueUsd: float = 0
     totalRevenueUsd: float = 0
@@ -281,6 +282,7 @@ class DailyOrderData:
 class DashboardTotals:
     tickets: int = 0
     orders: int = 0
+    ticketsRefunded: int = 0
     ticketRevenueUsd: float = 0
     serviceFeesRevenueUsd: float = 0
     totalRevenueUsd: float = 0
@@ -292,12 +294,18 @@ class DashboardTotals:
         self.day = day
         self.daysInMonth = calendar.monthrange(year, month)[1]
         self.dayOfYear = datetime.datetime(year, month, day).timetuple().tm_yday
+        self.totalDaysInYear = datetime.datetime(year, 12, 31).timetuple().tm_yday
         sql = "SELECT * FROM Settings WHERE Name=%(name)s"
         data = {
-            'name': 'RevenueGoal'
+            'name': 'YearlyRevenueGoal'
         }
         row = db.queryOne(sql, data)
-        self.revenueGoal = float(row["Value"])
+        self.yearlyRevenueGoal = float(row["Value"])
+        data = {
+            'name': 'MonthlyRevenueGoal'
+        }
+        row = db.queryOne(sql, data)
+        self.monthlyRevenueGoal = float(row["Value"])
         
 class DashboardPayload:
     def __init__(self, orders: list[VipOrder], totals: DashboardTotals):
