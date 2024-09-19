@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import operator
 import traceback
 
@@ -271,6 +271,16 @@ class EventService:
                            showDeleted: bool = False, showHidden: bool = False, ignoreFlags: bool = False):
         orders: list[VipOrder] = []
         
+        midnightStart: str = None
+        if start != None:
+            midnightStart = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+            
+        midnightEnd: str = None
+        if end != None:
+            end_str = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            midnightEndDate = datetime.strptime(end_str, '%Y-%m-%d') + timedelta(days=1)
+            midnightEnd = midnightEndDate.strftime('%Y-%m-%d')        
+                
         sellerEventCategoryIds: list[int] = []
         if sellerId != None:
             seller = Seller(sellerId)
@@ -314,17 +324,17 @@ class EventService:
             sellerEventCategoryIdStr = db.convertListToParameters(sellerEventCategoryIds, data, 'sellerEventCategoryId')
             whereClause.append("TicketSocketEvents.SellerEventCategoryId IN " + sellerEventCategoryIdStr)
         
-        if start != None and end != None:
+        if midnightStart != None and midnightEnd != None:
             whereClause.append("TicketSocketOrders.PurchaseDate BETWEEN %(startDate)s AND %(endDate)s")
-            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
-            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            data["startDate"] = midnightStart
+            data["endDate"] = midnightEnd
         elif end != None:
             whereClause.append("TicketSocketOrders.PurchaseDate BETWEEN %(startDate)s AND %(endDate)s")
             data["startDate"] = datetime.now().strftime('%Y-%m-%d')
-            data["endDate"] = datetime.fromtimestamp(end).strftime('%Y-%m-%d')
+            data["endDate"] = midnightEnd
         elif start != None:
             whereClause.append("TicketSocketOrders.PurchaseDate >= %(startDate)s")
-            data["startDate"] = datetime.fromtimestamp(start).strftime('%Y-%m-%d')
+            data["startDate"] = midnightStart
         elif getOrders == False or sellerId == None:
             whereClause.append("TicketSocketOrders.PurchaseDate >= %(startDate)s")
             data["startDate"] = datetime.now().strftime('%Y-%m-%d')
@@ -395,7 +405,47 @@ class EventService:
             orders.append(order)
         return orders
 
-    
+
+    def getDashboardData(self):
+        dailyOrderData: list[DailyOrderData] = []
+        now = datetime.now()
+        currentYear = now.year
+        dashTotals = DashboardTotals(currentYear, now.month, now.day)
+        
+        start = datetime.strptime(f'{currentYear}-01-01 00:00:00', '%Y-%m-%d %H:%M:%S').timestamp()
+        
+        orders = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
+        dashTotals.orders = len(orders)
+        
+        for order in orders:
+            orderData: DailyOrderData = None
+            foundIndex: int = -1
+            for idx, x in enumerate(dailyOrderData):
+                if x.ticketSocketEventId == order.ticketSocketEventId and x.purchaseDate == order.purchaseDate:
+                    orderData = x
+                    foundIndex = idx
+                    break
+            if orderData == None:
+                orderData = DailyOrderData(order.purchaseDate, order.ticketSocketEventId, order.eventTitle, order.eventDate, order.sellerId, order.sellerName, order.eventCity, order.eventState, order.eventCountry)
+                
+            orderData.tickets += order.numTickets
+            orderData.ticketRevenueUsd += order.revenueUsd
+            orderData.serviceFeesRevenueUsd += order.serviceFeesUsd
+            orderData.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)   
+            
+            if foundIndex >= 0:
+                dailyOrderData[foundIndex] = orderData
+            else:
+                dailyOrderData.append(orderData)
+            
+            dashTotals.tickets += order.numTickets
+            dashTotals.ticketRevenueUsd += order.revenueUsd
+            dashTotals.serviceFeesRevenueUsd += order.serviceFeesUsd
+            dashTotals.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)
+        
+        dashTotals.dailyOrderData = dailyOrderData
+        return dashTotals
+
     def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
         ticketTypes: list[TicketSocketTicketType] = []
         

@@ -327,6 +327,7 @@ def ordersSecured():
    showDeleted: bool = False
    showHidden: bool = False
    ignoreFlags: bool = False
+   getYearToDateTotals: bool = False
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
    if request.args.get('start') != None:
@@ -341,7 +342,9 @@ def ordersSecured():
       showHidden = True if int(request.args.get('hidden')) == 1 else False
    if request.args.get('ignoreFlags') != None:
       ignoreFlags = True if int(request.args.get('ignoreFlags')) == 1 else False
-   results = service.getOrders(sellerId, start, end, showInactive, showDeleted, showHidden, ignoreFlags)
+   if request.args.get('getYearToDateTotals') != None:
+      getYearToDateTotals = True if int(request.args.get('getYearToDateTotals')) == 1 else False
+   results = service.getOrders(sellerId, start, end, showInactive, showDeleted, showHidden, ignoreFlags, getYearToDateTotals)
    return convertToJson(results)
    
 @app.route("/user/setEventInactive", methods=["POST"])
@@ -980,7 +983,17 @@ def getUserActivity():
    else:
       activities = service.getUserActivity(start, end, filterAdmins=filterAdminVal)
    return convertToJson(activities)
-      
+     
+@app.route('/dashboard/getDashboardDataSecured')
+@jwt_required()
+def getDashboardDataSecured():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   service = EventService()
+   dashData = service.getDashboardData()
+   return convertToJson(dashData) 
       
 
 if __name__ == "__main__":

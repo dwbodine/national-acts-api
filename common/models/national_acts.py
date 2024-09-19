@@ -1,5 +1,7 @@
 from common.models.ticket_socket import *
 from common.models.user import *
+import calendar
+import datetime
 
 from .. import db
 
@@ -257,7 +259,51 @@ class VipEvent(TicketSocketEvent):
         
         if self.externalVipLink != None and self.externalVipLink != "":
             self.ticketSocketUrl = self.externalVipLink
-      
+            
+class DailyOrderData:
+    orders: int = 0
+    tickets: int = 0
+    ticketRevenueUsd: float = 0
+    serviceFeesRevenueUsd: float = 0
+    totalRevenueUsd: float = 0
+    
+    def __init__(self, purchaseDate: str, ticketSocketEventId: int, eventTitle: str, eventDate: str, sellerId: int, sellerName: str, city: str, state: str, country: str):
+        self.purchaseDate = purchaseDate
+        self.ticketSocketEventId = ticketSocketEventId
+        self.eventTitle = eventTitle
+        self.eventDate = eventDate
+        self.sellerId = sellerId
+        self.sellerName = sellerName
+        self.city = city
+        self.state = state
+        self.country = country
+
+class DashboardTotals:
+    tickets: int = 0
+    orders: int = 0
+    ticketRevenueUsd: float = 0
+    serviceFeesRevenueUsd: float = 0
+    totalRevenueUsd: float = 0
+    dailyOrderData: list[DailyOrderData] = []
+   
+    def __init__(self, year: int, month: int, day: int):
+        self.year = year    
+        self.month = month
+        self.day = day
+        self.daysInMonth = calendar.monthrange(year, month)[1]
+        self.dayOfYear = datetime.datetime(year, month, day).timetuple().tm_yday
+        sql = "SELECT * FROM Settings WHERE Name=%(name)s"
+        data = {
+            'name': 'RevenueGoal'
+        }
+        row = db.queryOne(sql, data)
+        self.revenueGoal = float(row["Value"])
+        
+class DashboardPayload:
+    def __init__(self, orders: list[VipOrder], totals: DashboardTotals):
+        self.orders = orders
+        self.totals = totals    
+    
 class Seller:
     hideInList: bool = False
     isActive: bool = True
