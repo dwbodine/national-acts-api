@@ -703,14 +703,13 @@ def refreshEventsFromService(sellerId: int = None):
       # currently hard-coded to TJ as updater
       results = service.refreshDatabaseFromTicketSocket(sellerId, start, end, 5)
       
-      # update rollup data
-      year = datetime.fromtimestamp(start).year
-      currentYear = datetime.now().year
-      if year >= currentYear or year < 2022:
-         year = 0         
-      success = service.updateDailyOrderData(year)
-      if success != True:
-         results = None
+      if results != None and results.succeeded == True:
+         # update rollup data
+         year = datetime.fromtimestamp(start).year
+         currentYear = datetime.now().year
+         if year >= currentYear or year < 2022:
+            year = 0         
+         results.succeeded = service.updateDailyOrderData(year)
    else:
       results = None
    return convertToJson(results)

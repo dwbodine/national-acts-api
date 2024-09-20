@@ -16,8 +16,6 @@ class UpdateService:
     def updateAllEventsFromTicketSocket(self):
         service = event_service.EventService()
         results = service.refreshDatabaseFromTicketSocket()
-        success = service.updateDailyOrderData()
-        if success != True:
-            return None
-        else:
-            return results
+        if results != None and results.succeeded == True:
+            results.succeeded = service.updateDailyOrderData()
+        return results
