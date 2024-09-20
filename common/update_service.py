@@ -15,4 +15,9 @@ class UpdateService:
 
     def updateAllEventsFromTicketSocket(self):
         service = event_service.EventService()
-        return service.refreshDatabaseFromTicketSocket()
+        results = service.refreshDatabaseFromTicketSocket()
+        success = service.updateDailyOrderData()
+        if success != True:
+            return None
+        else:
+            return results
