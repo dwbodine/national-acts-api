@@ -267,17 +267,17 @@ class DailyOrderData:
     ticketRevenueUsd: float = 0
     serviceFeesRevenueUsd: float = 0
     totalRevenueUsd: float = 0
+    eventTitle: str = None
+    eventDate: str = None
+    sellerId: int = None
+    sellerName: str = None
+    city: str = None
+    state: str = None
+    country: str = None
     
-    def __init__(self, purchaseDate: str, ticketSocketEventId: int, eventTitle: str, eventDate: str, sellerId: int, sellerName: str, city: str, state: str, country: str):
+    def __init__(self, purchaseDate: str, ticketSocketEventId: int):
         self.purchaseDate = purchaseDate
         self.ticketSocketEventId = ticketSocketEventId
-        self.eventTitle = eventTitle
-        self.eventDate = eventDate
-        self.sellerId = sellerId
-        self.sellerName = sellerName
-        self.city = city
-        self.state = state
-        self.country = country
 
 class DashboardTotals:
     tickets: int = 0

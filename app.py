@@ -984,15 +984,36 @@ def getUserActivity():
       activities = service.getUserActivity(start, end, filterAdmins=filterAdminVal)
    return convertToJson(activities)
      
-@app.route('/dashboard/getDashboardDataSecured')
+@app.route('/dashboard/getDashboardDataSecured/<int:year>')
 @jwt_required()
-def getDashboardDataSecured():
+def getDashboardDataSecured(year: int):
    isAdmin = __isAdminLoggedIn()
    if isAdmin == False:
       return {"msg": "Unauthorized"}, 401
    
+   currentYear = datetime.now().year
+   if year >= currentYear or year < 2022:
+      year = 0
+   
    service = EventService()
-   dashData = service.getDashboardData()
+   dashData = service.getDashboardData(year)
+   return convertToJson(dashData) 
+
+@app.route('/internal/updateDailyOrderData/<int:year>')
+def updateDailyOrderData(year: int):
+   # secured by internal api key
+   senderKey = str(request.headers.get('x-api-key'))
+   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
+   
+   if (senderKey != apiKey):
+      return {"msg": "Unauthorized"}, 401
+   
+   currentYear = datetime.now().year
+   if year >= currentYear or year < 2022:
+      year = 0      
+   
+   service = EventService()
+   dashData = service.updateDailyOrderData(year)
    return convertToJson(dashData) 
       
 

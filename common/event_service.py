@@ -406,16 +406,26 @@ class EventService:
         return orders
 
 
-    def getDashboardData(self):
+    def getDailyOrderDataFromOrders(self, year: int = 0):
         dailyOrderData: list[DailyOrderData] = []
-        now = datetime.now()
-        currentYear = now.year
-        dashTotals = DashboardTotals(currentYear, now.month, now.day)
+        month: int = 0
+        day: int = 0
+        currentYear: int = 0
         
+        if year > 0:
+            currentYear = year
+            month = 12
+            day = 31
+        else:
+            currentYear = datetime.now().year
+            month = datetime.now().month
+            day = datetime.now().day
+
+        now = datetime(currentYear, month, day)
+            
         start = datetime.strptime(f'{currentYear}-01-01 00:00:00', '%Y-%m-%d %H:%M:%S').timestamp()
         
         orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
-        dashTotals.orders = len(orders)
         
         for order in orders:
             orderData: DailyOrderData = None
@@ -426,8 +436,9 @@ class EventService:
                     foundIndex = idx
                     break
             if orderData == None:
-                orderData = DailyOrderData(order.purchaseDate, order.ticketSocketEventId, order.eventTitle, order.eventDate, order.sellerId, order.sellerName, order.eventCity, order.eventState, order.eventCountry)
+                orderData = DailyOrderData(order.purchaseDate, order.ticketSocketEventId)
                 
+            orderData.orders += 1
             orderData.tickets += order.numTickets
             orderData.ticketRevenueUsd += order.revenueUsd
             orderData.serviceFeesRevenueUsd += order.serviceFeesUsd
@@ -440,14 +451,114 @@ class EventService:
             else:
                 dailyOrderData.append(orderData)
             
-            dashTotals.tickets += order.numTickets
-            dashTotals.ticketRevenueUsd += order.revenueUsd
-            dashTotals.serviceFeesRevenueUsd += order.serviceFeesUsd
-            dashTotals.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)
+        return dailyOrderData
+    
+    
+    def updateDailyOrderData(self, year: int = 0):
+        dailyOrderData = self.getDailyOrderDataFromOrders(year)
+
+        success = True        
+        for orderData in dailyOrderData:
+            sql = """SELECT DailyOrderDataId FROM DailyOrderData WHERE TicketSocketEventId=%(ticketSocketEventId)s and PurchaseDate=%(purchaseDate)s"""
+            data = {
+                'ticketSocketEventId': orderData.ticketSocketEventId,
+                'purchaseDate': orderData.purchaseDate
+            }
+            existingData = db.queryOne(sql, data)
+            
+            updateData = {
+                    'orders': orderData.orders,
+                    'tickets': orderData.tickets,
+                    'ticketsRefunded': orderData.ticketsRefunded,
+                    'ticketRevenue': orderData.ticketRevenueUsd,
+                    'serviceFeeRevenue': orderData.serviceFeesRevenueUsd, 
+                    'totalRevenue': orderData.totalRevenueUsd
+                }
+            if existingData != {}:
+                dailyOrderDataId = int(existingData["DailyOrderDataId"])
+                updateSql = """UPDATE DailyOrderData SET Orders=%(orders)s, Tickets=%(tickets)s, TicketsRefunded=%(ticketsRefunded)s, TicketRevenue=%(ticketRevenue)s, 
+                                ServiceFeeRevenue=%(serviceFeeRevenue)s, TotalRevenue=%(totalRevenue)s, LastUpdate=CURRENT_TIMESTAMP WHERE DailyOrderDataId=%(dailyOrderDataId)s"""
+                updateData["dailyOrderDataId"] = dailyOrderDataId
+                success = db.update(updateSql, updateData)
+            else:
+                insertSql = """INSERT INTO DailyOrderData (PurchaseDate, TicketSocketEventId, Orders, Tickets, TicketsRefunded, TicketRevenue, ServiceFeeRevenue, 
+                                    TotalRevenue) VALUES (%(purchaseDate)s, %(ticketSocketEventId)s, %(orders)s, %(tickets)s, %(ticketsRefunded)s, %(ticketRevenue)s, 
+                                    %(serviceFeeRevenue)s, %(totalRevenue)s)"""
+                updateData["ticketSocketEventId"] = orderData.ticketSocketEventId
+                updateData["purchaseDate"] = orderData.purchaseDate
+                id = db.insert(insertSql, updateData)
+                success = (id > 0)
+            if success != True:
+                break
+        return success
+    
+    def getDashboardData(self, year: int = 0):
+        dailyOrderData: list[DailyOrderData] = []
+        month: int = 0
+        day: int = 0
+        currentYear: int = 0
+        now = None
+        
+        if year > 0:
+            currentYear = year
+            month = 12
+            day = 31
+        else:
+            currentYear = datetime.now().year
+            month = datetime.now().month
+            day = datetime.now().day
+
+        now = datetime(currentYear, month, day) + timedelta(days=1)         
+        dashTotals = DashboardTotals(currentYear, month, day)
+        
+        start = f'{currentYear}-01-01 00:00:00'
+        end = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        sql = """SELECT DailyOrderData.*, TicketSocketEvents.Title AS EventTitle, TicketSocketEvents.EventDate, 
+                    TicketSocketEvents.City, TicketSocketEvents.State, TicketSocketEvents.Country, 
+                    Sellers.Name AS SellerName, Sellers.SellerId 
+                    FROM DailyOrderData 
+                    JOIN TicketSocketEvents ON TicketSocketEvents.Id = DailyOrderData.TicketSocketEventId 
+                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
+                    JOIN Sellers on Sellers.SellerId = SellerEventCategory.SellerId 
+                 WHERE DailyOrderData.PurchaseDate BETWEEN %(start)s and %(end)s 
+                    ORDER BY DailyOrderData.PurchaseDate, Sellers.Name"""
+        data = {
+            'start': start,
+            'end': end
+        }
+        
+        rows = db.queryAll(sql, data)
+        for row in rows:
+            purchaseDate = str(row["PurchaseDate"])
+            ticketSocketEventId = int(row["TicketSocketEventId"])
+            orderData = DailyOrderData(purchaseDate, ticketSocketEventId)
+            orderData.eventTitle = str(row["EventTitle"])
+            orderData.eventDate = str(row["EventDate"])            
+            orderData.sellerId = int(row["SellerId"])
+            orderData.sellerName = str(row["SellerName"])
+            orderData.city = str(row["City"])
+            orderData.state = str(row["State"])
+            orderData.country = str(row["Country"])
+            orderData.tickets = int(row["Tickets"])
+            orderData.orders = int(row["Orders"])
+            orderData.ticketsRefunded = int(row["TicketsRefunded"])    
+            orderData.ticketRevenueUsd = float(row["TicketRevenue"])
+            orderData.serviceFeesRevenueUsd = float(row["ServiceFeeRevenue"])
+            orderData.totalRevenueUsd = float(row["TotalRevenue"])
+
+            dashTotals.tickets += orderData.tickets
+            dashTotals.orders += orderData.orders
             dashTotals.ticketsRefunded += orderData.ticketsRefunded
+            dashTotals.ticketRevenueUsd += orderData.ticketRevenueUsd
+            dashTotals.serviceFeesRevenueUsd += orderData.serviceFeesRevenueUsd
+            dashTotals.totalRevenueUsd += orderData.totalRevenueUsd    
+            
+            dailyOrderData.append(orderData)
         
         dashTotals.dailyOrderData = dailyOrderData
         return dashTotals
+            
 
     def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
         ticketTypes: list[TicketSocketTicketType] = []
