@@ -428,6 +428,8 @@ class EventService:
         orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
         
         for order in orders:
+            if order.deleted == True:
+                continue
             orderData: DailyOrderData = None
             foundIndex: int = -1
             for idx, x in enumerate(dailyOrderData):
