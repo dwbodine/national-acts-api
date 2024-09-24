@@ -274,6 +274,7 @@ class DailyOrderData:
     city: str = None
     state: str = None
     country: str = None
+    ticketSocketId: int = 0
     
     def __init__(self, purchaseDate: str, ticketSocketEventId: int):
         self.purchaseDate = purchaseDate

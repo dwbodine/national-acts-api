@@ -428,8 +428,6 @@ class EventService:
         orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
         
         for order in orders:
-            if order.deleted == True:
-                continue
             orderData: DailyOrderData = None
             foundIndex: int = -1
             for idx, x in enumerate(dailyOrderData):
@@ -440,13 +438,14 @@ class EventService:
             if orderData == None:
                 orderData = DailyOrderData(order.purchaseDate, order.ticketSocketEventId)
                 
-            orderData.orders += 1
-            orderData.tickets += order.numTickets
-            orderData.ticketRevenueUsd += order.revenueUsd
-            orderData.serviceFeesRevenueUsd += order.serviceFeesUsd
-            orderData.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)   
-            if order.isDeleted != True and order.isRefunded == True:
-                orderData.ticketsRefunded += order.numTickets
+            if order.isDeleted != True:
+                orderData.orders += 1
+                orderData.tickets += order.numTickets
+                orderData.ticketRevenueUsd += order.revenueUsd
+                orderData.serviceFeesRevenueUsd += order.serviceFeesUsd
+                orderData.totalRevenueUsd += (order.revenueUsd + order.serviceFeesUsd)   
+                if order.isRefunded == True:
+                    orderData.ticketsRefunded += order.numTickets
             
             if foundIndex >= 0:
                 dailyOrderData[foundIndex] = orderData
@@ -492,6 +491,12 @@ class EventService:
                 success = (id > 0)
             if success != True:
                 break
+            
+        # cleanup
+        if success == True:
+            sql = """DELETE FROM DailyOrderData WHERE Orders=0"""
+            db.delete(sql)
+            
         return success
     
     def getDashboardData(self, year: int = 0):
@@ -518,10 +523,11 @@ class EventService:
         
         sql = """SELECT DailyOrderData.*, TicketSocketEvents.Title AS EventTitle, TicketSocketEvents.EventDate, 
                     TicketSocketEvents.City, TicketSocketEvents.State, TicketSocketEvents.Country, 
-                    Sellers.Name AS SellerName, Sellers.SellerId 
+                    Sellers.Name AS SellerName, Sellers.SellerId, TicketSocket.TicketSocketId, TicketSocket.AccountName 
                     FROM DailyOrderData 
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = DailyOrderData.TicketSocketEventId 
                     JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
+                    JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId 
                     JOIN Sellers on Sellers.SellerId = SellerEventCategory.SellerId 
                  WHERE DailyOrderData.PurchaseDate BETWEEN %(start)s and %(end)s 
                     ORDER BY DailyOrderData.PurchaseDate, Sellers.Name"""
@@ -548,6 +554,7 @@ class EventService:
             orderData.ticketRevenueUsd = float(row["TicketRevenue"])
             orderData.serviceFeesRevenueUsd = float(row["ServiceFeeRevenue"])
             orderData.totalRevenueUsd = float(row["TotalRevenue"])
+            orderData.ticketSocketId = int(row["TicketSocketId"])
 
             dashTotals.tickets += orderData.tickets
             dashTotals.orders += orderData.orders
