@@ -120,16 +120,20 @@ class VipOrder(TicketSocketOrder):
             return False
         lastNameLower = self.purchaserLastName.lower()
         strPos: int = -1
-        if lastNameLower.find("**refund**") >= 0:
-            strPos = lastNameLower.find("**refund**")
-        elif lastNameLower.find("*refund*") >= 0:
-            strPos = lastNameLower.find("*refund*")
+        if lastNameLower.find("**refund") >= 0:
+            strPos = lastNameLower.find("**refund")
+        elif lastNameLower.find("*refund") >= 0:
+            strPos = lastNameLower.find("*refund")
         elif lastNameLower.find("refunded") >= 0:
             strPos = lastNameLower.find("refunded")
-        elif lastNameLower.find("**chargeback**") >= 0:
-            strPos = lastNameLower.find("**chargeback**")
-        elif lastNameLower.find("*chargeback*") >= 0:
-            strPos = lastNameLower.find("*chargeback*")
+        elif lastNameLower.find("refund") >= 0:
+            strPos = lastNameLower.find("refund")
+        elif lastNameLower.find("**chargeback") >= 0:
+            strPos = lastNameLower.find("**chargeback")
+        elif lastNameLower.find("*chargeback") >= 0:
+            strPos = lastNameLower.find("*chargeback")
+        elif lastNameLower.find("chargeback") >= 0:
+            strPos = lastNameLower.find("chargeback")
         
         if strPos >= 0:
             self.isRefunded = True
