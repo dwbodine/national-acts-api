@@ -13,7 +13,8 @@ class Role:
 
 class UserSeller:
     permissions: list[int] = []
-    def __init__(self, sellerId: int, sellerName: str, sellerType: int, roleId: int):
+    def __init__(self, userSellerId: int, sellerId: int, sellerName: str, sellerType: int, roleId: int):
+        self.userSellerId = userSellerId
         self.sellerId = sellerId
         self.sellerName = sellerName
         self.sellerType = sellerType

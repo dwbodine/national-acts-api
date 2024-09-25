@@ -521,8 +521,8 @@ class EventService:
         start = f'{currentYear}-01-01 00:00:00'
         end = now.strftime('%Y-%m-%d %H:%M:%S')
         
-        sql = """SELECT DailyOrderData.*, TicketSocketEvents.Title AS EventTitle, TicketSocketEvents.EventDate, 
-                    TicketSocketEvents.City, TicketSocketEvents.State, TicketSocketEvents.Country, 
+        sql = """SELECT DailyOrderData.*, TicketSocketEvents.Title AS EventTitle, TicketSocketEvents.EventDate, TicketSocketEvents.Venue, 
+                    TicketSocketEvents.City, TicketSocketEvents.State, TicketSocketEvents.Country, TicketSocketEvents.Zip, 
                     Sellers.Name AS SellerName, Sellers.SellerId, TicketSocket.TicketSocketId, TicketSocket.AccountName 
                     FROM DailyOrderData 
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = DailyOrderData.TicketSocketEventId 
@@ -545,9 +545,11 @@ class EventService:
             orderData.eventDate = str(row["EventDate"])            
             orderData.sellerId = int(row["SellerId"])
             orderData.sellerName = str(row["SellerName"])
+            orderData.venue = str(row["Venue"])
             orderData.city = str(row["City"])
             orderData.state = str(row["State"])
             orderData.country = str(row["Country"])
+            orderData.zip = str(row["Zip"])
             orderData.tickets = int(row["Tickets"])
             orderData.orders = int(row["Orders"])
             orderData.ticketsRefunded = int(row["TicketsRefunded"])    
@@ -700,7 +702,7 @@ class EventService:
         return tickets
     
     def disableEvent(self, ticketSocketEventId: int, disabled: bool):
-        sql = """UPDATE TicketSocketEvents SET IsActive=%(isActive)s WHERE Id=%(ticketSocketEventId)s"""
+        sql = """UPDATE TicketSocketEvents SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
         data = {
             'ticketSocketEventId': ticketSocketEventId,
             'isActive': 0 if disabled == True else 1
@@ -1228,7 +1230,7 @@ class EventService:
                                         'ticketSocketOrderId': ticketSocketOrderId
                                     }
                                     orderTicketStr = db.convertListToParameters(orderTickets, orderTicketData, 'orderTicket')
-                                    sql = """UPDATE TicketSocketOrderTickets Set IsActive=0 
+                                    sql = """UPDATE TicketSocketOrderTickets Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP 
                                             WHERE TicketSocketOrderId=%(ticketSocketOrderId)s AND TicketId NOT IN """ + orderTicketStr
 
                                     inactiveTickets = db.update(sql, orderTicketData, cnx)
@@ -1243,7 +1245,7 @@ class EventService:
                                 'ticketSocketEventId': ticketSocketEventId
                             }
                             eventOrderStr = db.convertListToParameters(eventOrders, eventOrderData, 'eventOrder')
-                            sql = """UPDATE TicketSocketOrders Set IsActive=0 
+                            sql = """UPDATE TicketSocketOrders Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
                                     WHERE TicketSocketEventId=%(ticketSocketEventId)s AND OrderId NOT IN """ + eventOrderStr
     
                             inactiveOrders = db.update(sql, eventOrderData, cnx)

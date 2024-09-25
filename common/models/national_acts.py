@@ -271,8 +271,10 @@ class DailyOrderData:
     eventDate: str = None
     sellerId: int = None
     sellerName: str = None
+    venue: str = None
     city: str = None
     state: str = None
+    zip: str = None
     country: str = None
     ticketSocketId: int = 0
     

@@ -172,7 +172,7 @@ class UserService:
         
         self.__expireAllUserTokens(username)
         
-        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
+        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP WHERE Username=%(username)s"
         data = {
             'username': username,
             'password': self.__passwordHash(password)
@@ -194,7 +194,7 @@ class UserService:
         
         self.__expireAllUserTokens(username)
         
-        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0 WHERE Username=%(username)s"
+        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP WHERE Username=%(username)s"
         data = {
             'username': username,
             'password': self.__passwordHash(password)
@@ -381,8 +381,9 @@ class UserService:
             if userToUpdate.username != None and userToUpdate.username != "":
                 username = userToUpdate.username
             sendTextReset = userToUpdate.sendTextReset
-            if userToUpdate.mobile == None or userToUpdate.mobile == "":
+            if userToUpdate.mobile == None or userToUpdate.mobile == "" or userToUpdate.mobile == "None":
                 sendTextReset = False
+                userToUpdate.mobile = ""
             updateSql = """UPDATE Users SET IsAdmin=%(isAdmin)s, 
                            Username=%(username)s, 
                            FirstName=%(firstName)s, 
@@ -542,17 +543,17 @@ class UserService:
                     if existingSellerId in newSellerIds:
                         newSeller: UserSeller = self.__getUserSellerFromListById(newSellers, existingSellerId)
                         if existingSeller.roleId != newSeller.roleId:
-                            updateRoleSql = """UPDATE UserSeller SET RoleId=%(roleId)s WHERE UserSellerId=%(userSellerId)s"""
+                            updateRoleSql = """UPDATE UserSeller SET RoleId=%(roleId)s, LastUpdate=CURRENT_TIMESTAMP WHERE UserSellerId=%(userSellerId)s"""
                             updateRoleData = {
                                 'roleId': newSeller.roleId,
-                                'userSellerId': existingSellerId
+                                'userSellerId': existingSeller.userSellerId
                             }
                             success = db.update(updateRoleSql, updateRoleData)
                         newSellerIds.remove(existingSellerId)
                     else:
                         deleteSellerSql = """DELETE FROM UserSeller WHERE UserSellerId=%(userSellerId)s"""
                         deleteSellerData = {
-                            'userSellerId': existingSellerId
+                            'userSellerId': existingSeller.userSellerId
                         }
                         success = db.delete(deleteSellerSql, deleteSellerData)
                 if len(newSellerIds) > 0:
@@ -567,6 +568,7 @@ class UserService:
                                     'roleId': newSeller.roleId
                                 }
                                 userSellerId = db.insert(insertSellerSql, insertSellerData)
+                                success = (userSellerId > 0)
         else:
             success = False
         return success
@@ -618,7 +620,7 @@ class UserService:
         return permission
     
     def __expireAllUserTokens(self, username: str):
-        expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1 WHERE UserId IN (SELECT UserId FROM Users WHERE Username=%(username)s)"
+        expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1, LastUpdate=CURRENT_TIMESTAMP WHERE UserId IN (SELECT UserId FROM Users WHERE Username=%(username)s)"
         expireData = {
             'username': username
         }
@@ -739,7 +741,7 @@ class UserService:
             sellerName = str(row["Name"])
             sellerType = int(row["SellerTypeId"])
             roleId = int(row["RoleId"])
-            us = UserSeller(sellerId, sellerName, sellerType, roleId)
+            us = UserSeller(userSellerId, sellerId, sellerName, sellerType, roleId)
             if isAdmin == False:
                 permissions = self.__getUserSellerPermissions(userSellerId)
                 us.permissions = permissions
