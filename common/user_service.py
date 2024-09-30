@@ -499,7 +499,34 @@ class UserService:
             activities.append(activity)
             
         return activities
+      
+    def getUserSellerByEventId(self, userId: int, eventId: int):
+        userSeller: UserSeller = None 
+
+        user = self.__retrieveUserFromDatabase(userId=userId, fetchSellers=True)
+        
+        sql = """SELECT SellerEventCategory.SellerId 
+                FROM TicketSocketEvents 
+                JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
+                WHERE TicketSocketEvents.Id=%(ticketSocketEventId)s"""
                 
+        data = {
+            'ticketSocketEventId': eventId
+        }        
+
+        row = db.queryOne(sql, data)
+        eventSellerId = 0
+        if row != {}:
+            eventSellerId = int(row["SellerId"])
+            
+        if eventSellerId > 0:
+            for seller in user.sellers:
+                if seller.sellerId == eventSellerId:
+                    userSeller = seller
+                    break
+                
+        return userSeller
+              
     def __getPermissionsForRole(self, roleId: int):
         permissions: list[Permission] = []
         if roleId == None:

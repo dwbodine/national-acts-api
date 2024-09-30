@@ -228,6 +228,15 @@ def getUserSellers(userId: int):
    results = service.getUserSellers(userId)
    return convertToJson(results)
 
+@app.route('/user/getUserSellerFromEventId/<int:userId>/<int:eventId>')
+@jwt_required()
+def getUserSellerFromEventId(userId: int, eventId: int):   
+   if userId == None or userId == 0 or eventId == None or eventId == 0:
+      return {"msg", "Bad request"}, 400
+   service = UserService()
+   results = service.getUserSellerByEventId(userId, eventId)
+   return convertToJson(results)
+
 @app.route('/user/eventsAndOrders')
 def getEventsAndOrders():
    # secured by user api key
