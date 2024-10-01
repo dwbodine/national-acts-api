@@ -354,17 +354,17 @@ class TicketSocketService:
                     tickets = jsonData['tickets']
 
                 numTickets: int = 0
+                totalCount: int = 0
                 if tickets != None:        
                     if 'totalCount' in tickets:
-                        numTickets = int(tickets['totalCount'])
+                        totalCount = int(tickets['totalCount'])
 
-                order.numTickets = numTickets
                 orderRevenue: float = 0
                 orderServiceFees: float = 0
                 orderTickets = []
                 orderAttendeeNames = []
                 orderShirts = []
-                if numTickets > 0:
+                if totalCount > 0:
                     ticketData = tickets['data']
                     for item in ticketData:
                         # if the ticket doesn't belong to this event, move along
@@ -375,6 +375,8 @@ class TicketSocketService:
                             itemEventId = int(item['eventId'])
                         if itemEventId != int(eventId):
                             continue
+                        
+                        numTickets += 1
 
                         # set properties on order from ticket data if not present
                         if order.userId == 0 and 'userId' in item:
@@ -481,6 +483,7 @@ class TicketSocketService:
                         orderServiceFees += serviceFee
 
                 if len(orderTickets) > 0:
+                    order.numTickets = numTickets
                     order.tickets = orderTickets
                     order.shirts = orderShirts
                     order.attendeeNames = orderAttendeeNames

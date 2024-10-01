@@ -691,7 +691,7 @@ class EventService:
 
     def __getTicketsFromOrderId(self, ticketSocketOrderId: int):
         tickets: list[VipTicket] = []
-        sql = """SELECT * FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(ticketSocketOrderId)s"""
+        sql = """SELECT * FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(ticketSocketOrderId)s AND IsActive=1"""
         data = {
             'ticketSocketOrderId': ticketSocketOrderId
         }
