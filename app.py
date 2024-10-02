@@ -221,7 +221,7 @@ def updateUser():
 def updateAllEventsFromService():
    # secured by internal api key
    senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
+   apiKey = str(os.environ.get('CRON_API_KEY'))
    
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
@@ -234,7 +234,7 @@ def updateAllEventsFromService():
 def updateAllExchangeRates():
    # secured by internal api key
    senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
+   apiKey = str(os.environ.get('CRON_API_KEY'))
    
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
