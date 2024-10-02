@@ -223,6 +223,9 @@ def updateAllEventsFromService():
    senderKey = str(request.headers.get('x-api-key'))
    apiKey = str(os.environ.get('CRON_API_KEY'))
    
+   utility.logMessage('senderKey = ' + senderKey)
+   utility.logMessage('apiKey = ' + apiKey)
+   
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
    
@@ -348,22 +351,8 @@ def getUpdateHistory():
       return {"msg": "Unauthorized"}, 401
    
    service = EventService()
-   sellerId: int = None
-   start: int = None
-   end: int = None
-   limit: int = None
-   userId: int = user.userId   
-      
-   if request.args.get('sellerId') != None:
-      sellerId = int(request.args.get('sellerId'))
-   if request.args.get('start') != None:
-      start = int(request.args.get('start'))
-   if request.args.get('end') != None:
-      end = int(request.args.get('end'))
-   if request.args.get('limit') != None:
-      limit = int(request.args.get('limit'))
 
-   logs = service.getTicketSocketRefreshHistory(sellerId, start, end, userId, limit)
+   logs = service.getTicketSocketRefreshHistory()
    return convertToJson(logs)
 
 @app.route('/internal/logUserActivity', methods=["POST"])
@@ -431,7 +420,8 @@ def refreshEventsFromService(sellerId: int = None):
             currentYear = datetime.now().year
             if year >= currentYear or year < 2022:
                year = 0         
-         results.succeeded = service.updateDailyOrderData(year)
+         success = service.updateDailyOrderData(year)
+         results.setOrderUpdateSuccess(success)
    else:
       results = None
    return convertToJson(results)
@@ -450,8 +440,8 @@ def updateDailyOrderData(year: int):
       year = 0      
    
    service = EventService()
-   dashData = service.updateDailyOrderData(year)
-   return convertToJson(dashData) 
+   success = service.updateDailyOrderData(year)
+   return convertToJson(success) 
 # END INTERNAL ROUTES
 
 

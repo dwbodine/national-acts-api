@@ -1,3 +1,5 @@
+import traceback
+from common import utility
 from common.models.ticket_socket import *
 from common.models.user import *
 import calendar
@@ -386,6 +388,8 @@ class Seller:
 class TicketSocketRefreshHistory:
     sellerName: str = None
     userName: str = None
+    ticketSocketRefreshHistoryId: int = None
+    orderDataUpdateSucceeded: bool = False
 
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int], ticketTypesFailed: list[int], 
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
@@ -425,8 +429,44 @@ class TicketSocketRefreshHistory:
         if self.sellerId != None:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
+            
+    def cleanup(self, cnx = None):
+        success: bool = True
+        
+        try:
+            weekAgo: int = self.endTimer - (24 * 60 * 60)            
+            sql = """DELETE FROM TicketSocketRefreshHistory WHERE EndTimer <= %(weekAgo)s"""
+            data = {
+                'weekAgo': weekAgo
+            }
+            db.delete(sql, data, cnx)
+        except Exception as error:
+            success = False
+            errorMessage: str = str(error) + "\n" + traceback.format_exc()
+            utility.logMessage(errorMessage)
+            
+        return success
+    
+    def setOrderUpdateSuccess(self, success: bool, cnx = None):
+        if self.ticketSocketRefreshHistoryId <= 0:
+            self.orderDataUpdateSucceeded = False
+            return
+        
+        self.orderDataUpdateSucceeded = success
+        
+        successVal: int = 1 if success == True else 0
+        sql = """UPDATE TicketSocketRefreshHistory SET OrderDataUpdateSucceeded=%(successVal)s, LastUpdate=CURRENT_TIMESTAMP 
+                    WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
+        data = {
+            'successVal': successVal,
+            'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId
+        }
+        db.update(sql, data, cnx)        
 
     def commit(self, cnx = None):
+        if self.endTimer > 0:
+            self.cleanup(cnx)
+            
         self.__getSellerName()
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
@@ -467,5 +507,7 @@ class TicketSocketRefreshHistory:
             'ticketTypesInserted': self.ticketTypesInserted, 
             'ticketTypesDeactivated': self.ticketTypesDeactivated
         }
+        
+        self.ticketSocketRefreshHistoryId = db.insert(sql, data, cnx)
 
-        return (db.insert(sql, data, cnx) > 0)
+        return (self.ticketSocketRefreshHistoryId > 0)

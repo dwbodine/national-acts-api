@@ -1243,9 +1243,6 @@ class EventService:
 
                                     inactiveTickets = db.update(sql, orderTicketData, cnx)
                                     ticketsDeactivated += inactiveTickets
-                                
-                        
-                        
                         
                         # find any orders not returned by the service and mark as inactive
                         if len(eventOrders) > 0:
@@ -1304,55 +1301,24 @@ class EventService:
             
         return results
         
-    def getTicketSocketRefreshHistory(self, sellerId: int = None, start: int = None, end: int = None, userId: int = 0, limit: int = None):
+    def getTicketSocketRefreshHistory(self):
         logs: list[TicketSocketRefreshHistory] = []
-
-        if limit == None or limit == 0:
-            limit = 20
 
         sql = """SELECT TicketSocketRefreshHistory.*, CONCAT(Users.FirstName, ' ', Users.LastName) AS UserName, Users.UserName AS Email, Sellers.Name AS SellerName
                   FROM TicketSocketRefreshHistory 
                   LEFT JOIN Users ON Users.UserId = TicketSocketRefreshHistory.UserId
                   LEFT JOIN Sellers ON Sellers.SellerId = TicketSocketRefreshHistory.SellerId
-                  WHERE """
-        data = {
-            'limit': limit
-        }
+                  ORDER BY TicketSocketRefreshHistory.StartTimer DESC"""
 
-        whereClause: list[str] = []
-        if sellerId != None:
-            whereClause.append("SellerId = %(sellerId)s")
-            data["sellerId"] = sellerId
-        if userId != None:
-            whereClause.append("UserId = %(userId)s")
-            data["userId"] = userId
-        if start != None and end != None:
-            whereClause.append("StartTimer BETWEEN %(startDate)s AND %(endDate)s")
-            data["startDate"] = start
-            data["endDate"] = end
-        elif end != None:
-            whereClause.append("StartTimer BETWEEN %(startDate)s AND %(endDate)s")
-            data["startDate"] = int(datetime.now().timestamp() - (24 * 60 * 60))
-            data["endDate"] = end
-        elif start != None:
-            whereClause.append("StartTimer >= %(startDate)s")
-            data["startDate"] = start
-        else:
-            whereClause.append("StartTimer >= %(startDate)s")
-            data["startDate"] = int(datetime.now().timestamp() - (24 * 60 * 60))
 
-        if len(whereClause) > 0:
-            sql += " AND ".join(whereClause)
-
-        sql += " ORDER BY StartTimer DESC LIMIT 0, %(limit)s"
-
-        rows = db.queryAll(sql, data)
+        rows = db.queryAll(sql)
         for row in rows:
             userId = int(row["UserId"])
             if userId == 0:
                 userName = "System"
             else:
                 userName = str(row["UserName"]) + " (" + str(row["Email"]) + ")"
+            sellerId = int(row["SellerId"]) if row["SellerId"] != None else None
             sellerName = str(row["SellerName"]) if row["SellerName"] != None else None
             start = int(row["Start"]) if row["Start"] != None else None
             end = int(row["End"]) if row["End"] != None else None
@@ -1379,7 +1345,7 @@ class EventService:
             ticketTypesUpdated = int(row["TicketTypesUpdated"])
             ticketTypesInserted = int(row["TicketTypesInserted"])
             ticketTypesDeactivated = int(row["TicketTypesDeactivated"])
-
+            orderDataUpdateSucceeded = True if int(row["OrderDataUpdateSucceeded"]) == 1 else False
 
             history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, eventsUpdated, 
                                                  eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
@@ -1387,6 +1353,7 @@ class EventService:
                                                  startTimer, endTimer, duration, userId, sellerId, start, end, succeeded, errorMessage)
             history.sellerName = sellerName
             history.userName = userName
+            history.orderDataUpdateSucceeded = orderDataUpdateSucceeded
             logs.append(history)
         
         return logs
