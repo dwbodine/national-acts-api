@@ -409,8 +409,7 @@ class EventService:
             orders.append(order)
         return orders
 
-
-    def getDailyOrderDataFromOrders(self, year: int = 0):
+    def getDailyOrderDataFromOrders(self, year: int = 0, sellerId: int = None):
         dailyOrderData: list[DailyOrderData] = []
         month: int = 0
         day: int = 0
@@ -429,7 +428,7 @@ class EventService:
             
         start = datetime.strptime(f'{currentYear}-01-01 00:00:00', '%Y-%m-%d %H:%M:%S').timestamp()
         
-        orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True)
+        orders: list[VipOrder] = self.getOrders(start=start, end=now.timestamp(), ignoreFlags=True, sellerId=sellerId)
         
         for order in orders:
             orderData: DailyOrderData = None
@@ -457,10 +456,9 @@ class EventService:
                 dailyOrderData.append(orderData)
             
         return dailyOrderData
-    
-    
-    def updateDailyOrderData(self, year: int = 0):
-        dailyOrderData = self.getDailyOrderDataFromOrders(year)
+     
+    def updateDailyOrderData(self, year: int = 0, sellerId: int = None):
+        dailyOrderData = self.getDailyOrderDataFromOrders(year, sellerId)
 
         success = True        
         for orderData in dailyOrderData:
@@ -573,7 +571,6 @@ class EventService:
         
         dashTotals.dailyOrderData = dailyOrderData
         return dashTotals
-            
 
     def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
         ticketTypes: list[TicketSocketTicketType] = []
@@ -1346,6 +1343,8 @@ class EventService:
             ticketTypesInserted = int(row["TicketTypesInserted"])
             ticketTypesDeactivated = int(row["TicketTypesDeactivated"])
             orderDataUpdateSucceeded = True if int(row["OrderDataUpdateSucceeded"]) == 1 else False
+            orderDataUpdateDuration = float(row["OrderDataUpdateDuration"])
+            totalDuration = float(row["TotalDuration"])
 
             history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, eventsUpdated, 
                                                  eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
@@ -1354,6 +1353,8 @@ class EventService:
             history.sellerName = sellerName
             history.userName = userName
             history.orderDataUpdateSucceeded = orderDataUpdateSucceeded
+            history.orderDataUpdateDuration = orderDataUpdateDuration
+            history.totalDuration = totalDuration
             logs.append(history)
         
         return logs

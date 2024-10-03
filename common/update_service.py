@@ -1,3 +1,4 @@
+import time
 from . import db
 from . import exchange_rate_service
 from . import event_service
@@ -17,6 +18,9 @@ class UpdateService:
         service = event_service.EventService()
         results = service.refreshDatabaseFromTicketSocket()
         if results != None and results.succeeded == True:
+            timer: float = time.time()
+            duration: float = 0
             success = service.updateDailyOrderData()
-            results.setOrderUpdateSuccess(success)
+            duration = time.time() - timer
+            results.setOrderUpdateSuccess(success, duration)
         return results

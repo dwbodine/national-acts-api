@@ -390,6 +390,8 @@ class TicketSocketRefreshHistory:
     userName: str = None
     ticketSocketRefreshHistoryId: int = None
     orderDataUpdateSucceeded: bool = False
+    orderDataUpdateDuration: float = 0
+    totalDuration: float = 0
 
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int], ticketTypesFailed: list[int], 
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
@@ -447,19 +449,25 @@ class TicketSocketRefreshHistory:
             
         return success
     
-    def setOrderUpdateSuccess(self, success: bool, cnx = None):
+    def setOrderUpdateSuccess(self, success: bool, duration: float, cnx = None):
         if self.ticketSocketRefreshHistoryId <= 0:
             self.orderDataUpdateSucceeded = False
             return
         
         self.orderDataUpdateSucceeded = success
+        self.orderDataUpdateDuration = duration
+        totalDuration = self.duration + duration
+        self.totalDuration = totalDuration
         
-        successVal: int = 1 if success == True else 0
-        sql = """UPDATE TicketSocketRefreshHistory SET OrderDataUpdateSucceeded=%(successVal)s, LastUpdate=CURRENT_TIMESTAMP 
+        sql = """UPDATE TicketSocketRefreshHistory SET OrderDataUpdateSucceeded=%(successVal)s, 
+                    OrderDataUpdateDuration=%(orderDataUpdateDuration)s, TotalDuration=%(totalDuration)s, 
+                    LastUpdate=CURRENT_TIMESTAMP 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
-            'successVal': successVal,
-            'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId
+            'successVal': 1 if success == True else 0,
+            'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId, 
+            'orderDataUpdateDuration': duration, 
+            'totalDuration': totalDuration
         }
         db.update(sql, data, cnx)        
 

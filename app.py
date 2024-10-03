@@ -415,13 +415,16 @@ def refreshEventsFromService(sellerId: int = None):
       if results != None and results.succeeded == True:
          # update rollup data
          year = 0
+         timer: float = time.time()
+         duration: float = 0
          if start != None:
             year = datetime.fromtimestamp(start).year
             currentYear = datetime.now().year
             if year >= currentYear or year < 2022:
                year = 0         
-         success = service.updateDailyOrderData(year)
-         results.setOrderUpdateSuccess(success)
+         success = service.updateDailyOrderData(year, sellerId)
+         duration = time.time() - timer
+         results.setOrderUpdateSuccess(success, duration)
    else:
       results = None
    return convertToJson(results)
