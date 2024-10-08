@@ -18,9 +18,6 @@ class UpdateService:
         service = event_service.EventService()
         results = service.refreshDatabaseFromTicketSocket()
         if results != None and results.succeeded == True:
-            timer: float = time.time()
-            duration: float = 0
-            success = service.updateDailyOrderData()
-            duration = time.time() - timer
-            results.setOrderUpdateSuccess(success, duration)
+            results = service.updateDailyOrderData(results)
+            
         return results

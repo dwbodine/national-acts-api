@@ -96,6 +96,12 @@ class VipOrder(TicketSocketOrder):
     isActive: bool = True
     isDeleted: bool = False
     isRefunded: bool = False
+    isChargedBack: bool = False
+    refundDate: str = None
+    chargebackDate: str = None
+    numTicketsRefunded: int = 0
+    revenueRefunded: float = 0
+    serviceFeeRevenueRefunded: float = 0
     totalShirts: int = 0
     revenueUsd: float = 0
     serviceFeesUsd: float = 0
@@ -110,7 +116,6 @@ class VipOrder(TicketSocketOrder):
 
     def getTotals(self):
         self.totalShirts = len(self.shirts)
-        self.__checkOrderRefunded()
         self.revenueUsd = self.revenue * self.exchangeRate            
         self.serviceFeesUsd = self.serviceFees * self.exchangeRate
         if self.numTickets > 0:
@@ -120,40 +125,6 @@ class VipOrder(TicketSocketOrder):
                     ticket.attendeeName = self.attendeeNames[i]
                 i += 1
     
-    def __checkOrderRefunded(self):
-        if self.purchaserLastName == None or self.purchaserLastName.strip() == "":
-            return False
-        lastNameLower = self.purchaserLastName.lower()
-        strPos: int = -1
-        if lastNameLower.find("**refund") >= 0:
-            strPos = lastNameLower.find("**refund")
-        elif lastNameLower.find("*refund") >= 0:
-            strPos = lastNameLower.find("*refund")
-        elif lastNameLower.find("refunded") >= 0:
-            strPos = lastNameLower.find("refunded")
-        elif lastNameLower.find("refund") >= 0:
-            strPos = lastNameLower.find("refund")
-        elif lastNameLower.find("**chargeback") >= 0:
-            strPos = lastNameLower.find("**chargeback")
-        elif lastNameLower.find("*chargeback") >= 0:
-            strPos = lastNameLower.find("*chargeback")
-        elif lastNameLower.find("chargeback") >= 0:
-            strPos = lastNameLower.find("chargeback")
-        
-        if strPos >= 0:
-            self.isRefunded = True
-            self.revenue = 0
-            self.revenueUsd = 0
-            if strPos > 0:
-                lastName = self.purchaserLastName
-                refundStr = lastName[strPos : len(lastName) - strPos]
-                lastName = lastName.replace(refundStr, "")
-                lastName = lastName.replace("-", "").strip()
-                self.purchaserLastName = refundStr + " - " + lastName
-        else:
-            self.isRefunded = False
-            
-
 class VipEvent(TicketSocketEvent):
     ticketSocketEventId: int = 0
     totalRevenue: float = 0
@@ -185,6 +156,8 @@ class VipEvent(TicketSocketEvent):
     nonUsaCurrencySymbol: str = None
     nonUsaCurrencyAbbrev: str = None
     numTicketsRefunded: int = 0
+    revenueRefunded: float = 0
+    serviceFeeRevenueRefunded: float = 0
     hasTicketTypeData: bool = False
     isAddedToBandsInTown: bool = False
     sellerName: str = ''
@@ -196,11 +169,15 @@ class VipEvent(TicketSocketEvent):
         totalTickets: int = 0
         totalShirts: int = 0
         totalTicketsRefunded: int = 0
+        totalRevenueRefunded: int = 0
+        totalServiceFeeRevenueRefunded: int = 0
         totalCheckedIn: int = 0
         shirtd: dict() = {}
         for order in self.orders:
-            if order.isRefunded:
-                totalTicketsRefunded += order.numTickets
+            if order.isRefunded or order.isChargedBack:
+                totalTicketsRefunded += order.numTicketsRefunded
+                totalRevenueRefunded += order.revenueRefunded
+                totalServiceFeeRevenueRefunded += order.serviceFeeRevenueRefunded
             if self.hasNonUSAOrders == False and order.currencyAbbrev != "USD":
                 self.hasNonUSAOrders = True
                 self.nonUsaCurrencyAbbrev = order.currencyAbbrev
@@ -236,6 +213,8 @@ class VipEvent(TicketSocketEvent):
         self.totalCheckedIn = totalCheckedIn
         self.totalShirts = totalShirts
         self.numTicketsRefunded = totalTicketsRefunded
+        self.revenueRefunded = totalRevenueRefunded
+        self.serviceFeeRevenueRefunded = totalServiceFeeRevenueRefunded
         
         self.hasTicketTypeData = (len(self.ticketTypes) > 0)
         
@@ -270,9 +249,9 @@ class VipEvent(TicketSocketEvent):
             self.ticketSocketUrl = self.externalVipLink
             
 class DailyOrderData:
+    ticketSocketOrderId: int = None
     orders: int = 0
     tickets: int = 0
-    ticketsRefunded: int = 0
     ticketRevenueUsd: float = 0
     serviceFeesRevenueUsd: float = 0
     totalRevenueUsd: float = 0
@@ -286,6 +265,11 @@ class DailyOrderData:
     zip: str = None
     country: str = None
     ticketSocketId: int = 0
+    isRefunded: bool = False
+    isChargeback: bool = False
+    numTicketsRefunded: int = 0
+    revenueRefunded: float = 0
+    serviceFeeRevenueRefunded: float = 0
     
     def __init__(self, purchaseDate: str, ticketSocketEventId: int):
         self.purchaseDate = purchaseDate
@@ -294,10 +278,12 @@ class DailyOrderData:
 class DashboardTotals:
     tickets: int = 0
     orders: int = 0
-    ticketsRefunded: int = 0
+    numTicketsRefunded: int = 0
     ticketRevenueUsd: float = 0
     serviceFeesRevenueUsd: float = 0
     totalRevenueUsd: float = 0
+    revenueRefunded: float = 0
+    serviceFeeRevenueRefunded: float = 0
     dailyOrderData: list[DailyOrderData] = []
    
     def __init__(self, year: int, month: int, day: int):
@@ -389,6 +375,10 @@ class TicketSocketRefreshHistory:
     sellerName: str = None
     userName: str = None
     ticketSocketRefreshHistoryId: int = None
+    orderDataRowsRemoved: int = 0
+    orderDataRowsUpdated: int = 0
+    orderDataRowsInserted: int = 0
+    orderDataRowsTotal: int = 0
     orderDataUpdateSucceeded: bool = False
     orderDataUpdateDuration: float = 0
     totalDuration: float = 0
@@ -449,13 +439,15 @@ class TicketSocketRefreshHistory:
             
         return success
     
-    def setOrderUpdateSuccess(self, success: bool, duration: float, cnx = None):
+    def setOrderUpdateSuccess(self, success: bool, duration: float, inserts: int, updates: int, cnx = None):
         if self.ticketSocketRefreshHistoryId <= 0:
             self.orderDataUpdateSucceeded = False
             return
         
         self.orderDataUpdateSucceeded = success
         self.orderDataUpdateDuration = duration
+        self.orderDataRowsInserted = inserts
+        self.orderDataRowsUpdated = updates
         totalDuration = self.duration + duration
         self.totalDuration = totalDuration
         

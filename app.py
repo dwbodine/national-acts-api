@@ -223,9 +223,6 @@ def updateAllEventsFromService():
    senderKey = str(request.headers.get('x-api-key'))
    apiKey = str(os.environ.get('CRON_API_KEY'))
    
-   utility.logMessage('senderKey = ' + senderKey)
-   utility.logMessage('apiKey = ' + apiKey)
-   
    if (senderKey != apiKey):
       return {"msg": "Unauthorized"}, 401
    
@@ -415,36 +412,15 @@ def refreshEventsFromService(sellerId: int = None):
       if results != None and results.succeeded == True:
          # update rollup data
          year = 0
-         timer: float = time.time()
-         duration: float = 0
          if start != None:
             year = datetime.fromtimestamp(start).year
             currentYear = datetime.now().year
             if year >= currentYear or year < 2022:
                year = 0         
-         success = service.updateDailyOrderData(year, sellerId)
-         duration = time.time() - timer
-         results.setOrderUpdateSuccess(success, duration)
+         results = service.updateDailyOrderData(results, year, sellerId)
    else:
       results = None
    return convertToJson(results)
-
-@app.route('/internal/updateDailyOrderData/<int:year>')
-def updateDailyOrderData(year: int):
-   # secured by internal api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('INTERNAL_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   currentYear = datetime.now().year
-   if year >= currentYear or year < 2022:
-      year = 0      
-   
-   service = EventService()
-   success = service.updateDailyOrderData(year)
-   return convertToJson(success) 
 # END INTERNAL ROUTES
 
 
