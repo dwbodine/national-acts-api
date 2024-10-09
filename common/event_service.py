@@ -543,7 +543,7 @@ class EventService:
         updates: int = 0
         inserts: int = 0 
         for orderData in dailyOrderData:
-            sql = """SELECT DailyOrderDataId FROM DailyOrderData WHERE TicketSocketEventId=%(ticketSocketEventId)s AND PurchaseDate=%(purchaseDate)s"""
+            sql = """SELECT DailyOrderDataId FROM DailyOrderData WHERE TicketSocketEventId=%(ticketSocketEventId)s AND PurchaseDate=DATE(%(purchaseDate)s)"""
             data = {
                 'ticketSocketEventId': orderData.ticketSocketEventId,
                 'purchaseDate': orderData.purchaseDate
@@ -1260,7 +1260,7 @@ class EventService:
                                         'ticketSocketEventId': ticketSocketEventId, 
                                         'purchaseDate': str(existingOrder['PurchaseDate'])
                                     }
-                                    checkCleanupSql = """SELECT DailyOrderDataId FROM DailyOrderData WHERE TicketSocketEventId=%(ticketSocketEventId)s AND PurchaseDate=%(purchaseDate)s"""
+                                    checkCleanupSql = """SELECT DailyOrderDataId FROM DailyOrderData WHERE TicketSocketEventId=%(ticketSocketEventId)s AND PurchaseDate=DATE(%(purchaseDate)s)"""
                                     rows = db.queryAll(checkCleanupSql, checkCleanupData)
                                     if len(rows) > 0:
                                         for row in rows:
@@ -1525,6 +1525,11 @@ class EventService:
             orderDataUpdateSucceeded = True if int(row["OrderDataUpdateSucceeded"]) == 1 else False
             orderDataUpdateDuration = float(row["OrderDataUpdateDuration"])
             totalDuration = float(row["TotalDuration"])
+            orderDataRowsTotal = int(row["OrderDataRowsTotal"])
+            orderDataRowsInserted = int(row["OrderDataRowsInserted"])
+            orderDataRowsUpdated = int(row["OrderDataRowsUpdated"])
+            orderDataRowsRemoved = int(row["OrderDataRowsRemoved"])
+            
 
             history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, eventsUpdated, 
                                                  eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
@@ -1534,6 +1539,10 @@ class EventService:
             history.userName = userName
             history.orderDataUpdateSucceeded = orderDataUpdateSucceeded
             history.orderDataUpdateDuration = orderDataUpdateDuration
+            history.orderDataRowsTotal = orderDataRowsTotal
+            history.orderDataRowsUpdated = orderDataRowsUpdated
+            history.orderDataRowsRemoved = orderDataRowsRemoved
+            history.orderDataRowsInserted = orderDataRowsInserted
             history.totalDuration = totalDuration
             logs.append(history)
         

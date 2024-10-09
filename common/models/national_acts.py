@@ -453,13 +453,19 @@ class TicketSocketRefreshHistory:
         
         sql = """UPDATE TicketSocketRefreshHistory SET OrderDataUpdateSucceeded=%(successVal)s, 
                     OrderDataUpdateDuration=%(orderDataUpdateDuration)s, TotalDuration=%(totalDuration)s, 
+                    OrderDataRowsTotal=%(orderDataRowsTotal)s, OrderDataRowsInserted=%(orderDataRowsInserted)s, 
+                    OrderDataRowsUpdated=%(orderDataRowsUpdated)s, OrderDataRowsRemoved=%(orderDataRowsRemoved)s, 
                     LastUpdate=CURRENT_TIMESTAMP 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
             'successVal': 1 if success == True else 0,
             'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId, 
             'orderDataUpdateDuration': duration, 
-            'totalDuration': totalDuration
+            'totalDuration': totalDuration, 
+            'orderDataRowsTotal': self.orderDataRowsTotal,
+            'orderDataRowsInserted': self.orderDataRowsInserted,
+            'orderDataRowsUpdated': self.orderDataRowsUpdated,
+            'orderDataRowsRemoved': self.orderDataRowsRemoved
         }
         db.update(sql, data, cnx)        
 
