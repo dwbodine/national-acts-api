@@ -485,7 +485,7 @@ class UserService:
             sql += " AND "
             sql += " AND ".join(whereClause)
             
-        sql += " ORDER BY UserActivity.Timestamp ASC, Username ASC"    
+        sql += " ORDER BY UserActivity.Timestamp DESC, Username ASC"    
         
         rows = db.queryAll(sql, data)
         for row in rows:
