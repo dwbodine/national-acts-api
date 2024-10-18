@@ -284,6 +284,8 @@ class DashboardTotals:
     totalRevenueUsd: float = 0
     revenueRefunded: float = 0
     serviceFeeRevenueRefunded: float = 0
+    pricePerTicket: float = 0
+    serviceFeePerTicket: float = 0
     dailyOrderData: list[DailyOrderData] = []
    
     def __init__(self, year: int, month: int, day: int):
@@ -385,8 +387,7 @@ class TicketSocketRefreshHistory:
 
     def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int], ticketTypesFailed: list[int], 
                   totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
-                  ordersDeactivated: int, ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketsDeactivated: int, 
-                  ticketTypesUpdated: int, ticketTypesInserted: int, ticketTypesDeactivated: int, 
+                  ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketTypesUpdated: int, ticketTypesInserted: int, 
                   startTimer: int, endTimer: int, duration: float, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
                   errorMessage: str = None):
         self.serviceEventsSkipped = serviceEventsSkipped
@@ -399,14 +400,11 @@ class TicketSocketRefreshHistory:
         self.eventsInserted = eventsInserted
         self.ordersInserted = ordersInserted
         self.ordersUpdated = ordersUpdated
-        self.ordersDeactivated = ordersDeactivated
         self.ordersDeleted = ordersDeleted
         self.ticketsUpdated = ticketsUpdated
         self.ticketsInserted = ticketsInserted
-        self.ticketsDeactivated = ticketsDeactivated
         self.ticketTypesUpdated = ticketTypesUpdated
         self.ticketTypesInserted = ticketTypesInserted
-        self.ticketTypesDeactivated = ticketTypesDeactivated
         self.userId = userId
         self.sellerId = sellerId
         self.start = start
@@ -477,12 +475,12 @@ class TicketSocketRefreshHistory:
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
                  ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed, TicketTypesFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
-                 OrdersInserted, OrdersUpdated, OrdersDeactivated, OrdersDeleted, TicketsUpdated, TicketsInserted, TicketsDeactivated, 
-                 TicketTypesUpdated, TicketTypesInserted, TicketTypesDeactivated) VALUES (%(userId)s, %(sellerId)s, 
+                 OrdersInserted, OrdersUpdated, OrdersDeleted, TicketsUpdated, TicketsInserted,  
+                 TicketTypesUpdated, TicketTypesInserted) VALUES (%(userId)s, %(sellerId)s, 
                  %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s, %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
                  %(ordersFailed)s, %(ticketsFailed)s, %(ticketTypesFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
-                 %(ordersUpdated)s, %(ordersDeactivated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s, %(ticketsDeactivated)s, 
-                 %(ticketTypesUpdated)s, %(ticketTypesInserted)s, %(ticketTypesDeactivated)s)"""
+                 %(ordersUpdated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s,  
+                 %(ticketTypesUpdated)s, %(ticketTypesInserted)s)"""
         
         data = {
             'userId': self.userId,
@@ -504,14 +502,11 @@ class TicketSocketRefreshHistory:
             'eventsInserted': self.eventsInserted,
             'ordersInserted': self.ordersInserted,
             'ordersUpdated': self.ordersUpdated,
-            'ordersDeactivated': self.ordersDeactivated, 
             'ordersDeleted': self.ordersDeleted,
             'ticketsUpdated': self.ticketsUpdated,
             'ticketsInserted': self.ticketsInserted, 
-            'ticketsDeactivated': self.ticketsDeactivated,
             'ticketTypesUpdated': self.ticketTypesUpdated,
-            'ticketTypesInserted': self.ticketTypesInserted, 
-            'ticketTypesDeactivated': self.ticketTypesDeactivated
+            'ticketTypesInserted': self.ticketTypesInserted
         }
         
         self.ticketSocketRefreshHistoryId = db.insert(sql, data, cnx)

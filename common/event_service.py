@@ -681,6 +681,8 @@ class EventService:
             dailyOrderData.append(orderData)
         
         dashTotals.dailyOrderData = dailyOrderData
+        dashTotals.pricePerTicket = (dashTotals.ticketRevenueUsd - dashTotals.revenueRefunded) / dashTotals.tickets
+        dashTotals.serviceFeePerTicket = (dashTotals.serviceFeesRevenueUsd - dashTotals.serviceFeeRevenueRefunded) / dashTotals.tickets
         return dashTotals
 
     def __getTicketTypesFromEventId(self, ticketSocketEventId: int):
@@ -1029,14 +1031,11 @@ class EventService:
         eventsInserted: int = 0
         ordersInserted: int = 0
         ordersUpdated: int = 0
-        ordersDeactivated: int = 0
         ordersDeleted: int = 0
         ticketsUpdated: int = 0
         ticketsInserted: int = 0
-        ticketsDeactivated: int = 0
         ticketTypesUpdated: int = 0
         ticketTypesInserted: int = 0
-        ticketTypesDeactivated: int = 0
         dailyOrderDataRowsRemoved: int = 0
         results: TicketSocketRefreshHistory = None
 
@@ -1186,21 +1185,11 @@ class EventService:
                                 # if that failed, mark it
                                 ticketTypesFailed.append(ticketType.ticketTypeId)
                                 
-                        # find any ticket types not returned by the service and mark as inactive
-                        if len(eventTicketTypes) > 0:
-                            eventTicketTypeData = {
-                                'ticketSocketEventId': ticketSocketEventId
-                            }
-                            eventTicketStr = db.convertListToParameters(eventTicketTypes, eventTicketTypeData, 'eventTicketType')
-                            updateSql = """UPDATE TicketSocketTicketTypes Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
-                                    WHERE TicketSocketEventId=%(ticketSocketEventId)s AND TicketSocketTicketTypeId NOT IN """ + eventTicketStr
-                                    
-                            inactiveTicketTypes = db.update(updateSql, eventTicketTypeData, cnx)
-                            ticketTypesDeactivated += inactiveTicketTypes
-                    
                     if ticketSocketEventId and len(evt.orders) > 0:
                         eventOrders: list[int] = []
                         for order in evt.orders:
+                            if order.eventId != evt.id:
+                                continue
                             eventOrders.append(order.id)
                             # compile order data for update
                             shirts: str = None
@@ -1406,30 +1395,6 @@ class EventService:
                                         ticketsFailed.append(ticket.id)
                                         updateSuccess = False
                                         continue
-                                
-                                # find any tickets not returned by the service and mark as inactive
-                                if len(orderTickets) > 0:
-                                    orderTicketData = {
-                                        'ticketSocketOrderId': ticketSocketOrderId
-                                    }
-                                    orderTicketStr = db.convertListToParameters(orderTickets, orderTicketData, 'orderTicket')
-                                    sql = """UPDATE TicketSocketOrderTickets Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP 
-                                            WHERE TicketSocketOrderId=%(ticketSocketOrderId)s AND TicketId NOT IN """ + orderTicketStr
-
-                                    inactiveTickets = db.update(sql, orderTicketData, cnx)
-                                    ticketsDeactivated += inactiveTickets
-                        
-                        # find any orders not returned by the service and mark as inactive
-                        if len(eventOrders) > 0:
-                            eventOrderData = {
-                                'ticketSocketEventId': ticketSocketEventId
-                            }
-                            eventOrderStr = db.convertListToParameters(eventOrders, eventOrderData, 'eventOrder')
-                            sql = """UPDATE TicketSocketOrders Set IsActive=0, LastUpdate=CURRENT_TIMESTAMP  
-                                    WHERE TicketSocketEventId=%(ticketSocketEventId)s AND OrderId NOT IN """ + eventOrderStr
-    
-                            inactiveOrders = db.update(sql, eventOrderData, cnx)
-                            ordersDeactivated += inactiveOrders
             else:
                 updateSuccess = True
                 
@@ -1440,8 +1405,8 @@ class EventService:
             utility.logMessage('database update complete in ' + str(databaseDuration) + ' seconds')       
                                     
             results = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, 
-                                                eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, 
-                                                ticketsUpdated, ticketsInserted, ticketsDeactivated, ticketTypesUpdated, ticketTypesInserted, ticketTypesDeactivated, 
+                                                eventsUpdated, eventsInserted, ordersInserted, ordersUpdated, ordersDeleted, 
+                                                ticketsUpdated, ticketsInserted, ticketTypesUpdated, ticketTypesInserted, 
                                                 int(startTimer), int(endTimer), duration, userId, sellerId, start, end, 
                                                 updateSuccess, errorMessage)
             if userId != None and userId > 0:
@@ -1514,14 +1479,11 @@ class EventService:
             eventsInserted = int(row["EventsInserted"])
             ordersInserted = int(row["OrdersInserted"])
             ordersUpdated = int(row["OrdersUpdated"])
-            ordersDeactivated = int(row["OrdersDeactivated"])
             ordersDeleted = int(row["OrdersDeleted"])
             ticketsUpdated = int(row["TicketsUpdated"])
             ticketsInserted = int(row["TicketsInserted"])
-            ticketsDeactivated = int(row["TicketsDeactivated"])
             ticketTypesUpdated = int(row["TicketTypesUpdated"])
             ticketTypesInserted = int(row["TicketTypesInserted"])
-            ticketTypesDeactivated = int(row["TicketTypesDeactivated"])
             orderDataUpdateSucceeded = True if int(row["OrderDataUpdateSucceeded"]) == 1 else False
             orderDataUpdateDuration = float(row["OrderDataUpdateDuration"])
             totalDuration = float(row["TotalDuration"])
@@ -1532,8 +1494,8 @@ class EventService:
             
 
             history = TicketSocketRefreshHistory(serviceEventsSkipped, eventsFailed, ordersFailed, ticketsFailed, ticketTypesFailed, totalEventsFromService, eventsUpdated, 
-                                                 eventsInserted, ordersInserted, ordersUpdated, ordersDeactivated, ordersDeleted, ticketsUpdated, ticketsInserted, 
-                                                 ticketsDeactivated, ticketTypesUpdated, ticketTypesInserted, ticketTypesDeactivated, 
+                                                 eventsInserted, ordersInserted, ordersUpdated, ordersDeleted, ticketsUpdated, ticketsInserted, 
+                                                 ticketTypesUpdated, ticketTypesInserted,  
                                                  startTimer, endTimer, duration, userId, sellerId, start, end, succeeded, errorMessage)
             history.sellerName = sellerName
             history.userName = userName
