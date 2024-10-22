@@ -1397,7 +1397,7 @@ class EventService:
                                         
                                         sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, ServiceFee=%(serviceFee)s, 
                                                 BarCode=%(barcode)s, AvailableScans=%(availableScans)s, PurchaseLocation=%(purchaseLocation)s, 
-                                                ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, AttendeeFirstName=%(attendeeFirstName)s, AttendeeLastName=%(attendeeLastName)s, """
+                                                ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, """
                                         if ticketPrice > 0:
                                             sql += """Price=%(price)s, """
                                         sql += """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
