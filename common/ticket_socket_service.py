@@ -362,7 +362,6 @@ class TicketSocketService:
                 orderRevenue: float = 0
                 orderServiceFees: float = 0
                 orderTickets = []
-                orderAttendeeNames = []
                 orderShirts = []
                 if totalCount > 0:
                     ticketData = tickets['data']
@@ -403,16 +402,6 @@ class TicketSocketService:
                         if order.email == '' and 'email' in item:
                             order.email = item['email']
                         
-                        # add attendee data from ticket
-                        attendeeName: str = ''
-                        if 'partyMember' in item:
-                            attendeeName = utility.fixMagicQuotes(item['partyMember'])
-                            if 'partyMemberLastName' in item:
-                                attendeeName += ' ' + utility.fixMagicQuotes(item['partyMemberLastName'])
-
-                        if attendeeName != '':
-                            orderAttendeeNames.append(attendeeName)
-
                         # get shirt and phone data from questions    
                         purchaserQuestions: list = []
                         attendeeQuestions: list = []
@@ -472,11 +461,17 @@ class TicketSocketService:
                         scannedTimestamp: int = 0
                         if 'scannedTimestamp' in item:
                             scannedTimestamp = int(item['scannedTimestamp'])
+                        attendeeFirstName: str = ''
+                        if 'partyMember' in item:
+                            attendeeFirstName = utility.fixMagicQuotes(item['partyMember'])
+                        attendeeLastName: str = ''
+                        if 'partyMemberLastName' in item:
+                            attendeeLastName = utility.fixMagicQuotes(item['partyMemberLastName'])
 
                         if ticketId == 0 or ticketType == '':
                             continue
                         
-                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp)
+                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp, attendeeFirstName, attendeeLastName)
                         orderTickets.append(ticket)
 
                         orderRevenue += price
@@ -486,7 +481,6 @@ class TicketSocketService:
                     order.numTickets = numTickets
                     order.tickets = orderTickets
                     order.shirts = orderShirts
-                    order.attendeeNames = orderAttendeeNames
                     order.revenue = orderRevenue
                     order.serviceFees = orderServiceFees
 

@@ -77,8 +77,8 @@ class VipTicket(TicketSocketTicket):
     ticketSocketOrderTicketId: int = 0
     isActive: bool = True
 
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int):
-        super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp)
+    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int, attendeeFirstName: str, attendeeLastName: str):
+        super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp, attendeeFirstName, attendeeLastName)
 
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
@@ -118,12 +118,6 @@ class VipOrder(TicketSocketOrder):
         self.totalShirts = len(self.shirts)
         self.revenueUsd = self.revenue * self.exchangeRate            
         self.serviceFeesUsd = self.serviceFees * self.exchangeRate
-        if self.numTickets > 0:
-            i = 0
-            for ticket in self.tickets:
-                if len(self.attendeeNames) >= (i + 1):
-                    ticket.attendeeName = self.attendeeNames[i]
-                i += 1
     
 class VipEvent(TicketSocketEvent):
     ticketSocketEventId: int = 0

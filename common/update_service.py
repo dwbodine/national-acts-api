@@ -2,6 +2,7 @@ import time
 from . import db
 from . import exchange_rate_service
 from . import event_service
+from . import utility
 
 class UpdateService:
     def updateAllExchangeRates(self):
@@ -21,3 +22,56 @@ class UpdateService:
             results = service.updateDailyOrderData(results)
             
         return results
+    
+    def migrateAttendeeNames(self):
+        sql = """SELECT Id, AttendeeNames, PurchaserFirstName, PurchaserLastName FROM TicketSocketOrders WHERE COALESCE(AttendeeNames, '') <> ''"""
+        rows = db.queryAll(sql)
+        success: bool = True
+        for row in rows:
+            orderId = int(row["Id"])
+            attendeeNameStr = str(row["AttendeeNames"]).strip()
+            purchaserFirstName = str(row["PurchaserFirstName"]).strip()
+            purchaserLastName = str(row["PurchaserLastName"]).strip()
+            ticketSql = """SELECT Id FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=%(orderId)s"""
+            ticketData = {
+                'orderId': orderId
+            }
+            attendeeNames = attendeeNameStr.split('/')
+            ticketRows = db.queryAll(ticketSql, ticketData)
+            i: int = 0
+            for ticketRow in ticketRows:
+                ticketId = int(ticketRow["Id"])
+                attendeeFirstName: str = ''
+                attendeeLastName: str = ''
+                if i < len(attendeeNames):
+                    aNameStr = attendeeNames[i].strip()
+                    aNameStr = ' '.join(aNameStr.split())
+                    aNameStr = aNameStr.strip()
+                    if len(aNameStr) > 0:
+                        aName = aNameStr.split(' ')
+                        if len(aName) > 0:
+                            attendeeFirstName = aName[0].strip()
+                            if len(attendeeFirstName) == 0:
+                                attendeeFirstName = purchaserFirstName
+                                attendeeLastName = purchaserLastName
+                            elif len(aName) > 1:
+                                attendeeLastName = aName[1].strip()
+                    else:
+                        attendeeFirstName = purchaserFirstName
+                        attendeeLastName = purchaserLastName
+                else:
+                    attendeeFirstName = purchaserFirstName
+                    attendeeLastName = purchaserLastName
+                ticketUpdateSql = """UPDATE TicketSocketOrderTickets SET AttendeeFirstName=%(attendeeFirstName)s, AttendeeLastName=%(attendeeLastName)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketId)s"""
+                ticketUpdateData = {
+                    'ticketId': ticketId, 
+                    'attendeeFirstName': attendeeFirstName, 
+                    'attendeeLastName': attendeeLastName
+                }
+                success = db.update(ticketUpdateSql, ticketUpdateData)
+                if success != True:
+                    break
+                i += 1
+            if success != True:
+                break
+        return success

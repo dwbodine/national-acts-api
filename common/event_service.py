@@ -419,14 +419,6 @@ class EventService:
                 for shirt in shirtArray:
                     shirts.append(shirt.strip())
             order.shirts = shirts
-            attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
-            attendees = []
-            if attendeeStr != None and attendeeStr != '':
-                attendeeArray = attendeeStr.split("/")
-                for attendee in attendeeArray:
-                    attendees.append(attendee.strip())
-            attendees.sort()
-            order.attendeeNames = attendees
             tickets = self.__getTicketsFromOrderId(ticketSocketOrderId)
             order.tickets = tickets
             order.getTotals()
@@ -799,14 +791,6 @@ class EventService:
                 for shirt in shirtArray:
                     shirts.append(shirt.strip())
             order.shirts = shirts
-            attendeeStr = str(row["AttendeeNames"]).strip() if row["AttendeeNames"] != None else None
-            attendees = []
-            if attendeeStr != None and attendeeStr != '':
-                attendeeArray = attendeeStr.split("/")
-                for attendee in attendeeArray:
-                    attendees.append(attendee.strip())
-            attendees.sort()
-            order.attendeeNames = attendees
             tickets = self.__getTicketsFromOrderId(ticketSocketOrderId)
             order.tickets = tickets
             order.getTotals()
@@ -825,7 +809,7 @@ class EventService:
             ticketId: int = 0
             if row["TicketId"] != None and row["TicketId"] != '':
                 ticketId = int(row["TicketId"])
-            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]), str(row["BarCode"]), int(row["AvailableScans"]), str(row["PurchaseLocation"]), int(row["ScannedTimestamp"]))
+            ticket = VipTicket(ticketId, str(row["TicketType"]), float(row["Price"]), float(row["ServiceFee"]), int(row["TicketSocketTicketTypeId"]), str(row["BarCode"]), int(row["AvailableScans"]), str(row["PurchaseLocation"]), int(row["ScannedTimestamp"]), str(row["AttendeeFirstName"]), str(row["AttendeeLastName"]))
             ticket.ticketSocketOrderId = ticketSocketOrderId
             ticket.ticketSocketOrderTicketId = int(row["Id"])
             ticket.isActive = True if int(row["IsActive"]) == 1 else False
@@ -917,6 +901,21 @@ class EventService:
                 'isHidden': 1 if eventToUpdate.isHidden else 0
             }
             success = db.update(updateSql, updateData)
+            
+            if len(eventToUpdate.ticketTypes) > 0:
+                for ticketType in eventToUpdate.ticketTypes:
+                    ticketTypeSql = """UPDATE TicketSocketTicketTypes 
+                                        SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP 
+                                        WHERE TicketSocketTicketTypeId=%(ticketTypeId)s 
+                                        AND TicketSocketEventId=%(ticketSocketEventId)s"""
+                    ticketTypeData = {
+                        'ticketTypeId': ticketType.ticketTypeId,
+                        'ticketSocketEventId': ticketSocketEventId,
+                        'isActive': ticketType.isActive
+                    }
+                    success = db.update(ticketTypeSql, ticketTypeData)
+                    if success == False:
+                        break
         return success   
     
     def updateOrder(self, orderToUpdate: VipOrder):
@@ -936,15 +935,53 @@ class EventService:
                             SET IsActive=%(isActive)s, 
                             IsDeleted=%(isDeleted)s, 
                             IsHidden=%(isHidden)s, 
+                            IsRefunded=%(isRefunded)s, 
+                            Revenue=%(revenue)s, 
+                            ServiceFees=%(serviceFees)s, 
+                            RefundDate=%(refundDate)s, 
+                            IsChargedBack=%(isChargedBack)s, 
+                            ChargebackDate=%(chargebackDate)s, 
+                            NumTicketsRefunded=%(numTicketsRefunded)s, 
+                            RevenueRefunded=%(revenueRefunded)s, 
+                            ServiceFeeRevenueRefunded=%(serviceFeeRevenueRefunded)s, 
                             LastUpdate=CURRENT_TIMESTAMP 
                             WHERE Id=%(ticketSocketOrderId)s"""
             updateData = {
                 'ticketSocketOrderId': ticketSocketOrderId,
+                'revenue': orderToUpdate.revenue if orderToUpdate.revenue != "None" else 0, 
+                'serviceFees': orderToUpdate.serviceFees if orderToUpdate.serviceFees != "None" else 0, 
                 'isActive': 1 if orderToUpdate.isActive else 0,
                 'isDeleted': 1 if orderToUpdate.isDeleted else 0,
-                'isHidden': 1 if orderToUpdate.isHidden else 0
+                'isHidden': 1 if orderToUpdate.isHidden else 0, 
+                'isRefunded': 1 if orderToUpdate.isRefunded else 0, 
+                'refundDate': orderToUpdate.refundDate if orderToUpdate.refundDate != "None" else None, 
+                'isChargedBack': 1 if orderToUpdate.isChargedBack else 0, 
+                'chargebackDate': orderToUpdate.chargebackDate if orderToUpdate.chargebackDate != "None" else None, 
+                'numTicketsRefunded': orderToUpdate.numTicketsRefunded if orderToUpdate.numTicketsRefunded != "None" else 0, 
+                'revenueRefunded': orderToUpdate.revenueRefunded if orderToUpdate.revenueRefunded != "None" else 0, 
+                'serviceFeeRevenueRefunded': orderToUpdate.serviceFeeRevenueRefunded if orderToUpdate.serviceFeeRevenueRefunded != "None" else 0
             }
             success = db.update(updateSql, updateData)
+            if len(orderToUpdate.tickets) > 0:
+                for ticket in orderToUpdate.tickets:
+                    orderTicketSql = """UPDATE TicketSocketOrderTickets 
+                                            SET Price=%(price)s, 
+                                            ServiceFee=%(serviceFee)s, 
+                                            IsActive=%(isActive)s, 
+                                            IsCheckedIn=%(isCheckedIn)s, 
+                                            LastUpdate=CURRENT_TIMESTAMP 
+                                            WHERE Id=%(ticketId)s AND TicketSocketOrderId=%(ticketSocketOrderId)s"""
+                    orderTicketData = {
+                        'ticketId': ticket.id, 
+                        'ticketSocketOrderId': ticket.ticketSocketOrderId, 
+                        'price': ticket.price, 
+                        'serviceFee': ticket.serviceFee, 
+                        'isActive': 1 if ticket.isActive == True else 0, 
+                        'isCheckedIn': 1 if ticket.isCheckedIn == True else 0
+                    }
+                    success = db.update(orderTicketSql, orderTicketData)
+                    if success == False:
+                        break
         return success      
     
     def retrieveTicketSocketEventsForUpdate(self, sellerId: int = None, start: int = None, end: int = None):
@@ -1195,9 +1232,6 @@ class EventService:
                             shirts: str = None
                             if len(order.shirts) > 0:
                                 shirts = " / ".join(order.shirts)
-                            attendeeNames: str = None
-                            if len(order.attendeeNames) > 0:
-                                attendeeNames = " / ".join(order.attendeeNames)
 
                             orderData = {
                                 'numTickets': order.numTickets,
@@ -1205,7 +1239,6 @@ class EventService:
                                 'purchaseTimestamp': order.purchaseTimestamp.strip(),
                                 'phone': order.phone.strip() if order.phone != None else None,
                                 'shirts': shirts,
-                                'attendeeNames': attendeeNames,
                                 'userId': order.userId,
                                 'eventId': order.eventId,
                                 'purchaserLastName': order.purchaserLastName.strip() if order.purchaserLastName != None else None,
@@ -1263,7 +1296,7 @@ class EventService:
                                 
                                 #update existing order
                                 sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s, PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s, 
-                                        Phone=%(phone)s, Shirts=%(shirts)s, AttendeeNames=%(attendeeNames)s, EventId=%(eventId)s, UserId=%(userId)s, 
+                                        Phone=%(phone)s, Shirts=%(shirts)s, EventId=%(eventId)s, UserId=%(userId)s, 
                                         PurchaserLastName=%(purchaserLastName)s, PurchaserFirstName=%(purchaserFirstName)s, PurchaserCity=%(purchaserCity)s, 
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s, PurchaserCountry=%(purchaserCountry)s, PurchaserIpAddress=%(purchaserIpAddress)s, 
                                         Email=%(email)s, """
@@ -1280,14 +1313,14 @@ class EventService:
                                 orderData['orderId'] = int(order.id)
                                 orderData['ticketSocketEventId'] = ticketSocketEventId
                                 sql = """INSERT INTO TicketSocketOrders (TicketSocketEventId, OrderId, NumTickets, PurchaseDate, PurchaseTimestamp, Phone, Shirts, 
-                                                AttendeeNames, EventId, UserId, PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState, PurchaserZip, PurchaserCountry, 
+                                                EventId, UserId, PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState, PurchaserZip, PurchaserCountry, 
                                                 PurchaserIpAddress, Email"""
                                 if order.revenue > 0:
                                     sql += """, Revenue"""
                                 if order.serviceFees > 0:
                                     sql += """, ServiceFees"""
                                 sql += """) VALUES (%(ticketSocketEventId)s, %(orderId)s, %(numTickets)s, %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s, 
-                                               %(attendeeNames)s, %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(purchaserCity)s, %(purchaserState)s, 
+                                               %(eventId)s, %(userId)s, %(purchaserLastName)s, %(purchaserFirstName)s, %(purchaserCity)s, %(purchaserState)s, 
                                                 %(purchaserZip)s, %(purchaserCountry)s, %(purchaserIpAddress)s,  %(email)s"""
                                 if order.revenue > 0:
                                     sql +=""", %(revenue)s"""
@@ -1329,7 +1362,9 @@ class EventService:
                                         'availableScans': ticket.availableScans,
                                         'barcode': ticket.barcode,
                                         'purchaseLocation': ticket.purchaseLocation,
-                                        'scannedTimestamp': ticket.scannedTimestamp
+                                        'scannedTimestamp': ticket.scannedTimestamp,
+                                        'attendeeFirstName': ticket.attendeeFirstName, 
+                                        'attendeeLastName': ticket.attendeeLastName
                                     }
 
                                     ticketPrice = ticket.price if ticket.price != None else 0
@@ -1362,7 +1397,7 @@ class EventService:
                                         
                                         sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, ServiceFee=%(serviceFee)s, 
                                                 BarCode=%(barcode)s, AvailableScans=%(availableScans)s, PurchaseLocation=%(purchaseLocation)s, 
-                                                ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, """
+                                                ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, AttendeeFirstName=%(attendeeFirstName)s, AttendeeLastName=%(attendeeLastName)s, """
                                         if ticketPrice > 0:
                                             sql += """Price=%(price)s, """
                                         sql += """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
@@ -1373,11 +1408,11 @@ class EventService:
                                         ticketData['ticketId'] = int(ticket.id)
                                         ticketData['ticketSocketOrderId'] = ticketSocketOrderId
                                         ticketData['isCheckedIn'] = 1 if ticket.scannedTimestamp != 0 else 0
-                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation, ScannedTimestamp, IsCheckedIn""" 
+                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation, ScannedTimestamp, IsCheckedIn, AttendeeFirstName, AttendeeLastName""" 
                                         if ticketPrice > 0:
                                             sql += ", Price"
                                         sql += """) """
-                                        sql += """VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s, %(isCheckedIn)s"""
+                                        sql += """VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s, %(isCheckedIn)s, %(attendeeFirstName)s, %(attendeeLastName)s"""
                                         if ticketPrice > 0:
                                             sql += ", %(price)s"
                                         sql += """)"""
