@@ -23,6 +23,42 @@ class UpdateService:
             
         return results
     
+    def migrateTicketTypeIds(self):
+        success: bool = True
+        sql = """SELECT TicketSocketEventId, TicketSocketTicketTypeId, TicketTypeName 
+                    FROM TicketSocketTicketTypes 
+                    ORDER BY TicketSocketEventId, TicketSocketTicketTypeId"""
+        rows = db.queryAll(sql)
+        for row in rows:
+            ticketSocketEventId = int(row["TicketSocketEventId"])
+            eventTicketTypeId = int(row["TicketSocketTicketTypeId"])
+            eventTicketTypeName = str(row["TicketTypeName"]).upper()
+            orderTicketSql = """SELECT TicketSocketOrderTickets.Id, TicketSocketOrderTickets.TicketType 
+                                    FROM TicketSocketOrderTickets 
+                                    JOIN TicketSocketOrders ON TicketSocketOrders.Id = TicketSocketOrderTickets.TicketSocketOrderId 
+                                    WHERE TicketSocketOrders.TicketSocketEventId = %(ticketSocketEventId)s"""
+            orderTicketData = {
+                'ticketSocketEventId': ticketSocketEventId
+            }
+            orderTicketRows = db.queryAll(orderTicketSql, orderTicketData)
+            if len(orderTicketRows) == 0:
+                continue
+            for orderTicketRow in orderTicketRows:
+                ticketId = int(orderTicketRow["Id"])
+                ticketType = str(orderTicketRow["TicketType"]).upper()
+                if ticketType == eventTicketTypeName:
+                    updateSql = """UPDATE TicketSocketOrderTickets SET TicketSocketTicketTypeId=%(eventTicketTypeId)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketId)s"""
+                    udpateData = {
+                        'eventTicketTypeId': eventTicketTypeId,
+                        'ticketId': ticketId
+                    }
+                    success = db.update(updateSql, udpateData)
+                if success != True: 
+                    break
+            if success != True: 
+                break
+        return success
+    
     def migrateAttendeeNames(self):
         sql = """SELECT Id, AttendeeNames, PurchaserFirstName, PurchaserLastName FROM TicketSocketOrders WHERE COALESCE(AttendeeNames, '') <> ''"""
         rows = db.queryAll(sql)

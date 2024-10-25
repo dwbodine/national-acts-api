@@ -690,11 +690,11 @@ class EventService:
         
         rows = db.queryAll(sql, data)
         for row in rows:
-            id = int(row["TicketSocketTicketTypeId"])
+            ticketTypeId = int(row["TicketSocketTicketTypeId"])
             name = str(row["TicketTypeName"])
             total = int(row["TotalAvailable"])
             isActive: bool = (int(row["IsActive"]) == 1)
-            ticketType = TicketSocketTicketType(ticketSocketEventId, id, name, total, isActive)
+            ticketType = TicketSocketTicketType(ticketSocketEventId, ticketTypeId, name, total, isActive)
             ticketTypes.append(ticketType)
         
         return ticketTypes
@@ -1358,6 +1358,7 @@ class EventService:
                                     # compile ticket data for update
                                     ticketData = {
                                         'ticketType': ticket.ticketType.strip(),
+                                        'ticketTypeId': ticket.ticketTypeId,
                                         'serviceFee': ticket.serviceFee if ticket.serviceFee != None else 0,
                                         'availableScans': ticket.availableScans,
                                         'barcode': ticket.barcode,
@@ -1395,7 +1396,7 @@ class EventService:
                                         ticketData['id'] = ticketSocketOrderTicketId
                                         ticketData['isCheckedIn'] = isCheckedIn
                                         
-                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, ServiceFee=%(serviceFee)s, 
+                                        sql = """Update TicketSocketOrderTickets SET TicketType=%(ticketType)s, TicketSocketTicketTypeId=%(ticketTypeId)s, ServiceFee=%(serviceFee)s, 
                                                 BarCode=%(barcode)s, AvailableScans=%(availableScans)s, PurchaseLocation=%(purchaseLocation)s, 
                                                 ScannedTimestamp=%(scannedTimestamp)s, IsCheckedIn=%(isCheckedIn)s, """
                                         if ticketPrice > 0:
@@ -1408,11 +1409,11 @@ class EventService:
                                         ticketData['ticketId'] = int(ticket.id)
                                         ticketData['ticketSocketOrderId'] = ticketSocketOrderId
                                         ticketData['isCheckedIn'] = 1 if ticket.scannedTimestamp != 0 else 0
-                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation, ScannedTimestamp, IsCheckedIn, AttendeeFirstName, AttendeeLastName""" 
+                                        sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId, TicketId, TicketSocketTicketTypeId, TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation, ScannedTimestamp, IsCheckedIn, AttendeeFirstName, AttendeeLastName""" 
                                         if ticketPrice > 0:
                                             sql += ", Price"
                                         sql += """) """
-                                        sql += """VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketType)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s, %(isCheckedIn)s, %(attendeeFirstName)s, %(attendeeLastName)s"""
+                                        sql += """VALUES (%(ticketSocketOrderId)s, %(ticketId)s, %(ticketTypeId)s, %(ticketType)s, %(serviceFee)s, %(barcode)s, %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s, %(isCheckedIn)s, %(attendeeFirstName)s, %(attendeeLastName)s"""
                                         if ticketPrice > 0:
                                             sql += ", %(price)s"
                                         sql += """)"""
