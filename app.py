@@ -77,6 +77,48 @@ def __getUserFromJwt():
    return user
 
 # BEGIN ADMIN ROUTES
+@app.route('/admin/events/cancel', methods=["POST"])
+@jwt_required()
+def cancelEvent():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   eventId = request.json.get("eventId", None)
+   
+   if eventId == None:
+      return {"msg": "Bad Request"}, 400
+   
+   refundOrdersStr = request.json.get("refundOrders", None)
+   refundOrders: bool = True if refundOrdersStr == 1 else False
+   refundServiceFees: bool = False
+   if refundOrders == True:
+      refundServiceFeesStr = request.json.get("refundServiceFees", None)
+      refundServiceFees = True if refundServiceFeesStr == 1 else False   
+   
+   service = EventService()
+   success = service.cancelEvent(int(eventId), refundOrders, refundServiceFees)
+   return convertToJson(success) 
+
+@app.route('/admin/events/refund', methods=["POST"])
+@jwt_required()
+def refundEvent():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   eventId = request.json.get("eventId", None)
+   
+   if eventId == None:
+      return {"msg": "Bad Request"}, 400
+   
+   refundServiceFeesStr = request.json.get("refundServiceFees", None)
+   refundServiceFees: bool = True if refundServiceFeesStr == 1 else False   
+   
+   service = EventService()
+   success = service.refundAllEventOrders(int(eventId), True, refundServiceFees)
+   return convertToJson(success) 
+
 @app.route('/admin/events/update', methods=["POST"])
 @jwt_required()
 def updateEvent():
@@ -90,6 +132,25 @@ def updateEvent():
    
    service = EventService()
    success = service.updateEvent(event)
+   return convertToJson(success) 
+
+@app.route('/admin/orders/refund', methods=["POST"])
+@jwt_required()
+def refundOrder():
+   isAdmin = __isAdminLoggedIn()
+   if isAdmin == False:
+      return {"msg": "Unauthorized"}, 401
+   
+   orderId = request.json.get("orderId", None)
+   
+   if orderId == None:
+      return {"msg": "Bad Request"}, 400
+   
+   refundServiceFeesStr = request.json.get("refundServiceFees", None)
+   refundServiceFees: bool = True if refundServiceFeesStr == 1 else False   
+   
+   service = EventService()
+   success = service.refundOrder(int(orderId), refundServiceFees)
    return convertToJson(success) 
 
 @app.route('/admin/orders/update', methods=["POST"])
@@ -742,26 +803,6 @@ def sendPasswordReset():
    success = service.sendPasswordResetEmail(username)
    return convertToJson(success)
 
-@app.route("/user/setEventDeleted", methods=["POST"])
-def setEventDeleted():
-    # secured by user api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('USER_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   ticketSocketEventId = request.json.get("eventId", None)
-   isDeleted = request.json.get("isDeleted", None)
-   
-   if ticketSocketEventId == None or isDeleted == None:
-      return {"msg": "Bad Request"}, 400   
-   
-   deleted: bool = True if int(isDeleted) == 1 else False
-   service = EventService()
-   result = service.deleteEvent(int(ticketSocketEventId), deleted)
-   return convertToJson(result)
-
 @app.route("/user/setEventDeletedSecured", methods=["POST"])
 @jwt_required()
 def setEventDeletedSecured():
@@ -773,20 +814,19 @@ def setEventDeletedSecured():
       return {"msg": "Bad Request"}, 400 
    
    eventIds: list[int] = []
+   deleted: bool = True if int(isDeleted) == 1 else False
    if ticketSocketEventIdList != None:
       eventIds = json.loads(ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(eventIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketEventId != None:
+      eventIds.append(int(ticketSocketEventId))
    
-   deleted: bool = True if int(isDeleted) == 1 else False
    service = EventService()
    if len(eventIds) > 0:
-      for eventId in eventIds:
-         result = service.deleteEvent(eventId, deleted)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.deleteEvent(int(ticketSocketEventId), deleted)
+      result = service.deleteEvents(eventIds, deleted)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setEventHiddenSecured", methods=["POST"])
@@ -804,36 +844,15 @@ def setEventHiddenSecured():
       eventIds = json.loads(ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(eventIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketEventId != None:
+      eventIds.append(int(ticketSocketEventId))
    
    hidden: bool = True if int(isHidden) == 1 else False
    service = EventService()
    if len(eventIds) > 0:
-      for eventId in eventIds:
-         result = service.hideEvent(eventId, hidden)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.hideEvent(int(ticketSocketEventId), hidden)
-   return convertToJson(result)
-
-@app.route("/user/setEventInactive", methods=["POST"])
-def setEventInactive():
-    # secured by user api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('USER_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   ticketSocketEventId = request.json.get("eventId", None)
-   isActive = request.json.get("isActive", None)
-   
-   if ticketSocketEventId == None or isActive == None:
-      return {"msg": "Bad Request"}, 400   
-   
-   disabled: bool = True if int(isActive) == 0 else False
-   service = EventService()
-   result = service.disableEvent(int(ticketSocketEventId), disabled)
+      result = service.hideEvents(eventIds, hidden)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setEventInactiveSecured", methods=["POST"])
@@ -851,36 +870,15 @@ def setEventInactiveSecured():
       eventIds = json.loads(ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(eventIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketEventId != None:
+      eventIds.append(int(ticketSocketEventId))
    
    disabled: bool = True if int(isActive) == 0 else False
    service = EventService()
    if len(eventIds) > 0:
-      for eventId in eventIds:
-         result = service.disableEvent(eventId, disabled)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.disableEvent(int(ticketSocketEventId), disabled)
-   return convertToJson(result)
-
-@app.route("/user/setOrderDeleted", methods=["POST"])
-def setOrderDeleted():
-    # secured by user api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('USER_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   ticketSocketOrderId = request.json.get("orderId", None)
-   isDeleted = request.json.get("isDeleted", None)
-   
-   if ticketSocketOrderId == None or isDeleted == None:
-      return {"msg": "Bad Request"}, 400 
-   
-   deleted: bool = True if int(isDeleted) == 1 else False
-   service = EventService()
-   result = service.deleteOrder(int(ticketSocketOrderId), deleted)
+      result = service.disableEvents(eventIds, disabled)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setOrderDeletedSecured", methods=["POST"])
@@ -898,16 +896,15 @@ def setOrderDeletedSecured():
       orderIds = json.loads(ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(orderIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketOrderId != None:
+      orderIds.append(int(ticketSocketOrderId))
    
    deleted: bool = True if int(isDeleted) == 1 else False
    service = EventService()
    if len(orderIds) > 0:
-      for orderId in orderIds:
-         result = service.deleteOrder(orderId, deleted)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.deleteOrder(int(ticketSocketOrderId), deleted)
+      result = service.deleteOrders(orderIds, deleted)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setOrderHiddenSecured", methods=["POST"])
@@ -925,36 +922,15 @@ def setOrderHiddenSecured():
       orderIds = json.loads(ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(orderIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketOrderId != None:
+      orderIds.append(int(ticketSocketOrderId))    
    
    hidden: bool = True if int(isHidden) == 1 else False
    service = EventService()
    if len(orderIds) > 0:
-      for orderId in orderIds:
-         result = service.hideOrder(orderId, hidden)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.hideOrder(int(ticketSocketOrderId), hidden)
-   return convertToJson(result)
-
-@app.route("/user/setOrderInactive", methods=["POST"])
-def setOrderInactive():
-    # secured by user api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('USER_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   ticketSocketOrderId = request.json.get("orderId", None)
-   isActive = request.json.get("isActive", None)
-   
-   if ticketSocketOrderId == None or isActive == None:
-      return {"msg": "Bad Request"}, 400   
-   
-   disabled: bool = True if int(isActive) == 0 else False
-   service = EventService()
-   result = service.disableOrder(int(ticketSocketOrderId), disabled)
+      result = service.hideOrders(orderIds, hidden)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setOrderInactiveSecured", methods=["POST"])
@@ -972,16 +948,15 @@ def setOrderInactiveSecured():
       orderIds = json.loads(ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(orderIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketOrderId != None:
+      orderIds.append(int(ticketSocketOrderId))
    
    disabled: bool = True if int(isActive) == 0 else False
    service = EventService()
    if len(orderIds) > 0:
-      for orderId in orderIds:
-         result = service.disableOrder(orderId, disabled)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.disableOrder(int(ticketSocketOrderId), disabled)
+      result = service.disableOrders(orderIds, disabled)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
 
 @app.route("/user/setTicketCheckinSecured", methods=["POST"])
@@ -999,16 +974,15 @@ def setTicketCheckinSecured():
       ticketIds = json.loads(ticketSocketOrderTicketIdList, object_hook=lambda d: SimpleNamespace(**d))
       if len(ticketIds) == 0:
          return {"msg": "Bad Request"}, 400
+   elif ticketSocketOrderTicketId != None:
+      ticketIds.append(int(ticketSocketOrderTicketId))
    
    checkedIn: bool = True if int(isCheckedIn) == 1 else False
    service = EventService()
    if len(ticketIds) > 0:
-      for ticketId in ticketIds:
-         result = service.checkInTicket(ticketId, checkedIn)      
-         if result == False:
-            return {"msg": "Internal Server Error"}, 500
-   else:
-      result = service.checkInTicket(ticketSocketOrderTicketId, checkedIn)
+      result = service.checkInTickets(ticketIds, checkedIn)      
+      if result == False:
+         return {"msg": "Internal Server Error"}, 500
    return convertToJson(result)
    
 @app.route("/user/validateResetCode", methods=["POST"])

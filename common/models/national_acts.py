@@ -156,6 +156,8 @@ class VipEvent(TicketSocketEvent):
     isAddedToBandsInTown: bool = False
     sellerName: str = ''
     isHidden: bool = False
+    isCancelled: bool = False
+    cancelledDate: str = None
 
     def getTotals(self):
         totalRevenue: float = 0

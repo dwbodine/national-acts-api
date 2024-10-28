@@ -137,6 +137,7 @@ class EventService:
             vipEvent.ticketSocketUrl = str(row["URL"])
             vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
             vipEvent.isHidden = True if int(row["IsHidden"]) == 1 else False
+            vipEvent.isCancelled = True if int(row["IsCancelled"]) == 1 else False
             
             venueName = str(row["Venue"]) if row["Venue"] != None else None
             if row["ExternalVenue"] != None:
@@ -261,6 +262,7 @@ class EventService:
                 vipEvent.disableVipLinkReason = str(row["DisableVipLinkReason"])
                 vipEvent.isAddedToBandsInTown = True if int(row["IsAddedToBandsInTown"]) == 1 else False
                 vipEvent.isHidden = True if int(row["IsHidden"]) == 1 else False
+                vipEvent.isCancelled = True if int(row["IsCancelled"]) == 1 else False
                 events.append(vipEvent)
 
         events.sort(key = operator.attrgetter('eventDate', 'title', 'externalEventId'))
@@ -817,61 +819,132 @@ class EventService:
             tickets.append(ticket)
         return tickets
     
-    def disableEvent(self, ticketSocketEventId: int, disabled: bool):
-        sql = """UPDATE TicketSocketEvents SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
-        data = {
-            'ticketSocketEventId': ticketSocketEventId,
-            'isActive': 0 if disabled == True else 1
-        }
-        return db.update(sql, data)
+    def disableEvents(self, ticketSocketEventIds: list[int], disabled: bool):
+        success: bool = True
+        for ticketSocketEventId in ticketSocketEventIds:
+            sql = """UPDATE TicketSocketEvents SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
+            data = {
+                'ticketSocketEventId': ticketSocketEventId,
+                'isActive': 0 if disabled == True else 1
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def deleteEvent(self, ticketSocketEventId: int, deleted: bool):
-        sql = """UPDATE TicketSocketEvents SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
-        data = {
-            'ticketSocketEventId': ticketSocketEventId,
-            'isDeleted': 1 if deleted == True else 0
-        }
-        return db.update(sql, data)
+    def deleteEvents(self, ticketSocketEventIds: list[int], deleted: bool):
+        success: bool = True
+        for ticketSocketEventId in ticketSocketEventIds:
+            sql = """UPDATE TicketSocketEvents SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
+            data = {
+                'ticketSocketEventId': ticketSocketEventId,
+                'isDeleted': 1 if deleted == True else 0
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def disableOrder(self, ticketSocketOrderId: int, disabled: bool):
-        sql = """UPDATE TicketSocketOrders SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
-        data = {
-            'ticketSocketOrderId': ticketSocketOrderId,
-            'isActive': 0 if disabled == True else 1
-        }
-        return db.update(sql, data)
+    def hideEvents(self, ticketSocketEventIds: list[int], hidden: bool):
+        success: bool = True
+        for ticketSocketEventId in ticketSocketEventIds:
+            sql = """UPDATE TicketSocketEvents SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
+            data = {
+                'ticketSocketEventId': ticketSocketEventId,
+                'isHidden': 1 if hidden == True else 0
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def deleteOrder(self, ticketSocketOrderId: int, deleted: bool):
-        sql = """UPDATE TicketSocketOrders SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
-        data = {
-            'ticketSocketOrderId': ticketSocketOrderId,
-            'isDeleted': 1 if deleted == True else 0
-        }
-        return db.update(sql, data)
+    def disableOrders(self, ticketSocketOrderIds: list[int], disabled: bool):
+        success: bool = True
+        for ticketSocketOrderId in ticketSocketOrderIds:
+            sql = """UPDATE TicketSocketOrders SET IsActive=%(isActive)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
+            data = {
+                'ticketSocketOrderId': ticketSocketOrderId,
+                'isActive': 0 if disabled == True else 1
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def hideEvent(self, ticketSocketEventId: int, hidden: bool):
-        sql = """UPDATE TicketSocketEvents SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketEventId)s"""
-        data = {
-            'ticketSocketEventId': ticketSocketEventId,
-            'isHidden': 1 if hidden == True else 0
-        }
-        return db.update(sql, data)
+    def deleteOrders(self, ticketSocketOrderIds: list[int], deleted: bool):
+        success: bool = True
+        for ticketSocketOrderId in ticketSocketOrderIds:
+            sql = """UPDATE TicketSocketOrders SET IsDeleted=%(isDeleted)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
+            data = {
+                'ticketSocketOrderId': ticketSocketOrderId,
+                'isDeleted': 1 if deleted == True else 0
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def hideOrder(self, ticketSocketOrderId: int, hidden: bool):
-        sql = """UPDATE TicketSocketOrders SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
-        data = {
-            'ticketSocketOrderId': ticketSocketOrderId,
-            'isHidden': 1 if hidden == True else 0
-        }
-        return db.update(sql, data)
+    def hideOrders(self, ticketSocketOrderIds: list[int], hidden: bool):
+        success: bool = True
+        for ticketSocketOrderId in ticketSocketOrderIds:
+            sql = """UPDATE TicketSocketOrders SET IsHidden=%(isHidden)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderId)s"""
+            data = {
+                'ticketSocketOrderId': ticketSocketOrderId,
+                'isHidden': 1 if hidden == True else 0
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
     
-    def checkInTicket(self, ticketSocketOrderTicketId: int, checkedIn: bool):
-        sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=%(checkedIn)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderTicketId)s"""
+    def checkInTickets(self, ticketSocketOrderTicketIds: list[int], checkedIn: bool):
+        success: bool = True
+        for ticketSocketOrderTicketId in ticketSocketOrderTicketIds:
+            sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=%(checkedIn)s, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(ticketSocketOrderTicketId)s"""
+            data = {
+                'ticketSocketOrderTicketId': ticketSocketOrderTicketId,
+                'checkedIn': 1 if checkedIn == True else 0
+            }
+            success = db.update(sql, data)
+            if success == False:
+                break
+        return success
+    
+    def cancelEvent(self, ticketSocketEventId: int, refundAllOrders: bool = False, refundServiceFees: bool = False):
+        success: bool = True
         data = {
-            'ticketSocketOrderTicketId': ticketSocketOrderTicketId,
-            'checkedIn': 1 if checkedIn == True else 0
+            'ticketSocketEventId': ticketSocketEventId
         }
-        return db.update(sql, data)
+        sql = """UPDATE TicketSocketEvents SET IsCancelled=1, CancelledDate=CURRENT_TIMESTAMP, LastUpdate=CURRENT_TIMESTAMP WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        success = db.update(sql, data)
+        if success == True and refundAllOrders == True:
+            success = self.refundAllEventOrders(ticketSocketEventId, refundServiceFees)
+        return success        
+    
+    def refundAllEventOrders(self, ticketSocketEventId: int, refundServiceFees: bool = False):
+        success: bool = True
+        sql = """SELECT Id from TicketSocketOrders WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        data = {
+            'ticketSocketEventId': ticketSocketEventId
+        }
+        rows = db.queryAll(sql, data)
+        if len(rows) > 0:
+            for row in rows:
+                orderId = int(row["Id"])
+                success = self.refundOrder(orderId, refundServiceFees)
+                if success == False:
+                    break
+        return success
+    
+    def refundOrder(self, ticketSocketOrderId: int, refundServiceFees: bool = False):
+        orderSql = """UPDATE TicketSocketOrders SET IsRefunded=1, RefundDate=CURRENT_TIMESTAMP, LastUpdate=CURRENT_TIMESTAMP, RevenueRefunded=Revenue, NumTicketsRefunded=NumTickets"""
+        orderData = {
+            'ticketSocketOrderId': ticketSocketOrderId
+        }
+        if refundServiceFees == True:
+            orderSql += """, ServiceFeeRevenueRefunded=ServiceFees"""
+        orderSql += " WHERE Id=%(ticketSocketOrderId)s"
+        success = db.update(orderSql, orderData)
     
     def updateEvent(self, eventToUpdate: VipEvent):
         success: bool = True
