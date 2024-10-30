@@ -170,7 +170,7 @@ class VipEvent(TicketSocketEvent):
         totalCheckedIn: int = 0
         shirtd: dict() = {}
         for order in self.orders:
-            if order.isRefunded or order.isChargedBack:
+            if order.isRefunded == True or order.isChargedBack == True:
                 totalTicketsRefunded += order.numTicketsRefunded
                 totalRevenueRefunded += order.revenueRefunded
                 totalServiceFeeRevenueRefunded += order.serviceFeeRevenueRefunded

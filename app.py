@@ -502,9 +502,6 @@ def getEvents():
    excludeStart: int = None
    excludeEnd: int = None
    searchTerm: str = None
-   showInactive: bool = False
-   showDeleted: bool = False
-   showHidden: bool = False
    tsEventId: int = None
    if request.args.get('sellerId') != None:
       sellerId = int(request.args.get('sellerId'))
@@ -516,17 +513,11 @@ def getEvents():
       excludeStart = int(request.args.get('excludeStart'))
    if request.args.get('excludeEnd') != None:
       excludeEnd = int(request.args.get('excludeEnd'))
-   if request.args.get('inactive') != None:
-      showInactive = True if int(request.args.get('inactive')) == 1 else False
-   if request.args.get('deleted') != None:
-      showDeleted = True if int(request.args.get('deleted')) == 1 else False
-   if request.args.get('hidden') != None:
-      showHidden = True if int(request.args.get('hidden')) == 1 else False
    if request.args.get('search') != None:
       searchTerm = str(request.args.get('search'))   
    if request.args.get('tsEventId') != None:
       tsEventId = int(request.args.get('tsEventId'))
-   results = service.getEventsAndOrders(False, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd, showHidden, False)
+   results = service.getEventsAndOrders(False, sellerId, start, end, False, searchTerm, tsEventId, False, excludeStart, excludeEnd, False, False)
    return convertToJson(results)
 
 @app.route('/public/sellers')
@@ -544,51 +535,6 @@ def getSellers():
 # END PUBLIC ROUTES
 
 # BEGIN USER ROUTES
-@app.route('/user/eventsAndOrders')
-def getEventsAndOrders():
-   # secured by user api key
-   senderKey = str(request.headers.get('x-api-key'))
-   apiKey = str(os.environ.get('USER_API_KEY'))
-   
-   if (senderKey != apiKey):
-      return {"msg": "Unauthorized"}, 401
-   
-   service = EventService()
-   sellerId: int = None
-   start: int = None
-   end: int = None
-   excludeStart: int = None
-   excludeEnd: int = None
-   searchTerm: str = None
-   showInactive: bool = False
-   showDeleted: bool = False
-   showHidden: bool = False
-   excludeExternal: bool = False
-   tsEventId: int = None
-   if request.args.get('sellerId') != None:
-      sellerId = int(request.args.get('sellerId'))
-   if request.args.get('start') != None:
-      start = int(request.args.get('start'))
-   if request.args.get('end') != None:
-      end = int(request.args.get('end'))
-   if request.args.get('excludeStart') != None:
-      excludeStart = int(request.args.get('excludeStart'))
-   if request.args.get('excludeEnd') != None:
-      excludeEnd = int(request.args.get('excludeEnd'))
-   if request.args.get('inactive') != None:
-      showInactive = True if int(request.args.get('inactive')) == 1 else False
-   if request.args.get('deleted') != None:
-      showDeleted = True if int(request.args.get('deleted')) == 1 else False
-   if request.args.get('hidden') != None:
-      showHidden = True if int(request.args.get('hidden')) == 1 else False
-   if request.args.get('search') != None:
-      searchTerm = str(request.args.get('search'))
-   if request.args.get('tsEventId') != None:
-      tsEventId = int(request.args.get('tsEventId'))
-      excludeExternal = True
-   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd, excludeExternal, showHidden, False)
-   return convertToJson(results)
-
 @app.route('/user/eventsAndOrdersSecured')
 @jwt_required()
 def getEventsAndOrdersSecured():
@@ -602,6 +548,7 @@ def getEventsAndOrdersSecured():
    showInactive: bool = False
    showDeleted: bool = False
    showHidden: bool = False
+   showCancelled: bool = False
    tsEventId: int = None
    excludeExternal: bool = False
    ignoreFlags: bool = False
@@ -629,7 +576,9 @@ def getEventsAndOrdersSecured():
       excludeExternal = True if int(request.args.get('excludeExternal')) == 1 else False
    if request.args.get('ignoreFlags') != None:
       ignoreFlags = True if int(request.args.get('ignoreFlags')) == 1 else False
-   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd, excludeExternal, showHidden, ignoreFlags)
+   if request.args.get('cancelled') != None:
+      showCancelled = True if int(request.args.get('cancelled')) == 1 else False
+   results = service.getEventsAndOrders(True, sellerId, start, end, showInactive, searchTerm, tsEventId, showDeleted, excludeStart, excludeEnd, excludeExternal, showHidden, ignoreFlags, showCancelled)
    return convertToJson(results)
 
 @app.route('/user/getUserSellerFromEventId/<int:userId>/<int:eventId>')
@@ -691,6 +640,7 @@ def ordersSecured():
    showInactive: bool = False
    showDeleted: bool = False
    showHidden: bool = False
+   showCancelled: bool = False
    ignoreFlags: bool = False
    getYearToDateTotals: bool = False
    if request.args.get('sellerId') != None:
@@ -705,11 +655,13 @@ def ordersSecured():
       showDeleted = True if int(request.args.get('deleted')) == 1 else False
    if request.args.get('hidden') != None:
       showHidden = True if int(request.args.get('hidden')) == 1 else False
+   if request.args.get('cancelled') != None:
+      showCancelled = True if int(request.args.get('cancelled')) == 1 else False
    if request.args.get('ignoreFlags') != None:
       ignoreFlags = True if int(request.args.get('ignoreFlags')) == 1 else False
    if request.args.get('getYearToDateTotals') != None:
       getYearToDateTotals = True if int(request.args.get('getYearToDateTotals')) == 1 else False
-   results = service.getOrders(sellerId, start, end, showInactive, showDeleted, showHidden, ignoreFlags, getYearToDateTotals)
+   results = service.getOrders(sellerId, start, end, showInactive, showDeleted, showHidden, ignoreFlags, getYearToDateTotals, showCancelled)
    return convertToJson(results)
 
 @app.route('/user/profile/<int:userId>')
