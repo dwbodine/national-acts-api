@@ -16,8 +16,6 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-sys.path.insert(0, os.path.dirname(__file__))
-
 from common.utility import *
 from common.ticket_socket_service import *
 from common.event_service import *
@@ -26,6 +24,8 @@ from common.update_service import *
 from common.seller_service import *
 from common.user_service import *
 from common.environment import *
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 # loads environment variables in debug mode
 loadEnv()
@@ -568,32 +568,35 @@ def send_mail():
 
 @app.route("/internal/refreshEventsFromService/<int:sellerId>")
 @jwt_required()
-def refreshEventsFromService(sellerId: int = None):
+def refresh_events_from_service(seller_id: int = None):
+    """
+    API method to refresh TS events from the admin
+    """
     user = __get_user_from_jwt()
-    if user is None or user.is_admin is False:
+    if user is None or user.isAdmin is False:
         return {"msg": "Unauthorized"}, 401
 
     service = EventService()
     start: int = None
     end: int = None
-    userId: int = user.userId
+    user_id: int = user.userId
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
         end = int(request.args.get("end"))
 
-    if sellerId is not None:
-        results = service.refreshDatabaseFromTicketSocket(sellerId, start, end, userId)
+    if seller_id is not None:
+        results = service.refreshDatabaseFromTicketSocket(seller_id, start, end, user_id)
 
         if results is not None and results.succeeded is True:
             # update rollup data
             year = 0
             if start is not None:
                 year = datetime.fromtimestamp(start).year
-                currentYear = datetime.now().year
-                if year >= currentYear or year < 2022:
+                current_year = datetime.now().year
+                if year >= current_year or year < 2022:
                     year = 0
-            results = service.updateDailyOrderData(results, year, sellerId)
+            results = service.updateDailyOrderData(results, year, seller_id)
     else:
         results = None
     return convertToJson(results)
@@ -604,7 +607,10 @@ def refreshEventsFromService(sellerId: int = None):
 
 # BEGIN PUBLIC ROUTES
 @app.route("/public/events")
-def getEvents():
+def get_events():
+    """
+    API method for public website to fetch/search events
+    """
     # secured by public api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("PUBLIC_API_KEY"))
@@ -613,38 +619,38 @@ def getEvents():
         return {"msg": "Unauthorized"}, 401
 
     service = EventService()
-    sellerId: int = None
+    seller_id: int = None
     start: int = None
     end: int = None
-    excludeStart: int = None
-    excludeEnd: int = None
-    searchTerm: str = None
-    tsEventId: int = None
+    exclude_start: int = None
+    exclude_end: int = None
+    search_term: str = None
+    ts_event_id: int = None
     if request.args.get("sellerId") is not None:
-        sellerId = int(request.args.get("sellerId"))
+        seller_id = int(request.args.get("sellerId"))
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
         end = int(request.args.get("end"))
     if request.args.get("excludeStart") is not None:
-        excludeStart = int(request.args.get("excludeStart"))
+        exclude_start = int(request.args.get("excludeStart"))
     if request.args.get("excludeEnd") is not None:
-        excludeEnd = int(request.args.get("excludeEnd"))
+        exclude_end = int(request.args.get("excludeEnd"))
     if request.args.get("search") is not None:
-        searchTerm = str(request.args.get("search"))
+        search_term = str(request.args.get("search"))
     if request.args.get("tsEventId") is not None:
-        tsevent_id = int(request.args.get("tsEventId"))
+        ts_event_id = int(request.args.get("tsEventId"))
     results = service.getEventsAndOrders(
         False,
-        sellerId,
+        seller_id,
         start,
         end,
         False,
-        searchTerm,
-        tsEventId,
+        search_term,
+        ts_event_id,
         False,
-        excludeStart,
-        excludeEnd,
+        exclude_start,
+        exclude_end,
         False,
         False,
     )
@@ -652,7 +658,10 @@ def getEvents():
 
 
 @app.route("/public/sellers")
-def getSellers():
+def get_sellers():
+    """
+    API method to fetch all sellers for public site
+    """
     # secured by public api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("PUBLIC_API_KEY"))
@@ -671,80 +680,87 @@ def getSellers():
 # BEGIN USER ROUTES
 @app.route("/user/eventsAndOrdersSecured")
 @jwt_required()
-def getEventsAndOrdersSecured():
+def get_events_and_orders_secured():
+    """
+    API method to fetch events and orders for Sellers
+    """
     service = EventService()
-    sellerId: int = None
+    seller_id: int = None
     start: int = None
     end: int = None
-    excludeStart: int = None
-    excludeEnd: int = None
-    searchTerm: str = None
-    showInactive: bool = False
-    showDeleted: bool = False
-    showHidden: bool = False
-    showCancelled: bool = False
-    tsEventId: int = None
-    excludeExternal: bool = False
-    ignoreFlags: bool = False
+    exclude_start: int = None
+    exclude_end: int = None
+    search_term: str = None
+    show_inactive: bool = False
+    show_deleted: bool = False
+    show_hidden: bool = False
+    show_cancelled: bool = False
+    ts_event_id: int = None
+    exclude_external: bool = False
+    ignore_flags: bool = False
     if request.args.get("sellerId") is not None:
-        sellerId = int(request.args.get("sellerId"))
+        seller_id = int(request.args.get("sellerId"))
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
         end = int(request.args.get("end"))
     if request.args.get("excludeStart") is not None:
-        excludeStart = int(request.args.get("excludeStart"))
+        exclude_start = int(request.args.get("excludeStart"))
     if request.args.get("excludeEnd") is not None:
-        excludeEnd = int(request.args.get("excludeEnd"))
+        exclude_end = int(request.args.get("excludeEnd"))
     if request.args.get("inactive") is not None:
-        showInactive = True if int(request.args.get("inactive")) == 1 else False
+        show_inactive = True if int(request.args.get("inactive")) == 1 else False
     if request.args.get("deleted") is not None:
-        showDeleted = True if int(request.args.get("deleted")) == 1 else False
+        show_deleted = True if int(request.args.get("deleted")) == 1 else False
     if request.args.get("hidden") is not None:
-        showHidden = True if int(request.args.get("hidden")) == 1 else False
+        show_hidden = True if int(request.args.get("hidden")) == 1 else False
     if request.args.get("search") is not None:
-        searchTerm = str(request.args.get("search"))
+        search_term = str(request.args.get("search"))
     if request.args.get("tsEventId") is not None:
-        tsevent_id = int(request.args.get("tsEventId"))
+        ts_event_id = int(request.args.get("tsEventId"))
     if request.args.get("excludeExternal") is not None:
-        excludeExternal = (
-            True if int(request.args.get("excludeExternal")) == 1 else False
-        )
+        exclude_external = True if int(request.args.get("excludeExternal")) == 1 else False 
     if request.args.get("ignoreFlags") is not None:
-        ignoreFlags = True if int(request.args.get("ignoreFlags")) == 1 else False
+        ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
     if request.args.get("cancelled") is not None:
-        showCancelled = True if int(request.args.get("cancelled")) == 1 else False
+        show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
     results = service.getEventsAndOrders(
         True,
-        sellerId,
+        seller_id,
         start,
         end,
-        showInactive,
-        searchTerm,
-        tsEventId,
-        showDeleted,
-        excludeStart,
-        excludeEnd,
-        excludeExternal,
-        showHidden,
-        ignoreFlags,
-        showCancelled,
+        show_inactive,
+        search_term,
+        ts_event_id,
+        show_deleted,
+        exclude_start,
+        exclude_end,
+        exclude_external,
+        show_hidden,
+        ignore_flags,
+        show_cancelled,
     )
     return convertToJson(results)
 
 
 @app.route("/user/getUserSellerFromEventId/<int:userId>/<int:eventId>")
 @jwt_required()
-def getUserSellerFromEventId(userId: int, eventId: int):
-    if userId is None or userId == 0 or event_id is None or event_id == 0:
+def get_user_seller_from_event_id(user_id: int, event_id: int):
+    """
+    API method to get user seller from event by event and user id's
+    """
+    if user_id is None or user_id == 0 or event_id is None or event_id == 0:
         return {"msg", "Bad request"}, 400
     service = UserService()
-    results = service.getUserSellerByEventId(userId, eventId)
+    results = service.getUserSellerByEventId(user_id, event_id)
     return convertToJson(results)
 
 
 @app.route("/user/login", methods=["POST"])
 def create_token():
+    """
+    API to log in user and create token
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
@@ -759,11 +775,11 @@ def create_token():
         return {"msg", "Bad request"}, 400
 
     service = UserService()
-    loginResponse = service.login(username, password)
+    login_response = service.login(username, password)
 
-    if loginResponse.errorMessage is not None:
-        return {"msg": loginResponse.errorMessage}, 401
-    elif loginResponse.user is None or loginResponse.user.isAuthenticated != True:
+    if login_response.errorMessage is not None:
+        return {"msg": login_response.errorMessage}, 401
+    elif login_response.user is None or login_response.user.isAuthenticated is True:
         return {"msg": "Invalid username or password"}, 401
 
     access_token = create_access_token(identity=username)
@@ -771,7 +787,7 @@ def create_token():
     if access_token is None:
         return {"msg": "Unable to create access token"}, 500
 
-    user: User = loginResponse.user
+    user: User = login_response.user
     user.token = access_token
     user.isAuthenticated = True
 
@@ -780,6 +796,9 @@ def create_token():
 
 @app.route("/user/logout", methods=["POST"])
 def logout():
+    """
+    API method to log out user and retire token
+    """
     response = jsonify({"msg": "logout successful"})
     unset_jwt_cookies(response)
     return response
@@ -787,63 +806,67 @@ def logout():
 
 @app.route("/user/ordersSecured")
 @jwt_required()
-def ordersSecured():
+def orders_secured():
+    """
+    API method to fetch orders for seller
+    """
     service = EventService()
-    sellerId: int = None
+    seller_id: int = None
     start: int = None
     end: int = None
-    showInactive: bool = False
-    showDeleted: bool = False
-    showHidden: bool = False
-    showCancelled: bool = False
-    ignoreFlags: bool = False
-    getYearToDateTotals: bool = False
+    show_inactive: bool = False
+    show_deleted: bool = False
+    show_hidden: bool = False
+    show_cancelled: bool = False
+    ignore_flags: bool = False
     if request.args.get("sellerId") is not None:
-        sellerId = int(request.args.get("sellerId"))
+        seller_id = int(request.args.get("sellerId"))
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
         end = int(request.args.get("end"))
     if request.args.get("inactive") is not None:
-        showInactive = True if int(request.args.get("inactive")) == 1 else False
+        show_inactive = True if int(request.args.get("inactive")) == 1 else False
     if request.args.get("deleted") is not None:
-        showDeleted = True if int(request.args.get("deleted")) == 1 else False
+        show_deleted = True if int(request.args.get("deleted")) == 1 else False
     if request.args.get("hidden") is not None:
-        showHidden = True if int(request.args.get("hidden")) == 1 else False
+        show_hidden = True if int(request.args.get("hidden")) == 1 else False
     if request.args.get("cancelled") is not None:
-        showCancelled = True if int(request.args.get("cancelled")) == 1 else False
+        show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
     if request.args.get("ignoreFlags") is not None:
-        ignoreFlags = True if int(request.args.get("ignoreFlags")) == 1 else False
-    if request.args.get("getYearToDateTotals") is not None:
-        getYearToDateTotals = (
-            True if int(request.args.get("getYearToDateTotals")) == 1 else False
-        )
+        ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
+
     results = service.getOrders(
-        sellerId,
+        seller_id,
         start,
         end,
-        showInactive,
-        showDeleted,
-        showHidden,
-        ignoreFlags,
-        getYearToDateTotals,
-        showCancelled,
+        show_inactive,
+        show_deleted,
+        show_hidden,
+        ignore_flags,
+        show_cancelled,
     )
     return convertToJson(results)
 
 
 @app.route("/user/profile/<int:userId>")
 @jwt_required()
-def getUserProfile(userId: int):
-    if userId is None or userId <= 0:
+def get_user_profile(user_id: int):
+    """
+    API method to get user profile
+    """
+    if user_id is None or user_id <= 0:
         return {"msg": "Bad Request"}, 400
     service = UserService()
-    user = service.getUserById(userId, True)
+    user = service.getUserById(user_id, True)
     return convertToJson(user)
 
 
 @app.route("/user/register", methods=["POST"])
 def register():
+    """
+    API method to register new user
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
@@ -852,30 +875,33 @@ def register():
         return {"msg": "Unauthorized"}, 401
 
     username = request.json.get("username", None)
-    firstName = request.json.get("firstName", None)
-    lastName = request.json.get("lastName", None)
-    sellerId = request.json.get("sellerId", None)
+    first_name = request.json.get("firstName", None)
+    last_name = request.json.get("lastName", None)
+    seller_id = request.json.get("sellerId", None)
     password = request.json.get("password", None)
-    confirmPassword = request.json.get("confirmPassword", None)
+    confirm_password = request.json.get("confirmPassword", None)
     notes = request.json.get("notes", None)
     service = UserService()
     if (
         username is None
         or password is None
-        or confirmPassword is None
-        or firstName is None
-        or lastName is None
-        or sellerId is None
+        or confirm_password is None
+        or first_name is None
+        or last_name is None
+        or seller_id is None
     ):
         return {"msg", "Bad request"}, 400
     result = service.register(
-        username, firstName, lastName, sellerId, password, confirmPassword, notes
+        username, first_name, last_name, seller_id, password, confirm_password, notes
     )
     return convertToJson(result)
 
 
 @app.route("/user/resetPassword", methods=["POST"])
-def resetPassword():
+def reset_password():
+    """
+    API method to reset password (not logged in)
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
@@ -885,30 +911,36 @@ def resetPassword():
 
     username = request.json.get("username", None)
     password = request.json.get("password", None)
-    confirmPassword = request.json.get("confirmPassword", None)
+    confirm_password = request.json.get("confirmPassword", None)
     code = request.json.get("code", None)
     service = UserService()
-    if username is None or password is None or confirmPassword is None or code is None:
+    if username is None or password is None or confirm_password is None or code is None:
         return {"msg", "Bad request"}, 400
-    result = service.resetPassword(username, code, password, confirmPassword)
+    result = service.resetPassword(username, code, password, confirm_password)
     return convertToJson(result)
 
 
 @app.route("/user/resetPasswordSecured", methods=["POST"])
 @jwt_required()
-def resetPasswordSecured():
+def reset_password_secured():
+    """
+    API method to reset password (logged in)
+    """
     username = request.json.get("username", None)
     password = request.json.get("password", None)
-    confirmPassword = request.json.get("confirmPassword", None)
+    confirm_password = request.json.get("confirmPassword", None)
     service = UserService()
-    if username is None or password is None or confirmPassword is None:
+    if username is None or password is None or confirm_password is None:
         return {"msg", "Bad request"}, 400
-    result = service.resetPasswordSecured(username, password, confirmPassword)
+    result = service.resetPasswordSecured(username, password, confirm_password)
     return convertToJson(result)
 
 
 @app.route("/user/sellers/<int:userId>")
-def getUserSellers(userId: int):
+def get_user_sellers(user_id: int):
+    """
+    API method to get all sellers by user_id
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
@@ -917,12 +949,15 @@ def getUserSellers(userId: int):
         return {"msg": "Unauthorized"}, 401
 
     service = SellerService()
-    results = service.getUserSellers(userId)
+    results = service.getUserSellers(user_id)
     return convertToJson(results)
 
 
 @app.route("/user/sendPasswordReset", methods=["POST"])
-def sendPasswordReset():
+def send_password_reset():
+    """
+    API method to send password reset email with code (not logged in)
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
@@ -940,30 +975,33 @@ def sendPasswordReset():
 
 @app.route("/user/setEventDeletedSecured", methods=["POST"])
 @jwt_required()
-def setEventDeletedSecured():
-    ticketSocketevent_id = request.json.get("eventId", None)
-    ticketSocketEventIdList = request.json.get("eventIdList", None)
-    isDeleted = request.json.get("isDeleted", None)
+def set_event_deleted_secured():
+    """
+    API method to mark event(s) as deleted
+    """
+    ticket_socket_event_id = request.json.get("eventId", None)
+    ticket_socket_event_id_list = request.json.get("eventIdList", None)
+    is_deleted = request.json.get("isDeleted", None)
 
     if (
-        ticketSocketevent_id is None and ticketSocketEventIdList is None
-    ) or isDeleted is None:
+        ticket_socket_event_id is None and ticket_socket_event_id_list is None
+    ) or is_deleted is None:
         return {"msg": "Bad Request"}, 400
 
-    eventIds: list[int] = []
-    deleted: bool = True if int(isDeleted) == 1 else False
-    if ticketSocketEventIdList is not None:
-        eventIds = json.loads(
-            ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d)
+    event_ids: list[int] = []
+    deleted: bool = True if int(is_deleted) == 1 else False
+    if ticket_socket_event_id_list is not None:
+        event_ids = json.loads(
+            ticket_socket_event_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(eventIds) == 0:
+        if len(event_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketevent_id is not None:
-        eventIds.append(int(ticketSocketEventId))
+    elif ticket_socket_event_id is not None:
+        event_ids.append(int(ticket_socket_event_id))
 
     service = EventService()
-    if len(eventIds) > 0:
-        result = service.deleteEvents(eventIds, deleted)
+    if len(event_ids) > 0:
+        result = service.deleteEvents(event_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -971,30 +1009,33 @@ def setEventDeletedSecured():
 
 @app.route("/user/setEventHiddenSecured", methods=["POST"])
 @jwt_required()
-def setEventHiddenSecured():
-    ticketSocketevent_id = request.json.get("eventId", None)
-    ticketSocketEventIdList = request.json.get("eventIdList", None)
-    isHidden = request.json.get("isHidden", None)
+def set_event_hidden_secured():
+    """
+    API method to mark event(s) as hidden
+    """
+    ticket_socket_event_id = request.json.get("eventId", None)
+    ticket_socket_event_id_list = request.json.get("eventIdList", None)
+    is_hidden = request.json.get("isHidden", None)
 
     if (
-        ticketSocketevent_id is None and ticketSocketEventIdList is None
-    ) or isHidden is None:
+        ticket_socket_event_id is None and ticket_socket_event_id_list is None
+    ) or is_hidden is None:
         return {"msg": "Bad Request"}, 400
 
-    eventIds: list[int] = []
-    if ticketSocketEventIdList is not None:
-        eventIds = json.loads(
-            ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d)
+    event_ids: list[int] = []
+    if ticket_socket_event_id_list is not None:
+        event_ids = json.loads(
+            ticket_socket_event_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(eventIds) == 0:
+        if len(event_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketevent_id is not None:
-        eventIds.append(int(ticketSocketEventId))
+    elif ticket_socket_event_id is not None:
+        event_ids.append(int(ticket_socket_event_id))
 
-    hidden: bool = True if int(isHidden) == 1 else False
+    hidden: bool = True if int(is_hidden) == 1 else False
     service = EventService()
-    if len(eventIds) > 0:
-        result = service.hideEvents(eventIds, hidden)
+    if len(event_ids) > 0:
+        result = service.hideEvents(event_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1002,30 +1043,33 @@ def setEventHiddenSecured():
 
 @app.route("/user/setEventInactiveSecured", methods=["POST"])
 @jwt_required()
-def setEventInactiveSecured():
-    ticketSocketevent_id = request.json.get("eventId", None)
-    ticketSocketEventIdList = request.json.get("eventIdList", None)
-    isActive = request.json.get("isActive", None)
+def set_event_inactive_secured():
+    """
+    API method to mark event(s) as inactive
+    """
+    ticket_socket_event_id = request.json.get("eventId", None)
+    ticket_socket_event_id_list = request.json.get("eventIdList", None)
+    is_active = request.json.get("isActive", None)
 
     if (
-        ticketSocketevent_id is None and ticketSocketEventIdList is None
-    ) or isActive is None:
+        ticket_socket_event_id is None and ticket_socket_event_id_list is None
+    ) or is_active is None:
         return {"msg": "Bad Request"}, 400
 
-    eventIds: list[int] = []
-    if ticketSocketEventIdList is not None:
-        eventIds = json.loads(
-            ticketSocketEventIdList, object_hook=lambda d: SimpleNamespace(**d)
+    event_ids: list[int] = []
+    if ticket_socket_event_id_list is not None:
+        event_ids = json.loads(
+            ticket_socket_event_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(eventIds) == 0:
+        if len(event_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketevent_id is not None:
-        eventIds.append(int(ticketSocketEventId))
+    elif ticket_socket_event_id is not None:
+        event_ids.append(int(ticket_socket_event_id))
 
-    disabled: bool = True if int(isActive) == 0 else False
+    disabled: bool = True if int(is_active) == 0 else False
     service = EventService()
-    if len(eventIds) > 0:
-        result = service.disableEvents(eventIds, disabled)
+    if len(event_ids) > 0:
+        result = service.disableEvents(event_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1033,30 +1077,33 @@ def setEventInactiveSecured():
 
 @app.route("/user/setOrderDeletedSecured", methods=["POST"])
 @jwt_required()
-def setOrderDeletedSecured():
-    ticketSocketorder_id = request.json.get("orderId", None)
-    ticketSocketOrderIdList = request.json.get("orderIdList", None)
-    isDeleted = request.json.get("isDeleted", None)
+def set_order_deleted_secured():
+    """
+    API method to mark order(s) as deleted
+    """
+    ticket_socket_order_id = request.json.get("orderId", None)
+    ticket_socket_order_id_list = request.json.get("orderIdList", None)
+    is_deleted = request.json.get("isDeleted", None)
 
     if (
-        ticketSocketorder_id is None and ticketSocketOrderIdList is None
-    ) or isDeleted is None:
+        ticket_socket_order_id is None and ticket_socket_order_id_list is None
+    ) or is_deleted is None:
         return {"msg": "Bad Request"}, 400
 
-    orderIds: list[int] = []
-    if ticketSocketOrderIdList is not None:
-        orderIds = json.loads(
-            ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d)
+    order_ids: list[int] = []
+    if ticket_socket_order_id_list is not None:
+        order_ids = json.loads(
+            ticket_socket_order_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(orderIds) == 0:
+        if len(order_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketorder_id is not None:
-        orderIds.append(int(ticketSocketOrderId))
+    elif ticket_socket_order_id is not None:
+        order_ids.append(int(ticket_socket_order_id))
 
-    deleted: bool = True if int(isDeleted) == 1 else False
+    deleted: bool = True if int(is_deleted) == 1 else False
     service = EventService()
-    if len(orderIds) > 0:
-        result = service.deleteOrders(orderIds, deleted)
+    if len(order_ids) > 0:
+        result = service.deleteOrders(order_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1064,30 +1111,33 @@ def setOrderDeletedSecured():
 
 @app.route("/user/setOrderHiddenSecured", methods=["POST"])
 @jwt_required()
-def setOrderHiddenSecured():
-    ticketSocketorder_id = request.json.get("orderId", None)
-    ticketSocketOrderIdList = request.json.get("orderIdList", None)
-    isHidden = request.json.get("isHidden", None)
+def set_order_hidden_secured():
+    """
+    API method to set order(s) as hidden
+    """
+    ticket_socket_order_id = request.json.get("orderId", None)
+    ticket_socket_order_id_list = request.json.get("orderIdList", None)
+    is_hidden = request.json.get("isHidden", None)
 
     if (
-        ticketSocketorder_id is None and ticketSocketOrderIdList is None
-    ) or isHidden is None:
+        ticket_socket_order_id is None and ticket_socket_order_id_list is None
+    ) or is_hidden is None:
         return {"msg": "Bad Request"}, 400
 
-    orderIds: list[int] = []
-    if ticketSocketOrderIdList is not None:
-        orderIds = json.loads(
-            ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d)
+    order_ids: list[int] = []
+    if ticket_socket_order_id_list is not None:
+        order_ids = json.loads(
+            ticket_socket_order_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(orderIds) == 0:
+        if len(order_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketorder_id is not None:
-        orderIds.append(int(ticketSocketOrderId))
+    elif ticket_socket_order_id is not None:
+        order_ids.append(int(ticket_socket_order_id))
 
-    hidden: bool = True if int(isHidden) == 1 else False
+    hidden: bool = True if int(is_hidden) == 1 else False
     service = EventService()
-    if len(orderIds) > 0:
-        result = service.hideOrders(orderIds, hidden)
+    if len(order_ids) > 0:
+        result = service.hideOrders(order_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1095,30 +1145,33 @@ def setOrderHiddenSecured():
 
 @app.route("/user/setOrderInactiveSecured", methods=["POST"])
 @jwt_required()
-def setOrderInactiveSecured():
-    ticketSocketorder_id = request.json.get("orderId", None)
-    ticketSocketOrderIdList = request.json.get("orderIdList", None)
-    isActive = request.json.get("isActive", None)
+def set_order_inactive_secured():
+    """
+    API method to mark order(s) as inactive
+    """
+    ticket_socket_order_id = request.json.get("orderId", None)
+    ticket_socket_order_id_list = request.json.get("orderIdList", None)
+    is_active = request.json.get("isActive", None)
 
     if (
-        ticketSocketorder_id is None and ticketSocketOrderIdList is None
-    ) or isActive is None:
+        ticket_socket_order_id is None and ticket_socket_order_id_list is None
+    ) or is_active is None:
         return {"msg": "Bad Request"}, 400
 
-    orderIds: list[int] = []
-    if ticketSocketOrderIdList is not None:
-        orderIds = json.loads(
-            ticketSocketOrderIdList, object_hook=lambda d: SimpleNamespace(**d)
+    order_ids: list[int] = []
+    if ticket_socket_order_id_list is not None:
+        order_ids = json.loads(
+            ticket_socket_order_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(orderIds) == 0:
+        if len(order_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketorder_id is not None:
-        orderIds.append(int(ticketSocketOrderId))
+    elif ticket_socket_order_id is not None:
+        order_ids.append(int(ticket_socket_order_id))
 
-    disabled: bool = True if int(isActive) == 0 else False
+    disabled: bool = True if int(is_active) == 0 else False
     service = EventService()
-    if len(orderIds) > 0:
-        result = service.disableOrders(orderIds, disabled)
+    if len(order_ids) > 0:
+        result = service.disableOrders(order_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1126,37 +1179,43 @@ def setOrderInactiveSecured():
 
 @app.route("/user/setTicketCheckinSecured", methods=["POST"])
 @jwt_required()
-def setTicketCheckinSecured():
-    ticketSocketOrderTicketId = request.json.get("ticketId", None)
-    ticketSocketOrderTicketIdList = request.json.get("ticketIdList", None)
-    isCheckedIn = request.json.get("isCheckedIn", None)
+def set_ticket_checkin_secured():
+    """
+    API method to mark ticket(s) as checked-in
+    """
+    ticket_socket_order_ticket_id = request.json.get("ticketId", None)
+    ticket_socket_order_ticket_id_list = request.json.get("ticketIdList", None)
+    is_checked_in = request.json.get("isCheckedIn", None)
 
     if (
-        ticketSocketOrderTicketId is None and ticketSocketOrderTicketIdList is None
-    ) or isCheckedIn is None:
+        ticket_socket_order_ticket_id is None and ticket_socket_order_ticket_id_list is None
+    ) or is_checked_in is None:
         return {"msg": "Bad Request"}, 400
 
-    ticketIds: list[int] = []
-    if ticketSocketOrderTicketIdList is not None:
-        ticketIds = json.loads(
-            ticketSocketOrderTicketIdList, object_hook=lambda d: SimpleNamespace(**d)
+    ticket_ids: list[int] = []
+    if ticket_socket_order_ticket_id_list is not None:
+        ticket_ids = json.loads(
+            ticket_socket_order_ticket_id_list, object_hook=lambda d: SimpleNamespace(**d)
         )
-        if len(ticketIds) == 0:
+        if len(ticket_ids) == 0:
             return {"msg": "Bad Request"}, 400
-    elif ticketSocketOrderTicketId is not None:
-        ticketIds.append(int(ticketSocketOrderTicketId))
+    elif ticket_socket_order_ticket_id is not None:
+        ticket_ids.append(int(ticket_socket_order_ticket_id))
 
-    checkedIn: bool = True if int(isCheckedIn) == 1 else False
+    checked_in: bool = True if int(is_checked_in) == 1 else False
     service = EventService()
-    if len(ticketIds) > 0:
-        result = service.checkInTickets(ticketIds, checkedIn)
+    if len(ticket_ids) > 0:
+        result = service.checkInTickets(ticket_ids, checked_in)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
 
 
 @app.route("/user/validateResetCode", methods=["POST"])
-def validateResetCode():
+def validate_reset_code():
+    """
+    API method to validate code sent for password reset
+    """
     # secured by user api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("USER_API_KEY"))
