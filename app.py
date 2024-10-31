@@ -5,7 +5,7 @@ import os
 import sys
 import json
 from types import SimpleNamespace
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, datetime
 from flask import Flask, request, jsonify
 from flask_jwt_extended import (
     create_access_token,
@@ -16,14 +16,13 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-from common.utility import *
-from common.ticket_socket_service import *
-from common.event_service import *
-from common.exchange_rate_service import *
-from common.update_service import *
-from common.seller_service import *
-from common.user_service import *
-from common.environment import *
+from common.utility import logMessage, sendEmail, convertToJson
+from common.ticket_socket_service import TicketSocketService, getAllAccounts
+from common.event_service import EventService, VipEvent, VipOrder
+from common.update_service import UpdateService
+from common.seller_service import SellerService
+from common.user_service import UserService, User, Role, UserActivity
+from common.environment import loadEnv
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -66,7 +65,7 @@ def after_request(response):
                     response.data = json.dumps(data)
     except (RuntimeError, KeyError):
         # Case where there is not a valid JWT. Just return the original respone
-        utility.logMessage("JWT not found")
+        logMessage("JWT not found")
     return response
 
 def __is_admin_logged_in():
@@ -561,7 +560,7 @@ def send_mail():
     ):
         return {"msg": "Bad Request"}, 200
 
-    result = utility.sendEmail(to_email, subject, html_content, to_name, cc_emails)
+    result = sendEmail(to_email, subject, html_content, to_name, cc_emails)
 
     return convertToJson(result)
 
