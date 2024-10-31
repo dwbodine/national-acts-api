@@ -653,6 +653,7 @@ def get_events():
         exclude_end,
         False,
         False,
+        False
     )
     return convertToJson(results)
 

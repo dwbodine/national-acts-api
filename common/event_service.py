@@ -28,6 +28,7 @@ class EventService:
         showHidden: bool = False,
         ignoreFlags: bool = False,
         showCancelled: bool = False,
+        showUnannounced: bool = True
     ):
         events: list[VipEvent] = []
 
@@ -99,7 +100,7 @@ class EventService:
 
                 if showCancelled != True:
                     whereClause.append("TicketSocketEvents.IsCancelled = 0")
-
+                    
             if searchTerm is not None and len(searchTerm) > 0:
                 whereClause.append(
                     """MATCH (TicketSocketEvents.Title, 
@@ -137,6 +138,9 @@ class EventService:
             elif getOrders is False or sellerId == None:
                 whereClause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                
+            if showUnannounced != True:
+                whereClause.append("COALESCE(TicketSocketEvents.AnnounceDate, CURRENT_TIMESTAMP) >= CURRENT_TIMESTAMP")
 
             if excludeStart is not None and excludeEnd is not None:
                 whereClause.append(
@@ -1197,6 +1201,7 @@ class EventService:
                             IsDeleted=%(isDeleted)s, 
                             IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
                             IsHidden=%(isHidden)s, 
+                            AnnounceDate=%(announceDate)s, 
                             LastUpdate=CURRENT_TIMESTAMP 
                             WHERE Id=%(ticketSocketEventId)s"""
             updateData = {
@@ -1212,6 +1217,7 @@ class EventService:
                     1 if eventToUpdate.isAddedToBandsInTown is True else 0
                 ),
                 "isHidden": 1 if eventToUpdate.isHidden is True else 0,
+                "announceDate": eventToUpdate.announceDate
             }
             success = db.update(updateSql, updateData)
 
