@@ -1,5 +1,3 @@
-from .. import db
-
 class TicketSocketCategory:
     def __init__(self, id: int, title: str):
         self.eventCategoryId = id
@@ -25,7 +23,6 @@ class TicketSocketTicketType:
         self.isActive = isActive
 
 class TicketSocketTicket:
-    isCheckedIn: bool = False
     def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int, attendeeFirstName: str, attendeeLastName: str):
         self.id = id
         self.ticketType = ticketType

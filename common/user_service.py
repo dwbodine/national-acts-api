@@ -51,11 +51,11 @@ class UserService:
         try:
             # validate input
             usernameError = self.__validateUserName(username)
-            if usernameError != None:
+            if usernameError is not None:
                 return UserResponse(None, usernameError)
 
             passwordError = self.__validatePassword(password, confirmPassword)
-            if passwordError != None:
+            if passwordError is not None:
                 return UserResponse(None, passwordError)
             
             if firstName == None or firstName == "":
@@ -77,7 +77,7 @@ class UserService:
             }
             userId = db.insert(sql, data)
             if userId > 0:
-                if sellerId != None and sellerId > 0:
+                if sellerId is not None and sellerId > 0:
                     sql = "INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"
                     data = {
                         'userId': userId,
@@ -102,7 +102,7 @@ class UserService:
             
             errorMessage: str = None        
             user = self.__retrieveUserFromDatabase(username=username)
-            if user != None:
+            if user is not None:
                 code = self.__generatePasswordCode(user.username)
                 if code > 0:
                     html = "A password reset request has been requested for you from national-acts.com.\n\n"
@@ -159,7 +159,7 @@ class UserService:
     
     def resetPassword(self, username: str, code: int, password: str, confirmPassword: str):
         passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError != None:
+        if passwordError is not None:
             return UserResponse(None, passwordError)
         
         response = self.validatePasswordResetCode(username, code)
@@ -186,7 +186,7 @@ class UserService:
     
     def resetPasswordSecured(self, username: str, password: str, confirmPassword: str):
         passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError != None:
+        if passwordError is not None:
             return UserResponse(None, passwordError)
         
         user = self.__retrieveUserFromDatabase(username=username)
@@ -208,12 +208,12 @@ class UserService:
     
     def register(self, username: str, firstName: str, lastName: str, sellerId: int, password: str, confirmPassword: str, notes: str = None):
         passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError != None:
+        if passwordError is not None:
             return UserResponse(None, passwordError)
         
         user: User = self.getUserByUserName(username=username)
         
-        if user != None:
+        if user is not None:
             return UserResponse(None, "There is already a user in the system with that email")
         
         errorMessage: str = None        
@@ -336,7 +336,7 @@ class UserService:
         existingRole: Role = None
         if roleToUpdate.roleId > 0:
             existingRole = self.getRoleById(roleToUpdate.roleId)
-        if existingRole != None:
+        if existingRole is not None:
             roleId = existingRole.roleId
             updateSql = """UPDATE Roles SET RoleName=%(roleName)s, LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
             updateData = {
@@ -344,7 +344,7 @@ class UserService:
                 'roleId': roleId
             }
             success = db.update(updateSql, updateData)
-            if success == True:
+            if success is True:
                 success = self.__assignPermissionsToRole(roleId, roleToUpdate.permissions)
         else:
             insertSql = """INSERT INTO Roles (RoleName) VALUES (%(roleName)s)"""    
@@ -365,7 +365,7 @@ class UserService:
                 'roleList': roleIdList
             }
             success = db.delete(deletePermissionSql, deleteRoleData)
-            if success == True:
+            if success is True:
                 deleteRoleSql = """DELETE FROM Roles WHERE RoleId IN (%(roleList)s)"""
                 success = db.delete(deleteRoleSql, deleteRoleData)
         return success      
@@ -376,9 +376,9 @@ class UserService:
             return False
         userId: int = userToUpdate.userId
         existingUser: User = self.__retrieveUserFromDatabase(userId=userId)
-        if existingUser != None:
+        if existingUser is not None:
             username = existingUser.username
-            if userToUpdate.username != None and userToUpdate.username != "":
+            if userToUpdate.username is not None and userToUpdate.username != "":
                 username = userToUpdate.username
             sendTextReset = userToUpdate.sendTextReset
             if userToUpdate.mobile == None or userToUpdate.mobile == "" or userToUpdate.mobile == "None":
@@ -412,7 +412,7 @@ class UserService:
                 'userId': userId
             }
             success = db.update(updateSql, updateData)
-            if success == True:
+            if success is True:
                 success = self.__assignUserToSellers(userId, userToUpdate.isAdmin, userToUpdate.sellers)
         else:
             success = False                
@@ -470,15 +470,15 @@ class UserService:
         
         whereClause: list[str] = []
         
-        if userId != None:
+        if userId is not None:
             whereClause.append("UserActivity.UserId = %(userId)s")
             data["userId"] = userId
             
-        if activityType != None:
+        if activityType is not None:
             whereClause.append("UserActivity.ActivityId = %(activityId)s")
             data["activityId"] = activityType
             
-        if filterAdmins == True:
+        if filterAdmins is True:
             whereClause.append("Users.IsAdmin <> 1")
         
         if len(whereClause) > 0:
@@ -556,8 +556,8 @@ class UserService:
     def __assignUserToSellers(self, userId: int, isAdmin: bool, newSellers: list[UserSeller]):
         success: bool = True
         existingUser: User = self.__retrieveUserFromDatabase(userId=userId, fetchSellers=True)
-        if existingUser != None:
-            if isAdmin == True:
+        if existingUser is not None:
+            if isAdmin is True:
                 deleteSellerSql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
                 deleteSellerData = {
                     'userId': userId
@@ -587,7 +587,7 @@ class UserService:
                     for newSellerId in newSellerIds:
                         if newSellerId > 0:
                             newSeller: UserSeller = self.__getUserSellerFromListById(newSellers, newSellerId)
-                            if newSeller != None:
+                            if newSeller is not None:
                                 insertSellerSql = """INSERT INTO UserSeller (UserId, SellerId, RoleId) VALUES (%(userId)s, %(sellerId)s, %(roleId)s)"""
                                 insertSellerData = {
                                     'userId': userId,
@@ -603,7 +603,7 @@ class UserService:
     def __assignPermissionsToRole(self, roleId: int, newPermissions: list[Permission]):
         existingRole = self.getRoleById(roleId)
         success: bool = True
-        if existingRole != None:
+        if existingRole is not None:
             newPermissionIds = [permission.permissionId for permission in newPermissions]
             for existingPermission in existingRole.permissions:
                 existingPermissionId = existingPermission.permissionId
@@ -620,7 +620,7 @@ class UserService:
                 for newPermissionId in newPermissionIds:
                     if newPermissionId > 0:
                         newPermission: Permission = self.__getPermissionFromListById(newPermissions, newPermissionId)
-                        if newPermission != None:
+                        if newPermission is not None:
                             insertPermissionSql = """INSERT INTO RolePermissions (RoleId, PermissionId) VALUES (%(roleId)s, %(permissionId)s)"""
                             insertPermissionData = {
                                 'roleId': roleId,
@@ -693,14 +693,14 @@ class UserService:
         sql: str = None
         data = {}
         user: User = None
-        if userId != None and userId > 0:
+        if userId is not None and userId > 0:
             sql = """SELECT Users.*
                         FROM Users 
                         WHERE Users.UserId=%(userId)s"""
             data = {
                 'userId': userId
             }
-        elif username != None and username != "":
+        elif username is not None and username != "":
             sql = """SELECT Users.* 
                         FROM Users 
                         WHERE Users.Username=%(username)s"""
@@ -708,7 +708,7 @@ class UserService:
                 'username': username
             }
         
-        if sql != None:
+        if sql is not None:
             row = db.queryOne(sql, data)
             if row != {}:
                 user = User()
@@ -729,7 +729,7 @@ class UserService:
                 user.createdAt = createdAt.strftime("%m/%d/%Y")
                 user.lastUpdate = lastUpdate.strftime("%m/%d/%Y")
                 
-                if fetchSellers == True:
+                if fetchSellers is True:
                     sellers = self.__getUserSellers(user.userId, user.isAdmin)
                     user.sellers = sellers
                     if user.isAdmin:
@@ -748,7 +748,7 @@ class UserService:
         
         data = {}
         sql = ""
-        if isAdmin == False:
+        if isAdmin is False:
             sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId, UserSeller.RoleId 
                         FROM Sellers
                         JOIN UserSeller on UserSeller.SellerId = Sellers.SellerId 
@@ -769,7 +769,7 @@ class UserService:
             sellerType = int(row["SellerTypeId"])
             roleId = int(row["RoleId"])
             us = UserSeller(userSellerId, sellerId, sellerName, sellerType, roleId)
-            if isAdmin == False:
+            if isAdmin is False:
                 permissions = self.__getUserSellerPermissions(userSellerId)
                 us.permissions = permissions
             sellers.append(us)
@@ -802,7 +802,7 @@ class UserService:
         if username == None or username.strip() == "":
             return "Please enter a username"
         username = username.strip()
-        if utility.validateEmailAddress(username) == False:
+        if utility.validateEmailAddress(username) is False:
             return "Username must be a valid email address"
     
         sql = "SELECT UserId FROM Users WHERE Username = %(username)s"
@@ -830,7 +830,7 @@ class UserService:
     def __sendRegistrationEmail(self, username: str):
         result = utility.SendEmailResult(True, None)
         user = self.__retrieveUserFromDatabase(username=username)
-        if user != None:            
+        if user is not None:            
             html = "<table>"
             html += "<tr><td>User Email:</td><td>" + username + "</td></tr>"
             html += "<tr><td>Submitted:</td><td>" + user.createdAt + "</td></tr>"

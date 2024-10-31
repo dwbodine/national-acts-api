@@ -1,9 +1,10 @@
+import calendar
+import datetime
 import traceback
 from common import utility
 from common.models.ticket_socket import *
 from common.models.user import *
-import calendar
-import datetime
+
 
 from .. import db
 
@@ -14,13 +15,13 @@ class SellerEventCategory:
     sellerEventCategoryId: int = 0
 
     def __init__(self, sellerId: int = None, ticketSocketId: int = None, eventCategoryId: int = None, sellerEventCategoryId: int = None):
-        if sellerId != None and ticketSocketId != None and eventCategoryId == None and sellerEventCategoryId == None:
+        if sellerId is not None and ticketSocketId is not None and eventCategoryId == None and sellerEventCategoryId == None:
             self.__populateFromSellerIdAndTicketSocketId(sellerId, ticketSocketId)
-        elif sellerId == None and ticketSocketId != None and eventCategoryId != None and sellerEventCategoryId == None:
+        elif sellerId == None and ticketSocketId is not None and eventCategoryId is not None and sellerEventCategoryId == None:
             self.__populateFromTicketSocketIdAndEventCategoryId(ticketSocketId, eventCategoryId)
-        elif sellerEventCategoryId != None:
+        elif sellerEventCategoryId is not None:
             self.__populateFromSellerEventCategoryId(sellerEventCategoryId)
-        elif sellerId != None and ticketSocketId != None and eventCategoryId != None and sellerEventCategoryId != None:
+        elif sellerId is not None and ticketSocketId is not None and eventCategoryId is not None and sellerEventCategoryId is not None:
             self.sellerId = sellerId
             self.ticketSocketId = ticketSocketId
             self.eventCategoryId = eventCategoryId
@@ -75,7 +76,12 @@ class ShirtSales:
 class VipTicket(TicketSocketTicket):
     ticketSocketOrderId: int = 0
     ticketSocketOrderTicketId: int = 0
-    isActive: bool = True
+    isCheckedIn: bool = False
+    isRefunded: bool = False
+    refundDate: str = None
+    isChargedBack: bool = False
+    chargebackDate: str = None
+    isServiceFeeRefunded: bool = False
 
     def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int, attendeeFirstName: str, attendeeLastName: str):
         super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp, attendeeFirstName, attendeeLastName)
@@ -95,13 +101,18 @@ class VipOrder(TicketSocketOrder):
     eventDate: str = None
     isActive: bool = True
     isDeleted: bool = False
-    isRefunded: bool = False
-    isChargedBack: bool = False
-    refundDate: str = None
-    chargebackDate: str = None
+    hasRefunds: bool = False
+    hasChargebacks: bool = False
     numTicketsRefunded: int = 0
+    numTicketsChargedBack: int = 0
     revenueRefunded: float = 0
+    revenueChargedBack: float = 0
+    revenueRefundedUsd: float = 0
+    revenueChargedBackUsd: float = 0
     serviceFeeRevenueRefunded: float = 0
+    serviceFeeRevenueRefundedUsd: float = 0
+    serviceFeeRevenueChargedBack: float = 0
+    serviceFeeRevenueChargedBackUsd: float = 0
     totalShirts: int = 0
     revenueUsd: float = 0
     serviceFeesUsd: float = 0
@@ -116,8 +127,23 @@ class VipOrder(TicketSocketOrder):
 
     def getTotals(self):
         self.totalShirts = len(self.shirts)
-        self.revenueUsd = self.revenue * self.exchangeRate            
+        for ticket in self.tickets:
+            if ticket.isRefunded is True:
+                self.numTicketsRefunded += 1
+                self.revenueRefunded += ticket.price
+                if ticket.isServiceFeeRefunded is True:
+                    self.serviceFeeRevenueRefunded += ticket.serviceFee
+            elif ticket.isChargedBack is True:
+                self.numTicketsChargedBack += 1
+                self.revenueChargedBack += ticket.price
+                self.serviceFeeRevenueChargedBack += ticket.serviceFee
+                
+        self.revenueUsd = self.revenue * self.exchangeRate     
         self.serviceFeesUsd = self.serviceFees * self.exchangeRate
+        self.revenueRefundedUsd = self.revenueRefunded * self.exchangeRate               
+        self.serviceFeeRevenueRefundedUsd = self.serviceFeeRevenueRefunded * self.exchangeRate
+        self.revenueChargedBackUsd = self.revenueChargedBack * self.exchangeRate
+        self.serviceFeeRevenueChargedBackUsd = self.serviceFeeRevenueChargedBack * self.exchangeRate
     
 class VipEvent(TicketSocketEvent):
     ticketSocketEventId: int = 0
@@ -152,6 +178,9 @@ class VipEvent(TicketSocketEvent):
     numTicketsRefunded: int = 0
     revenueRefunded: float = 0
     serviceFeeRevenueRefunded: float = 0
+    numTicketsChargedBack: int = 0
+    revenueChargedBack: float = 0
+    serviceFeeRevenueChargedBack: float = 0
     hasTicketTypeData: bool = False
     isAddedToBandsInTown: bool = False
     sellerName: str = ''
@@ -165,24 +194,31 @@ class VipEvent(TicketSocketEvent):
         totalTickets: int = 0
         totalShirts: int = 0
         totalTicketsRefunded: int = 0
-        totalRevenueRefunded: int = 0
-        totalServiceFeeRevenueRefunded: int = 0
+        totalTicketsChargedBack: int = 0
+        totalRevenueRefunded: float = 0
+        totalRevenueChargedBack: float = 0
+        totalServiceFeeRevenueRefunded: float = 0
+        totalServiceFeeRevenueChargedBack: float = 0
         totalCheckedIn: int = 0
         shirtd: dict() = {}
         for order in self.orders:
-            if order.isRefunded == True or order.isChargedBack == True:
+            if order.hasRefunds is True:
                 totalTicketsRefunded += order.numTicketsRefunded
-                totalRevenueRefunded += order.revenueRefunded
-                totalServiceFeeRevenueRefunded += order.serviceFeeRevenueRefunded
-            if self.hasNonUSAOrders == False and order.currencyAbbrev != "USD":
+                totalRevenueRefunded += order.revenueRefundedUsd
+                totalServiceFeeRevenueRefunded += order.serviceFeeRevenueRefundedUsd
+            if order.hasChargebacks is True:
+                totalTicketsChargedBack += order.numTicketsChargedBack
+                totalRevenueChargedBack += order.revenueChargedBackUsd
+                totalServiceFeeRevenueChargedBack += order.serviceFeeRevenueChargedBackUsd
+            if self.hasNonUSAOrders is False and order.currencyAbbrev != "USD":
                 self.hasNonUSAOrders = True
                 self.nonUsaCurrencyAbbrev = order.currencyAbbrev
                 self.nonUsaCurrencySymbol = order.currencySymbol
 
-            if self.hasShirtData == False and len(order.shirts) > 0:
+            if self.hasShirtData is False and len(order.shirts) > 0:
                 self.hasShirtData = True
 
-            if self.hasPhoneData == False and order.phone != None and len(order.phone) > 0:
+            if self.hasPhoneData is False and order.phone is not None and len(order.phone) > 0:
                 self.hasPhoneData = True
                 
             if order.isDeleted != True:
@@ -209,8 +245,11 @@ class VipEvent(TicketSocketEvent):
         self.totalCheckedIn = totalCheckedIn
         self.totalShirts = totalShirts
         self.numTicketsRefunded = totalTicketsRefunded
+        self.numTicketsChargedBack = totalTicketsRefunded
         self.revenueRefunded = totalRevenueRefunded
+        self.revenueChargedBack = totalRevenueChargedBack
         self.serviceFeeRevenueRefunded = totalServiceFeeRevenueRefunded
+        self.serviceFeeRevenueChargedBack = totalServiceFeeRevenueChargedBack
         
         self.hasTicketTypeData = (len(self.ticketTypes) > 0)
         
@@ -221,27 +260,27 @@ class VipEvent(TicketSocketEvent):
         self.shirtSales = shirtSales
 
         # roll up external event data, if any
-        if self.externalTitle != None and self.externalTitle != "":
+        if self.externalTitle is not None and self.externalTitle != "":
             self.title = self.externalTitle
             
-        if self.externalVenue != None:
-            if self.externalVenue.name != None and self.externalVenue.name != "":
+        if self.externalVenue is not None:
+            if self.externalVenue.name is not None and self.externalVenue.name != "":
                 self.venue.name = self.externalVenue.name
-            if self.externalVenue.address1 != None and self.externalVenue.address1 != "":
+            if self.externalVenue.address1 is not None and self.externalVenue.address1 != "":
                 self.venue.address1 = self.externalVenue.address1
-            if self.externalVenue.address2 != None and self.externalVenue.address2 != "":
+            if self.externalVenue.address2 is not None and self.externalVenue.address2 != "":
                 self.venue.address2 = self.externalVenue.address2
-            if self.externalVenue.city != None and self.externalVenue.city != "":
+            if self.externalVenue.city is not None and self.externalVenue.city != "":
                 self.venue.city = self.externalVenue.city
-            if self.externalVenue.state != None and self.externalVenue.state != "":
+            if self.externalVenue.state is not None and self.externalVenue.state != "":
                 self.venue.state = self.externalVenue.state
-            if self.externalVenue.postalCode != None and self.externalVenue.postalCode != "":
+            if self.externalVenue.postalCode is not None and self.externalVenue.postalCode != "":
                 self.venue.postalCode = self.externalVenue.postalCode
 
-        if self.externalThumbnail != None and self.externalThumbnail != "":
+        if self.externalThumbnail is not None and self.externalThumbnail != "":
             self.thumbnail = self.externalThumbnail
         
-        if self.externalVipLink != None and self.externalVipLink != "":
+        if self.externalVipLink is not None and self.externalVipLink != "":
             self.ticketSocketUrl = self.externalVipLink
             
 class DailyOrderData:
@@ -412,7 +451,7 @@ class TicketSocketRefreshHistory:
         self.errorMessage = errorMessage
 
     def __getSellerName(self):
-        if self.sellerId != None:
+        if self.sellerId is not None:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
             
@@ -452,7 +491,7 @@ class TicketSocketRefreshHistory:
                     LastUpdate=CURRENT_TIMESTAMP 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
-            'successVal': 1 if success == True else 0,
+            'successVal': 1 if success is True else 0,
             'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId, 
             'orderDataUpdateDuration': duration, 
             'totalDuration': totalDuration, 
@@ -486,7 +525,7 @@ class TicketSocketRefreshHistory:
             'startTimer': self.startTimer,
             'endTimer': self.endTimer,
             'duration': self.duration,
-            'success': 1 if self.succeeded == True else 0,
+            'success': 1 if self.succeeded is True else 0,
             'errorMessage': self.errorMessage,
             'serviceEventsSkipped': ", ".join(self.serviceEventsSkipped),
             'eventsFailed': ", ".join(str(v) for v in self.eventsFailed),

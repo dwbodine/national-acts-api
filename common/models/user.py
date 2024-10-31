@@ -59,4 +59,4 @@ class UserResponse:
         self.errorMessage = errorMessage
         
     def hasError(self):
-        return (self.errorMessage != None and self.errorMessage != "")
+        return (self.errorMessage is not None and self.errorMessage != "")

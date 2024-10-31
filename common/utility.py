@@ -21,7 +21,7 @@ class SendEmailResult:
 def sendEmail(toEmailAddress: str, subject: str, htmlContent: str, toName: str = None, ccEmails: list[str] = None):
     fromEmail = From('info@national-acts.com', 'National Acts VIP')
     
-    if toName != None and toName != "":
+    if toName is not None and toName != "":
         toEmail = To(toEmailAddress, toName)    
     else:
         toEmail = toEmailAddress    
@@ -32,7 +32,7 @@ def sendEmail(toEmailAddress: str, subject: str, htmlContent: str, toName: str =
         subject=subject,
         html_content=htmlContent)
     
-    if ccEmails != None:
+    if ccEmails is not None:
         for email in ccEmails:
             message.add_cc(email)
    

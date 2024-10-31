@@ -115,15 +115,15 @@ class TicketSocketService:
     def getEventsAndOrders(self, eventCategoryId: int = None, unixStart: int = None, unixEnd: int = None):
         url = '/api/v1/events?includeEnded=true&includeOffSale=true&includeTicketTypes=true&limit=9999'
 
-        if eventCategoryId != None and eventCategoryId > 0:
+        if eventCategoryId is not None and eventCategoryId > 0:
             url += '&category=' + str(eventCategoryId)
             
         if unixStart == None and unixEnd == None:
             url += "&startsAfter=" + str(int(time.time()))
         else:
-            if unixStart != None:
+            if unixStart is not None:
                 url += "&startsAfter=" + str(unixStart)
-            if unixEnd != None:
+            if unixEnd is not None:
                 url += "&startsBefore=" + str(unixEnd)
                 
         headers = {
@@ -355,7 +355,7 @@ class TicketSocketService:
 
                 numTickets: int = 0
                 totalCount: int = 0
-                if tickets != None:        
+                if tickets is not None:        
                     if 'totalCount' in tickets:
                         totalCount = int(tickets['totalCount'])
 

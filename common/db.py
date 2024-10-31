@@ -19,7 +19,7 @@ def queryAll(sql: str, jsonData = None, cnx = None):
         
     cursor = cnx.cursor()
 
-    if jsonData != None:
+    if jsonData is not None:
         cursor.execute(sql, jsonData)
     else:
         cursor.execute(sql)
@@ -31,7 +31,7 @@ def queryAll(sql: str, jsonData = None, cnx = None):
 
     cursor.close()
 
-    if keepAlive == False:
+    if keepAlive is False:
         cnx.close()
 
     return rows
@@ -49,12 +49,12 @@ def queryOne(sql: str, jsonData, cnx = None):
     cursor.execute(sql, jsonData)
 
     cursorRow = cursor.fetchone()
-    if cursorRow != None:
+    if cursorRow is not None:
         row = __convertCursorRowToDictionary(cursorRow, cursor)
 
     cursor.close()
     
-    if keepAlive == False:
+    if keepAlive is False:
         cnx.close()
 
     return row
@@ -82,7 +82,7 @@ def update(sql: str, jsonData = None, cnx = None):
         
     cursor = cnx.cursor()
         
-    if jsonData != None:
+    if jsonData is not None:
         cursor.execute(sql, jsonData)
     else:
         cursor.execute(sql)
@@ -93,7 +93,7 @@ def update(sql: str, jsonData = None, cnx = None):
 
     cursor.close()
     
-    if keepAlive == False:
+    if keepAlive is False:
         cnx.close()
 
     return count > 0
@@ -107,7 +107,7 @@ def insert(sql: str, jsonData = None, cnx = None):
         
     cursor = cnx.cursor()
         
-    if jsonData != None:
+    if jsonData is not None:
         cursor.execute(sql, jsonData)
     else:
         cursor.execute(sql)
@@ -118,7 +118,7 @@ def insert(sql: str, jsonData = None, cnx = None):
 
     cursor.close()
     
-    if keepAlive == False:
+    if keepAlive is False:
         cnx.close()
 
     return newId
@@ -132,7 +132,7 @@ def delete(sql: str, jsonData = None, cnx = None):
         
     cursor = cnx.cursor()
         
-    if jsonData != None:
+    if jsonData is not None:
         cursor.execute(sql, jsonData)
     else:
         cursor.execute(sql)
@@ -143,7 +143,7 @@ def delete(sql: str, jsonData = None, cnx = None):
 
     cursor.close()
     
-    if keepAlive == False:
+    if keepAlive is False:
         cnx.close()
 
     return count > 0
