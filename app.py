@@ -714,7 +714,7 @@ def get_events_and_orders_secured():
     if request.args.get("tsEventId") is not None:
         ts_event_id = int(request.args.get("tsEventId"))
     if request.args.get("excludeExternal") is not None:
-        exclude_external = True if int(request.args.get("excludeExternal")) == 1 else False 
+        exclude_external = True if int(request.args.get("excludeExternal")) == 1 else False
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
     if request.args.get("cancelled") is not None:

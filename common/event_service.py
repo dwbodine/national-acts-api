@@ -11,8 +11,8 @@ from common.db import convertListToParameters, getDbConnection, delete
 from common.utility import logMessage, convertToJson, sendEmail
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
-    VipEvent, VipOrder, VipTicket, Seller, 
-    SellerEventCategory, DailyOrderData, 
+    VipEvent, VipOrder, VipTicket, Seller,
+    SellerEventCategory, DailyOrderData,
     TicketSocketRefreshHistory, DashboardTotals
 )
 from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketType
