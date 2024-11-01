@@ -675,7 +675,7 @@ def get_sellers():
         return {"msg": "Unauthorized"}, 401
 
     service = SellerService()
-    results = service.getAllSellers()
+    results = service.get_all_sellers()
     return convert_to_json(results)
 
 
@@ -956,7 +956,7 @@ def get_user_sellers(user_id: int):
         return {"msg": "Unauthorized"}, 401
 
     service = SellerService()
-    results = service.getUserSellers(user_id)
+    results = service.get_user_sellers(user_id)
     return convert_to_json(results)
 
 
