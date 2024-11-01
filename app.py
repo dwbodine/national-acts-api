@@ -1,6 +1,7 @@
 """
 Flask API entry point
 """
+
 import os
 import sys
 import json
@@ -68,6 +69,7 @@ def after_request(response):
         log_message("JWT not found")
     return response
 
+
 def __is_admin_logged_in():
     """Check if logged in user is an admin"""
     is_admin: bool = False
@@ -75,6 +77,7 @@ def __is_admin_logged_in():
     if user is not None:
         is_admin = user.isAdmin
     return is_admin
+
 
 def __get_user_from_jwt():
     user: User = None
@@ -87,6 +90,7 @@ def __get_user_from_jwt():
     except (RuntimeError, KeyError):
         user = None
     return user
+
 
 # BEGIN ADMIN ROUTES
 @app.route("/admin/events/cancel", methods=["POST"])
@@ -213,6 +217,7 @@ def get_all_permissions():
     permissions = service.getAllPermissions()
     return convert_to_json(permissions)
 
+
 @app.route("/admin/roles")
 @jwt_required()
 def get_all_roles():
@@ -226,6 +231,7 @@ def get_all_roles():
     service = UserService()
     roles = service.getAllRoles()
     return convert_to_json(roles)
+
 
 @app.route("/admin/roles/<int:roleId>")
 @jwt_required()
@@ -354,7 +360,7 @@ def update_all_events_from_service():
         return {"msg": "Unauthorized"}, 401
 
     service = UpdateService()
-    results = service.updateAllEventsFromTicketSocket()
+    results = service.update_all_events_from_ticket_socket()
     return convert_to_json(results)
 
 
@@ -371,7 +377,7 @@ def update_all_exchange_rates():
         return {"msg": "Unauthorized"}, 401
 
     service = UpdateService()
-    rates = service.updateAllExchangeRates()
+    rates = service.update_all_exchange_rates_from_stripe()
     return convert_to_json(rates)
 
 
@@ -486,7 +492,9 @@ def get_events_from_service(seller_id: int = None):
         end = int(request.args.get("end"))
 
     if seller_id is not None:
-        results = service.retrieve_ticket_socket_events_for_update(seller_id, start, end)
+        results = service.retrieve_ticket_socket_events_for_update(
+            seller_id, start, end
+        )
     else:
         results = None
     return convert_to_json(results)
@@ -580,7 +588,9 @@ def refresh_events_from_service(seller_id: int = None):
         end = int(request.args.get("end"))
 
     if seller_id is not None:
-        results = service.refresh_database_from_ticket_socket(seller_id, start, end, user_id)
+        results = service.refresh_database_from_ticket_socket(
+            seller_id, start, end, user_id
+        )
 
         if results is not None and results.succeeded is True:
             # update rollup data
@@ -647,7 +657,7 @@ def get_events():
         exclude_end,
         False,
         False,
-        False
+        False,
     )
     return convert_to_json(results)
 
@@ -714,7 +724,9 @@ def get_events_and_orders_secured():
     if request.args.get("tsEventId") is not None:
         ts_event_id = int(request.args.get("tsEventId"))
     if request.args.get("excludeExternal") is not None:
-        exclude_external = True if int(request.args.get("excludeExternal")) == 1 else False
+        exclude_external = (
+            True if int(request.args.get("excludeExternal")) == 1 else False
+        )
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
     if request.args.get("cancelled") is not None:
@@ -1183,14 +1195,16 @@ def set_ticket_checkin_secured():
     is_checked_in = request.json.get("isCheckedIn", None)
 
     if (
-        ticket_socket_order_ticket_id is None and ticket_socket_order_ticket_id_list is None
+        ticket_socket_order_ticket_id is None
+        and ticket_socket_order_ticket_id_list is None
     ) or is_checked_in is None:
         return {"msg": "Bad Request"}, 400
 
     ticket_ids: list[int] = []
     if ticket_socket_order_ticket_id_list is not None:
         ticket_ids = json.loads(
-            ticket_socket_order_ticket_id_list, object_hook=lambda d: SimpleNamespace(**d)
+            ticket_socket_order_ticket_id_list,
+            object_hook=lambda d: SimpleNamespace(**d),
         )
         if len(ticket_ids) == 0:
             return {"msg": "Bad Request"}, 400
@@ -1225,6 +1239,8 @@ def validate_reset_code():
     service = UserService()
     success = service.validatePasswordResetCode(str(username), int(code))
     return convert_to_json(success)
+
+
 # END USER ROUTES
 
 if __name__ == "__main__":

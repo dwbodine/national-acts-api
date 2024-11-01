@@ -1,21 +1,26 @@
 """
 Uniform database accessor utility
 """
+
 import os
 import mysql.connector
 import mysql.connector.connection
+
 
 def db_get_connection():
     """
     Connect to MySql database
     """
-    return mysql.connector.connect(user=os.getenv('DB_USER'),
-                                   password=os.getenv('DB_PASSWORD'),
-                                   host=os.getenv('DB_HOST'),
-                                   database=os.getenv('DB_DB'),
-                                   connection_timeout=3600)
+    return mysql.connector.connect(
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_DB"),
+        connection_timeout=3600,
+    )
 
-def db_query_all(sql: str, json_data = None, cnx = None):
+
+def db_query_all(sql: str, json_data=None, cnx=None):
     """
     Return multiple rows
     """
@@ -45,7 +50,8 @@ def db_query_all(sql: str, json_data = None, cnx = None):
 
     return rows
 
-def db_query_one(sql: str, json_data, cnx = None):
+
+def db_query_one(sql: str, json_data, cnx=None):
     """
     Query for single result
     """
@@ -86,7 +92,8 @@ def __convert_cursor_row_to_dictionary(cursor_row: any, cursor: any):
         counter += 1
     return row
 
-def db_update(sql: str, json_data = None, cnx = None):
+
+def db_update(sql: str, json_data=None, cnx=None):
     """
     Update SQL database
     """
@@ -114,7 +121,8 @@ def db_update(sql: str, json_data = None, cnx = None):
 
     return count > 0
 
-def db_insert(sql: str, json_data = None, cnx = None):
+
+def db_insert(sql: str, json_data=None, cnx=None):
     """
     Insert to MySQL table
     """
@@ -142,7 +150,8 @@ def db_insert(sql: str, json_data = None, cnx = None):
 
     return new_id
 
-def db_delete(sql: str, json_data = None, cnx = None):
+
+def db_delete(sql: str, json_data=None, cnx=None):
     """
     Delete row from MySQL table
     """
@@ -170,18 +179,19 @@ def db_delete(sql: str, json_data = None, cnx = None):
 
     return count > 0
 
+
 def db_convert_list_to_parameters(the_list: list[any], param_object: dict, prefix: str):
     """
     SQL safe method to convert Python list to parameterized list
     """
-    sql = '('
+    sql = "("
     counter = 0
     for item in the_list:
         if counter > 0:
-            sql += ', '
-        param_name = prefix + '_' + str(counter)
-        sql += '%(' + param_name + ')s'
+            sql += ", "
+        param_name = prefix + "_" + str(counter)
+        sql += "%(" + param_name + ")s"
         param_object[param_name] = item
         counter += 1
-    sql += ')'
+    sql += ")"
     return sql

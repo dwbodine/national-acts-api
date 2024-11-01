@@ -1,21 +1,32 @@
 """
 Event Service
 """
+
 import time
 from datetime import datetime, timedelta
 import operator
 import traceback
 
 from common.db import (
-    db_query_all, db_query_one, db_update, db_insert,
-    db_convert_list_to_parameters, db_get_connection, db_delete
+    db_query_all,
+    db_query_one,
+    db_update,
+    db_insert,
+    db_convert_list_to_parameters,
+    db_get_connection,
+    db_delete,
 )
 from common.utility import log_message, convert_to_json, send_email
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
-    VipEvent, VipOrder, VipTicket, Seller,
-    SellerEventCategory, DailyOrderData,
-    TicketSocketRefreshHistory, DashboardTotals
+    VipEvent,
+    VipOrder,
+    VipTicket,
+    Seller,
+    SellerEventCategory,
+    DailyOrderData,
+    TicketSocketRefreshHistory,
+    DashboardTotals,
 )
 from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketType
 from common.user_service import UserService
@@ -25,6 +36,7 @@ class EventService:
     """
     Service to handle all event-related activity
     """
+
     def get_events_and_orders(
         self,
         get_orders: bool = False,
@@ -41,7 +53,7 @@ class EventService:
         show_hidden: bool = False,
         ignore_flags: bool = False,
         show_cancelled: bool = False,
-        show_unannounced: bool = True
+        show_unannounced: bool = True,
     ):
         """
         main method to fetch events and orders
@@ -156,8 +168,10 @@ class EventService:
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
             if show_unannounced is not True:
-                where_clause.append("""COALESCE(TicketSocketEvents.AnnounceDate,
-                                     CURRENT_TIMESTAMP) >= CURRENT_TIMESTAMP""")
+                where_clause.append(
+                    """COALESCE(TicketSocketEvents.AnnounceDate,
+                                     CURRENT_TIMESTAMP) >= CURRENT_TIMESTAMP"""
+                )
 
             if exclude_start is not None and exclude_end is not None:
                 where_clause.append(
@@ -269,7 +283,9 @@ class EventService:
                 vip_event.disableVipLinkReason = str(row["DisableVipLinkReason"])
 
             if get_orders is True:
-                ticket_types = self.__get_ticket_types_from_event_id(ticket_socket_event_id)
+                ticket_types = self.__get_ticket_types_from_event_id(
+                    ticket_socket_event_id
+                )
                 vip_event.ticketTypes = ticket_types
                 orders = self.__get_orders_from_event_id(
                     ticket_socket_event_id,
@@ -434,7 +450,9 @@ class EventService:
         midnight_end: str = None
         if end is not None:
             end_str = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-            midnight_end_date = datetime.strptime(end_str, "%Y-%m-%d") + timedelta(days=1)
+            midnight_end_date = datetime.strptime(end_str, "%Y-%m-%d") + timedelta(
+                days=1
+            )
             midnight_end = midnight_end_date.strftime("%Y-%m-%d")
 
         seller_event_category_ids: list[int] = []
@@ -605,7 +623,9 @@ class EventService:
             if order.isDeleted is True:
                 order.is_active = False
                 order.isHidden = False
-            shirt_str = str(row["Shirts"]).strip() if row["Shirts"] is not None else None
+            shirt_str = (
+                str(row["Shirts"]).strip() if row["Shirts"] is not None else None
+            )
             shirts = []
             if shirt_str is not None and shirt_str != "":
                 shirt_array = shirt_str.split("/")
@@ -678,20 +698,14 @@ class EventService:
                         found_index = idx
                         break
 
-            if (
-                order.hasRefunds is True
-                and refund_order_data is None
-            ):
+            if order.hasRefunds is True and refund_order_data is None:
                 refund_order_data = DailyOrderData(
                     order.refundDate, order.ticketSocketEventId
                 )
                 refund_order_data.ticketSocketOrderId = order.ticketSocketOrderId
                 refund_order_data.isRefunded = True
                 refund_order_data.isChargeback = False
-            elif (
-                order.hasChargebacks is True
-                and refund_order_data is None
-            ):
+            elif order.hasChargebacks is True and refund_order_data is None:
                 refund_order_data = DailyOrderData(
                     order.chargebackDate, order.ticketSocketEventId
                 )
@@ -930,7 +944,9 @@ class EventService:
             dash_totals.orders += order_data.orders
             dash_totals.numTicketsRefunded += order_data.numTicketsRefunded
             dash_totals.revenueRefunded += order_data.revenueRefunded
-            dash_totals.serviceFeeRevenueRefunded += order_data.serviceFeeRevenueRefunded
+            dash_totals.serviceFeeRevenueRefunded += (
+                order_data.serviceFeeRevenueRefunded
+            )
             dash_totals.ticketRevenueUsd += order_data.ticketRevenueUsd
             dash_totals.serviceFeesRevenueUsd += order_data.serviceFeesRevenueUsd
             dash_totals.totalRevenueUsd += order_data.totalRevenueUsd
@@ -1086,7 +1102,9 @@ class EventService:
             if order.isDeleted is True:
                 order.is_active = False
                 order.isHidden = False
-            shirt_str = str(row["Shirts"]).strip() if row["Shirts"] is not None else None
+            shirt_str = (
+                str(row["Shirts"]).strip() if row["Shirts"] is not None else None
+            )
             shirts = []
             if shirt_str is not None and shirt_str != "":
                 shirt_array = shirt_str.split("/")
@@ -1258,7 +1276,9 @@ class EventService:
                 break
         return success
 
-    def check_in_tickets(self, ticket_socket_order_ticket_ids: list[int], checked_in: bool):
+    def check_in_tickets(
+        self, ticket_socket_order_ticket_ids: list[int], checked_in: bool
+    ):
         """
         Marks tickets as checked in
         """
@@ -1294,14 +1314,16 @@ class EventService:
                     WHERE Id=%(ticket_socket_event_id)s"""
         success = db_update(sql, data)
         if success is True:
-            success = self.refund_all_event_orders(ticket_socket_event_id, refund_service_fees)
+            success = self.refund_all_event_orders(
+                ticket_socket_event_id, refund_service_fees
+            )
         return success
 
     def refund_all_event_orders(
         self,
         ticket_socket_event_id: int,
         refund_service_fees: bool = False,
-        mark_chargeback: bool = False
+        mark_chargeback: bool = False,
     ):
         """
         Refunds all orders in an event one at a time
@@ -1314,7 +1336,9 @@ class EventService:
         if len(rows) > 0:
             for row in rows:
                 order_id = int(row["Id"])
-                success = self.refund_order(order_id, refund_service_fees, mark_chargeback)
+                success = self.refund_order(
+                    order_id, refund_service_fees, mark_chargeback
+                )
                 if success is False:
                     break
         return success
@@ -1380,11 +1404,14 @@ class EventService:
                     1 if event_to_update.isAddedToBandsInTown is True else 0
                 ),
                 "isHidden": 1 if event_to_update.isHidden is True else 0,
-                "announceDate": event_to_update.announceDate
+                "announceDate": event_to_update.announceDate,
             }
             success = db_update(update_sql, update_data)
 
-            if event_to_update.isDeleted is False and len(event_to_update.ticketTypes) > 0:
+            if (
+                event_to_update.isDeleted is False
+                and len(event_to_update.ticketTypes) > 0
+            ):
                 for ticket_type in event_to_update.ticketTypes:
                     ticket_type_wql = """UPDATE TicketSocketTicketTypes
                                         SET IsActive=%(is_active)s, LastUpdate=CURRENT_TIMESTAMP 
@@ -1513,7 +1540,9 @@ class EventService:
                         seller_ec_temp = SellerEventCategory(
                             None, ticket_socket_id, vip_event.eventCategoryId
                         )
-                        vip_event.sellerEventCategoryId = seller_ec_temp.sellerEventCategoryId
+                        vip_event.sellerEventCategoryId = (
+                            seller_ec_temp.sellerEventCategoryId
+                        )
 
                     # if this combo of TS and category does not exist on our side,
                     # we can't update this event
@@ -1534,7 +1563,11 @@ class EventService:
         return all_events
 
     def refresh_database_from_ticket_socket(
-        self, seller_id: int = None, start: int = None, end: int = None, user_id: int = 0
+        self,
+        seller_id: int = None,
+        start: int = None,
+        end: int = None,
+        user_id: int = 0,
     ):
         """
         Calls out to TS and refreshes objects in database
@@ -1568,14 +1601,14 @@ class EventService:
 
         try:
             log_message("retrieving events from TicketSocket Service")
-            all_events = self.retrieve_ticket_socket_events_for_update(seller_id, start, end)
+            all_events = self.retrieve_ticket_socket_events_for_update(
+                seller_id, start, end
+            )
             # log_message('events retrieved')
 
             service_timer = time.time()
             service_duration = service_timer - start_timer
-            log_message(
-                "Service fetch done in " + str(service_duration) + " seconds"
-            )
+            log_message("Service fetch done in " + str(service_duration) + " seconds")
 
             # get total number of events grabbed from service
             total_events_from_service = len(all_events)
@@ -1731,7 +1764,9 @@ class EventService:
                                         LastUpdate=CURRENT_TIMESTAMP 
                                         WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                         AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
-                                ticket_type_success = db_update(sql, ticket_type_data, cnx)
+                                ticket_type_success = db_update(
+                                    sql, ticket_type_data, cnx
+                                )
                             else:
                                 ticket_type_add_new = True
                                 # insert new ticket type
@@ -1741,7 +1776,9 @@ class EventService:
                                                 VALUES (%(ticketSocketTicketTypeId)s,
                                                 %(ticket_socket_event_id)s, %(ticketTypeName)s,
                                                 %(totalAvailable)s, %(is_active)s)"""
-                                ticket_socket_type_id = db_insert(sql, ticket_type_data, cnx)
+                                ticket_socket_type_id = db_insert(
+                                    sql, ticket_type_data, cnx
+                                )
                                 ticket_type_success = ticket_socket_type_id > 0
 
                             # if the update succeeded, update counters
@@ -1867,7 +1904,10 @@ class EventService:
                                 existing_purchase_timestamp = datetime.strptime(
                                     str(existing_order["PurchaseDate"]), "%Y-%m-%d"
                                 ).timestamp()
-                                if order_purchase_timestamp != existing_purchase_timestamp:
+                                if (
+                                    order_purchase_timestamp
+                                    != existing_purchase_timestamp
+                                ):
                                     check_cleanup_data = {
                                         "ticket_socket_event_id": ticket_socket_event_id,
                                         "purchaseDate": str(
@@ -1919,7 +1959,9 @@ class EventService:
                                 order_add_new = True
                                 # insert new order
                                 order_data["order_id"] = int(order.id)
-                                order_data["ticket_socket_event_id"] = ticket_socket_event_id
+                                order_data["ticket_socket_event_id"] = (
+                                    ticket_socket_event_id
+                                )
                                 sql = """INSERT INTO TicketSocketOrders
                                             (TicketSocketEventId, OrderId, NumTickets,
                                             PurchaseDate, PurchaseTimestamp, Phone, Shirts, EventId, UserId,
@@ -2006,7 +2048,9 @@ class EventService:
                                         "ticketId": ticket.id,
                                     }
 
-                                    existing_ticket = db_query_one(ticket_sql, data, cnx)
+                                    existing_ticket = db_query_one(
+                                        ticket_sql, data, cnx
+                                    )
 
                                     ticket_success: bool = False
                                     ticket_socket_order_ticket_id: int = 0
@@ -2017,12 +2061,16 @@ class EventService:
                                         ticket_socket_order_ticket_id = int(
                                             existing_ticket["Id"]
                                         )
-                                        is_checked_in = int(existing_ticket["IsCheckedIn"])
+                                        is_checked_in = int(
+                                            existing_ticket["IsCheckedIn"]
+                                        )
                                         if is_checked_in != 1:
                                             is_checked_in = (
                                                 1 if ticket.scannedTimestamp != 0 else 0
                                             )
-                                        ticket_data["id"] = ticket_socket_order_ticket_id
+                                        ticket_data["id"] = (
+                                            ticket_socket_order_ticket_id
+                                        )
                                         ticket_data["is_checked_in"] = is_checked_in
 
                                         sql = """Update TicketSocketOrderTickets
@@ -2037,7 +2085,9 @@ class EventService:
                                         if ticket_price > 0:
                                             sql += """Price=%(price)s, """
                                         sql += """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                                        ticket_success = db_update(sql, ticket_data, cnx)
+                                        ticket_success = db_update(
+                                            sql, ticket_data, cnx
+                                        )
                                     else:
                                         # insert new ticket
                                         ticket_add_new = True
@@ -2067,7 +2117,9 @@ class EventService:
                                         ticket_socket_order_ticket_id = db_insert(
                                             sql, ticket_data
                                         )
-                                        ticket_success = ticket_socket_order_ticket_id > 0
+                                        ticket_success = (
+                                            ticket_socket_order_ticket_id > 0
+                                        )
 
                                     # if the update succeeded, update counters
                                     if ticket_success:
@@ -2132,14 +2184,23 @@ class EventService:
             if cnx is not None and cnx.is_connected:
                 cnx.close()
 
-        except (IndexError, MemoryError, EOFError, BufferError,
-                SystemError, TimeoutError, RuntimeError) as error:
+        except (
+            IndexError,
+            MemoryError,
+            EOFError,
+            BufferError,
+            SystemError,
+            TimeoutError,
+            RuntimeError,
+        ) as error:
             update_success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
             log_message(error_message)
 
         # alert dB if it failed
-        if update_success is not True or (results is not None and results.succeeded is not True):
+        if update_success is not True or (
+            results is not None and results.succeeded is not True
+        ):
             subject = "Error in TS Refresh - " + datetime.now().strftime(
                 "%m/%d/%Y %H:%M:%S"
             )
