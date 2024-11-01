@@ -18,7 +18,7 @@ from flask_jwt_extended import (
 )
 
 from common.utility import log_message, send_email, convert_to_json
-from common.ticket_socket_service import TicketSocketService, getAllAccounts
+from common.ticket_socket_service import TicketSocketService, get_all_accounts
 from common.event_service import EventService, VipEvent, VipOrder
 from common.update_service import UpdateService
 from common.seller_service import SellerService
@@ -464,7 +464,7 @@ def get_accounts():
     """
     API method to fetch account
     """
-    accounts = getAllAccounts()
+    accounts = get_all_accounts()
     return convert_to_json(accounts)
 
 
@@ -474,7 +474,7 @@ def get_categories(ticket_socket_id: int):
     API method to fetch categories
     """
     service = TicketSocketService(ticket_socket_id)
-    categories = service.getCategories()
+    categories = service.get_categories()
     return convert_to_json(categories)
 
 

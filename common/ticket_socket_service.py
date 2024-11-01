@@ -1,3 +1,7 @@
+"""
+Ticket Socket API service module
+"""
+
 import os
 import json
 import http.client
@@ -5,521 +9,612 @@ import time
 from datetime import datetime
 from typing import Any
 
-from . import utility
-from . import db
-from common.models.ticket_socket import *
+from common.utility import fix_magic_quotes, format_phone
+from common.db import db_query_all, db_query_one
+from common.models.ticket_socket import (
+    TicketSocketCategory,
+    TicketSocketEvent,
+    TicketSocketVenue,
+    TicketSocketTicketType,
+    TicketSocketTicket,
+    TicketSocketOrder,
+)
+
 
 class TicketSocketService:
-    name: str = ''
-    serviceUrl: str = ''
-    utcOffsetHours: int = 0
-    exchangeRateId: int = 1
-    exchangeRateSlug: str = ''
+    """
+    Service to fetch data from TicketSocket API
+    """
+
+    name: str = ""
+    service_url: str = ""
+    utc_offset_hours: int = 0
+    exchange_rate_id: int = 1
+    exchange_rate_slug: str = ""
     mulitiplier: float = 1
-    currencySymbol: str = ''
-    token: str = ''
+    currency_symbol: str = ""
+    token: str = ""
     categories: list[TicketSocketCategory] = []
     events: list[TicketSocketEvent] = []
 
-    def __init__(self, ticketSocketId: int):
-        self.ticketSocketId = ticketSocketId
+    def __init__(self, ticket_socket_id: int):
+        self.ticket_socket_id = ticket_socket_id
         self.__initialize()
 
-    def __getTsAccountData(self):
-        sql = """SELECT TicketSocket.AccountName, TicketSocket.ServiceUrl, TicketSocket.DefaultUtcOffsetHours, TicketSocket.ExchangeRateId,  
+    def __get_ts_account_data(self):
+        """
+        Get stored data from this TicketSocket account
+        """
+        sql = """SELECT TicketSocket.AccountName, TicketSocket.ServiceUrl,
+                 TicketSocket.DefaultUtcOffsetHours, TicketSocket.ExchangeRateId,  
                  ExchangeRates.Symbol, ExchangeRates.ServiceTokenId, ExchangeRates.Multiplier 
                  FROM TicketSocket 
                  INNER JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                  WHERE TicketSocketId=%(ts_id)s"""
 
-        data = {
-            'ts_id': self.ticketSocketId
-        }
+        data = {"ts_id": self.ticket_socket_id}
 
-        row = db.queryOne(sql, data)
-        if row != {}:
-            self.name = row['AccountName']
-            self.serviceUrl = row['ServiceUrl']
-            self.serviceUrl = self.serviceUrl.replace('https://', '')
-            self.utcOffsetHours = int(row['DefaultUtcOffsetHours'])
-            self.currencySymbol = row['Symbol']
-            self.exchangeRateId = int(row['ExchangeRateId'])
-            self.exchangeRateSlug = row['ServiceTokenId']
-            self.mulitiplier = float(row['Multiplier'])        
+        row = db_query_one(sql, data)
+        if row:
+            self.name = row["AccountName"]
+            self.service_url = row["ServiceUrl"]
+            self.service_url = self.service_url.replace("https://", "")
+            self.utc_offset_hours = int(row["DefaultUtcOffsetHours"])
+            self.currency_symbol = row["Symbol"]
+            self.exchange_rate_id = int(row["ExchangeRateId"])
+            self.exchange_rate_slug = row["ServiceTokenId"]
+            self.mulitiplier = float(row["Multiplier"])
 
-    def __getJwtToken(self):
-        uid = os.getenv('API_UID_'+str(self.ticketSocketId))
-        pwd = os.getenv('API_PWD_'+str(self.ticketSocketId))
-        pk = os.getenv('API_PK_'+str(self.ticketSocketId))
-        pk_slug = os.getenv('API_PK_SLUG_'+str(self.ticketSocketId))
+    def __get_jwt_token(self):
+        """
+        Gets JWT bearer token from TicketSocket for this account
+        """
+        uid = os.getenv("API_UID_" + str(self.ticket_socket_id))
+        pwd = os.getenv("API_PWD_" + str(self.ticket_socket_id))
+        pk = os.getenv("API_PK_" + str(self.ticket_socket_id))
+        pk_slug = os.getenv("API_PK_SLUG_" + str(self.ticket_socket_id))
 
         creds = {
             "userName": uid,
             "password": pwd,
             "publicKey": pk,
-            "publicKeySlug": pk_slug
+            "publicKeySlug": pk_slug,
         }
 
-        url = '/api/v1/tokens'
+        url = "/api/v1/tokens"
         headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json;charset=UTF-8'
-        }    
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+        }
 
-        conn = http.client.HTTPSConnection(self.serviceUrl)
-        conn.request('POST', url, json.dumps(creds), headers)
-        response = conn.getresponse()    
-        
-        jwt = ''
+        conn = http.client.HTTPSConnection(self.service_url)
+        conn.request("POST", url, json.dumps(creds), headers)
+        response = conn.getresponse()
+
+        jwt = ""
         if response.status == 200:
-            jsonResponse = json.loads(response.read())
-            jwt = jsonResponse['data']['jwt']
-        
+            json_response = json.loads(response.read())
+            jwt = json_response["data"]["jwt"]
+
         conn.close()
         self.token = jwt
 
     def __initialize(self):
-        self.__getTsAccountData()
-        self.__getJwtToken()
+        self.__get_ts_account_data()
+        self.__get_jwt_token()
 
-    def getCategories(self):
-        url = '/api/v1/categories'
+    def get_categories(self):
+        """
+        Fetch list of categories from TS
+        """
+        url = "/api/v1/categories"
         headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json;charset=UTF-8',
-            'Authorization': 'Bearer ' + self.token
-        }    
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+            "Authorization": "Bearer " + self.token,
+        }
 
-        conn = http.client.HTTPSConnection(self.serviceUrl)
-        conn.request('GET', url, headers=headers)
-        response = conn.getresponse()    
-        
+        conn = http.client.HTTPSConnection(self.service_url)
+        conn.request("GET", url, headers=headers)
+        response = conn.getresponse()
+
         self.categories = []
         if response.status == 200:
-            jsonResponse = json.loads(response.read())
-            jsonData = jsonResponse['data']
-            for item in jsonData:
-                categoryId: int = 0
-                title: str = ''
-                if 'id' in item:
-                    categoryId = int(item['id'])
-                if 'title' in item:
-                    title = item['title']
-                if categoryId > 0 and title != '':
-                    self.categories.append(TicketSocketCategory(item['id'], item['title']))            
-        
+            json_response = json.loads(response.read())
+            json_data = json_response["data"]
+            for item in json_data:
+                category_id: int = 0
+                title: str = ""
+                if "id" in item:
+                    category_id = int(item["id"])
+                if "title" in item:
+                    title = item["title"]
+                if category_id > 0 and title != "":
+                    self.categories.append(
+                        TicketSocketCategory(item["id"], item["title"])
+                    )
+
         conn.close()
 
         return self.categories
-    
-    def getEventsAndOrders(self, eventCategoryId: int = None, unixStart: int = None, unixEnd: int = None):
-        url = '/api/v1/events?includeEnded=true&includeOffSale=true&includeTicketTypes=true&limit=9999'
 
-        if eventCategoryId is not None and eventCategoryId > 0:
-            url += '&category=' + str(eventCategoryId)
-            
-        if unixStart == None and unixEnd == None:
+    def get_events_and_orders(
+        self,
+        event_category_id: int = None,
+        unix_start: int = None,
+        unix_end: int = None,
+    ):
+        """
+        Get all TS data for the specified category and time period
+        """
+        url = """/api/v1/events?
+                includeEnded=true&includeOffSale=true
+                &includeTicketTypes=true&limit=9999"""
+
+        if event_category_id is not None and event_category_id > 0:
+            url += "&category=" + str(event_category_id)
+
+        if unix_start is None and unix_end is None:
             url += "&startsAfter=" + str(int(time.time()))
         else:
-            if unixStart is not None:
-                url += "&startsAfter=" + str(unixStart)
-            if unixEnd is not None:
-                url += "&startsBefore=" + str(unixEnd)
-                
-        headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json;charset=UTF-8',
-            'Authorization': 'Bearer ' + self.token
-        }    
+            if unix_start is not None:
+                url += "&startsAfter=" + str(unix_start)
+            if unix_end is not None:
+                url += "&startsBefore=" + str(unix_end)
 
-        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
-        conn.request('GET', url, headers=headers)
-        response = conn.getresponse() 
+        headers = {
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+            "Authorization": "Bearer " + self.token,
+        }
+
+        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
+        conn.request("GET", url, headers=headers)
+        response = conn.getresponse()
 
         self.events = []
         if response.status == 200:
-            jsonResponse = json.loads(response.read())
-            jsonData = jsonResponse['data']
-            for item in jsonData:
+            json_response = json.loads(response.read())
+            json_data = json_response["data"]
+            for item in json_data:
                 # basic info
-                id: int = 0
-                title: str = ''
-                if 'id' in item:
-                    id = int(item['id'])
-                if 'title' in item:
-                    title = item['title']
+                event_id: int = 0
+                title: str = ""
+                if "id" in item:
+                    event_id = int(item["id"])
+                if "title" in item:
+                    title = item["title"]
 
-                if id == 0 or title == '':
+                if event_id == 0 or title == "":
                     continue
 
-                event = TicketSocketEvent(id, title)
+                event = TicketSocketEvent(event_id, title)
 
-                onSale: str = ''
-                if 'onsale' in item:
-                    onSale = item['onsale']
-                event.onSale = True if onSale == '1' else False
+                on_sale: str = ""
+                if "onsale" in item:
+                    on_sale = item["onsale"]
+                event.onSale = True if on_sale == "1" else False
 
                 categories = []
-                if 'categories' in item:
-                    categories = item['categories']
+                if "categories" in item:
+                    categories = item["categories"]
 
                 if len(categories) <= 0:
                     continue
 
                 category = categories[0]
 
-                categoryId: int = 0
-                if 'id' in category:
-                    categoryId = int(category['id'])
+                category_id: int = 0
+                if "id" in category:
+                    category_id = int(category["id"])
 
-                if categoryId <= 0:
+                if category_id <= 0:
                     continue
-                
-                event.eventCategoryId = categoryId
 
-                thumbnail: str = ''
-                if 'smallPic' in item:
-                    thumbnail = item['smallPic']
+                event.eventCategoryId = category_id
+
+                thumbnail: str = ""
+                if "smallPic" in item:
+                    thumbnail = item["smallPic"]
                 event.thumbnail = thumbnail
 
-                sefUrl: str = ''
-                if 'sefUrl' in item:
-                    sefUrl = item['sefUrl']
+                sef_url: str = ""
+                if "sefUrl" in item:
+                    sef_url = item["sefUrl"]
 
-                event.ticketSocketUrl = "https://" + self.serviceUrl + "/event/" + sefUrl
+                event.ticketSocketUrl = (
+                    "https://" + self.service_url + "/event/" + sef_url
+                )
 
                 # venue info
-                venue = ''
-                if 'venue' in item:
-                    venue = utility.fixMagicQuotes(item['venue'])
+                venue = ""
+                if "venue" in item:
+                    venue = fix_magic_quotes(item["venue"])
 
-                customFields = {}
-                if 'customFields' in item:
-                    customFields = item['customFields']
+                custom_fields = {}
+                if "custom_fields" in item:
+                    custom_fields = item["custom_fields"]
 
-                address1 = ''                
-                if 'venueAddress1' in item and item['venueAddress1'] != '':
-                    address1 = utility.fixMagicQuotes(item['venueAddress1'])
-                elif customFields != {} and 'venueAddress1' in customFields:
-                    address1 = utility.fixMagicQuotes(customFields['venueAddress1'])
+                address1 = ""
+                if "venueAddress1" in item and item["venueAddress1"] != "":
+                    address1 = fix_magic_quotes(item["venueAddress1"])
+                elif custom_fields != {} and "venueAddress1" in custom_fields:
+                    address1 = fix_magic_quotes(custom_fields["venueAddress1"])
 
-                address2 = ''
-                if 'venueAddress2' in item and item['venueAddress2'] != '':
-                    address2 = utility.fixMagicQuotes(item['venueAddress2'])
-                elif customFields != {} and 'venueAddress2' in customFields:
-                    address2 = utility.fixMagicQuotes(customFields['venueAddress2'])
+                address2 = ""
+                if "venueAddress2" in item and item["venueAddress2"] != "":
+                    address2 = fix_magic_quotes(item["venueAddress2"])
+                elif custom_fields != {} and "venueAddress2" in custom_fields:
+                    address2 = fix_magic_quotes(custom_fields["venueAddress2"])
 
-                city = ''
-                if 'venueCity' in item and item['venueCity'] != '':
-                    city = utility.fixMagicQuotes(item['venueCity'])
-                elif customFields != {} and 'venueCity' in customFields:
-                    city = utility.fixMagicQuotes(customFields['venueCity'])
+                city = ""
+                if "venueCity" in item and item["venueCity"] != "":
+                    city = fix_magic_quotes(item["venueCity"])
+                elif custom_fields != {} and "venueCity" in custom_fields:
+                    city = fix_magic_quotes(custom_fields["venueCity"])
 
-                state = ''
-                if 'venueState' in item and item['venueState'] != '':
-                    state = utility.fixMagicQuotes(item['venueState'])
-                elif customFields != {} and 'venueState' in customFields:
-                    state = utility.fixMagicQuotes(customFields['venueState'])
+                state = ""
+                if "venueState" in item and item["venueState"] != "":
+                    state = fix_magic_quotes(item["venueState"])
+                elif custom_fields != {} and "venueState" in custom_fields:
+                    state = fix_magic_quotes(custom_fields["venueState"])
 
-                zip = ''
-                if 'venuePostalCode' in item and item['venuePostalCode'] != '':
-                    zip = utility.fixMagicQuotes(item['venuePostalCode'])
-                elif customFields != {} and 'venuePostalCode' in customFields:
-                    zip = utility.fixMagicQuotes(customFields['venuePostalCode'])
+                zip_code = ""
+                if "venuePostalCode" in item and item["venuePostalCode"] != "":
+                    zip_code = fix_magic_quotes(item["venuePostalCode"])
+                elif custom_fields != {} and "venuePostalCode" in custom_fields:
+                    zip_code = fix_magic_quotes(custom_fields["venuePostalCode"])
 
-                country = ''
-                if 'venueCountry' in item and item['venueCountry'] != '':
-                    country = utility.fixMagicQuotes(item['venueCountry'])
-                elif customFields != {} and 'venueCountry' in customFields:
-                    country = utility.fixMagicQuotes(customFields['venueCountry'])
-                    
-                formatPhones: bool = True
-                if country != '' and country != 'USA' and country != 'United States':
-                    formatPhones = False
+                country = ""
+                if "venueCountry" in item and item["venueCountry"] != "":
+                    country = fix_magic_quotes(item["venueCountry"])
+                elif custom_fields != {} and "venueCountry" in custom_fields:
+                    country = fix_magic_quotes(custom_fields["venueCountry"])
 
-                timezone = ''
-                if customFields != {} and 'timezone' in customFields:
-                    timezone = customFields['timezone']
-                
-                event.venue = TicketSocketVenue(venue, address1, address2, city, state, zip, country, timezone)
-                
+                format_phones: bool = True
+                if country != "" and country != "USA" and country != "United States":
+                    format_phones = False
+
+                timezone = ""
+                if custom_fields != {} and "timezone" in custom_fields:
+                    timezone = custom_fields["timezone"]
+
+                event.venue = TicketSocketVenue(
+                    venue, address1, address2, city, state, zip_code, country, timezone
+                )
+
                 # date/time info
-                displayDate: str = ''
-                if 'displayStartDate' in item:
-                    displayDate = item['displayStartDate']
+                display_date: str = ""
+                if "displayStartDate" in item:
+                    display_date = item["displayStartDate"]
 
-                event.displayDate = displayDate
+                event.displayDate = display_date
 
-                eventUtc: int = 0
-                if 'start' in item:
-                    eventUtc = int(item['start'])
+                event_utc: int = 0
+                if "start" in item:
+                    event_utc = int(item["start"])
 
-                event.utcTime = eventUtc
+                event.utcTime = event_utc
 
                 # need at least one of them to be non-zero
-                if displayDate == '' and eventUtc == 0:
+                if display_date == "" and event_utc == 0:
                     continue
 
                 # note: this is a total hack since TicketSocket returns in UTC
-                # BUT does NOT return a reliable timezone value for the venue (yeah this is that bad - even when it's right, 
+                # BUT does NOT return a reliable timezone value for the venue
+                # (yeah this is that bad - even when it's right,
                 # it's a timezone that isn't convertible using Python or well...anything)
-                # So what we do instead is define a "default offset" in the database that roughly gets us the right date
-                # since we're not displaying times in the front end.  With any luck the "displayStartDate" comes back 
-                # with a valid value and we use that for our date instead         
+                # So what we do instead is define a "default offset" in the database
+                # that roughly gets us the right date since we're not displaying times
+                # in the front end.  With any luck the "displayStartDate" comes back
+                # with a valid value and we use that for our date instead
 
                 try:
-                    eventDt = datetime.strptime(event.displayDate, '%m/%d/%Y')
-                    event.eventDate = eventDt.strftime('%Y-%m-%d')
-                except:
-                    eventTime: int = event.utcTime + (self.utcOffsetHours * 60 * 60)         
-                    event.eventDate = datetime.fromtimestamp(eventTime).strftime('%Y-%m-%d')
-                    
-                    
+                    event_date = datetime.strptime(event.displayDate, "%m/%d/%Y")
+                    event.eventDate = event_date.strftime("%Y-%m-%d")
+                except RuntimeError:
+                    event_time: int = event.utcTime + (self.utc_offset_hours * 60 * 60)
+                    event.eventDate = datetime.fromtimestamp(event_time).strftime(
+                        "%Y-%m-%d"
+                    )
+
                 # ticket types
-                ticketTypes = []
-                if 'ticketTypes' in item:
-                    ticketTypes = self.getTicketTypesFromEvent(item['ticketTypes'])
-                event.ticketTypes = ticketTypes                
+                ticket_types = []
+                if "ticketTypes" in item:
+                    ticket_types = self.get_ticket_types_from_event(item["ticketTypes"])
+                event.ticketTypes = ticket_types
 
                 # orders
-                event.orders = self.getOrdersFromEventId(event.id, formatPhones)       
-                
+                event.orders = self.get_orders_from_event_id(event.id, format_phones)
+
                 self.events.append(event)
 
         return self.events
-    
-    def getTicketTypesFromEvent(self, ticketTypes: list[Any]):
-        if len(ticketTypes) <= 0:
+
+    def get_ticket_types_from_event(self, ticket_types: list[Any]):
+        """
+        Fetch ticket types from event
+        """
+        if len(ticket_types) <= 0:
             return []
-        
+
         ttypes: list[TicketSocketTicketType] = []
-        for item in ticketTypes:
-            id = int(item['id'])
-            name = str(item['name'])
-            eventId = int(item['eventId'])
-            totalAvailable = int(item['quantity'])
-            isActive: bool = True
-            if 'deleted' in item:
-                isActive = (int(item['deleted']) == 0)
-            ttype = TicketSocketTicketType(eventId, id, name, totalAvailable, isActive)
+        for item in ticket_types:
+            ticket_type_id = int(item["id"])
+            name = str(item["name"])
+            event_id = int(item["eventId"])
+            total_available = int(item["quantity"])
+            is_active: bool = True
+            if "deleted" in item:
+                is_active = int(item["deleted"]) == 0
+            ttype = TicketSocketTicketType(
+                event_id, ticket_type_id, name, total_available, is_active
+            )
             ttypes.append(ttype)
-            
+
         return ttypes
-    
-    def getOrdersFromEventId(self, eventId: int, formatPhoneNumbers: bool):
+
+    def get_orders_from_event_id(self, event_id: int, format_phone_numbers: bool):
+        """
+        Get order data per event from TS
+        """
         # get list of orderIds first
-        orderIds = self.getOrderIdsFromEventId(eventId)
+        order_ids = self.get_order_ids_from_event_id(event_id)
 
         # if there are no orders, return nothing
-        if len(orderIds) <= 0:
+        if len(order_ids) <= 0:
             return []
 
         # common service settings
-        baseUrl: str = '/api/v1/orders/'
+        base_url: str = "/api/v1/orders/"
         headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json;charset=UTF-8',
-            'Authorization': 'Bearer ' + self.token
-        } 
-        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+            "Authorization": "Bearer " + self.token,
+        }
+        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
 
         # loop through and append orders
         orders = []
-        for orderId in orderIds:
-            url = baseUrl + str(orderId)
-            conn.request('GET', url, headers=headers)
-            response = conn.getresponse() 
+        for order_id in order_ids:
+            url = base_url + str(order_id)
+            conn.request("GET", url, headers=headers)
+            response = conn.getresponse()
 
             if response.status == 200:
-                jsonResponse = json.loads(response.read())
-                jsonData = jsonResponse['data']
+                json_response = json.loads(response.read())
+                json_data = json_response["data"]
                 # get data from order
-                id: int = 0
-                if 'id' in jsonData:
-                    id = int(jsonData['id'])
+                order_id: int = 0
+                if "id" in json_data:
+                    order_id = int(json_data["id"])
 
-                if id == 0:
+                if order_id == 0:
                     continue
 
-                order = TicketSocketOrder(id, eventId)
+                order = TicketSocketOrder(order_id, event_id)
 
-                if 'cancelled' in jsonData:
-                    order.cancelled = bool(jsonData['cancelled'])
+                if "cancelled" in json_data:
+                    order.cancelled = bool(json_data["cancelled"])
 
-                if 'deleted' in jsonData:
-                    order.deleted = True if int(jsonData['deleted']) == 1 else False
+                if "deleted" in json_data:
+                    order.deleted = True if int(json_data["deleted"]) == 1 else False
 
                 tickets = None
-                if 'tickets' in jsonData:
-                    tickets = jsonData['tickets']
+                if "tickets" in json_data:
+                    tickets = json_data["tickets"]
 
-                numTickets: int = 0
-                totalCount: int = 0
-                if tickets is not None:        
-                    if 'totalCount' in tickets:
-                        totalCount = int(tickets['totalCount'])
+                num_tickets: int = 0
+                total_count: int = 0
+                if tickets is not None:
+                    if "totalCount" in tickets:
+                        total_count = int(tickets["totalCount"])
 
-                orderRevenue: float = 0
-                orderServiceFees: float = 0
-                orderTickets = []
-                orderShirts = []
-                if totalCount > 0:
-                    ticketData = tickets['data']
-                    for item in ticketData:
+                order_revenue: float = 0
+                order_service_fees: float = 0
+                order_tickets = []
+                order_shirts = []
+                if total_count > 0:
+                    ticket_data = tickets["data"]
+                    for item in ticket_data:
                         # if the ticket doesn't belong to this event, move along
                         # and yes that happens that an order can contain tickets to multiple events
 
-                        itemEventId: int = 0
-                        if 'eventId' in item:
-                            itemEventId = int(item['eventId'])
-                        if itemEventId != int(eventId):
+                        item_event_id: int = 0
+                        if "eventId" in item:
+                            item_event_id = int(item["eventId"])
+                        if item_event_id != int(event_id):
                             continue
-                        
-                        numTickets += 1
+
+                        num_tickets += 1
 
                         # set properties on order from ticket data if not present
-                        if order.userId == 0 and 'userId' in item:
-                            order.userId = int(item['userId'])
-                        if order.purchaserFirstName == '' and 'billing_firstName' in item:
-                            order.purchaserFirstName = utility.fixMagicQuotes(item['billing_firstName'])
-                        if order.purchaserLastName == '' and 'billing_lastName' in item:
-                            order.purchaserLastName = utility.fixMagicQuotes(item['billing_lastName'])
-                        if order.purchaserCity == None and 'billing_city' in item:
-                            order.purchaserCity = utility.fixMagicQuotes(item['billing_city'])
-                        if order.purchaserState == None and 'billing_state' in item:
-                            order.purchaserState = utility.fixMagicQuotes(item['billing_state'])
-                        if order.purchaserZipCode == None and 'billing_zip' in item:
-                            order.purchaserZipCode = utility.fixMagicQuotes(item['billing_zip'])
-                        if order.purchaserCountry == None and 'billing_country' in item:
-                            order.purchaserCountry = utility.fixMagicQuotes(item['billing_country'])
-                        if order.purchaserIpAddress == None and 'remoteAddr' in item:
-                            order.purchaserIpAddress = utility.fixMagicQuotes(item['remoteAddr'])
-                        if order.purchaseDate == '' and 'purchaseDate' in item:
-                            # datetime is not serializable in python, convert it to ISO-compatible string
-                            purchaseDate = datetime.fromtimestamp(float(item['purchaseDate']))
-                            order.purchaseDate = purchaseDate.strftime('%Y-%m-%d')
-                            order.purchaseTimestamp = purchaseDate.strftime('%Y-%m-%d %H:%M:%S')
-                        if order.email == '' and 'email' in item:
-                            order.email = item['email']
-                        
-                        # get shirt and phone data from questions    
-                        purchaserQuestions: list = []
-                        attendeeQuestions: list = []
-                        if 'purchaserQuestions' in item:                    
-                            purchaserQuestions = list(item['purchaserQuestions'])
-                        if 'attendeeQuestions' in item:
-                            attendeeQuestions = list(item['attendeeQuestions'])
-                        questions = purchaserQuestions + attendeeQuestions
-                        if len(questions) > 0:
-                            for questionItem in questions:
-                                question: str = ''
-                                if 'question' in questionItem:
-                                    question = str(questionItem['question']).lower()
+                        if order.userId == 0 and "userId" in item:
+                            order.userId = int(item["userId"])
+                        if (
+                            order.purchaserFirstName == ""
+                            and "billing_firstName" in item
+                        ):
+                            order.purchaserFirstName = fix_magic_quotes(
+                                item["billing_firstName"]
+                            )
+                        if order.purchaserLastName == "" and "billing_lastName" in item:
+                            order.purchaserLastName = fix_magic_quotes(
+                                item["billing_lastName"]
+                            )
+                        if order.purchaserCity is None and "billing_city" in item:
+                            order.purchaserCity = fix_magic_quotes(item["billing_city"])
+                        if order.purchaserState is None and "billing_state" in item:
+                            order.purchaserState = fix_magic_quotes(
+                                item["billing_state"]
+                            )
+                        if order.purchaserZipCode is None and "billing_zip" in item:
+                            order.purchaserZipCode = fix_magic_quotes(
+                                item["billing_zip"]
+                            )
+                        if order.purchaserCountry is None and "billing_country" in item:
+                            order.purchaserCountry = fix_magic_quotes(
+                                item["billing_country"]
+                            )
+                        if order.purchaserIpAddress is None and "remoteAddr" in item:
+                            order.purchaserIpAddress = fix_magic_quotes(
+                                item["remoteAddr"]
+                            )
+                        if order.purchaseDate == "" and "purchaseDate" in item:
+                            # datetime is not serializable in python,
+                            # convert it to ISO-compatible string
+                            purchase_date = datetime.fromtimestamp(
+                                float(item["purchaseDate"])
+                            )
+                            order.purchaseDate = purchase_date.strftime("%Y-%m-%d")
+                            order.purchaseTimestamp = purchase_date.strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                        if order.email == "" and "email" in item:
+                            order.email = item["email"]
 
-                                if question == '':
+                        # get shirt and phone data from questions
+                        purchaser_questions: list = []
+                        attendee_questions: list = []
+                        if "purchaserQuestions" in item:
+                            purchaser_questions = list(item["purchaserQuestions"])
+                        if "attendeeQuestions" in item:
+                            attendee_questions = list(item["attendeeQuestions"])
+                        questions = purchaser_questions + attendee_questions
+                        if len(questions) > 0:
+                            for question_item in questions:
+                                question: str = ""
+                                if "question" in question_item:
+                                    question = str(question_item["question"]).lower()
+
+                                if question == "":
                                     continue
 
-                                answer: str = ''
-                                if 'answerText' in questionItem:
-                                    answer = str(questionItem['answerText'])
-                                    
-                                if answer != '':
-                                    if question.find('phone') >= 0 and order.phone == '':
-                                        if formatPhoneNumbers:
-                                            order.phone = utility.formatPhone(answer)
+                                answer: str = ""
+                                if "answerText" in question_item:
+                                    answer = str(question_item["answerText"])
+
+                                if answer != "":
+                                    if (
+                                        question.find("phone") >= 0
+                                        and order.phone == ""
+                                    ):
+                                        if format_phone_numbers:
+                                            order.phone = format_phone(answer)
                                         else:
                                             order.phone = answer
-                                    elif question.find('shirt') >= 0:
-                                        orderShirts.append(answer)
+                                    elif question.find("shirt") >= 0:
+                                        order_shirts.append(answer)
 
                         # create the ticket object
                         price: float = 0
-                        if 'price' in item:
-                            price = float(item['price'])
+                        if "price" in item:
+                            price = float(item["price"])
 
-                        ticketId: int = 0
-                        if 'id' in item:
-                            ticketId = int(item['id'])
-                        ticketType: str = ''
-                        if 'ticketTypeName' in item:
-                            ticketType = item['ticketTypeName']
-                        serviceFee: float = 0
-                        if 'fee1Amount' in item:
-                            serviceFee = float(item['fee1Amount'])
-                        ticketTypeId: int = 0
-                        if 'typeId' in item:
-                            ticketTypeId = int(item['typeId'])
-                        barcode: str = ''
-                        if 'barcode' in item:
-                            barcode = str(item['barcode'])
-                        availableScans: int = 0
-                        if 'availableScans' in item:
-                            availableScans = int(item['availableScans'])
-                        purchaseLocation: str = ''
-                        if 'purchaseLocation' in item:
-                            purchaseLocation = str(item['purchaseLocation'])
-                        scannedTimestamp: int = 0
-                        if 'scannedTimestamp' in item:
-                            scannedTimestamp = int(item['scannedTimestamp'])
-                        attendeeFirstName: str = ''
-                        if 'partyMember' in item:
-                            attendeeFirstName = utility.fixMagicQuotes(item['partyMember'])
-                        attendeeLastName: str = ''
-                        if 'partyMemberLastName' in item:
-                            attendeeLastName = utility.fixMagicQuotes(item['partyMemberLastName'])
+                        ticket_id: int = 0
+                        if "id" in item:
+                            ticket_id = int(item["id"])
+                        ticket_type: str = ""
+                        if "ticketTypeName" in item:
+                            ticket_type = item["ticketTypeName"]
+                        service_fee: float = 0
+                        if "fee1Amount" in item:
+                            service_fee = float(item["fee1Amount"])
+                        ticket_type_id: int = 0
+                        if "typeId" in item:
+                            ticket_type_id = int(item["typeId"])
+                        barcode: str = ""
+                        if "barcode" in item:
+                            barcode = str(item["barcode"])
+                        available_scans: int = 0
+                        if "availableScans" in item:
+                            available_scans = int(item["availableScans"])
+                        purchase_location: str = ""
+                        if "purchaseLocation" in item:
+                            purchase_location = str(item["purchaseLocation"])
+                        scanned_timestamp: int = 0
+                        if "scannedTimestamp" in item:
+                            scanned_timestamp = int(item["scannedTimestamp"])
+                        attendee_first_name: str = ""
+                        if "partyMember" in item:
+                            attendee_first_name = fix_magic_quotes(item["partyMember"])
+                        attendee_last_name: str = ""
+                        if "partyMemberLastName" in item:
+                            attendee_last_name = fix_magic_quotes(
+                                item["partyMemberLastName"]
+                            )
 
-                        if ticketId == 0 or ticketType == '':
+                        if ticket_id == 0 or ticket_type == "":
                             continue
-                        
-                        ticket = TicketSocketTicket(ticketId, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp, attendeeFirstName, attendeeLastName)
-                        orderTickets.append(ticket)
 
-                        orderRevenue += price
-                        orderServiceFees += serviceFee
+                        ticket = TicketSocketTicket(
+                            ticket_id,
+                            ticket_type,
+                            price,
+                            service_fee,
+                            ticket_type_id,
+                            barcode,
+                            available_scans,
+                            purchase_location,
+                            scanned_timestamp,
+                            attendee_first_name,
+                            attendee_last_name,
+                        )
+                        order_tickets.append(ticket)
 
-                if len(orderTickets) > 0:
-                    order.numTickets = numTickets
-                    order.tickets = orderTickets
-                    order.shirts = orderShirts
-                    order.revenue = orderRevenue
-                    order.serviceFees = orderServiceFees
+                        order_revenue += price
+                        order_service_fees += service_fee
+
+                if len(order_tickets) > 0:
+                    order.numTickets = num_tickets
+                    order.tickets = order_tickets
+                    order.shirts = order_shirts
+                    order.revenue = order_revenue
+                    order.serviceFees = order_service_fees
 
                     orders.append(order)
 
         return orders
-    
-    def getOrderIdsFromEventId(self, eventId: int):
-        url = '/api/v1/orders?limit=999&eventId=' + str(eventId)
+
+    def get_order_ids_from_event_id(self, event_id: int):
+        """
+        Fetch list of order ids from TS eventId
+        """
+        url = "/api/v1/orders?limit=999&eventId=" + str(event_id)
 
         headers = {
-            'Accept': 'application/json',
-            'Content-type': 'application/json;charset=UTF-8',
-            'Authorization': 'Bearer ' + self.token
-        }    
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+            "Authorization": "Bearer " + self.token,
+        }
 
-        conn = http.client.HTTPSConnection(self.serviceUrl, timeout=600)
-        conn.request('GET', url, headers=headers)
-        response = conn.getresponse() 
+        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
+        conn.request("GET", url, headers=headers)
+        response = conn.getresponse()
 
-        orderIds: list[int] = []
+        order_ids: list[int] = []
         if response.status == 200:
-            jsonResponse = json.loads(response.read())
-            json_data = jsonResponse['data']
+            json_response = json.loads(response.read())
+            json_data = json_response["data"]
             for item in json_data:
-                orderId: int = 0
-                if 'orderId' in item:
-                    orderId = int(item['orderId'])
-                if orderId != 0:
-                    orderIds.append(orderId)
-        
-        return orderIds
-    
-def getAllAccounts():
+                order_id: int = 0
+                if "orderId" in item:
+                    order_id = int(item["orderId"])
+                if order_id != 0:
+                    order_ids.append(order_id)
+
+        return order_ids
+
+
+def get_all_accounts():
+    """
+    Gets stored data for all TS accounts
+    """
     accounts: list[TicketSocketService] = []
     sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
-    rows = db.queryAll(sql)
+    rows = db_query_all(sql)
     for row in rows:
-        ticketSocketId = int(row["TicketSocketId"])
-        account = TicketSocketService(ticketSocketId)
+        ticket_socket_id = int(row["TicketSocketId"])
+        account = TicketSocketService(ticket_socket_id)
         accounts.append(account)
     return accounts

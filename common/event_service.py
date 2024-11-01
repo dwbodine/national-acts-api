@@ -1522,13 +1522,13 @@ class EventService:
                 else:
                     continue
 
-            events = tss.getEventsAndOrders(event_category_id, start, end)
+            events = tss.get_events_and_orders(event_category_id, start, end)
 
             if len(events) > 0:
                 for event in events:
                     # convert ts events to vip events
                     vip_event = VipEvent(event.id, event.title)
-                    vip_event.__dict__.db_update(event.__dict__)
+                    vip_event.__dict__.update(event.__dict__)
                     vip_event.isVip = is_vip_service
 
                     # populate sellerEventCategoryId, which is required on our end
