@@ -1,162 +1,187 @@
+"""
+Uniform database accessor utility
+"""
 import os
 import mysql.connector
 import mysql.connector.connection
 
-def getDbConnection():
-    return mysql.connector.connect(user=os.getenv('DB_USER'), 
+def db_get_connection():
+    """
+    Connect to MySql database
+    """
+    return mysql.connector.connect(user=os.getenv('DB_USER'),
                                    password=os.getenv('DB_PASSWORD'),
                                    host=os.getenv('DB_HOST'),
                                    database=os.getenv('DB_DB'),
                                    connection_timeout=3600)
 
-def queryAll(sql: str, jsonData = None, cnx = None):    
+def db_query_all(sql: str, json_data = None, cnx = None):
+    """
+    Return multiple rows
+    """
     rows = []
-    keepAlive = True
-    
-    if (cnx == None):
-        cnx = getDbConnection()
-        keepAlive = False
-        
+    keep_alive = True
+
+    if cnx is None:
+        cnx = db_get_connection()
+        keep_alive = False
+
     cursor = cnx.cursor()
 
-    if jsonData is not None:
-        cursor.execute(sql, jsonData)
+    if json_data is not None:
+        cursor.execute(sql, json_data)
     else:
         cursor.execute(sql)
 
-    cursorRows = cursor.fetchall()
-    for cursorRow in cursorRows:
-        row = __convertCursorRowToDictionary(cursorRow, cursor)
+    cursor_rows = cursor.fetchall()
+    for cursor_row in cursor_rows:
+        row = __convert_cursor_row_to_dictionary(cursor_row, cursor)
         rows.append(row)
 
     cursor.close()
 
-    if keepAlive is False:
+    if keep_alive is False:
         cnx.close()
 
     return rows
 
-def queryOne(sql: str, jsonData, cnx = None):    
+def db_query_one(sql: str, json_data, cnx = None):
+    """
+    Query for single result
+    """
     row = {}
-    keepAlive = True
-    
-    if (cnx == None):
-        cnx = getDbConnection()
-        keepAlive = False
-        
+    keep_alive = True
+
+    if cnx is None:
+        cnx = db_get_connection()
+        keep_alive = False
+
     cursor = cnx.cursor()
 
-    cursor.execute(sql, jsonData)
+    cursor.execute(sql, json_data)
 
-    cursorRow = cursor.fetchone()
-    if cursorRow is not None:
-        row = __convertCursorRowToDictionary(cursorRow, cursor)
+    cursor_row = cursor.fetchone()
+    if cursor_row is not None:
+        row = __convert_cursor_row_to_dictionary(cursor_row, cursor)
 
     cursor.close()
-    
-    if keepAlive is False:
+
+    if keep_alive is False:
         cnx.close()
 
     return row
 
 
-def __convertCursorRowToDictionary(cursorRow: any, cursor: any):
-    # to get around the Python MySQL limitation of using integers as indices,
-    # this converts the row tuples to dictionary objects that can be used
-    # as associative arrays by the code
+def __convert_cursor_row_to_dictionary(cursor_row: any, cursor: any):
+    """
+    to get around the Python MySQL limitation of using integers as indices,
+    this converts the row tuples to dictionary objects that can be used
+    as associative arrays by the code
+    """
     row = {}
     counter: int = 0
     for column in cursor.description:
         field: str = column[0]
-        row[field] = cursorRow[counter]
+        row[field] = cursor_row[counter]
         counter += 1
     return row
 
+def db_update(sql: str, json_data = None, cnx = None):
+    """
+    Update SQL database
+    """
+    keep_alive = True
 
-def update(sql: str, jsonData = None, cnx = None):
-    keepAlive = True
-    
-    if (cnx == None):
-        cnx = getDbConnection()
-        keepAlive = False
-        
+    if cnx is None:
+        cnx = db_get_connection()
+        keep_alive = False
+
     cursor = cnx.cursor()
-        
-    if jsonData is not None:
-        cursor.execute(sql, jsonData)
+
+    if json_data is not None:
+        cursor.execute(sql, json_data)
     else:
         cursor.execute(sql)
-    
+
     count = cursor.rowcount
 
     cnx.commit()
 
     cursor.close()
-    
-    if keepAlive is False:
+
+    if keep_alive is False:
         cnx.close()
 
     return count > 0
 
-def insert(sql: str, jsonData = None, cnx = None):
-    keepAlive = True
-    
-    if (cnx == None):
-        cnx = getDbConnection()
-        keepAlive = False
-        
+def db_insert(sql: str, json_data = None, cnx = None):
+    """
+    Insert to MySQL table
+    """
+    keep_alive = True
+
+    if cnx is None:
+        cnx = db_get_connection()
+        keep_alive = False
+
     cursor = cnx.cursor()
-        
-    if jsonData is not None:
-        cursor.execute(sql, jsonData)
+
+    if json_data is not None:
+        cursor.execute(sql, json_data)
     else:
         cursor.execute(sql)
-    
+
     cnx.commit()
 
-    newId = cursor.lastrowid
+    new_id = cursor.lastrowid
 
     cursor.close()
-    
-    if keepAlive is False:
+
+    if keep_alive is False:
         cnx.close()
 
-    return newId
+    return new_id
 
-def delete(sql: str, jsonData = None, cnx = None):
-    keepAlive = True
-    
-    if (cnx == None):
-        cnx = getDbConnection()
-        keepAlive = False
-        
+def db_delete(sql: str, json_data = None, cnx = None):
+    """
+    Delete row from MySQL table
+    """
+    keep_alive = True
+
+    if cnx is None:
+        cnx = db_get_connection()
+        keep_alive = False
+
     cursor = cnx.cursor()
-        
-    if jsonData is not None:
-        cursor.execute(sql, jsonData)
+
+    if json_data is not None:
+        cursor.execute(sql, json_data)
     else:
         cursor.execute(sql)
-    
+
     count = cursor.rowcount
 
     cnx.commit()
 
     cursor.close()
-    
-    if keepAlive is False:
+
+    if keep_alive is False:
         cnx.close()
 
     return count > 0
 
-def convertListToParameters(theList: list[any], paramObject: dict, prefix: str):
+def db_convert_list_to_parameters(the_list: list[any], param_object: dict, prefix: str):
+    """
+    SQL safe method to convert Python list to parameterized list
+    """
     sql = '('
     counter = 0
-    for item in theList:
+    for item in the_list:
         if counter > 0:
             sql += ', '
-        paramName = prefix + '_' + str(counter)
-        sql += '%(' + paramName + ')s'
-        paramObject[paramName] = item
+        param_name = prefix + '_' + str(counter)
+        sql += '%(' + param_name + ')s'
+        param_object[param_name] = item
         counter += 1
     sql += ')'
     return sql

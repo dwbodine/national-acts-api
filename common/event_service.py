@@ -6,8 +6,10 @@ from datetime import datetime, timedelta
 import operator
 import traceback
 
-from common.db import queryAll, queryOne, update, insert
-from common.db import convertListToParameters, getDbConnection, delete
+from common.db import (
+    db_query_all, db_query_one, db_update, db_insert,
+    db_convert_list_to_parameters, db_get_connection, db_delete
+)
 from common.utility import logMessage, convertToJson, sendEmail
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
@@ -127,7 +129,7 @@ class EventService:
                 )
                 data["search_term"] = "*" + search_term + "*"
             if len(seller_event_category_ids) > 0:
-                seller_event_category_id_str = convertListToParameters(
+                seller_event_category_id_str = db_convert_list_to_parameters(
                     seller_event_category_ids, data, "sellerEventCategoryId"
                 )
                 where_clause.append(
@@ -177,7 +179,7 @@ class EventService:
 
         sql = sql.replace("\n", "")
 
-        event_rows = queryAll(sql, data)
+        event_rows = db_query_all(sql, data)
         for row in event_rows:
             event_id = int(row["EventId"])
             ticket_socket_event_id = int(row["Id"])
@@ -354,7 +356,7 @@ class EventService:
 
             external_sql = external_sql.replace("\n", "")
 
-            externalevent_rows = queryAll(external_sql, external_data)
+            externalevent_rows = db_query_all(external_sql, external_data)
             for row in externalevent_rows:
                 event_id = int(row["EventId"])
                 vip_event = VipEvent(event_id, str(row["Title"]))
@@ -489,7 +491,7 @@ class EventService:
                 where_clause.append("TicketSocketEvents.IsCancelled = 0")
 
         if len(seller_event_category_ids) > 0:
-            seller_event_category_id_str = convertListToParameters(
+            seller_event_category_id_str = db_convert_list_to_parameters(
                 seller_event_category_ids, data, "sellerEventCategoryId"
             )
             where_clause.append(
@@ -536,7 +538,7 @@ class EventService:
 
         sql = sql.replace("\n", "")
 
-        order_rows = queryAll(sql, data)
+        order_rows = db_query_all(sql, data)
         for row in order_rows:
             order_id = int(row["OrderId"])
             event_id = int(row["EventId"])
@@ -776,7 +778,7 @@ class EventService:
             else:
                 sql += """ AND TicketSocketOrderId IS NULL"""
 
-            existing_data = queryOne(sql, data)
+            existing_data = db_query_one(sql, data)
 
             update_data = {
                 "purchaseDate": order_data.purchaseDate,
@@ -808,7 +810,7 @@ class EventService:
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE DailyOrderDataId=%(dailyOrderDataId)s"""
                 update_data["dailyOrderDataId"] = daily_order_data_id
-                success = update(update_sql, update_data)
+                success = db_update(update_sql, update_data)
                 if success:
                     updates += 1
             else:
@@ -823,7 +825,7 @@ class EventService:
                                     %(revenueRefunded)s, %(serviceFeeRevenueRefunded)s,
                                     %(ticket_socket_order_id)s )"""
 
-                daily_order_data_id = insert(insert_sql, update_data)
+                daily_order_data_id = db_insert(insert_sql, update_data)
                 success = daily_order_data_id > 0
                 if success:
                     inserts += 1
@@ -891,7 +893,7 @@ class EventService:
                     ORDER BY DailyOrderData.PurchaseDate, Sellers.Name"""
         data = {"start": start, "end": end}
 
-        rows = queryAll(sql, data)
+        rows = db_query_all(sql, data)
         for row in rows:
             purchase_date = str(row["PurchaseDate"])
             ticket_socket_event_id = int(row["TicketSocketEventId"])
@@ -956,7 +958,7 @@ class EventService:
                     ORDER BY TicketSocketTicketTypes.TicketTypeName"""
         data = {"ticketSocketEventId": ticket_socket_event_id}
 
-        rows = queryAll(sql, data)
+        rows = db_query_all(sql, data)
         for row in rows:
             ticket_type_id = int(row["TicketSocketTicketTypeId"])
             name = str(row["TicketTypeName"])
@@ -1017,7 +1019,7 @@ class EventService:
         sql += """ ORDER BY TicketSocketOrders.PurchaserLastName ASC,
                     TicketSocketOrders.PurchaserFirstName ASC"""
 
-        rows = queryAll(sql, data)
+        rows = db_query_all(sql, data)
         for row in rows:
             order_id = int(row["OrderId"])
             event_id = int(row["EventId"])
@@ -1104,7 +1106,7 @@ class EventService:
                     AND IsActive=1"""
         data = {"ticket_socket_order_id": ticket_socket_order_id}
 
-        rows = queryAll(sql, data)
+        rows = db_query_all(sql, data)
         for row in rows:
             ticket_id: int = 0
             if row["TicketId"] is not None and row["TicketId"] != "":
@@ -1156,7 +1158,7 @@ class EventService:
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "is_active": 0 if disabled is True else 1,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1175,7 +1177,7 @@ class EventService:
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "isDeleted": 1 if deleted is True else 0,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1194,7 +1196,7 @@ class EventService:
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "isHidden": 1 if hidden is True else 0,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1213,7 +1215,7 @@ class EventService:
                 "ticket_socket_order_id": ticket_socket_order_id,
                 "is_active": 0 if disabled is True else 1,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1232,7 +1234,7 @@ class EventService:
                 "ticket_socket_order_id": ticket_socket_order_id,
                 "isDeleted": 1 if deleted is True else 0,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1251,7 +1253,7 @@ class EventService:
                 "ticket_socket_order_id": ticket_socket_order_id,
                 "isHidden": 1 if hidden is True else 0,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1270,7 +1272,7 @@ class EventService:
                 "ticket_socket_order_ticket_id": ticket_socket_order_ticket_id,
                 "checkedIn": 1 if checked_in is True else 0,
             }
-            success = update(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -1290,7 +1292,7 @@ class EventService:
                     CancelledDate=CURRENT_TIMESTAMP,
                     LastUpdate=CURRENT_TIMESTAMP
                     WHERE Id=%(ticket_socket_event_id)s"""
-        success = update(sql, data)
+        success = db_update(sql, data)
         if success is True:
             success = self.refund_all_event_orders(ticket_socket_event_id, refund_service_fees)
         return success
@@ -1308,7 +1310,7 @@ class EventService:
         sql = """SELECT Id FROM TicketSocketOrders
                     WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
         data = {"ticket_socket_event_id": ticket_socket_event_id}
-        rows = queryAll(sql, data)
+        rows = db_query_all(sql, data)
         if len(rows) > 0:
             for row in rows:
                 order_id = int(row["Id"])
@@ -1339,7 +1341,7 @@ class EventService:
             ticket_sql += """, ServiceFeeRevenueRefunded=ServiceFees"""
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
         ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
-        success = update(ticket_sql, ticket_data)
+        success = db_update(ticket_sql, ticket_data)
 
         return success
 
@@ -1354,7 +1356,7 @@ class EventService:
         ticket_socket_event_id: int = event_to_update.ticketSocketEventId
         sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticket_socket_event_id)s"""
         data = {"ticket_socket_event_id": ticket_socket_event_id}
-        existing_event: VipEvent = queryOne(sql, data)
+        existing_event: VipEvent = db_query_one(sql, data)
 
         if existing_event is not None:
             update_sql = """UPDATE TicketSocketEvents
@@ -1380,7 +1382,7 @@ class EventService:
                 "isHidden": 1 if event_to_update.isHidden is True else 0,
                 "announceDate": event_to_update.announceDate
             }
-            success = update(update_sql, update_data)
+            success = db_update(update_sql, update_data)
 
             if event_to_update.isDeleted is False and len(event_to_update.ticketTypes) > 0:
                 for ticket_type in event_to_update.ticketTypes:
@@ -1393,7 +1395,7 @@ class EventService:
                         "ticket_socket_event_id": ticket_socket_event_id,
                         "is_active": 1 if ticket_type.isActive is True else 0,
                     }
-                    success = update(ticket_type_wql, ticket_type_data)
+                    success = db_update(ticket_type_wql, ticket_type_data)
                     if success is False:
                         break
         return success
@@ -1409,7 +1411,7 @@ class EventService:
         ticket_socket_order_id: int = order_to_update.ticketSocketOrderId
         sql = """SELECT * FROM TicketSocketOrders WHERE Id=%(ticket_socket_order_id)s"""
         data = {"ticket_socket_order_id": ticket_socket_order_id}
-        existing_order: VipOrder = queryOne(sql, data)
+        existing_order: VipOrder = db_query_one(sql, data)
 
         if existing_order is not None:
             update_sql = """UPDATE TicketSocketOrders
@@ -1434,7 +1436,7 @@ class EventService:
                 "isDeleted": 1 if order_to_update.isDeleted is True else 0,
                 "isHidden": 1 if order_to_update.isHidden is True else 0,
             }
-            success = update(update_sql, update_data)
+            success = db_update(update_sql, update_data)
             if order_to_update.isDeleted is False and len(order_to_update.tickets) > 0:
                 for ticket in order_to_update.tickets:
                     order_ticket_sql = """UPDATE TicketSocketOrderTickets
@@ -1451,7 +1453,7 @@ class EventService:
                         "serviceFee": ticket.serviceFee,
                         "is_checked_in": 1 if ticket.is_checked_in is True else 0,
                     }
-                    success = update(order_ticket_sql, order_ticket_data)
+                    success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
                         break
         return success
@@ -1470,7 +1472,7 @@ class EventService:
 
         # fetch TS data
         ts_sql = "SELECT TicketSocketId, IsVip FROM TicketSocket"
-        rows = queryAll(ts_sql)
+        rows = db_query_all(ts_sql)
 
         # query events across all TS services
         all_events: list[VipEvent] = []
@@ -1499,7 +1501,7 @@ class EventService:
                 for event in events:
                     # convert ts events to vip events
                     vip_event = VipEvent(event.id, event.title)
-                    vip_event.__dict__.update(event.__dict__)
+                    vip_event.__dict__.db_update(event.__dict__)
                     vip_event.isVip = is_vip_service
 
                     # populate sellerEventCategoryId, which is required on our end
@@ -1522,7 +1524,7 @@ class EventService:
                     orders: list[VipEvent] = []
                     for order in event.orders:
                         vip_order = VipOrder(order.id, order.eventId)
-                        vip_order.__dict__.update(order.__dict__)
+                        vip_order.__dict__.db_update(order.__dict__)
                         orders.append(vip_order)
 
                     vip_event.orders = orders
@@ -1580,7 +1582,7 @@ class EventService:
 
             logMessage("starting database update - opening connection")
             # get one database connection
-            cnx = getDbConnection()
+            cnx = db_get_connection()
 
             if total_events_from_service > 0:
 
@@ -1640,7 +1642,7 @@ class EventService:
                         "sellerEventCategoryId": evt.sellerEventCategoryId,
                     }
 
-                    existing_event = queryOne(event_sql, data, cnx)
+                    existing_event = db_query_one(event_sql, data, cnx)
 
                     event_success: bool = False
                     ticket_socket_event_id: int = 0
@@ -1658,7 +1660,7 @@ class EventService:
                                 DisplayDate=%(displayDate)s, IsVip=%(isVip)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE Id=%(id)s"""
-                        event_success = update(sql, event_data, cnx)
+                        event_success = db_update(sql, event_data, cnx)
                     else:
                         event_add_new = True
                         # insert new event
@@ -1674,7 +1676,7 @@ class EventService:
                                     %(eventDate)s, %(utcTime)s, %(url)s, %(venue)s, %(address)s,
                                     %(city)s, %(state)s, %(zip)s, %(country)s, 
                                     %(onsale)s, %(thumbnail)s, %(displayDate)s, %(isVip)s)"""
-                        ticket_socket_event_id = insert(sql, event_data, cnx)
+                        ticket_socket_event_id = db_insert(sql, event_data, cnx)
                         event_success = ticket_socket_event_id > 0
 
                     # if the update succeeded, update counters
@@ -1712,7 +1714,7 @@ class EventService:
                                 "ticket_socket_event_id": ticket_socket_event_id,
                             }
 
-                            existing_ticket_type = queryOne(
+                            existing_ticket_type = db_query_one(
                                 ticket_type_sql, ticket_type_sql_data, cnx
                             )
 
@@ -1729,7 +1731,7 @@ class EventService:
                                         LastUpdate=CURRENT_TIMESTAMP 
                                         WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                         AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
-                                ticket_type_success = update(sql, ticket_type_data, cnx)
+                                ticket_type_success = db_update(sql, ticket_type_data, cnx)
                             else:
                                 ticket_type_add_new = True
                                 # insert new ticket type
@@ -1739,7 +1741,7 @@ class EventService:
                                                 VALUES (%(ticketSocketTicketTypeId)s,
                                                 %(ticket_socket_event_id)s, %(ticketTypeName)s,
                                                 %(totalAvailable)s, %(is_active)s)"""
-                                ticket_socket_type_id = insert(sql, ticket_type_data, cnx)
+                                ticket_socket_type_id = db_insert(sql, ticket_type_data, cnx)
                                 ticket_type_success = ticket_socket_type_id > 0
 
                             # if the update succeeded, update counters
@@ -1849,7 +1851,7 @@ class EventService:
                                 "order_id": order.id,
                             }
 
-                            existing_order = queryOne(order_sql, data, cnx)
+                            existing_order = db_query_one(order_sql, data, cnx)
 
                             order_success: bool = False
                             ticket_socket_order_id: int = 0
@@ -1876,7 +1878,7 @@ class EventService:
                                             FROM DailyOrderData
                                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                             AND PurchaseDate=DATE(%(purchaseDate)s)"""
-                                    rows = queryAll(
+                                    rows = db_query_all(
                                         check_cleanup_sql, check_cleanup_data
                                     )
                                     if len(rows) > 0:
@@ -1888,7 +1890,7 @@ class EventService:
                                                     row["DailyOrderDataId"]
                                                 )
                                             }
-                                            del_success = delete(
+                                            del_success = db_delete(
                                                 cleanup_sql, cleanup_data
                                             )
                                             if del_success is True:
@@ -1912,7 +1914,7 @@ class EventService:
                                     """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                 )
 
-                                order_success = update(sql, order_data, cnx)
+                                order_success = db_update(sql, order_data, cnx)
                             else:
                                 order_add_new = True
                                 # insert new order
@@ -1940,7 +1942,7 @@ class EventService:
                                     sql += """, %(serviceFees)s"""
                                 sql += """)"""
 
-                                ticket_socket_order_id = insert(sql, order_data, cnx)
+                                ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
 
                             # if the update succeeded, update counters
@@ -1965,7 +1967,7 @@ class EventService:
                                 delete_data = {
                                     "ticket_socket_order_id": ticket_socket_order_id
                                 }
-                                delete(delete_sql, delete_data)
+                                db_delete(delete_sql, delete_data)
 
                                 for ticket in order.tickets:
                                     order_tickets.append(ticket.id)
@@ -2004,7 +2006,7 @@ class EventService:
                                         "ticketId": ticket.id,
                                     }
 
-                                    existing_ticket = queryOne(ticket_sql, data, cnx)
+                                    existing_ticket = db_query_one(ticket_sql, data, cnx)
 
                                     ticket_success: bool = False
                                     ticket_socket_order_ticket_id: int = 0
@@ -2035,7 +2037,7 @@ class EventService:
                                         if ticket_price > 0:
                                             sql += """Price=%(price)s, """
                                         sql += """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                                        ticket_success = update(sql, ticket_data, cnx)
+                                        ticket_success = db_update(sql, ticket_data, cnx)
                                     else:
                                         # insert new ticket
                                         ticket_add_new = True
@@ -2062,7 +2064,7 @@ class EventService:
                                         if ticket_price > 0:
                                             sql += ", %(price)s"
                                         sql += """)"""
-                                        ticket_socket_order_ticket_id = insert(
+                                        ticket_socket_order_ticket_id = db_insert(
                                             sql, ticket_data
                                         )
                                         ticket_success = ticket_socket_order_ticket_id > 0
@@ -2165,7 +2167,7 @@ class EventService:
                 LEFT JOIN Sellers ON Sellers.SellerId = TicketSocketRefreshHistory.SellerId
                 ORDER BY TicketSocketRefreshHistory.StartTimer DESC"""
 
-        rows = queryAll(sql)
+        rows = db_query_all(sql)
         for row in rows:
             user_id = int(row["UserId"])
             if user_id == 0:
