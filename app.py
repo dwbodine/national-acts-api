@@ -16,7 +16,7 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-from common.utility import logMessage, sendEmail, convertToJson
+from common.utility import log_message, send_email, convert_to_json
 from common.ticket_socket_service import TicketSocketService, getAllAccounts
 from common.event_service import EventService, VipEvent, VipOrder
 from common.update_service import UpdateService
@@ -65,7 +65,7 @@ def after_request(response):
                     response.data = json.dumps(data)
     except (RuntimeError, KeyError):
         # Case where there is not a valid JWT. Just return the original respone
-        logMessage("JWT not found")
+        log_message("JWT not found")
     return response
 
 def __is_admin_logged_in():
@@ -109,7 +109,7 @@ def cancel_event():
 
     service = EventService()
     success = service.cancel_event(int(event_id), refund_service_fees)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/events/refund", methods=["POST"])
@@ -132,7 +132,7 @@ def refund_event():
 
     service = EventService()
     success = service.refund_all_event_orders(int(event_id), refund_service_fees)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/events/update", methods=["POST"])
@@ -145,13 +145,13 @@ def update_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convertToJson(request.get_json())
+    data = convert_to_json(request.get_json())
 
     event: VipEvent = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = EventService()
     success = service.update_event(event)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/orders/refund", methods=["POST"])
@@ -177,7 +177,7 @@ def refund_order():
 
     service = EventService()
     success = service.refund_order(int(order_id), refund_service_fees, mark_chargeback)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/orders/update", methods=["POST"])
@@ -190,13 +190,13 @@ def update_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convertToJson(request.get_json())
+    data = convert_to_json(request.get_json())
 
     order: VipOrder = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = EventService()
     success = service.update_order(order)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/permissions")
@@ -211,7 +211,7 @@ def get_all_permissions():
 
     service = UserService()
     permissions = service.getAllPermissions()
-    return convertToJson(permissions)
+    return convert_to_json(permissions)
 
 @app.route("/admin/roles")
 @jwt_required()
@@ -225,7 +225,7 @@ def get_all_roles():
 
     service = UserService()
     roles = service.getAllRoles()
-    return convertToJson(roles)
+    return convert_to_json(roles)
 
 @app.route("/admin/roles/<int:roleId>")
 @jwt_required()
@@ -242,7 +242,7 @@ def get_role_by_id(role_id):
 
     service = UserService()
     role = service.getRoleById(role_id)
-    return convertToJson(role)
+    return convert_to_json(role)
 
 
 @app.route("/admin/roles/delete", methods=["POST"])
@@ -255,13 +255,13 @@ def delete_roles():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convertToJson(request.get_json())
+    data = convert_to_json(request.get_json())
 
     role_ids: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
     success = service.deleteRoles(role_ids)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/roles/update", methods=["POST"])
@@ -274,13 +274,13 @@ def update_role():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convertToJson(request.get_json())
+    data = convert_to_json(request.get_json())
 
     role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
     success = service.updateRole(role)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/users")
@@ -295,7 +295,7 @@ def get_all_users():
 
     service = UserService()
     users = service.getAllUsers()
-    return convertToJson(users)
+    return convert_to_json(users)
 
 
 @app.route("/admin/users/delete", methods=["POST"])
@@ -315,7 +315,7 @@ def delete_user():
 
     service = UserService()
     success = service.deleteUser(user_id)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/admin/users/update", methods=["POST"])
@@ -328,13 +328,13 @@ def update_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convertToJson(request.get_json())
+    data = convert_to_json(request.get_json())
 
     user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
     success = service.updateUser(user)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 # END ADMIN ROUTES
@@ -355,7 +355,7 @@ def update_all_events_from_service():
 
     service = UpdateService()
     results = service.updateAllEventsFromTicketSocket()
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/cron/updateAllExchangeRates")
@@ -372,7 +372,7 @@ def update_all_exchange_rates():
 
     service = UpdateService()
     rates = service.updateAllExchangeRates()
-    return convertToJson(rates)
+    return convert_to_json(rates)
 
 
 # END CRON JOB ROUTES
@@ -395,7 +395,7 @@ def get_dashboard_data_secured(year: int):
 
     service = EventService()
     dash_data = service.get_dashboard_data(year)
-    return convertToJson(dash_data)
+    return convert_to_json(dash_data)
 
 
 @app.route("/dashboard/getUserActivity", methods=["POST"])
@@ -434,7 +434,7 @@ def get_user_activity():
         )
     else:
         activities = service.getUserActivity(start, end, filterAdmins=filter_admin_val)
-    return convertToJson(activities)
+    return convert_to_json(activities)
 
 
 # END DASHBOARD ROUTES
@@ -459,7 +459,7 @@ def get_accounts():
     API method to fetch account
     """
     accounts = getAllAccounts()
-    return convertToJson(accounts)
+    return convert_to_json(accounts)
 
 
 @app.route("/internal/<int:ticketSocketId>/categories")
@@ -469,7 +469,7 @@ def get_categories(ticket_socket_id: int):
     """
     service = TicketSocketService(ticket_socket_id)
     categories = service.getCategories()
-    return convertToJson(categories)
+    return convert_to_json(categories)
 
 
 @app.route("/internal/getEventsFromService/<int:sellerId>")
@@ -489,7 +489,7 @@ def get_events_from_service(seller_id: int = None):
         results = service.retrieve_ticket_socket_events_for_update(seller_id, start, end)
     else:
         results = None
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/internal/getUpdateHistory")
@@ -504,7 +504,7 @@ def get_update_history():
 
     service = EventService()
     logs = service.get_ticket_socket_refresh_history()
-    return convertToJson(logs)
+    return convert_to_json(logs)
 
 
 @app.route("/internal/logUserActivity", methods=["POST"])
@@ -524,7 +524,7 @@ def log_user_activity():
         service = UserService()
         data: str = str(activity_data) if activity_data is not None else ""
         success = service.logUserActivity(user_id, int(activity_data), data)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/internal/mail", methods=["POST"])
@@ -555,9 +555,9 @@ def send_mail():
     ):
         return {"msg": "Bad Request"}, 200
 
-    result = sendEmail(to_email, subject, html_content, to_name, cc_emails)
+    result = send_email(to_email, subject, html_content, to_name, cc_emails)
 
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/internal/refreshEventsFromService/<int:sellerId>")
@@ -593,7 +593,7 @@ def refresh_events_from_service(seller_id: int = None):
             results = service.update_daily_order_data(results, year, seller_id)
     else:
         results = None
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 # END INTERNAL ROUTES
@@ -649,7 +649,7 @@ def get_events():
         False,
         False
     )
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/public/sellers")
@@ -666,7 +666,7 @@ def get_sellers():
 
     service = SellerService()
     results = service.getAllSellers()
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 # END PUBLIC ROUTES
@@ -735,7 +735,7 @@ def get_events_and_orders_secured():
         ignore_flags,
         show_cancelled,
     )
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/user/getUserSellerFromEventId/<int:userId>/<int:eventId>")
@@ -748,7 +748,7 @@ def get_user_seller_from_event_id(user_id: int, event_id: int):
         return {"msg", "Bad request"}, 400
     service = UserService()
     results = service.getUserSellerByEventId(user_id, event_id)
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/user/login", methods=["POST"])
@@ -786,7 +786,7 @@ def create_token():
     user.token = access_token
     user.isAuthenticated = True
 
-    return convertToJson(user)
+    return convert_to_json(user)
 
 
 @app.route("/user/logout", methods=["POST"])
@@ -841,7 +841,7 @@ def orders_secured():
         ignore_flags,
         show_cancelled,
     )
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/user/profile/<int:userId>")
@@ -854,7 +854,7 @@ def get_user_profile(user_id: int):
         return {"msg": "Bad Request"}, 400
     service = UserService()
     user = service.getUserById(user_id, True)
-    return convertToJson(user)
+    return convert_to_json(user)
 
 
 @app.route("/user/register", methods=["POST"])
@@ -889,7 +889,7 @@ def register():
     result = service.register(
         username, first_name, last_name, seller_id, password, confirm_password, notes
     )
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/resetPassword", methods=["POST"])
@@ -912,7 +912,7 @@ def reset_password():
     if username is None or password is None or confirm_password is None or code is None:
         return {"msg", "Bad request"}, 400
     result = service.resetPassword(username, code, password, confirm_password)
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/resetPasswordSecured", methods=["POST"])
@@ -928,7 +928,7 @@ def reset_password_secured():
     if username is None or password is None or confirm_password is None:
         return {"msg", "Bad request"}, 400
     result = service.resetPasswordSecured(username, password, confirm_password)
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/sellers/<int:userId>")
@@ -945,7 +945,7 @@ def get_user_sellers(user_id: int):
 
     service = SellerService()
     results = service.getUserSellers(user_id)
-    return convertToJson(results)
+    return convert_to_json(results)
 
 
 @app.route("/user/sendPasswordReset", methods=["POST"])
@@ -965,7 +965,7 @@ def send_password_reset():
         return {"msg", "Bad request"}, 400
     service = UserService()
     success = service.sendPasswordResetEmail(username)
-    return convertToJson(success)
+    return convert_to_json(success)
 
 
 @app.route("/user/setEventDeletedSecured", methods=["POST"])
@@ -999,7 +999,7 @@ def set_event_deleted_secured():
         result = service.delete_events(event_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setEventHiddenSecured", methods=["POST"])
@@ -1033,7 +1033,7 @@ def set_event_hidden_secured():
         result = service.hide_events(event_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setEventInactiveSecured", methods=["POST"])
@@ -1067,7 +1067,7 @@ def set_event_inactive_secured():
         result = service.disable_events(event_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setOrderDeletedSecured", methods=["POST"])
@@ -1101,7 +1101,7 @@ def set_order_deleted_secured():
         result = service.delete_orders(order_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setOrderHiddenSecured", methods=["POST"])
@@ -1135,7 +1135,7 @@ def set_order_hidden_secured():
         result = service.hide_orders(order_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setOrderInactiveSecured", methods=["POST"])
@@ -1169,7 +1169,7 @@ def set_order_inactive_secured():
         result = service.disable_orders(order_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/setTicketCheckinSecured", methods=["POST"])
@@ -1203,7 +1203,7 @@ def set_ticket_checkin_secured():
         result = service.check_in_tickets(ticket_ids, checked_in)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
-    return convertToJson(result)
+    return convert_to_json(result)
 
 
 @app.route("/user/validateResetCode", methods=["POST"])
@@ -1224,7 +1224,7 @@ def validate_reset_code():
         return {"msg", "Bad request"}, 400
     service = UserService()
     success = service.validatePasswordResetCode(str(username), int(code))
-    return convertToJson(success)
+    return convert_to_json(success)
 # END USER ROUTES
 
 if __name__ == "__main__":

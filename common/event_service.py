@@ -10,7 +10,7 @@ from common.db import (
     db_query_all, db_query_one, db_update, db_insert,
     db_convert_list_to_parameters, db_get_connection, db_delete
 )
-from common.utility import logMessage, convertToJson, sendEmail
+from common.utility import log_message, convert_to_json, send_email
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
     VipEvent, VipOrder, VipTicket, Seller,
@@ -745,12 +745,12 @@ class EventService:
         """
         Pulls order data from the database and rolls it up to DailyOrderData
         """
-        logMessage("Starting update of daily order data")
+        log_message("Starting update of daily order data")
         timer: float = time.time()
         duration: float = 0
         daily_order_data = self.get_daily_order_data_from_orders(year, seller_id)
         duration = time.time() - timer
-        logMessage(f"Daily order data fetch completed in {duration} seconds")
+        log_message(f"Daily order data fetch completed in {duration} seconds")
 
         history.order_data_rows_total = len(daily_order_data)
 
@@ -758,7 +758,7 @@ class EventService:
             history.order_data_update_succeeded = False
             return history
 
-        logMessage("Daily order data - starting database update")
+        log_message("Daily order data - starting database update")
 
         success = True
         updates: int = 0
@@ -835,7 +835,7 @@ class EventService:
         duration = time.time() - timer
         history.setOrderUpdateSuccess(success, duration, inserts, updates)
 
-        logMessage(f"Daily order data - update complete in {duration} seconds")
+        log_message(f"Daily order data - update complete in {duration} seconds")
 
         return history
 
@@ -1539,7 +1539,7 @@ class EventService:
         """
         Calls out to TS and refreshes objects in database
         """
-        # logMessage('starting TS update')
+        # log_message('starting TS update')
         update_success: bool = True
         error_message: str = None
 
@@ -1567,20 +1567,20 @@ class EventService:
         results: TicketSocketRefreshHistory = None
 
         try:
-            logMessage("retrieving events from TicketSocket Service")
+            log_message("retrieving events from TicketSocket Service")
             all_events = self.retrieve_ticket_socket_events_for_update(seller_id, start, end)
-            # logMessage('events retrieved')
+            # log_message('events retrieved')
 
             service_timer = time.time()
             service_duration = service_timer - start_timer
-            logMessage(
+            log_message(
                 "Service fetch done in " + str(service_duration) + " seconds"
             )
 
             # get total number of events grabbed from service
             total_events_from_service = len(all_events)
 
-            logMessage("starting database update - opening connection")
+            log_message("starting database update - opening connection")
             # get one database connection
             cnx = db_get_connection()
 
@@ -2087,7 +2087,7 @@ class EventService:
             duration = end_timer - start_timer
 
             database_duration = end_timer - service_timer
-            logMessage(
+            log_message(
                 "database update complete in " + str(database_duration) + " seconds"
             )
 
@@ -2136,7 +2136,7 @@ class EventService:
                 SystemError, TimeoutError, RuntimeError) as error:
             update_success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
-            logMessage(error_message)
+            log_message(error_message)
 
         # alert dB if it failed
         if update_success is not True or (results is not None and results.succeeded is not True):
@@ -2144,12 +2144,12 @@ class EventService:
                 "%m/%d/%Y %H:%M:%S"
             )
             if results is not None:
-                html = convertToJson(results)
+                html = convert_to_json(results)
             else:
                 html = error_message
             to = "dwbodine@gmail.com"
             to_name = "dB"
-            sendEmail(to, subject, html, to_name)
+            send_email(to, subject, html, to_name)
 
         return results
 

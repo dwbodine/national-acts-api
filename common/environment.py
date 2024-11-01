@@ -17,6 +17,3 @@ def load_env():
             if (key in os.environ) is False:
                 os.environ[key] = val
         f.close()
-
-
-
