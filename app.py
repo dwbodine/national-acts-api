@@ -22,12 +22,12 @@ from common.event_service import EventService, VipEvent, VipOrder
 from common.update_service import UpdateService
 from common.seller_service import SellerService
 from common.user_service import UserService, User, Role, UserActivity
-from common.environment import loadEnv
+from common.environment import load_env
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 # loads environment variables in debug mode
-loadEnv()
+load_env()
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")
