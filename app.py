@@ -104,15 +104,11 @@ def cancel_event():
     if event_id is None:
         return {"msg": "Bad Request"}, 400
 
-    refund_orders_str = request.json.get("refundOrders", None)
-    refund_orders: bool = True if refund_orders_str == 1 else False
-    refund_service_fees: bool = False
-    if refund_orders is True:
-        refund_service_fees_str = request.json.get("refundServiceFees", None)
-        refund_service_fees = True if refund_service_fees_str == 1 else False
+    refund_service_fees_str = request.json.get("refundServiceFees", None)
+    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
 
     service = EventService()
-    success = service.cancelEvent(int(event_id), refund_orders, refund_service_fees)
+    success = service.cancel_event(int(event_id), refund_service_fees)
     return convertToJson(success)
 
 
@@ -135,7 +131,7 @@ def refund_event():
     refund_service_fees: bool = True if refund_service_fees_str == 1 else False
 
     service = EventService()
-    success = service.refundAllEventOrders(int(event_id), refund_service_fees)
+    success = service.refund_all_event_orders(int(event_id), refund_service_fees)
     return convertToJson(success)
 
 
@@ -154,7 +150,7 @@ def update_event():
     event: VipEvent = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = EventService()
-    success = service.updateEvent(event)
+    success = service.update_event(event)
     return convertToJson(success)
 
 
@@ -180,7 +176,7 @@ def refund_order():
     mark_chargeback: bool = True if mark_chargeback_str == 1 else False
 
     service = EventService()
-    success = service.refundOrder(int(order_id), refund_service_fees, mark_chargeback)
+    success = service.refund_order(int(order_id), refund_service_fees, mark_chargeback)
     return convertToJson(success)
 
 
@@ -199,7 +195,7 @@ def update_order():
     order: VipOrder = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = EventService()
-    success = service.updateOrder(order)
+    success = service.update_order(order)
     return convertToJson(success)
 
 
@@ -398,7 +394,7 @@ def get_dashboard_data_secured(year: int):
         year = 0
 
     service = EventService()
-    dash_data = service.getDashboardData(year)
+    dash_data = service.get_dashboard_data(year)
     return convertToJson(dash_data)
 
 
@@ -490,7 +486,7 @@ def get_events_from_service(seller_id: int = None):
         end = int(request.args.get("end"))
 
     if seller_id is not None:
-        results = service.retrieveTicketSocketEventsForUpdate(seller_id, start, end)
+        results = service.retrieve_ticket_socket_events_for_update(seller_id, start, end)
     else:
         results = None
     return convertToJson(results)
@@ -507,8 +503,7 @@ def get_update_history():
         return {"msg": "Unauthorized"}, 401
 
     service = EventService()
-
-    logs = service.getTicketSocketRefreshHistory()
+    logs = service.get_ticket_socket_refresh_history()
     return convertToJson(logs)
 
 
@@ -585,7 +580,7 @@ def refresh_events_from_service(seller_id: int = None):
         end = int(request.args.get("end"))
 
     if seller_id is not None:
-        results = service.refreshDatabaseFromTicketSocket(seller_id, start, end, user_id)
+        results = service.refresh_database_from_ticket_socket(seller_id, start, end, user_id)
 
         if results is not None and results.succeeded is True:
             # update rollup data
@@ -595,7 +590,7 @@ def refresh_events_from_service(seller_id: int = None):
                 current_year = datetime.now().year
                 if year >= current_year or year < 2022:
                     year = 0
-            results = service.updateDailyOrderData(results, year, seller_id)
+            results = service.update_daily_order_data(results, year, seller_id)
     else:
         results = None
     return convertToJson(results)
@@ -639,7 +634,7 @@ def get_events():
         search_term = str(request.args.get("search"))
     if request.args.get("tsEventId") is not None:
         ts_event_id = int(request.args.get("tsEventId"))
-    results = service.getEventsAndOrders(
+    results = service.get_events_and_orders(
         False,
         seller_id,
         start,
@@ -724,7 +719,7 @@ def get_events_and_orders_secured():
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
     if request.args.get("cancelled") is not None:
         show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
-    results = service.getEventsAndOrders(
+    results = service.get_events_and_orders(
         True,
         seller_id,
         start,
@@ -836,7 +831,7 @@ def orders_secured():
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
 
-    results = service.getOrders(
+    results = service.get_orders(
         seller_id,
         start,
         end,
@@ -1001,7 +996,7 @@ def set_event_deleted_secured():
 
     service = EventService()
     if len(event_ids) > 0:
-        result = service.deleteEvents(event_ids, deleted)
+        result = service.delete_events(event_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1035,7 +1030,7 @@ def set_event_hidden_secured():
     hidden: bool = True if int(is_hidden) == 1 else False
     service = EventService()
     if len(event_ids) > 0:
-        result = service.hideEvents(event_ids, hidden)
+        result = service.hide_events(event_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1069,7 +1064,7 @@ def set_event_inactive_secured():
     disabled: bool = True if int(is_active) == 0 else False
     service = EventService()
     if len(event_ids) > 0:
-        result = service.disableEvents(event_ids, disabled)
+        result = service.disable_events(event_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1103,7 +1098,7 @@ def set_order_deleted_secured():
     deleted: bool = True if int(is_deleted) == 1 else False
     service = EventService()
     if len(order_ids) > 0:
-        result = service.deleteOrders(order_ids, deleted)
+        result = service.delete_orders(order_ids, deleted)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1137,7 +1132,7 @@ def set_order_hidden_secured():
     hidden: bool = True if int(is_hidden) == 1 else False
     service = EventService()
     if len(order_ids) > 0:
-        result = service.hideOrders(order_ids, hidden)
+        result = service.hide_orders(order_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1171,7 +1166,7 @@ def set_order_inactive_secured():
     disabled: bool = True if int(is_active) == 0 else False
     service = EventService()
     if len(order_ids) > 0:
-        result = service.disableOrders(order_ids, disabled)
+        result = service.disable_orders(order_ids, disabled)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
@@ -1205,7 +1200,7 @@ def set_ticket_checkin_secured():
     checked_in: bool = True if int(is_checked_in) == 1 else False
     service = EventService()
     if len(ticket_ids) > 0:
-        result = service.checkInTickets(ticket_ids, checked_in)
+        result = service.check_in_tickets(ticket_ids, checked_in)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convertToJson(result)
