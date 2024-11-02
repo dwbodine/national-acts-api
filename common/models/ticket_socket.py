@@ -3,8 +3,19 @@ class TicketSocketCategory:
         self.eventCategoryId = id
         self.name = title
 
+
 class TicketSocketVenue:
-    def __init__(self, name: str, address1: str, address2: str, city: str, state: str, postalCode: str, country: str, timezone: str):
+    def __init__(
+        self,
+        name: str,
+        address1: str,
+        address2: str,
+        city: str,
+        state: str,
+        postalCode: str,
+        country: str,
+        timezone: str,
+    ):
         self.name = name
         self.address1 = address1
         self.address2 = address2
@@ -13,17 +24,39 @@ class TicketSocketVenue:
         self.postalCode = postalCode
         self.country = country
         self.timezone = timezone
-        
+
+
 class TicketSocketTicketType:
-    def __init__(self, eventId: int, ticketTypeId: int, ticketTypeName: str, totalAvailable: int, isActive: bool):
+    def __init__(
+        self,
+        eventId: int,
+        ticketTypeId: int,
+        ticketTypeName: str,
+        totalAvailable: int,
+        isActive: bool,
+    ):
         self.eventId = eventId
         self.ticketTypeId = ticketTypeId
         self.ticketTypeName = ticketTypeName
         self.totalAvailable = totalAvailable
         self.isActive = isActive
 
+
 class TicketSocketTicket:
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int, attendeeFirstName: str, attendeeLastName: str):
+    def __init__(
+        self,
+        id: int,
+        ticketType: str,
+        price: float,
+        serviceFee: float,
+        ticketTypeId: int,
+        barcode: str,
+        availableScans: int,
+        purchaseLocation: str,
+        scannedTimestamp: int,
+        attendeeFirstName: str,
+        attendeeLastName: str,
+    ):
         self.id = id
         self.ticketType = ticketType
         self.price = price
@@ -36,23 +69,24 @@ class TicketSocketTicket:
         self.attendeeFirstName = attendeeFirstName
         self.attendeeLastName = attendeeLastName
 
+
 class TicketSocketOrder:
     eventId: int = 0
     userId: int = 0
     numTickets: int = 0
     tickets: list[TicketSocketTicket] = []
-    phone: str = ''
+    phone: str = ""
     shirts: list[str] = []
-    purchaserFirstName: str = ''
-    purchaserLastName: str = ''
+    purchaserFirstName: str = ""
+    purchaserLastName: str = ""
     purchaserCity: str = None
     purchaserState: str = None
     purchaserZipCode: str = None
     purchaserCountry: str = None
     purchaserIpAddress: str = None
-    purchaseDate: str = ''
-    purchaseTimestamp: str = ''
-    email: str = ''
+    purchaseDate: str = ""
+    purchaseTimestamp: str = ""
+    email: str = ""
     revenue: float = 0
     serviceFees: float = 0
     cancelled: bool = False
@@ -62,20 +96,19 @@ class TicketSocketOrder:
         self.id = id
         self.eventId = eventId
 
+
 class TicketSocketEvent:
     venue: TicketSocketVenue = None
     orders: list[TicketSocketOrder] = []
     eventCategoryId: int = 0
     utcTime: int = 0
-    eventDate: str = ''
-    displayDate: str = ''
+    eventDate: str = ""
+    displayDate: str = ""
     onSale: bool = True
-    thumbnail: str = ''
-    ticketSocketUrl: str = ''
+    thumbnail: str = ""
+    ticketSocketUrl: str = ""
     ticketTypes: list[TicketSocketTicketType] = []
 
     def __init__(self, id: int, title: str):
         self.id = id
         self.title = title
-
-

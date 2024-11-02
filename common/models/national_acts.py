@@ -1,12 +1,15 @@
 import calendar
 import datetime
 import traceback
-from common import utility
-from common.models.ticket_socket import *
-from common.models.user import *
+from common.utility import log_message
+from common.models.ticket_socket import (
+    TicketSocketTicket,
+    TicketSocketOrder,
+    TicketSocketVenue,
+    TicketSocketEvent,
+)
+from common.db import db_query_all, db_query_one, db_insert, db_update, db_delete
 
-
-from .. import db
 
 class SellerEventCategory:
     sellerId: int = 0
@@ -14,64 +17,87 @@ class SellerEventCategory:
     eventCategoryId: int = 0
     sellerEventCategoryId: int = 0
 
-    def __init__(self, sellerId: int = None, ticketSocketId: int = None, eventCategoryId: int = None, sellerEventCategoryId: int = None):
-        if sellerId is not None and ticketSocketId is not None and eventCategoryId == None and sellerEventCategoryId == None:
+    def __init__(
+        self,
+        sellerId: int = None,
+        ticketSocketId: int = None,
+        eventCategoryId: int = None,
+        sellerEventCategoryId: int = None,
+    ):
+        if (
+            sellerId is not None
+            and ticketSocketId is not None
+            and eventCategoryId == None
+            and sellerEventCategoryId == None
+        ):
             self.__populateFromSellerIdAndTicketSocketId(sellerId, ticketSocketId)
-        elif sellerId == None and ticketSocketId is not None and eventCategoryId is not None and sellerEventCategoryId == None:
-            self.__populateFromTicketSocketIdAndEventCategoryId(ticketSocketId, eventCategoryId)
+        elif (
+            sellerId == None
+            and ticketSocketId is not None
+            and eventCategoryId is not None
+            and sellerEventCategoryId == None
+        ):
+            self.__populateFromTicketSocketIdAndEventCategoryId(
+                ticketSocketId, eventCategoryId
+            )
         elif sellerEventCategoryId is not None:
             self.__populateFromSellerEventCategoryId(sellerEventCategoryId)
-        elif sellerId is not None and ticketSocketId is not None and eventCategoryId is not None and sellerEventCategoryId is not None:
+        elif (
+            sellerId is not None
+            and ticketSocketId is not None
+            and eventCategoryId is not None
+            and sellerEventCategoryId is not None
+        ):
             self.sellerId = sellerId
             self.ticketSocketId = ticketSocketId
             self.eventCategoryId = eventCategoryId
             self.sellerEventCategoryId = sellerEventCategoryId
         else:
-            raise Exception('Invalid input data for SellerEventCategory')
+            raise Exception("Invalid input data for SellerEventCategory")
 
-    def __populateFromSellerIdAndTicketSocketId(self, sellerId: int, ticketSocketId: int):
+    def __populateFromSellerIdAndTicketSocketId(
+        self, sellerId: int, ticketSocketId: int
+    ):
         self.sellerId = sellerId
         self.ticketSocketId = ticketSocketId
         sql = "SELECT * FROM SellerEventCategory WHERE SellerId=%(sellerId)s AND TicketSocketId=%(ticketSocketId)s"
-        data = {
-            'sellerId': self.sellerId,
-            'ticketSocketId': self.ticketSocketId
-        }
-        sec = db.queryOne(sql, data)
+        data = {"sellerId": self.sellerId, "ticketSocketId": self.ticketSocketId}
+        sec = db_query_one(sql, data)
         if sec != {}:
-            self.eventCategoryId = sec['EventCategoryId']
-            self.sellerEventCategoryId = sec['SellerEventCategoryId']
+            self.eventCategoryId = sec["EventCategoryId"]
+            self.sellerEventCategoryId = sec["SellerEventCategoryId"]
 
-    def __populateFromTicketSocketIdAndEventCategoryId(self, ticketSocketId: int, eventCategoryId: int):
+    def __populateFromTicketSocketIdAndEventCategoryId(
+        self, ticketSocketId: int, eventCategoryId: int
+    ):
         self.ticketSocketId = ticketSocketId
         self.eventCategoryId = eventCategoryId
         sql = "SELECT * FROM SellerEventCategory WHERE TicketSocketId=%(ticketSocketId)s AND EventCategoryId=%(eventCategoryId)s"
         data = {
-            'ticketSocketId': self.ticketSocketId,
-            'eventCategoryId': self.eventCategoryId
+            "ticketSocketId": self.ticketSocketId,
+            "eventCategoryId": self.eventCategoryId,
         }
-        sec = db.queryOne(sql, data)
+        sec = db_query_one(sql, data)
         if sec != {}:
-            self.sellerId = sec['SellerId']
-            self.sellerEventCategoryId = sec['SellerEventCategoryId']
+            self.sellerId = sec["SellerId"]
+            self.sellerEventCategoryId = sec["SellerEventCategoryId"]
 
     def __populateFromSellerEventCategoryId(self, sellerEventCategoryId: int):
         self.sellerEventCategoryId = sellerEventCategoryId
         sql = "SELECT * FROM SellerEventCategory WHERE SellerEventCategoryId=%(sellerEventCategoryId)s"
-        data = {
-            'sellerEventCategoryId': self.sellerEventCategoryId
-        }
-        sec = db.queryOne(sql, data)
+        data = {"sellerEventCategoryId": self.sellerEventCategoryId}
+        sec = db_query_one(sql, data)
         if sec != {}:
-            self.sellerId = sec['SellerId']
-            self.ticketSocketId = sec['TicketSocketId']
-            self.eventCategoryId = sec['EventCategoryId']
-  
+            self.sellerId = sec["SellerId"]
+            self.ticketSocketId = sec["TicketSocketId"]
+            self.eventCategoryId = sec["EventCategoryId"]
+
 
 class ShirtSales:
     def __init__(self, size: str, total: int):
         self.size = size
         self.total = total
+
 
 class VipTicket(TicketSocketTicket):
     ticketSocketOrderId: int = 0
@@ -83,8 +109,34 @@ class VipTicket(TicketSocketTicket):
     chargebackDate: str = None
     isServiceFeeRefunded: bool = False
 
-    def __init__(self, id: int, ticketType: str, price: float, serviceFee: float, ticketTypeId: int, barcode: str, availableScans: int, purchaseLocation: str, scannedTimestamp: int, attendeeFirstName: str, attendeeLastName: str):
-        super().__init__(id, ticketType, price, serviceFee, ticketTypeId, barcode, availableScans, purchaseLocation, scannedTimestamp, attendeeFirstName, attendeeLastName)
+    def __init__(
+        self,
+        id: int,
+        ticketType: str,
+        price: float,
+        serviceFee: float,
+        ticketTypeId: int,
+        barcode: str,
+        availableScans: int,
+        purchaseLocation: str,
+        scannedTimestamp: int,
+        attendeeFirstName: str,
+        attendeeLastName: str,
+    ):
+        super().__init__(
+            id,
+            ticketType,
+            price,
+            serviceFee,
+            ticketTypeId,
+            barcode,
+            availableScans,
+            purchaseLocation,
+            scannedTimestamp,
+            attendeeFirstName,
+            attendeeLastName,
+        )
+
 
 class VipOrder(TicketSocketOrder):
     ticketSocketEventId: int = 0
@@ -137,14 +189,19 @@ class VipOrder(TicketSocketOrder):
                 self.numTicketsChargedBack += 1
                 self.revenueChargedBack += ticket.price
                 self.serviceFeeRevenueChargedBack += ticket.serviceFee
-                
-        self.revenueUsd = self.revenue * self.exchangeRate     
+
+        self.revenueUsd = self.revenue * self.exchangeRate
         self.serviceFeesUsd = self.serviceFees * self.exchangeRate
-        self.revenueRefundedUsd = self.revenueRefunded * self.exchangeRate               
-        self.serviceFeeRevenueRefundedUsd = self.serviceFeeRevenueRefunded * self.exchangeRate
+        self.revenueRefundedUsd = self.revenueRefunded * self.exchangeRate
+        self.serviceFeeRevenueRefundedUsd = (
+            self.serviceFeeRevenueRefunded * self.exchangeRate
+        )
         self.revenueChargedBackUsd = self.revenueChargedBack * self.exchangeRate
-        self.serviceFeeRevenueChargedBackUsd = self.serviceFeeRevenueChargedBack * self.exchangeRate
-    
+        self.serviceFeeRevenueChargedBackUsd = (
+            self.serviceFeeRevenueChargedBack * self.exchangeRate
+        )
+
+
 class VipEvent(TicketSocketEvent):
     ticketSocketEventId: int = 0
     totalRevenue: float = 0
@@ -183,7 +240,7 @@ class VipEvent(TicketSocketEvent):
     serviceFeeRevenueChargedBack: float = 0
     hasTicketTypeData: bool = False
     isAddedToBandsInTown: bool = False
-    sellerName: str = ''
+    sellerName: str = ""
     isHidden: bool = False
     isCancelled: bool = False
     cancelledDate: str = None
@@ -210,7 +267,9 @@ class VipEvent(TicketSocketEvent):
             if order.hasChargebacks is True:
                 totalTicketsChargedBack += order.numTicketsChargedBack
                 totalRevenueChargedBack += order.revenueChargedBackUsd
-                totalServiceFeeRevenueChargedBack += order.serviceFeeRevenueChargedBackUsd
+                totalServiceFeeRevenueChargedBack += (
+                    order.serviceFeeRevenueChargedBackUsd
+                )
             if self.hasNonUSAOrders is False and order.currencyAbbrev != "USD":
                 self.hasNonUSAOrders = True
                 self.nonUsaCurrencyAbbrev = order.currencyAbbrev
@@ -219,19 +278,23 @@ class VipEvent(TicketSocketEvent):
             if self.hasShirtData is False and len(order.shirts) > 0:
                 self.hasShirtData = True
 
-            if self.hasPhoneData is False and order.phone is not None and len(order.phone) > 0:
+            if (
+                self.hasPhoneData is False
+                and order.phone is not None
+                and len(order.phone) > 0
+            ):
                 self.hasPhoneData = True
-                
+
             if order.isDeleted != True:
                 totalRevenue += order.revenueUsd
                 totalServiceFees += order.serviceFeesUsd
                 totalTickets += order.numTickets
-                
+
                 if len(order.tickets) > 0:
                     for ticket in order.tickets:
                         if ticket.isCheckedIn:
                             totalCheckedIn += 1
-                
+
                 if len(order.shirts) > 0:
                     totalShirts += len(order.shirts)
                     for size in order.shirts:
@@ -251,9 +314,9 @@ class VipEvent(TicketSocketEvent):
         self.revenueChargedBack = totalRevenueChargedBack
         self.serviceFeeRevenueRefunded = totalServiceFeeRevenueRefunded
         self.serviceFeeRevenueChargedBack = totalServiceFeeRevenueChargedBack
-        
-        self.hasTicketTypeData = (len(self.ticketTypes) > 0)
-        
+
+        self.hasTicketTypeData = len(self.ticketTypes) > 0
+
         shirtSales: list[ShirtSales] = []
         for size in shirtd:
             shirtSale = ShirtSales(size, int(shirtd[size]))
@@ -263,27 +326,37 @@ class VipEvent(TicketSocketEvent):
         # roll up external event data, if any
         if self.externalTitle is not None and self.externalTitle != "":
             self.title = self.externalTitle
-            
+
         if self.externalVenue is not None:
             if self.externalVenue.name is not None and self.externalVenue.name != "":
                 self.venue.name = self.externalVenue.name
-            if self.externalVenue.address1 is not None and self.externalVenue.address1 != "":
+            if (
+                self.externalVenue.address1 is not None
+                and self.externalVenue.address1 != ""
+            ):
                 self.venue.address1 = self.externalVenue.address1
-            if self.externalVenue.address2 is not None and self.externalVenue.address2 != "":
+            if (
+                self.externalVenue.address2 is not None
+                and self.externalVenue.address2 != ""
+            ):
                 self.venue.address2 = self.externalVenue.address2
             if self.externalVenue.city is not None and self.externalVenue.city != "":
                 self.venue.city = self.externalVenue.city
             if self.externalVenue.state is not None and self.externalVenue.state != "":
                 self.venue.state = self.externalVenue.state
-            if self.externalVenue.postalCode is not None and self.externalVenue.postalCode != "":
+            if (
+                self.externalVenue.postalCode is not None
+                and self.externalVenue.postalCode != ""
+            ):
                 self.venue.postalCode = self.externalVenue.postalCode
 
         if self.externalThumbnail is not None and self.externalThumbnail != "":
             self.thumbnail = self.externalThumbnail
-        
+
         if self.externalVipLink is not None and self.externalVipLink != "":
             self.ticketSocketUrl = self.externalVipLink
-            
+
+
 class DailyOrderData:
     ticketSocketOrderId: int = None
     orders: int = 0
@@ -306,10 +379,11 @@ class DailyOrderData:
     numTicketsRefunded: int = 0
     revenueRefunded: float = 0
     serviceFeeRevenueRefunded: float = 0
-    
+
     def __init__(self, purchaseDate: str, ticketSocketEventId: int):
         self.purchaseDate = purchaseDate
         self.ticketSocketEventId = ticketSocketEventId
+
 
 class DashboardTotals:
     tickets: int = 0
@@ -323,31 +397,29 @@ class DashboardTotals:
     pricePerTicket: float = 0
     serviceFeePerTicket: float = 0
     dailyOrderData: list[DailyOrderData] = []
-   
+
     def __init__(self, year: int, month: int, day: int):
-        self.year = year    
+        self.year = year
         self.month = month
         self.day = day
         self.daysInMonth = calendar.monthrange(year, month)[1]
         self.dayOfYear = datetime.datetime(year, month, day).timetuple().tm_yday
         self.totalDaysInYear = datetime.datetime(year, 12, 31).timetuple().tm_yday
         sql = "SELECT * FROM Settings WHERE Name=%(name)s"
-        data = {
-            'name': 'YearlyRevenueGoal'
-        }
-        row = db.queryOne(sql, data)
+        data = {"name": "YearlyRevenueGoal"}
+        row = db_query_one(sql, data)
         self.yearlyRevenueGoal = float(row["Value"])
-        data = {
-            'name': 'MonthlyRevenueGoal'
-        }
-        row = db.queryOne(sql, data)
+        data = {"name": "MonthlyRevenueGoal"}
+        row = db_query_one(sql, data)
         self.monthlyRevenueGoal = float(row["Value"])
-        
+
+
 class DashboardPayload:
     def __init__(self, orders: list[VipOrder], totals: DashboardTotals):
         self.orders = orders
-        self.totals = totals    
-    
+        self.totals = totals
+
+
 class Seller:
     hideInList: bool = False
     isActive: bool = True
@@ -363,37 +435,38 @@ class Seller:
     def __initialize(self):
         sql = """SELECT * FROM Sellers
                  WHERE SellerId=%(sellerId)s"""
-        data = {
-            'sellerId': self.sellerId
-        }
+        data = {"sellerId": self.sellerId}
 
-        row = db.queryOne(sql, data)
+        row = db_query_one(sql, data)
         if row != {}:
-            self.name = str(row['Name'])
+            self.name = str(row["Name"])
             self.sellerType = int(row["SellerTypeId"])
-            self.hideInList = int(row['HideInList']) == 1
-            self.isActive = int(row['Inactive']) != 1
+            self.hideInList = int(row["HideInList"]) == 1
+            self.isActive = int(row["Inactive"]) != 1
             self.__getSellerEventCategories()
 
     def __getSellerEventCategories(self):
         sql = """SELECT * 
                  FROM SellerEventCategory
                  WHERE SellerId=%(sellerId)s"""
-        data = {
-            'sellerId': self.sellerId
-        }
+        data = {"sellerId": self.sellerId}
 
         sellerEventCategories = []
-        rows = db.queryAll(sql, data)
+        rows = db_query_all(sql, data)
         for row in rows:
-            sec = SellerEventCategory(self.sellerId, int(row['TicketSocketId']), int(row['EventCategoryId']), int(row['SellerEventCategoryId']))
+            sec = SellerEventCategory(
+                self.sellerId,
+                int(row["TicketSocketId"]),
+                int(row["EventCategoryId"]),
+                int(row["SellerEventCategoryId"]),
+            )
             sellerEventCategories.append(sec)
         self.sellerEventCategories = sellerEventCategories
 
     def getSellerEventCategory(self, ticketSocketId: int):
         if len(self.sellerEventCategories) == 0:
             return None
-        
+
         sellerEventCategory = None
         for sec in self.sellerEventCategories:
             if sec.ticketSocketId == ticketSocketId:
@@ -401,14 +474,15 @@ class Seller:
                 break
 
         return sellerEventCategory
-    
+
     def getSellerEventCategoryIds(self):
         ids: list[int] = []
         if len(self.sellerEventCategories) > 0:
             for sec in self.sellerEventCategories:
                 ids.append(sec.sellerEventCategoryId)
         return ids
-  
+
+
 class TicketSocketRefreshHistory:
     sellerName: str = None
     userName: str = None
@@ -421,11 +495,33 @@ class TicketSocketRefreshHistory:
     orderDataUpdateDuration: float = 0
     totalDuration: float = 0
 
-    def __init__(self, serviceEventsSkipped: list[int], eventsFailed: list[int], ordersFailed: list[int], ticketsFailed: list[int], ticketTypesFailed: list[int], 
-                  totalEventsFromService: int, eventsUpdated: int, eventsInserted: int, ordersInserted: int, ordersUpdated: int, 
-                  ordersDeleted: int, ticketsUpdated: int, ticketsInserted: int, ticketTypesUpdated: int, ticketTypesInserted: int, 
-                  startTimer: int, endTimer: int, duration: float, userId: int = 0, sellerId: int = 0, start: int = 0, end: int = 0, succeeded: bool = False,
-                  errorMessage: str = None):
+    def __init__(
+        self,
+        serviceEventsSkipped: list[int],
+        eventsFailed: list[int],
+        ordersFailed: list[int],
+        ticketsFailed: list[int],
+        ticketTypesFailed: list[int],
+        totalEventsFromService: int,
+        eventsUpdated: int,
+        eventsInserted: int,
+        ordersInserted: int,
+        ordersUpdated: int,
+        ordersDeleted: int,
+        ticketsUpdated: int,
+        ticketsInserted: int,
+        ticketTypesUpdated: int,
+        ticketTypesInserted: int,
+        startTimer: int,
+        endTimer: int,
+        duration: float,
+        userId: int = 0,
+        sellerId: int = 0,
+        start: int = 0,
+        end: int = 0,
+        succeeded: bool = False,
+        errorMessage: str = None,
+    ):
         self.serviceEventsSkipped = serviceEventsSkipped
         self.eventsFailed = eventsFailed
         self.ordersFailed = ordersFailed
@@ -455,36 +551,36 @@ class TicketSocketRefreshHistory:
         if self.sellerId is not None:
             seller = Seller(self.sellerId)
             self.sellerName = seller.name + " (SellerId: " + str(self.sellerId) + ")"
-            
-    def cleanup(self, cnx = None):
+
+    def cleanup(self, cnx=None):
         success: bool = True
-        
+
         try:
-            weekAgo: int = self.endTimer - (24 * 60 * 60)            
+            weekAgo: int = self.endTimer - (24 * 60 * 60)
             sql = """DELETE FROM TicketSocketRefreshHistory WHERE EndTimer <= %(weekAgo)s"""
-            data = {
-                'weekAgo': weekAgo
-            }
-            db.delete(sql, data, cnx)
+            data = {"weekAgo": weekAgo}
+            db_delete(sql, data, cnx)
         except Exception as error:
             success = False
             errorMessage: str = str(error) + "\n" + traceback.format_exc()
-            utility.logMessage(errorMessage)
-            
+            log_message(errorMessage)
+
         return success
-    
-    def setOrderUpdateSuccess(self, success: bool, duration: float, inserts: int, updates: int, cnx = None):
+
+    def setOrderUpdateSuccess(
+        self, success: bool, duration: float, inserts: int, updates: int, cnx=None
+    ):
         if self.ticketSocketRefreshHistoryId <= 0:
             self.orderDataUpdateSucceeded = False
             return
-        
+
         self.orderDataUpdateSucceeded = success
         self.orderDataUpdateDuration = duration
         self.orderDataRowsInserted = inserts
         self.orderDataRowsUpdated = updates
         totalDuration = self.duration + duration
         self.totalDuration = totalDuration
-        
+
         sql = """UPDATE TicketSocketRefreshHistory SET OrderDataUpdateSucceeded=%(successVal)s, 
                     OrderDataUpdateDuration=%(orderDataUpdateDuration)s, TotalDuration=%(totalDuration)s, 
                     OrderDataRowsTotal=%(orderDataRowsTotal)s, OrderDataRowsInserted=%(orderDataRowsInserted)s, 
@@ -492,21 +588,21 @@ class TicketSocketRefreshHistory:
                     LastUpdate=CURRENT_TIMESTAMP 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
-            'successVal': 1 if success is True else 0,
-            'ticketSocketRefreshHistoryId': self.ticketSocketRefreshHistoryId, 
-            'orderDataUpdateDuration': duration, 
-            'totalDuration': totalDuration, 
-            'orderDataRowsTotal': self.orderDataRowsTotal,
-            'orderDataRowsInserted': self.orderDataRowsInserted,
-            'orderDataRowsUpdated': self.orderDataRowsUpdated,
-            'orderDataRowsRemoved': self.orderDataRowsRemoved
+            "successVal": 1 if success is True else 0,
+            "ticketSocketRefreshHistoryId": self.ticketSocketRefreshHistoryId,
+            "orderDataUpdateDuration": duration,
+            "totalDuration": totalDuration,
+            "orderDataRowsTotal": self.orderDataRowsTotal,
+            "orderDataRowsInserted": self.orderDataRowsInserted,
+            "orderDataRowsUpdated": self.orderDataRowsUpdated,
+            "orderDataRowsRemoved": self.orderDataRowsRemoved,
         }
-        db.update(sql, data, cnx)        
+        db_update(sql, data, cnx)
 
-    def commit(self, cnx = None):
+    def commit(self, cnx=None):
         if self.endTimer > 0:
             self.cleanup(cnx)
-            
+
         self.__getSellerName()
 
         sql = """INSERT INTO TicketSocketRefreshHistory (UserId, SellerId, Start, End, StartTimer, EndTimer, Duration, Success, ErrorMessage, 
@@ -517,34 +613,34 @@ class TicketSocketRefreshHistory:
                  %(ordersFailed)s, %(ticketsFailed)s, %(ticketTypesFailed)s, %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
                  %(ordersUpdated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s,  
                  %(ticketTypesUpdated)s, %(ticketTypesInserted)s)"""
-        
-        data = {
-            'userId': self.userId,
-            'sellerId': self.sellerId,
-            'start': self.start,
-            'end': self.end,
-            'startTimer': self.startTimer,
-            'endTimer': self.endTimer,
-            'duration': self.duration,
-            'success': 1 if self.succeeded is True else 0,
-            'errorMessage': self.errorMessage,
-            'serviceEventsSkipped': ", ".join(self.serviceEventsSkipped),
-            'eventsFailed': ", ".join(str(v) for v in self.eventsFailed),
-            'ordersFailed': ", ".join(str(v) for v in self.ordersFailed),
-            'ticketsFailed': ", ".join(str(v) for v in self.ticketsFailed),
-            'ticketTypesFailed': ", ".join(str(v) for v in self.ticketTypesFailed),
-            'totalEventsFromService': self.totalEventsFromService,
-            'eventsUpdated': self.eventsUpdated,
-            'eventsInserted': self.eventsInserted,
-            'ordersInserted': self.ordersInserted,
-            'ordersUpdated': self.ordersUpdated,
-            'ordersDeleted': self.ordersDeleted,
-            'ticketsUpdated': self.ticketsUpdated,
-            'ticketsInserted': self.ticketsInserted, 
-            'ticketTypesUpdated': self.ticketTypesUpdated,
-            'ticketTypesInserted': self.ticketTypesInserted
-        }
-        
-        self.ticketSocketRefreshHistoryId = db.insert(sql, data, cnx)
 
-        return (self.ticketSocketRefreshHistoryId > 0)
+        data = {
+            "userId": self.userId,
+            "sellerId": self.sellerId,
+            "start": self.start,
+            "end": self.end,
+            "startTimer": self.startTimer,
+            "endTimer": self.endTimer,
+            "duration": self.duration,
+            "success": 1 if self.succeeded is True else 0,
+            "errorMessage": self.errorMessage,
+            "serviceEventsSkipped": ", ".join(self.serviceEventsSkipped),
+            "eventsFailed": ", ".join(str(v) for v in self.eventsFailed),
+            "ordersFailed": ", ".join(str(v) for v in self.ordersFailed),
+            "ticketsFailed": ", ".join(str(v) for v in self.ticketsFailed),
+            "ticketTypesFailed": ", ".join(str(v) for v in self.ticketTypesFailed),
+            "totalEventsFromService": self.totalEventsFromService,
+            "eventsUpdated": self.eventsUpdated,
+            "eventsInserted": self.eventsInserted,
+            "ordersInserted": self.ordersInserted,
+            "ordersUpdated": self.ordersUpdated,
+            "ordersDeleted": self.ordersDeleted,
+            "ticketsUpdated": self.ticketsUpdated,
+            "ticketsInserted": self.ticketsInserted,
+            "ticketTypesUpdated": self.ticketTypesUpdated,
+            "ticketTypesInserted": self.ticketTypesInserted,
+        }
+
+        self.ticketSocketRefreshHistoryId = db_insert(sql, data, cnx)
+
+        return self.ticketSocketRefreshHistoryId > 0
