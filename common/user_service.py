@@ -1,3 +1,7 @@
+"""
+User service module
+"""
+
 from datetime import datetime
 import hashlib
 import random
@@ -21,270 +25,326 @@ from common.utility import (
 
 
 class UserService:
+    """
+    Service to deal with user operations
+    """
+
     # PUBLIC METHODS
     def login(self, username: str, password: str):
+        """
+        securely login user and create token
+        """
         try:
             user: User = None
-            errorMessage: str = None
-            isValidInput: bool = True
+            error_message: str = None
+            is_valid_input: bool = True
 
-            if username == None or username == "" or password == None or password == "":
-                isValidInput = False
-                errorMessage = "Incorrect username or password"
+            if username is None or username == "" or password is None or password == "":
+                is_valid_input = False
+                error_message = "Incorrect username or password"
 
-            if isValidInput:
+            if is_valid_input:
                 # check to see if they exist first and pull data
                 sql = "SELECT Password, RequireResetPassword FROM Users WHERE Username=%(username)s"
                 data = {"username": username}
                 row = db_query_one(sql, data)
 
-                if row != {}:
-                    requireReset = (
+                if row:
+                    require_reset = (
                         True if int(row["RequireResetPassword"]) == 1 else False
                     )
-                    if requireReset:
-                        errorMessage = 'Password reset required - please click on "Forgot Password?" to proceed'
+                    if require_reset:
+                        error_message = """Password reset required -
+                         please click on "Forgot Password?" to proceed"""
                     else:
-                        hashedPassword = str(row["Password"])
-                        authenticated = self.__passwordverify(password, hashedPassword)
+                        hashed_password = str(row["Password"])
+                        authenticated = self.__password_verify(
+                            password, hashed_password
+                        )
                         if authenticated:
-                            user = self.__retrieveUserFromDatabase(
-                                username=username, fetchSellers=True
+                            user = self.__retrieve_user_from_database(
+                                username=username, fetch_sellers=True
                             )
                             user.isAuthenticated = True
                 else:
-                    errorMessage = "Incorrect username or password"
+                    error_message = "Incorrect username or password"
 
-        except Exception as err:
+        except RuntimeError as err:
             user = None
-            errorMessage: str = "Error occurred during login"
+            error_message: str = "Error occurred during login"
             log_message(f"Unexpected {err=}, {type(err)=}")
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
-    def registerUser(
+    def register_user(
         self,
         username: str,
         password: str,
-        confirmPassword: str,
-        firstName: str,
-        lastName: str,
-        sellerId: int = None,
+        confirm_password: str,
+        first_name: str,
+        last_name: str,
+        seller_id: int = None,
     ):
+        """
+        Register a new user
+        """
         try:
             # validate input
-            usernameError = self.__validateUserName(username)
-            if usernameError is not None:
-                return UserResponse(None, usernameError)
+            username_error = self.__validate_username(username)
+            if username_error is not None:
+                return UserResponse(None, username_error)
 
-            passwordError = self.__validatePassword(password, confirmPassword)
-            if passwordError is not None:
-                return UserResponse(None, passwordError)
+            password_error = self.__validate_password(password, confirm_password)
+            if password_error is not None:
+                return UserResponse(None, password_error)
 
-            if firstName == None or firstName == "":
+            if first_name is None or first_name == "":
                 return UserResponse(None, "First name cannot be blank")
 
-            if lastName == None or lastName == "":
+            if last_name is None or last_name == "":
                 return UserResponse(None, "Last name cannot be blank")
 
             user: User = None
-            errorMessage: str = None
+            error_message: str = None
 
-            hashedPassword = self.__passwordHash(password)
-            sql = "INSERT INTO Users (Username, Password, FirstName, LastName) VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s)"
+            hashed_password = self.__password_hash(password)
+            sql = """INSERT INTO Users (Username, Password, FirstName, LastName)
+                        VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s)"""
             data = {
                 "username": username,
-                "password": hashedPassword,
-                "firstName": firstName,
-                "lastName": lastName,
+                "password": hashed_password,
+                "firstName": first_name,
+                "lastName": last_name,
             }
-            userId = db_insert(sql, data)
-            if userId > 0:
-                if sellerId is not None and sellerId > 0:
-                    sql = "INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"
-                    data = {"userId": userId, "sellerId": sellerId}
-                    id = db_insert(sql, data)
-                    if id <= 0:
-                        errorMessage = "Error occurred during user registration, please contact your administrator"
+            user_id = db_insert(sql, data)
+            if user_id > 0:
+                if seller_id is not None and seller_id > 0:
+                    sql = """INSERT INTO UserSeller (UserId, SellerId)
+                            VALUES (%(userId)s, %(sellerId)s)"""
+                    data = {"userId": user_id, "sellerId": seller_id}
+                    user_seller_id = db_insert(sql, data)
+                    if user_seller_id <= 0:
+                        error_message = """Error occurred during user registration,
+                            please contact your administrator"""
             else:
-                errorMessage = "Error occurred during user registration, please contact your administrator"
-        except Exception as err:
+                error_message = """Error occurred during user registration,
+                            please contact your administrator"""
+        except RuntimeError as err:
             user = None
-            errorMessage = "Error occurred during user registration, please contact your administrator"
+            error_message = """Error occurred during user registration,
+                            please contact your administrator"""
             log_message(f"Unexpected {err=}, {type(err)=}")
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
-    def sendPasswordResetEmail(self, username: str):
+    def send_password_reset_email(self, username: str):
+        """
+        Sends an email to the user with the password reset code
+        """
         try:
-            if username == "" or username == "":
+            if username is None or username == "":
                 return UserResponse(None, "Username cannot be blank")
 
-            errorMessage: str = None
-            user = self.__retrieveUserFromDatabase(username=username)
+            error_message: str = None
+            user = self.__retrieve_user_from_database(username=username)
             if user is not None:
-                code = self.__generatePasswordCode(user.username)
+                code = self.__generate_password_code(user.username)
                 if code > 0:
-                    html = "A password reset request has been requested for you from national-acts.com.\n\n"
-                    html += (
-                        "Please use this security code to confirm your email in our system:\n\n"
-                        + str(code)
-                    )
+                    html = f"""A password reset request has been requested for you
+                        from national-acts.com.\n\nPlease use this security code
+                        to confirm your email in our system:\n\n{str(code)}"""
                     subject = "National Acts VIP - Password Reset"
-                    toName = user.firstName + " " + user.lastName
-                    result = send_email(username, subject, html, toName)
-                    if result.success != True:
+                    to_name = user.firstName + " " + user.lastName
+                    result = send_email(username, subject, html, to_name)
+                    if result.success is not True:
                         user = None
-                        errorMessage = (
+                        error_message = (
                             "Error occurred during password reset: " + result.error
                         )
                 else:
                     user = None
-                    errorMessage = "Error occurred during password reset"
+                    error_message = "Error occurred during password reset"
             else:
-                errorMessage = "User not found"
-        except Exception as err:
+                error_message = "User not found"
+        except RuntimeError as err:
             user = None
-            errorMessage = "Error occurred during password reset"
+            error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
-    def validatePasswordResetCode(self, username: str, code: int):
+    def validate_password_reset_code(self, username: str, code: int):
+        """
+        Validate reset code against value stored for user in database
+        """
         try:
-            if username == None or username == "":
+            if username is None or username == "":
                 return UserResponse(None, "Username cannot be blank")
 
-            errorMessage: str = None
+            error_message: str = None
             user: User = None
-            userId: int = 0
+            user_id: int = 0
 
-            user = self.__retrieveUserFromDatabase(username=username)
+            user = self.__retrieve_user_from_database(username=username)
 
-            if user == None:
+            if user is None:
                 return UserResponse(None, "User not found")
 
-            userId = user.userId
+            user_id = user.userId
 
-            sql = """SELECT * FROM ForgotPasswordToken WHERE UserId=%(userId)s AND Code=%(code)s AND IsExpired=0"""
-            data = {"userId": userId, "code": code}
+            sql = """SELECT * FROM ForgotPasswordToken
+                        WHERE UserId=%(userId)s
+                        AND Code=%(code)s AND IsExpired=0"""
+            data = {"userId": user_id, "code": code}
             row = db_query_one(sql, data)
-            if row == {}:
+            if not row:
                 user = None
-                errorMessage = "Invalid code"
-        except Exception as err:
+                error_message = "Invalid code"
+        except RuntimeError as err:
             user = None
-            errorMessage = "Error occurred during password reset"
+            error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
-    def resetPassword(
-        self, username: str, code: int, password: str, confirmPassword: str
+    def reset_password(
+        self, username: str, code: int, password: str, confirm_password: str
     ):
-        passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError is not None:
-            return UserResponse(None, passwordError)
+        """
+        Reset user password
+        """
+        password_error = self.__validate_password(password, confirm_password)
+        if password_error is not None:
+            return UserResponse(None, password_error)
 
-        response = self.validatePasswordResetCode(username, code)
+        response = self.validate_password_reset_code(username, code)
 
         if response.hasError():
             return response
 
         user = response.user
-        errorMessage: str = None
+        error_message: str = None
 
-        self.__expireAllUserTokens(username)
+        self.__expire_all_user_tokens(username)
 
-        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP WHERE Username=%(username)s"
-        data = {"username": username, "password": self.__passwordHash(password)}
+        sql = """UPDATE Users SET Password=%(password)s,
+                RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP
+                WHERE Username=%(username)s"""
+        data = {"username": username, "password": self.__password_hash(password)}
         success = db_update(sql, data)
-        if success != True:
+        if success is not True:
             user = None
-            errorMessage = "Error occurred during password reset"
+            error_message = "Error occurred during password reset"
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
-    def resetPasswordSecured(self, username: str, password: str, confirmPassword: str):
-        passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError is not None:
-            return UserResponse(None, passwordError)
+    def reset_password_secured(
+        self, username: str, password: str, confirm_password: str
+    ):
+        """
+        Reset password for user already logged in
+        """
+        password_error = self.__validate_password(password, confirm_password)
+        if password_error is not None:
+            return UserResponse(None, password_error)
 
-        user = self.__retrieveUserFromDatabase(username=username)
-        errorMessage: str = None
+        user = self.__retrieve_user_from_database(username=username)
+        error_message: str = None
 
-        self.__expireAllUserTokens(username)
+        self.__expire_all_user_tokens(username)
 
-        sql = "UPDATE Users SET Password=%(password)s, RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP WHERE Username=%(username)s"
-        data = {"username": username, "password": self.__passwordHash(password)}
+        sql = """UPDATE Users SET Password=%(password)s,
+                RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP
+                WHERE Username=%(username)s"""
+        data = {"username": username, "password": self.__password_hash(password)}
         success = db_update(sql, data)
-        if success != True:
+        if success is not True:
             user = None
-            errorMessage = "Error occurred during password reset"
+            error_message = "Error occurred during password reset"
 
-        return UserResponse(user, errorMessage)
+        return UserResponse(user, error_message)
 
     def register(
         self,
         username: str,
-        firstName: str,
-        lastName: str,
-        sellerId: int,
+        first_name: str,
+        last_name: str,
+        seller_id: int,
         password: str,
-        confirmPassword: str,
+        confirm_password: str,
         notes: str = None,
     ):
-        passwordError = self.__validatePassword(password, confirmPassword)
-        if passwordError is not None:
-            return UserResponse(None, passwordError)
+        """
+        Start user registration
+        """
+        password_error = self.__validate_password(password, confirm_password)
+        if password_error is not None:
+            return UserResponse(None, password_error)
 
-        user: User = self.getUserByUserName(username=username)
+        user: User = self.get_user_by_user_name(username=username)
 
         if user is not None:
             return UserResponse(
                 None, "There is already a user in the system with that email"
             )
 
-        errorMessage: str = None
+        error_message: str = None
 
-        sql = """INSERT INTO Users (Username, FirstName, LastName, Password, Notes) 
-                    VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s)"""
+        sql = """INSERT INTO Users (Username, FirstName, LastName, Password, Notes)
+                     VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s)"""
         data = {
             "username": username,
-            "firstName": firstName,
-            "lastName": lastName,
-            "password": self.__passwordHash(password),
+            "firstName": first_name,
+            "lastName": last_name,
+            "password": self.__password_hash(password),
             "notes": notes,
         }
-        userId = db_insert(sql, data)
+        user_id = db_insert(sql, data)
 
-        if userId <= 0:
+        if user_id <= 0:
             user = None
-            errorMessage = "Error occurred while registering user"
+            error_message = "Error occurred while registering user"
 
         sql2 = """INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"""
-        data2 = {"userId": userId, "sellerId": sellerId}
-        userSellerId = db_insert(sql2, data2)
+        data2 = {"userId": user_id, "sellerId": seller_id}
+        user_seller_id = db_insert(sql2, data2)
 
-        regEmailResult = self.__sendRegistrationEmail(username)
+        if user_seller_id > 0:
+            reg_email_result = self.__send_registration_email(username)
 
-        if regEmailResult.success != True:
+            if reg_email_result.success is not True:
+                user = None
+                error_message = reg_email_result.error
+
+            user = self.get_user_by_id(user_id)
+        else:
             user = None
-            errorMessage = regEmailResult.error
+            error_message = (
+                """Error occurred while updating sellers during registration"""
+            )
 
-        user = self.getUserById(userId)
+        return UserResponse(user, error_message)
 
-        return UserResponse(user, errorMessage)
-
-    def getUserById(self, userId: int, fetchSellers: bool = False):
-        return self.__retrieveUserFromDatabase(userId=userId, fetchSellers=fetchSellers)
-
-    def getUserByUserName(self, username: str, fetchSellers: bool = False):
-        return self.__retrieveUserFromDatabase(
-            username=username, fetchSellers=fetchSellers
+    def get_user_by_id(self, user_id: int, fetch_sellers: bool = False):
+        """
+        Fetch user by user_id
+        """
+        return self.__retrieve_user_from_database(
+            user_id=user_id, fetch_sellers=fetch_sellers
         )
 
-    def getAllUsers(self):
+    def get_user_by_user_name(self, username: str, fetch_sellers: bool = False):
+        """
+        Fetch user by username
+        """
+        return self.__retrieve_user_from_database(
+            username=username, fetch_sellers=fetch_sellers
+        )
+
+    def get_all_users(self):
+        """
+        Get all users in the system
+        """
         users: list[User] = []
         sql: str = """SELECT Users.* FROM Users"""
         rows = db_query_all(sql)
@@ -304,12 +364,12 @@ class UserService:
             user.sendEmailReset = True if int(row["SendEmailReset"]) == 1 else False
             user.sendTextReset = True if int(row["SendTextReset"]) == 1 else False
             user.disableCheckIn = True if int(row["DisableCheckIn"]) == 1 else False
-            createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
-            lastUpdate = datetime.fromisoformat(str(row["LastUpdate"]))
-            user.createdAt = createdAt.strftime("%m/%d/%Y")
-            user.lastUpdate = lastUpdate.strftime("%m/%d/%Y")
+            created_at = datetime.fromisoformat(str(row["CreatedAt"]))
+            last_update = datetime.fromisoformat(str(row["LastUpdate"]))
+            user.createdAt = created_at.strftime("%m/%d/%Y")
+            user.lastUpdate = last_update.strftime("%m/%d/%Y")
 
-            sellers = self.__getUserSellers(user.userId, user.isAdmin)
+            sellers = self.__get_user_sellers(user.userId, user.isAdmin)
             user.sellers = sellers
             if user.isAdmin:
                 user.category = "Admin"
@@ -320,106 +380,125 @@ class UserService:
             users.append(user)
         return users
 
-    def getAllPermissions(self):
+    def get_all_permissions(self):
+        """
+        Get all permissions in the system
+        """
         permissions: list[Permission] = []
         sql = """SELECT * FROM Permissions ORDER BY PermissionName"""
         rows = db_query_all(sql)
         for row in rows:
-            permissionId = int(row["PermissionId"])
+            permission_id = int(row["PermissionId"])
             name = str(row["PermissionName"])
-            permission = Permission(permissionId, name)
+            permission = Permission(permission_id, name)
             permissions.append(permission)
         return permissions
 
-    def getAllRoles(self):
+    def get_all_roles(self):
+        """
+        Get all roles in the system
+        """
         roles: list[Role] = []
         sql = """SELECT * FROM Roles ORDER BY RoleId"""
         rows = db_query_all(sql)
         for row in rows:
-            roleId = int(row["RoleId"])
-            roleName = str(row["RoleName"])
-            role = Role(roleId, roleName)
-            permissions = self.__getPermissionsForRole(roleId)
+            role_id = int(row["RoleId"])
+            role_name = str(row["RoleName"])
+            role = Role(role_id, role_name)
+            permissions = self.__get_permissions_for_role(role_id)
             role.permissions = permissions
             roles.append(role)
         return roles
 
-    def getRoleById(self, roleId: int):
+    def get_role_by_id(self, role_id: int):
+        """
+        Get role by role_id
+        """
         role: Role = None
         sql = """SELECT * FROM Roles WHERE RoleId=%(roleId)s"""
-        data = {"roleId": roleId}
+        data = {"roleId": role_id}
         row = db_query_one(sql, data)
-        if row != {}:
-            roleId = int(row["RoleId"])
-            roleName = str(row["RoleName"])
-            role = Role(roleId, roleName)
-            permissions = self.__getPermissionsForRole(roleId)
+        if row:
+            role_id = int(row["RoleId"])
+            role_name = str(row["RoleName"])
+            role = Role(role_id, role_name)
+            permissions = self.__get_permissions_for_role(role_id)
             role.permissions = permissions
         return role
 
-    def updateRole(self, roleToUpdate: Role):
+    def update_role(self, role_to_update: Role):
+        """
+        Update or Create role
+        """
         success: bool = True
-        if roleToUpdate == None:
+        if role_to_update is None:
             return False
-        existingRole: Role = None
-        if roleToUpdate.roleId > 0:
-            existingRole = self.getRoleById(roleToUpdate.roleId)
-        if existingRole is not None:
-            roleId = existingRole.roleId
-            updateSql = """UPDATE Roles SET RoleName=%(roleName)s, LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
-            updateData = {"roleName": roleToUpdate.roleName, "roleId": roleId}
-            success = db_update(updateSql, updateData)
+        existing_role: Role = None
+        if role_to_update.roleId > 0:
+            existing_role = self.get_role_by_id(role_to_update.roleId)
+        if existing_role is not None:
+            role_id = existing_role.roleId
+            update_sql = """UPDATE Roles SET RoleName=%(roleName)s,
+                        LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
+            update_data = {"roleName": role_to_update.roleName, "roleId": role_id}
+            success = db_update(update_sql, update_data)
             if success is True:
-                success = self.__assignPermissionsToRole(
-                    roleId, roleToUpdate.permissions
+                success = self.__assign_permissions_to_role_id(
+                    role_id, role_to_update.permissions
                 )
         else:
-            insertSql = """INSERT INTO Roles (RoleName) VALUES (%(roleName)s)"""
-            insertData = {"roleName": roleToUpdate.roleName}
-            roleId = db_insert(insertSql, insertData)
-            if roleId > 1:
-                success = self.__assignPermissionsToRole(
-                    roleId, roleToUpdate.permissions
+            insert_sql = """INSERT INTO Roles (RoleName) VALUES (%(roleName)s)"""
+            insert_data = {"roleName": role_to_update.roleName}
+            role_id = db_insert(insert_sql, insert_data)
+            if role_id > 1:
+                success = self.__assign_permissions_to_role_id(
+                    role_id, role_to_update.permissions
                 )
         return success
 
-    def deleteRoles(self, roleIdsToDelete: list[int]):
+    def delete_roles(self, role_ids_to_delete: list[int]):
+        """
+        Delete list of roles
+        """
         success: bool = True
-        if len(roleIdsToDelete) > 0:
-            roleIdList = ",".join(str(x) for x in roleIdsToDelete)
-            deletePermissionSql = (
+        if len(role_ids_to_delete) > 0:
+            role_id_list = ",".join(str(x) for x in role_ids_to_delete)
+            delete_permission_sql = (
                 """DELETE FROM RolePermissions WHERE RoleId IN (%(roleList)s)"""
             )
-            deleteRoleData = {"roleList": roleIdList}
-            success = db_delete(deletePermissionSql, deleteRoleData)
+            delete_role_data = {"roleList": role_id_list}
+            success = db_delete(delete_permission_sql, delete_role_data)
             if success is True:
-                deleteRoleSql = """DELETE FROM Roles WHERE RoleId IN (%(roleList)s)"""
-                success = db_delete(deleteRoleSql, deleteRoleData)
+                delete_row_sql = """DELETE FROM Roles WHERE RoleId IN (%(roleList)s)"""
+                success = db_delete(delete_row_sql, delete_role_data)
         return success
 
-    def updateUser(self, userToUpdate: User):
+    def update_user(self, user_to_update: User):
+        """
+        Update existing user (does not create)
+        """
         success: bool = True
         if (
-            userToUpdate == None
-            or userToUpdate.userId == None
-            or userToUpdate.userId <= 0
+            user_to_update is None
+            or user_to_update.userId is None
+            or user_to_update.userId <= 0
         ):
             return False
-        userId: int = userToUpdate.userId
-        existingUser: User = self.__retrieveUserFromDatabase(userId=userId)
-        if existingUser is not None:
-            username = existingUser.username
-            if userToUpdate.username is not None and userToUpdate.username != "":
-                username = userToUpdate.username
-            sendTextReset = userToUpdate.sendTextReset
+        user_id: int = user_to_update.userId
+        existing_user: User = self.__retrieve_user_from_database(user_id=user_id)
+        if existing_user is not None:
+            username = existing_user.username
+            if user_to_update.username is not None and user_to_update.username != "":
+                username = user_to_update.username
+            send_text_reset = user_to_update.sendTextReset
             if (
-                userToUpdate.mobile == None
-                or userToUpdate.mobile == ""
-                or userToUpdate.mobile == "None"
+                user_to_update.mobile is None
+                or user_to_update.mobile == ""
+                or user_to_update.mobile == "None"
             ):
-                sendTextReset = False
-                userToUpdate.mobile = ""
-            updateSql = """UPDATE Users SET IsAdmin=%(isAdmin)s, 
+                send_text_reset = False
+                user_to_update.mobile = ""
+            update_sql = """UPDATE Users SET IsAdmin=%(isAdmin)s,
                            Username=%(username)s, 
                            FirstName=%(firstName)s, 
                            LastName=%(lastName)s, 
@@ -432,73 +511,82 @@ class UserService:
                            DisableCheckIn=%(disableCheckin)s, 
                            LastUpdate=CURRENT_TIMESTAMP 
                            WHERE UserId=%(userId)s"""
-            updateData = {
-                "isAdmin": 1 if userToUpdate.isAdmin else 0,
+            update_data = {
+                "isAdmin": 1 if user_to_update.isAdmin else 0,
                 "username": username,
-                "firstName": userToUpdate.firstName,
-                "lastName": userToUpdate.lastName,
-                "mobile": userToUpdate.mobile,
-                "notes": userToUpdate.notes,
-                "isActive": 1 if userToUpdate.isActive else 0,
-                "requireResetPassword": 1 if userToUpdate.requireResetPassword else 0,
-                "sendEmailReset": 1 if userToUpdate.sendEmailReset else 0,
-                "disableCheckin": 1 if userToUpdate.disableCheckIn else 0,
-                "sendTextReset": 1 if sendTextReset else 0,
-                "userId": userId,
+                "firstName": user_to_update.firstName,
+                "lastName": user_to_update.lastName,
+                "mobile": user_to_update.mobile,
+                "notes": user_to_update.notes,
+                "isActive": 1 if user_to_update.isActive else 0,
+                "requireResetPassword": 1 if user_to_update.requireResetPassword else 0,
+                "sendEmailReset": 1 if user_to_update.sendEmailReset else 0,
+                "disableCheckin": 1 if user_to_update.disableCheckIn else 0,
+                "sendTextReset": 1 if send_text_reset else 0,
+                "userId": user_id,
             }
-            success = db_update(updateSql, updateData)
+            success = db_update(update_sql, update_data)
             if success is True:
-                success = self.__assignUserToSellers(
-                    userId, userToUpdate.isAdmin, userToUpdate.sellers
+                success = self.__assign_user_to_sellers(
+                    user_id, user_to_update.isAdmin, user_to_update.sellers
                 )
         else:
             success = False
         return success
 
-    def deleteUser(self, userId: int):
+    def delete_user(self, user_id: int):
+        """
+        Delete user from system
+        """
         success: bool = False
-        data = {"userId": userId}
+        data = {"userId": user_id}
 
         try:
-            userSellerSql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
-            success = db_delete(userSellerSql, data)
+            user_seller_sql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
+            success = db_delete(user_seller_sql, data)
 
-            userActivitySql = """DELETE FROM UserActivity WHERE UserId=%(userId)s"""
-            success = db_delete(userActivitySql, data)
+            user_activity_sql = """DELETE FROM UserActivity WHERE UserId=%(userId)s"""
+            success = db_delete(user_activity_sql, data)
 
-            userSql = """DELETE FROM Users WHERE UserId=%(userId)s"""
-            success = db_delete(userSql, data)
-        except Exception as err:
+            user_sql = """DELETE FROM Users WHERE UserId=%(userId)s"""
+            success = db_delete(user_sql, data)
+        except RuntimeError as err:
             success = False
             log_message(f"Unexpected {err=}, {type(err)=}")
 
         return success
 
-    def logUserActivity(self, userId: int, activityId: int, activityData: str):
+    def log_user_activity(self, user_id: int, activity_id: int, activity_data: str):
+        """
+        Log user activity from the UI
+        """
         sql = ""
-        data = {"userId": userId, "activityId": activityId}
-        if len(activityData) > 0:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId, ActivityData) 
-                        VALUES (%(userId)s, %(activityId)s, %(activityData)s)"""
-            data["activityData"] = activityData
+        data = {"userId": user_id, "activityId": activity_id}
+        if len(activity_data) > 0:
+            sql = """INSERT INTO UserActivity (UserId, ActivityId, ActivityData)
+                         VALUES (%(userId)s, %(activityId)s, %(activityData)s)"""
+            data["activityData"] = activity_data
         else:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId) 
-                        VALUES (%(userId)s, %(activityId)s)"""
+            sql = """INSERT INTO UserActivity (UserId, ActivityId)
+                         VALUES (%(userId)s, %(activityId)s)"""
 
         success = db_update(sql, data)
         return success
 
-    def getUserActivity(
+    def get_user_activity(
         self,
         start: int,
         end: int,
-        userId: int = None,
-        activityType: int = None,
-        filterAdmins: bool = False,
+        user_id: int = None,
+        activity_type: int = None,
+        filter_admins: bool = False,
     ):
+        """
+        Get a report of user activity
+        """
         activities: list[UserActivity] = []
-        sql = """SELECT UserActivity.*, Activity.ActivityName, Users.Username 
-                    FROM UserActivity 
+        sql = """SELECT UserActivity.*, Activity.ActivityName, Users.Username
+                     FROM UserActivity 
                     JOIN Activity ON Activity.ActivityId=UserActivity.ActivityId 
                     JOIN Users ON Users.UserId=UserActivity.UserId 
                     WHERE UserActivity.Timestamp BETWEEN %(startDate)s AND %(endDate)s"""
@@ -507,258 +595,315 @@ class UserService:
             "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
         }
 
-        whereClause: list[str] = []
+        where_clause: list[str] = []
 
-        if userId is not None:
-            whereClause.append("UserActivity.UserId = %(userId)s")
-            data["userId"] = userId
+        if user_id is not None:
+            where_clause.append("UserActivity.UserId = %(userId)s")
+            data["userId"] = user_id
 
-        if activityType is not None:
-            whereClause.append("UserActivity.ActivityId = %(activityId)s")
-            data["activityId"] = activityType
+        if activity_type is not None:
+            where_clause.append("UserActivity.ActivityId = %(activityId)s")
+            data["activityId"] = activity_type
 
-        if filterAdmins is True:
-            whereClause.append("Users.IsAdmin <> 1")
+        if filter_admins is True:
+            where_clause.append("Users.IsAdmin <> 1")
 
-        if len(whereClause) > 0:
+        if len(where_clause) > 0:
             sql += " AND "
-            sql += " AND ".join(whereClause)
+            sql += " AND ".join(where_clause)
 
         sql += " ORDER BY UserActivity.Timestamp DESC, Username ASC"
 
         rows = db_query_all(sql, data)
         for row in rows:
-            aUserId = int(row["UserId"])
-            activityType = int(row["ActivityId"])
-            activityName = str(row["ActivityName"])
+            activity_user_id = int(row["UserId"])
+            activity_type = int(row["ActivityId"])
+            activity_name = str(row["ActivityName"])
             username = str(row["Username"])
-            activityData = str(row["ActivityData"])
-            activityTime = str(row["Timestamp"])
+            activity_data = str(row["ActivityData"])
+            activity_time = str(row["Timestamp"])
             activity = UserActivity(
-                aUserId,
-                activityType,
-                activityData,
-                activityTime,
-                activityName,
+                activity_user_id,
+                activity_type,
+                activity_data,
+                activity_time,
+                activity_name,
                 username,
             )
             activities.append(activity)
 
         return activities
 
-    def getUserSellerByEventId(self, userId: int, eventId: int):
-        userSeller: UserSeller = None
+    def get_user_seller_by_event_id(self, user_id: int, event_id: int):
+        """
+        Get user seller from event_id and user_id
+        """
+        user_seller: UserSeller = None
 
-        user = self.__retrieveUserFromDatabase(userId=userId, fetchSellers=True)
+        user = self.__retrieve_user_from_database(user_id=user_id, fetch_sellers=True)
 
-        sql = """SELECT SellerEventCategory.SellerId 
-                FROM TicketSocketEvents 
-                JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
+        sql = """SELECT SellerEventCategory.SellerId
+                 FROM TicketSocketEvents 
+                JOIN SellerEventCategory
+                    ON SellerEventCategory.SellerEventCategoryId
+                        = TicketSocketEvents.SellerEventCategoryId 
                 WHERE TicketSocketEvents.Id=%(ticketSocketEventId)s"""
 
-        data = {"ticketSocketEventId": eventId}
+        data = {"ticketSocketEventId": event_id}
 
         row = db_query_one(sql, data)
-        eventSellerId = 0
-        if row != {}:
-            eventSellerId = int(row["SellerId"])
+        event_seller_id = 0
+        if row:
+            event_seller_id = int(row["SellerId"])
 
-        if eventSellerId > 0:
+        if event_seller_id > 0:
             for seller in user.sellers:
-                if seller.sellerId == eventSellerId:
-                    userSeller = seller
+                if seller.sellerId == event_seller_id:
+                    user_seller = seller
                     break
 
-        return userSeller
+        return user_seller
 
-    def __getPermissionsForRole(self, roleId: int):
+    def __get_permissions_for_role(self, role_id: int):
         permissions: list[Permission] = []
-        if roleId == None:
+        if role_id is None:
             return permissions
 
         sql = ""
-        if roleId > 1:
-            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName 
-                    FROM Permissions 
-                    JOIN RolePermissions ON RolePermissions.PermissionId = Permissions.PermissionId 
+        if role_id > 1:
+            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName
+                     FROM Permissions 
+                    JOIN RolePermissions
+                        ON RolePermissions.PermissionId = Permissions.PermissionId 
                     WHERE RolePermissions.RoleId=%(roleId)s"""
         else:
-            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName 
-                    FROM Permissions"""
+            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName
+                     FROM Permissions"""
 
-        data = {"roleId": roleId}
+        data = {"roleId": role_id}
         rows = db_query_all(sql, data)
         for row in rows:
-            permissionId = int(row["PermissionId"])
-            permissionName = str(row["PermissionName"])
-            permission = Permission(permissionId, permissionName)
+            permission_id = int(row["PermissionId"])
+            permission_name = str(row["PermissionName"])
+            permission = Permission(permission_id, permission_name)
             permissions.append(permission)
         return permissions
 
-    def __assignUserToSellers(
-        self, userId: int, isAdmin: bool, newSellers: list[UserSeller]
+    def __assign_user_to_sellers(
+        self, user_id: int, is_admin: bool, new_sellers: list[UserSeller]
     ):
+        """
+        Update list of sellers for user
+        """
         success: bool = True
-        existingUser: User = self.__retrieveUserFromDatabase(
-            userId=userId, fetchSellers=True
+        existing_user: User = self.__retrieve_user_from_database(
+            user_id=user_id, fetch_sellers=True
         )
-        if existingUser is not None:
-            if isAdmin is True:
-                deleteSellerSql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
-                deleteSellerData = {"userId": userId}
-                db_delete(deleteSellerSql, deleteSellerData)
+        if existing_user is not None:
+            if is_admin is True:
+                delete_seller_sql = """DELETE FROM UserSeller WHERE UserId=%(userId)s"""
+                delete_seller_data = {"userId": user_id}
+                db_delete(delete_seller_sql, delete_seller_data)
             else:
-                newSellerIds = [seller.sellerId for seller in newSellers]
-                for existingSeller in existingUser.sellers:
-                    existingSellerId = existingSeller.sellerId
-                    if existingSellerId in newSellerIds:
-                        newSeller: UserSeller = self.__getUserSellerFromListById(
-                            newSellers, existingSellerId
+                new_seller_ids = [seller.sellerId for seller in new_sellers]
+                for existing_seller in existing_user.sellers:
+                    existing_seller_id = existing_seller.sellerId
+                    if existing_seller_id in new_seller_ids:
+                        new_seller: UserSeller = self.__get_user_seller_from_list_by_id(
+                            new_sellers, existing_seller_id
                         )
-                        if existingSeller.roleId != newSeller.roleId:
-                            updateRoleSql = """UPDATE UserSeller SET RoleId=%(roleId)s, LastUpdate=CURRENT_TIMESTAMP WHERE UserSellerId=%(userSellerId)s"""
-                            updateRoleData = {
-                                "roleId": newSeller.roleId,
-                                "userSellerId": existingSeller.userSellerId,
+                        if existing_seller.roleId != new_seller.roleId:
+                            update_role_sql = """UPDATE UserSeller SET RoleId=%(roleId)s,
+                                                 LastUpdate=CURRENT_TIMESTAMP
+                                                 WHERE UserSellerId=%(userSellerId)s"""
+                            update_role_data = {
+                                "roleId": new_seller.roleId,
+                                "userSellerId": existing_seller.userSellerId,
                             }
-                            success = db_update(updateRoleSql, updateRoleData)
-                        newSellerIds.remove(existingSellerId)
+                            success = db_update(update_role_sql, update_role_data)
+                        new_seller_ids.remove(existing_seller_id)
                     else:
-                        deleteSellerSql = """DELETE FROM UserSeller WHERE UserSellerId=%(userSellerId)s"""
-                        deleteSellerData = {"userSellerId": existingSeller.userSellerId}
-                        success = db_delete(deleteSellerSql, deleteSellerData)
-                if len(newSellerIds) > 0:
-                    for newSellerId in newSellerIds:
-                        if newSellerId > 0:
-                            newSeller: UserSeller = self.__getUserSellerFromListById(
-                                newSellers, newSellerId
-                            )
-                            if newSeller is not None:
-                                insertSellerSql = """INSERT INTO UserSeller (UserId, SellerId, RoleId) VALUES (%(userId)s, %(sellerId)s, %(roleId)s)"""
-                                insertSellerData = {
-                                    "userId": userId,
-                                    "sellerId": newSellerId,
-                                    "roleId": newSeller.roleId,
-                                }
-                                userSellerId = db_insert(
-                                    insertSellerSql, insertSellerData
+                        delete_seller_sql = """DELETE FROM UserSeller
+                                            WHERE UserSellerId=%(userSellerId)s"""
+                        delete_seller_data = {
+                            "userSellerId": existing_seller.userSellerId
+                        }
+                        success = db_delete(delete_seller_sql, delete_seller_data)
+                if len(new_seller_ids) > 0:
+                    for new_seller_id in new_seller_ids:
+                        if new_seller_id > 0:
+                            new_seller: UserSeller = (
+                                self.__get_user_seller_from_list_by_id(
+                                    new_sellers, new_seller_id
                                 )
-                                success = userSellerId > 0
+                            )
+                            if new_seller is not None:
+                                insert_seller_sql = """INSERT INTO UserSeller
+                                                (UserId, SellerId, RoleId)
+                                                VALUES (%(userId)s, %(sellerId)s, %(roleId)s)"""
+                                insert_seller_data = {
+                                    "userId": user_id,
+                                    "sellerId": new_seller_id,
+                                    "roleId": new_seller.roleId,
+                                }
+                                user_seller_id = db_insert(
+                                    insert_seller_sql, insert_seller_data
+                                )
+                                success = user_seller_id > 0
         else:
             success = False
         return success
 
-    def __assignPermissionsToRole(self, roleId: int, newPermissions: list[Permission]):
-        existingRole = self.getRoleById(roleId)
+    def __assign_permissions_to_role_id(
+        self, role_id: int, new_permissions: list[Permission]
+    ):
+        """
+        Update permissions for selected role
+        """
+        existing_role = self.get_role_by_id(role_id)
         success: bool = True
-        if existingRole is not None:
-            newPermissionIds = [
-                permission.permissionId for permission in newPermissions
+        if existing_role is not None:
+            new_permission_ids = [
+                permission.permissionId for permission in new_permissions
             ]
-            for existingPermission in existingRole.permissions:
-                existingPermissionId = existingPermission.permissionId
-                if existingPermissionId in newPermissionIds:
-                    newPermissionIds.remove(existingPermissionId)
+            for existing_permission in existing_role.permissions:
+                existing_permission_id = existing_permission.permissionId
+                if existing_permission_id in new_permission_ids:
+                    new_permission_ids.remove(existing_permission_id)
                 else:
-                    deleteRoleSql = """DELETE FROM RolePermissions WHERE RoleId=%(roleId)s AND PermissionId=%(permissionId)s"""
-                    deleteRoleData = {
-                        "permissionId": existingPermissionId,
-                        "roleId": roleId,
+                    delete_row_sql = """DELETE FROM RolePermissions
+                                    WHERE RoleId=%(roleId)s
+                                    AND PermissionId=%(permissionId)s"""
+                    delete_role_data = {
+                        "permissionId": existing_permission_id,
+                        "roleId": role_id,
                     }
-                    success = db_delete(deleteRoleSql, deleteRoleData)
-            if len(newPermissionIds) > 0:
-                for newPermissionId in newPermissionIds:
-                    if newPermissionId > 0:
-                        newPermission: Permission = self.__getPermissionFromListById(
-                            newPermissions, newPermissionId
-                        )
-                        if newPermission is not None:
-                            insertPermissionSql = """INSERT INTO RolePermissions (RoleId, PermissionId) VALUES (%(roleId)s, %(permissionId)s)"""
-                            insertPermissionData = {
-                                "roleId": roleId,
-                                "permissionId": newPermissionId,
-                            }
-                            rolePermissionId = db_insert(
-                                insertPermissionSql, insertPermissionData
+                    success = db_delete(delete_row_sql, delete_role_data)
+            if len(new_permission_ids) > 0:
+                for new_permission_id in new_permission_ids:
+                    if new_permission_id > 0:
+                        new_permission: Permission = (
+                            self.__get_permission_from_list_by_id(
+                                new_permissions, new_permission_id
                             )
-                            success = rolePermissionId > 0
+                        )
+                        if new_permission is not None:
+                            insert_permission_sql = """INSERT INTO RolePermissions
+                                                    (RoleId, PermissionId)
+                                                    VALUES (%(roleId)s, %(permissionId)s)"""
+                            insert_permission_data = {
+                                "roleId": role_id,
+                                "permissionId": new_permission_id,
+                            }
+                            role_permission_id = db_insert(
+                                insert_permission_sql, insert_permission_data
+                            )
+                            success = role_permission_id > 0
         return success
 
-    def __getUserSellerFromListById(self, sellers: list[UserSeller], userSellerId: int):
-        userSeller: UserSeller = None
-        for seller in sellers:
-            if seller.sellerId == userSellerId:
-                userSeller = seller
-                break
-        return userSeller
-
-    def __getPermissionFromListById(
-        self, permissions: list[Permission], permissionId: int
+    def __get_user_seller_from_list_by_id(
+        self, sellers: list[UserSeller], user_seller_id: int
     ):
+        """
+        Filter one user seller from list by id
+        """
+        user_seller: UserSeller = None
+        for seller in sellers:
+            if seller.sellerId == user_seller_id:
+                user_seller = seller
+                break
+        return user_seller
+
+    def __get_permission_from_list_by_id(
+        self, permissions: list[Permission], permission_id: int
+    ):
+        """
+        Filter one permission from list by id
+        """
         permission: Permission = None
         for p in permissions:
-            if p.permissionId == permissionId:
+            if p.permissionId == permission_id:
                 permission = p
                 break
         return permission
 
-    def __expireAllUserTokens(self, username: str):
-        expireSql = "UPDATE ForgotPasswordToken SET IsExpired=1, LastUpdate=CURRENT_TIMESTAMP WHERE UserId IN (SELECT UserId FROM Users WHERE Username=%(username)s)"
-        expireData = {"username": username}
-        db_update(expireSql, expireData)
+    def __expire_all_user_tokens(self, username: str):
+        """
+        Clean up all user's forgot password tokens
+        """
+        expire_sql = """UPDATE ForgotPasswordToken SET IsExpired=1,
+                        LastUpdate=CURRENT_TIMESTAMP
+                        WHERE UserId IN
+                        (SELECT UserId FROM Users WHERE Username=%(username)s)"""
+        expire_data = {"username": username}
+        db_update(expire_sql, expire_data)
 
-    def __generatePasswordCode(self, username: str):
-        if username == None or username == "":
+    def __generate_password_code(self, username: str):
+        """
+        Generate and store 6-digit reset password code
+        """
+        if username is None or username == "":
             return 0
 
-        self.__expireAllUserTokens(username)
+        self.__expire_all_user_tokens(username)
 
-        user = self.__retrieveUserFromDatabase(username=username)
+        user = self.__retrieve_user_from_database(username=username)
 
-        if user == None:
+        if user is None:
             return 0
 
-        createdOn = datetime.now().timestamp()
+        created_on = datetime.now().timestamp()
         code = random.randint(100000, 999999)
 
-        sql = "INSERT INTO ForgotPasswordToken (UserId, Code, CreatedOn) VALUES (%(userId)s, %(code)s, %(createdOn)s)"
-        data = {"userId": user.userId, "code": code, "createdOn": createdOn}
-        id = db_insert(sql, data)
-        if id > 0:
+        sql = """INSERT INTO ForgotPasswordToken
+                (UserId, Code, CreatedOn)
+                VALUES (%(userId)s, %(code)s, %(createdOn)s)"""
+        data = {"userId": user.userId, "code": code, "createdOn": created_on}
+        token_id = db_insert(sql, data)
+        if token_id > 0:
             return code
         else:
             return 0
 
-    def __passwordverify(self, password: str, hashedPassword: str):
-        hPass = self.__passwordHash(password)
-        return hPass == hashedPassword
+    def __password_verify(self, password: str, hashed_password: str):
+        """
+        Verify plain-text password against encrypted stored value
+        """
+        generated_hashed_password = self.__password_hash(password)
+        return generated_hashed_password == hashed_password
 
-    def __passwordHash(self, password: str):
+    def __password_hash(self, password: str):
+        """
+        Create encrypted hashed password
+        """
         hash_object = hashlib.sha256()
         hash_object.update(password.encode())
         hash_password = hash_object.hexdigest()
         return hash_password
 
-    def __retrieveUserFromDatabase(
-        self, userId: int = None, username: str = None, fetchSellers: bool = False
+    def __retrieve_user_from_database(
+        self, user_id: int = None, username: str = None, fetch_sellers: bool = False
     ):
+        """
+        Fetch user from database by 1. user_id then 2. username
+        """
         sql: str = None
         data = {}
         user: User = None
-        if userId is not None and userId > 0:
+        if user_id is not None and user_id > 0:
             sql = """SELECT Users.*
                         FROM Users 
                         WHERE Users.UserId=%(userId)s"""
-            data = {"userId": userId}
+            data = {"userId": user_id}
         elif username is not None and username != "":
-            sql = """SELECT Users.* 
-                        FROM Users 
+            sql = """SELECT Users.*
+                         FROM Users 
                         WHERE Users.Username=%(username)s"""
             data = {"username": username}
 
         if sql is not None:
             row = db_query_one(sql, data)
-            if row != {}:
+            if row:
                 user = User()
                 user.userId = int(row["UserId"])
                 user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
@@ -774,13 +919,13 @@ class UserService:
                 user.sendEmailReset = True if int(row["SendEmailReset"]) else False
                 user.sendTextReset = True if int(row["SendTextReset"]) else False
                 user.disableCheckIn = True if int(row["DisableCheckIn"]) else False
-                createdAt = datetime.fromisoformat(str(row["CreatedAt"]))
-                lastUpdate = datetime.fromisoformat(str(row["LastUpdate"]))
-                user.createdAt = createdAt.strftime("%m/%d/%Y")
-                user.lastUpdate = lastUpdate.strftime("%m/%d/%Y")
+                created_at = datetime.fromisoformat(str(row["CreatedAt"]))
+                last_update = datetime.fromisoformat(str(row["LastUpdate"]))
+                user.createdAt = created_at.strftime("%m/%d/%Y")
+                user.lastUpdate = last_update.strftime("%m/%d/%Y")
 
-                if fetchSellers is True:
-                    sellers = self.__getUserSellers(user.userId, user.isAdmin)
+                if fetch_sellers is True:
+                    sellers = self.__get_user_sellers(user.userId, user.isAdmin)
                     user.sellers = sellers
                     if user.isAdmin:
                         user.category = "Admin"
@@ -791,42 +936,53 @@ class UserService:
 
         return user
 
-    def __getUserSellers(self, userId: int, isAdmin: bool):
+    def __get_user_sellers(self, user_id: int, is_admin: bool):
+        """
+        Get list of assigned sellers for user (all for admin)
+        """
         sellers: list[UserSeller] = []
-        if userId == None or userId <= 0:
+        if user_id is None or user_id <= 0:
             return sellers
 
         data = {}
         sql = ""
-        if isAdmin is False:
-            sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId, UserSeller.RoleId 
-                        FROM Sellers
+        if is_admin is False:
+            sql = """SELECT UserSeller.UserSellerId, Sellers.SellerId,
+                        Sellers.Name, Sellers.SellerTypeId, UserSeller.RoleId
+                         FROM Sellers
                         JOIN UserSeller on UserSeller.SellerId = Sellers.SellerId 
                         WHERE UserSeller.UserId=%(userId)s AND Sellers.Inactive <> 1
                         ORDER BY Sellers.Name ASC"""
-            data = {"userId": userId}
+            data = {"userId": user_id}
         else:
-            sql = "SELECT 0 as UserSellerId, Sellers.SellerId, Sellers.Name, Sellers.SellerTypeId, 1 AS RoleId FROM Sellers ORDER BY Sellers.Name ASC"
+            sql = """SELECT 0 as UserSellerId, Sellers.SellerId,
+                    Sellers.Name, Sellers.SellerTypeId, 1 AS RoleId
+                    FROM Sellers ORDER BY Sellers.Name ASC"""
 
         rows = db_query_all(sql, data)
 
         for row in rows:
-            userSellerId = int(row["UserSellerId"])
-            sellerId = int(row["SellerId"])
-            sellerName = str(row["Name"])
-            sellerType = int(row["SellerTypeId"])
-            roleId = int(row["RoleId"])
-            us = UserSeller(userSellerId, sellerId, sellerName, sellerType, roleId)
-            if isAdmin is False:
-                permissions = self.__getUserSellerPermissions(userSellerId)
+            user_seller_id = int(row["UserSellerId"])
+            seller_id = int(row["SellerId"])
+            seller_name = str(row["Name"])
+            seller_type = int(row["SellerTypeId"])
+            role_id = int(row["RoleId"])
+            us = UserSeller(
+                user_seller_id, seller_id, seller_name, seller_type, role_id
+            )
+            if is_admin is False:
+                permissions = self.__get_user_seller_permissions(user_seller_id)
                 us.permissions = permissions
             sellers.append(us)
 
         return sellers
 
-    def __getUserSellerPermissions(self, userSellerId: int):
+    def __get_user_seller_permissions(self, user_seller_id: int):
+        """
+        Get permissions for user by seller
+        """
         permissions: list[int] = []
-        if userSellerId == None or userSellerId <= 1:
+        if user_seller_id is None or user_seller_id <= 1:
             return permissions
 
         sql = """SELECT Permissions.PermissionId FROM Permissions
@@ -834,18 +990,21 @@ class UserService:
                     JOIN UserSeller ON UserSeller.RoleId = RolePermissions.RoleId 
                     WHERE UserSeller.UserSellerId=%(userSellerId)s 
                     ORDER BY Permissions.PermissionId"""
-        data = {"userSellerId": userSellerId}
+        data = {"userSellerId": user_seller_id}
 
         rows = db_query_all(sql, data)
 
         for row in rows:
-            permissionId = int(row["PermissionId"])
-            permissions.append(permissionId)
+            permission_id = int(row["PermissionId"])
+            permissions.append(permission_id)
 
         return permissions
 
-    def __validateUserName(self, username: str):
-        if username == None or username.strip() == "":
+    def __validate_username(self, username: str):
+        """
+        Validate username
+        """
+        if username is None or username.strip() == "":
             return "Please enter a username"
         username = username.strip()
         if validate_email_address(username) is False:
@@ -854,26 +1013,32 @@ class UserService:
         sql = "SELECT UserId FROM Users WHERE Username = %(username)s"
         data = {"username": username}
         row = db_query_one(sql, data)
-        if row != {}:
+        if row:
             return "That username is already taken"
         return None
 
-    def __validatePassword(self, password: str, confirmPassword: str):
-        if password == None or password.strip() == "":
+    def __validate_password(self, password: str, confirm_password: str):
+        """
+        Validate password
+        """
+        if password is None or password.strip() == "":
             return "Please enter a password"
         password = password.strip()
         if len(password) < 6:
             return "Password must have at least 6 characters."
-        if confirmPassword == None or confirmPassword.strip() == "":
+        if confirm_password is None or confirm_password.strip() == "":
             return "Please enter confirm password"
-        confirmPassword = confirmPassword.strip()
-        if password != confirmPassword:
+        confirm_password = confirm_password.strip()
+        if password != confirm_password:
             return "Passwords do not match"
         return None
 
-    def __sendRegistrationEmail(self, username: str):
+    def __send_registration_email(self, username: str):
+        """
+        Send notice to TJ that a new user has registered
+        """
         result = SendEmailResult(True, None)
-        user = self.__retrieveUserFromDatabase(username=username)
+        user = self.__retrieve_user_from_database(username=username)
         if user is not None:
             html = "<table>"
             html += "<tr><td>User Email:</td><td>" + username + "</td></tr>"

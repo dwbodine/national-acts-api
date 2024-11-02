@@ -86,7 +86,7 @@ def __get_user_from_jwt():
         if request.headers.get("Authorization") is not None:
             username = get_jwt()["sub"]
             service = UserService()
-            user = service.getUserByUserName(username)
+            user = service.get_user_by_user_name(username)
     except (RuntimeError, KeyError):
         user = None
     return user
@@ -214,7 +214,7 @@ def get_all_permissions():
         return {"msg": "Unauthorized"}, 401
 
     service = UserService()
-    permissions = service.getAllPermissions()
+    permissions = service.get_all_permissions()
     return convert_to_json(permissions)
 
 
@@ -229,7 +229,7 @@ def get_all_roles():
         return {"msg": "Unauthorized"}, 401
 
     service = UserService()
-    roles = service.getAllRoles()
+    roles = service.get_all_roles()
     return convert_to_json(roles)
 
 
@@ -247,7 +247,7 @@ def get_role_by_id(role_id):
         return {"msg": "Bad Request"}, 400
 
     service = UserService()
-    role = service.getRoleById(role_id)
+    role = service.get_role_by_id(role_id)
     return convert_to_json(role)
 
 
@@ -266,7 +266,7 @@ def delete_roles():
     role_ids: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
-    success = service.deleteRoles(role_ids)
+    success = service.delete_roles(role_ids)
     return convert_to_json(success)
 
 
@@ -285,7 +285,7 @@ def update_role():
     role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
-    success = service.updateRole(role)
+    success = service.update_role(role)
     return convert_to_json(success)
 
 
@@ -300,7 +300,7 @@ def get_all_users():
         return {"msg": "Unauthorized"}, 401
 
     service = UserService()
-    users = service.getAllUsers()
+    users = service.get_all_users()
     return convert_to_json(users)
 
 
@@ -320,7 +320,7 @@ def delete_user():
         return {"msg": "Bad Request"}, 400
 
     service = UserService()
-    success = service.deleteUser(user_id)
+    success = service.delete_user(user_id)
     return convert_to_json(success)
 
 
@@ -339,7 +339,7 @@ def update_user():
     user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
     service = UserService()
-    success = service.updateUser(user)
+    success = service.update_user(user)
     return convert_to_json(success)
 
 
@@ -427,19 +427,19 @@ def get_user_activity():
     activities: list[UserActivity] = []
     filter_admin_val: bool = True if filter_admins is not None else False
     if user_id is not None and activity_type is not None:
-        activities = service.getUserActivity(
-            start, end, int(user_id), int(activity_type), filterAdmins=filter_admin_val
+        activities = service.get_user_activity(
+            start, end, int(user_id), int(activity_type), filter_admins=filter_admin_val
         )
     elif user_id is not None:
-        activities = service.getUserActivity(
-            start, end, int(user_id), filterAdmins=filter_admin_val
+        activities = service.get_user_activity(
+            start, end, int(user_id), filter_admins=filter_admin_val
         )
     elif activity_type is not None:
-        activities = service.getUserActivity(
-            start, end, activityType=int(activity_type), filterAdmins=filter_admin_val
+        activities = service.get_user_activity(
+            start, end, activity_type=int(activity_type), filter_admins=filter_admin_val
         )
     else:
-        activities = service.getUserActivity(start, end, filterAdmins=filter_admin_val)
+        activities = service.get_user_activity(start, end, filter_admins=filter_admin_val)
     return convert_to_json(activities)
 
 
@@ -531,7 +531,7 @@ def log_user_activity():
 
         service = UserService()
         data: str = str(activity_data) if activity_data is not None else ""
-        success = service.logUserActivity(user_id, int(activity_data), data)
+        success = service.log_user_activity(user_id, int(activity_data), data)
     return convert_to_json(success)
 
 
@@ -759,7 +759,7 @@ def get_user_seller_from_event_id(user_id: int, event_id: int):
     if user_id is None or user_id == 0 or event_id is None or event_id == 0:
         return {"msg", "Bad request"}, 400
     service = UserService()
-    results = service.getUserSellerByEventId(user_id, event_id)
+    results = service.get_user_seller_by_event_id(user_id, event_id)
     return convert_to_json(results)
 
 
@@ -865,7 +865,7 @@ def get_user_profile(user_id: int):
     if user_id is None or user_id <= 0:
         return {"msg": "Bad Request"}, 400
     service = UserService()
-    user = service.getUserById(user_id, True)
+    user = service.get_user_by_id(user_id, True)
     return convert_to_json(user)
 
 
@@ -923,7 +923,7 @@ def reset_password():
     service = UserService()
     if username is None or password is None or confirm_password is None or code is None:
         return {"msg", "Bad request"}, 400
-    result = service.resetPassword(username, code, password, confirm_password)
+    result = service.reset_password(username, code, password, confirm_password)
     return convert_to_json(result)
 
 
@@ -939,7 +939,7 @@ def reset_password_secured():
     service = UserService()
     if username is None or password is None or confirm_password is None:
         return {"msg", "Bad request"}, 400
-    result = service.resetPasswordSecured(username, password, confirm_password)
+    result = service.reset_password_secured(username, password, confirm_password)
     return convert_to_json(result)
 
 
@@ -976,7 +976,7 @@ def send_password_reset():
     if username is None:
         return {"msg", "Bad request"}, 400
     service = UserService()
-    success = service.sendPasswordResetEmail(username)
+    success = service.send_password_reset_email(username)
     return convert_to_json(success)
 
 
@@ -1237,7 +1237,7 @@ def validate_reset_code():
     if username is None or code is None:
         return {"msg", "Bad request"}, 400
     service = UserService()
-    success = service.validatePasswordResetCode(str(username), int(code))
+    success = service.validate_password_reset_code(str(username), int(code))
     return convert_to_json(success)
 
 
