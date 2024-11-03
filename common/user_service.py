@@ -6,7 +6,6 @@ from datetime import datetime
 import hashlib
 import random
 
-# from common.models.ticket_socket import *
 from common.models.user import (
     UserResponse,
     User,

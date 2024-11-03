@@ -1,3 +1,6 @@
+"""
+Models specific to National Acts
+"""
 import calendar
 import datetime
 import traceback

@@ -193,7 +193,7 @@ class TicketSocketService:
                 on_sale: str = ""
                 if "onsale" in item:
                     on_sale = item["onsale"]
-                event.onSale = True if on_sale == "1" else False
+                event.on_sale = True if on_sale == "1" else False
 
                 categories = []
                 if "categories" in item:
@@ -211,7 +211,7 @@ class TicketSocketService:
                 if category_id <= 0:
                     continue
 
-                event.eventCategoryId = category_id
+                event.event_category_id = category_id
 
                 thumbnail: str = ""
                 if "smallPic" in item:
@@ -222,7 +222,7 @@ class TicketSocketService:
                 if "sefUrl" in item:
                     sef_url = item["sefUrl"]
 
-                event.ticketSocketUrl = (
+                event.ticket_socket_url = (
                     "https://" + self.service_url + "/event/" + sef_url
                 )
 
@@ -279,22 +279,23 @@ class TicketSocketService:
                 if custom_fields != {} and "timezone" in custom_fields:
                     timezone = custom_fields["timezone"]
 
-                event.venue = TicketSocketVenue(
+                event_venue = TicketSocketVenue(
                     venue, address1, address2, city, state, zip_code, country, timezone
                 )
+                event.venue = event_venue
 
                 # date/time info
                 display_date: str = ""
                 if "displayStartDate" in item:
                     display_date = item["displayStartDate"]
 
-                event.displayDate = display_date
+                event.display_date = display_date
 
                 event_utc: int = 0
                 if "start" in item:
                     event_utc = int(item["start"])
 
-                event.utcTime = event_utc
+                event.utc_time = event_utc
 
                 # need at least one of them to be non-zero
                 if display_date == "" and event_utc == 0:
@@ -310,10 +311,10 @@ class TicketSocketService:
                 # with a valid value and we use that for our date instead
 
                 try:
-                    event_date = datetime.strptime(event.displayDate, "%m/%d/%Y")
+                    event_date = datetime.strptime(event.display_date, "%m/%d/%Y")
                     event.eventDate = event_date.strftime("%Y-%m-%d")
                 except RuntimeError:
-                    event_time: int = event.utcTime + (self.utc_offset_hours * 60 * 60)
+                    event_time: int = event.utc_time + (self.utc_offset_hours * 60 * 60)
                     event.eventDate = datetime.fromtimestamp(event_time).strftime(
                         "%Y-%m-%d"
                     )
@@ -322,10 +323,10 @@ class TicketSocketService:
                 ticket_types = []
                 if "ticketTypes" in item:
                     ticket_types = self.get_ticket_types_from_event(item["ticketTypes"])
-                event.ticketTypes = ticket_types
+                event.ticket_types = ticket_types
 
                 # orders
-                event.orders = self.get_orders_from_event_id(event.id, format_phones)
+                event.orders = self.get_orders_from_event_id(event.event_id, format_phones)
 
                 self.events.append(event)
 
@@ -429,45 +430,45 @@ class TicketSocketService:
                         num_tickets += 1
 
                         # set properties on order from ticket data if not present
-                        if order.userId == 0 and "userId" in item:
-                            order.userId = int(item["userId"])
+                        if order.user_id == 0 and "userId" in item:
+                            order.user_id = int(item["userId"])
                         if (
-                            order.purchaserFirstName == ""
+                            order.purchaser_first_name == ""
                             and "billing_firstName" in item
                         ):
-                            order.purchaserFirstName = fix_magic_quotes(
+                            order.purchaser_first_name = fix_magic_quotes(
                                 item["billing_firstName"]
                             )
-                        if order.purchaserLastName == "" and "billing_lastName" in item:
-                            order.purchaserLastName = fix_magic_quotes(
+                        if order.purchaser_last_name == "" and "billing_lastName" in item:
+                            order.purchaser_last_name = fix_magic_quotes(
                                 item["billing_lastName"]
                             )
-                        if order.purchaserCity is None and "billing_city" in item:
-                            order.purchaserCity = fix_magic_quotes(item["billing_city"])
-                        if order.purchaserState is None and "billing_state" in item:
-                            order.purchaserState = fix_magic_quotes(
+                        if order.purchaser_city is None and "billing_city" in item:
+                            order.purchaser_city = fix_magic_quotes(item["billing_city"])
+                        if order.purchaser_state is None and "billing_state" in item:
+                            order.purchaser_state = fix_magic_quotes(
                                 item["billing_state"]
                             )
-                        if order.purchaserZipCode is None and "billing_zip" in item:
-                            order.purchaserZipCode = fix_magic_quotes(
+                        if order.purchaser_zip_code is None and "billing_zip" in item:
+                            order.purchaser_zip_code = fix_magic_quotes(
                                 item["billing_zip"]
                             )
-                        if order.purchaserCountry is None and "billing_country" in item:
-                            order.purchaserCountry = fix_magic_quotes(
+                        if order.purchaser_country is None and "billing_country" in item:
+                            order.purchaser_country = fix_magic_quotes(
                                 item["billing_country"]
                             )
-                        if order.purchaserIpAddress is None and "remoteAddr" in item:
-                            order.purchaserIpAddress = fix_magic_quotes(
+                        if order.purchaser_ip_address is None and "remoteAddr" in item:
+                            order.purchaser_ip_address = fix_magic_quotes(
                                 item["remoteAddr"]
                             )
-                        if order.purchaseDate == "" and "purchaseDate" in item:
+                        if order.purchase_date == "" and "purchaseDate" in item:
                             # datetime is not serializable in python,
                             # convert it to ISO-compatible string
                             purchase_date = datetime.fromtimestamp(
                                 float(item["purchaseDate"])
                             )
-                            order.purchaseDate = purchase_date.strftime("%Y-%m-%d")
-                            order.purchaseTimestamp = purchase_date.strftime(
+                            order.purchase_date = purchase_date.strftime("%Y-%m-%d")
+                            order.purchase_timestamp = purchase_date.strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             )
                         if order.email == "" and "email" in item:
@@ -566,11 +567,11 @@ class TicketSocketService:
                         order_service_fees += service_fee
 
                 if len(order_tickets) > 0:
-                    order.numTickets = num_tickets
+                    order.num_tickets = num_tickets
                     order.tickets = order_tickets
                     order.shirts = order_shirts
                     order.revenue = order_revenue
-                    order.serviceFees = order_service_fees
+                    order.service_fees = order_service_fees
 
                     orders.append(order)
 
