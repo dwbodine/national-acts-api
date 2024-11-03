@@ -167,17 +167,20 @@ class VipOrder(TicketSocketOrder):
     is_hidden: bool = False
 
     def get_totals(self):
+        """
+        Roll up data from tickets to order
+        """
         self.total_shirts = len(self.shirts)
         for ticket in self.tickets:
             if ticket.is_refunded is True:
                 self.num_tickets_refunded += 1
                 self.revenue_refunded += ticket.price
                 if ticket.is_service_fee_refunded is True:
-                    self.service_fee_revenue_refunded += ticket.serviceFee
+                    self.service_fee_revenue_refunded += ticket.service_fee
             elif ticket.is_charged_back is True:
                 self.num_tickets_charged_back += 1
                 self.revenue_charged_back += ticket.price
-                self.service_fee_revenue_charged_back += ticket.serviceFee
+                self.service_fee_revenue_charged_back += ticket.service_fee
 
         self.revenue_usd = self.revenue * self.exchange_rate
         self.service_fees_usd = self.service_fees * self.exchange_rate
@@ -193,7 +196,7 @@ class VipOrder(TicketSocketOrder):
 
 class VipEvent(TicketSocketEvent):
     ticket_socket_event_id: int = 0
-    totalRevenue: float = 0
+    total_revenue: float = 0
     totalServiceFees: float = 0
     totalTickets: int = 0
     totalCheckedIn: int = 0
@@ -231,12 +234,12 @@ class VipEvent(TicketSocketEvent):
     isAddedToBandsInTown: bool = False
     seller_name: str = ""
     is_hidden: bool = False
-    isCancelled: bool = False
-    cancelledDate: str = None
-    announceDate: str = None
+    is_cancelled: bool = False
+    cancelled_date: str = None
+    announce_date: str = None
 
     def get_totals(self):
-        totalRevenue: float = 0
+        total_revenue: float = 0
         totalServiceFees: float = 0
         totalTickets: int = 0
         total_shirts: int = 0
@@ -275,7 +278,7 @@ class VipEvent(TicketSocketEvent):
                 self.hasPhoneData = True
 
             if order.is_deleted is not True:
-                totalRevenue += order.revenue_usd
+                total_revenue += order.revenue_usd
                 totalServiceFees += order.service_fees_usd
                 totalTickets += order.numTickets
 
@@ -292,7 +295,7 @@ class VipEvent(TicketSocketEvent):
                         else:
                             shirtd[size] = 1
 
-        self.totalRevenue = totalRevenue
+        self.total_revenue = total_revenue
         self.totalServiceFees = totalServiceFees
         self.totalTickets = totalTickets
         self.totalCheckedIn = totalCheckedIn
