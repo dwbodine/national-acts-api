@@ -1,6 +1,7 @@
 """
 Models specific to National Acts
 """
+
 import calendar
 import datetime
 import traceback
@@ -19,6 +20,7 @@ class SellerEventCategory:
     Construct bringing together "category" (aka "event_category_id" from TS)
     and "seller_id" (National acts representation across multiple TS services)
     """
+
     seller_id: int = 0
     ticket_socket_id: int = 0
     event_category_id: int = 0
@@ -37,7 +39,9 @@ class SellerEventCategory:
             and event_category_id is None
             and seller_event_category_id is None
         ):
-            self.__populate_from_seller_id_and_ticket_socket_id(seller_id, ticket_socket_id)
+            self.__populate_from_seller_id_and_ticket_socket_id(
+                seller_id, ticket_socket_id
+            )
         elif (
             seller_id is None
             and ticket_socket_id is not None
@@ -108,6 +112,7 @@ class ShirtSales:
     """
     Shirt sale data
     """
+
     def __init__(self, size: str, total: int):
         self.size = size
         self.total = total
@@ -117,6 +122,7 @@ class VipTicket(TicketSocketTicket):
     """
     National acts specific verison of TS tickets
     """
+
     ticket_socket_order_id: int = 0
     ticket_socket_order_ticket_id: int = 0
     is_checked_in: bool = False
@@ -131,6 +137,7 @@ class VipOrder(TicketSocketOrder):
     """
     National acts specific version of TS orders
     """
+
     ticket_socket_event_id: int = 0
     ticket_socket_order_id: int = 0
     seller_name: str = None
@@ -198,6 +205,7 @@ class VipEvent(TicketSocketEvent):
     """
     National acts specific version of TS events
     """
+
     ticket_socket_event_id: int = 0
     total_revenue: float = 0
     total_service_fees: float = 0
@@ -261,7 +269,9 @@ class VipEvent(TicketSocketEvent):
             if order.has_refunds is True:
                 total_tickets_refunded += order.num_tickets_refunded
                 total_revenue_refunded += order.revenue_refunded_usd
-                total_service_fee_revenue_refunded += order.service_fee_revenue_refunded_usd
+                total_service_fee_revenue_refunded += (
+                    order.service_fee_revenue_refunded_usd
+                )
             if order.has_chargebacks is True:
                 total_tickets_charged_back += order.num_tickets_charged_back
                 total_revenue_charged_back += order.revenue_charged_back_usd
@@ -340,7 +350,10 @@ class VipEvent(TicketSocketEvent):
                 self.venue.address2 = self.external_venue.address2
             if self.external_venue.city is not None and self.external_venue.city != "":
                 self.venue.city = self.external_venue.city
-            if self.external_venue.state is not None and self.external_venue.state != "":
+            if (
+                self.external_venue.state is not None
+                and self.external_venue.state != ""
+            ):
                 self.venue.state = self.external_venue.state
             if (
                 self.external_venue.postal_code is not None
@@ -359,6 +372,7 @@ class DailyOrderData:
     """
     Represents one row + rollup data for table DailyOrderData
     """
+
     ticket_socket_order_id: int = None
     orders: int = 0
     tickets: int = 0
@@ -390,6 +404,7 @@ class DashboardTotals:
     """
     Totals rolled up for Admin dashboard
     """
+
     tickets: int = 0
     orders: int = 0
     num_tickets_refunded: int = 0
@@ -417,10 +432,12 @@ class DashboardTotals:
         row = db_query_one(sql, data)
         self.monthly_revenue_goal = float(row["Value"])
 
+
 class Seller:
     """
     Combination of internal id for TS account + TS category
     """
+
     hide_in_list: bool = False
     is_active: bool = True
     name: str = None
@@ -499,6 +516,7 @@ class TicketSocketRefreshHistory:
     """
     Represents a row in the TS refreh history table
     """
+
     seller_name: str = None
     user_name: str = None
     ticket_socket_refresh_history_id: int = None

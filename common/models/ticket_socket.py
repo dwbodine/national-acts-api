@@ -1,11 +1,14 @@
 """
 TicketSocket models
 """
+
+
 class TicketSocketCategory:
     """
-    "Category" in TicketSocket API which corresponds to 
+    "Category" in TicketSocket API which corresponds to
     SellerEventCategory.EventCategoryId in our database
     """
+
     def __init__(self, event_category_id: int, title: str):
         self.event_category_id = event_category_id
         self.name = title
@@ -15,6 +18,7 @@ class TicketSocketVenue:
     """
     Venue in TicketSocket API
     """
+
     def __init__(
         self,
         name: str,
@@ -40,6 +44,7 @@ class TicketSocketTicketType:
     """
     VIP ticket type in TicketSocket API
     """
+
     def __init__(
         self,
         event_id: int,
@@ -59,6 +64,7 @@ class TicketSocketTicket:
     """
     Ticket object in TicketSocket API
     """
+
     def __init__(
         self,
         ticket_id: int,
@@ -90,6 +96,7 @@ class TicketSocketOrder:
     """
     Order object from TicketSocket API
     """
+
     event_id: int = 0
     user_id: int = 0
     num_tickets: int = 0
@@ -120,6 +127,7 @@ class TicketSocketEvent:
     """
     Event object from TicketSocket API
     """
+
     venue: TicketSocketVenue = None
     orders: list[TicketSocketOrder] = []
     event_category_id: int = 0
