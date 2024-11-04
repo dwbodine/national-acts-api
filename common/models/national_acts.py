@@ -518,7 +518,7 @@ class TicketSocketRefreshHistory:
     """
 
     seller_name: str = None
-    user_name: str = None
+    username: str = None
     ticket_socket_refresh_history_id: int = None
     order_data_rows_removed: int = 0
     order_data_rows_updated: int = 0

@@ -63,7 +63,7 @@ class EventService:
         seller_event_category_ids: list[int] = []
         if seller_id is not None:
             seller = Seller(seller_id)
-            seller_event_category_ids = seller.getSellerEventCategoryIds()
+            seller_event_category_ids = seller.get_seller_event_category_ids()
             # prevent against returning every event in the database
             if len(seller_event_category_ids) == 0:
                 return []
@@ -199,26 +199,26 @@ class EventService:
             ticket_socket_event_id = int(row["Id"])
             vip_event = VipEvent(event_id, str(row["Title"]))
             vip_event.seller_name = str(row["SellerName"])
-            vip_event.isExternal = False
-            vip_event.ticketSocketEventId = ticket_socket_event_id
-            vip_event.sellerEventCategoryId = int(row["SellerEventCategoryId"])
-            vip_event.eventDate = str(row["EventDate"])
-            vip_event.utcTime = int(row["UtcTime"])
-            vip_event.displayDate = (
+            vip_event.is_external = False
+            vip_event.ticket_socket_event_id = ticket_socket_event_id
+            vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
+            vip_event.event_date = str(row["EventDate"])
+            vip_event.utc_time = int(row["UtcTime"])
+            vip_event.display_date = (
                 str(row["DisplayDate"]) if row["DisplayDate"] is not None else None
             )
             vip_event.thumbnail = (
                 str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
             )
-            vip_event.ticketSocketUrl = str(row["URL"])
-            vip_event.isAddedToBandsInTown = (
+            vip_event.ticket_socket_url = str(row["URL"])
+            vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False
             )
-            vip_event.isHidden = True if int(row["IsHidden"]) == 1 else False
-            vip_event.isCancelled = True if int(row["IsCancelled"]) == 1 else False
-            vip_event.cancelledDate = (
+            vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
+            vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
+            vip_event.cancelled_date = (
                 str(row["CancelledDate"])
-                if (vip_event.isCancelled is True and row["CancelledDate"] is not None)
+                if (vip_event.is_cancelled is True and row["CancelledDate"] is not None)
                 else None
             )
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
@@ -244,22 +244,22 @@ class EventService:
                 venue_name, address, "", city, state, zip_code, vip_country, ""
             )
             vip_event.venue = venue
-            vip_event.onSale = True if int(row["OnSale"]) == 1 else False
+            vip_event.on_sale = True if int(row["OnSale"]) == 1 else False
             vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-            vip_event.isDeleted = True if int(row["IsDeleted"]) == 1 else False
-            if vip_event.isDeleted is True:
+            vip_event.is_deleted = True if int(row["IsDeleted"]) == 1 else False
+            if vip_event.is_deleted is True:
                 vip_event.is_active = False
-            vip_event.isVip = True if int(row["IsVip"]) == 1 else False
+            vip_event.is_vip = True if int(row["IsVip"]) == 1 else False
             if (
                 row["ExternalEventId"] is not None
                 and row["ExternalEventId"] != ""
                 and exclude_external is not True
             ):
-                vip_event.externalEventId = int(row["ExternalEventId"])
-                vip_event.externalSellerId = int(row["ExternalSellerId"])
-                vip_event.externalTitle = str(row["ExternalTitle"])
-                vip_event.externalThumbnail = str(row["ExternalThumbnail"])
-                vip_event.externalUrl = str(row["ExternalUrl"])
+                vip_event.external_event_id = int(row["ExternalEventId"])
+                vip_event.external_seller_id = int(row["ExternalSellerId"])
+                vip_event.external_title = str(row["ExternalTitle"])
+                vip_event.external_thumbnail = str(row["ExternalThumbnail"])
+                vip_event.external_url = str(row["ExternalUrl"])
                 external_country = (
                     str(row["ExternalCountry"])
                     if row["ExternalCountry"] is not None
@@ -275,18 +275,18 @@ class EventService:
                     external_country,
                     "",
                 )
-                vip_event.externalVenue = external_venue
-                vip_event.disableLinkButton = str(row["DisableLinkButton"])
-                vip_event.disableLinkReason = str(row["DisableLinkReason"])
-                vip_event.externalVipLink = str(row["ExternalVipLink"])
-                vip_event.disableVipLinkButton = str(row["DisableVipLinkButton"])
-                vip_event.disableVipLinkReason = str(row["DisableVipLinkReason"])
+                vip_event.external_venue = external_venue
+                vip_event.disable_link_button = str(row["DisableLinkButton"])
+                vip_event.disable_link_reason = str(row["DisableLinkReason"])
+                vip_event.external_vip_link = str(row["ExternalVipLink"])
+                vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
+                vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
 
             if get_orders is True:
                 ticket_types = self.__get_ticket_types_from_event_id(
                     ticket_socket_event_id
                 )
-                vip_event.ticketTypes = ticket_types
+                vip_event.ticket_types = ticket_types
                 orders = self.__get_orders_from_event_id(
                     ticket_socket_event_id,
                     show_inactive,
@@ -296,7 +296,7 @@ class EventService:
                 )
                 vip_event.orders = orders
 
-            vip_event.getTotals()
+            vip_event.get_totals()
 
             events.append(vip_event)
 
@@ -377,10 +377,10 @@ class EventService:
                 event_id = int(row["EventId"])
                 vip_event = VipEvent(event_id, str(row["Title"]))
                 vip_event.seller_name = str(row["SellerName"])
-                vip_event.isExternal = True
-                vip_event.eventDate = str(row["EventDate"])
+                vip_event.is_external = True
+                vip_event.event_date = str(row["EventDate"])
                 vip_event.thumbnail = str(row["Thumbnail"])
-                vip_event.externalUrl = str(row["URL"])
+                vip_event.external_url = str(row["URL"])
                 venue = TicketSocketVenue(
                     str(row["Venue"]),
                     str(row["Address"]),
@@ -393,37 +393,37 @@ class EventService:
                 )
                 vip_event.venue = venue
                 vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-                vip_event.externalEventId = int(row["EventId"])
-                vip_event.externalSellerId = int(row["SellerId"])
-                vip_event.disableLinkButton = str(row["DisableLinkButton"])
-                vip_event.disableLinkReason = str(row["DisableLinkReason"])
-                vip_event.externalVipLink = str(row["ExternalVipLink"])
-                vip_event.isVip = (
+                vip_event.external_event_id = int(row["EventId"])
+                vip_event.external_seller_id = int(row["SellerId"])
+                vip_event.disable_link_button = str(row["DisableLinkButton"])
+                vip_event.disable_link_reason = str(row["DisableLinkReason"])
+                vip_event.external_vip_link = str(row["ExternalVipLink"])
+                vip_event.is_vip = (
                     True
                     if (
-                        vip_event.externalVipLink is not None
-                        and vip_event.externalVipLink != ""
+                        vip_event.external_vip_link is not None
+                        and vip_event.external_vip_link != ""
                     )
                     else False
                 )
-                vip_event.disableVipLinkButton = str(row["DisableVipLinkButton"])
-                vip_event.disableVipLinkReason = str(row["DisableVipLinkReason"])
-                vip_event.isAddedToBandsInTown = (
+                vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
+                vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
+                vip_event.is_added_to_bands_in_town = (
                     True if int(row["IsAddedToBandsInTown"]) == 1 else False
                 )
-                vip_event.isHidden = True if int(row["IsHidden"]) == 1 else False
-                vip_event.isCancelled = True if int(row["IsCancelled"]) == 1 else False
-                vip_event.cancelledDate = (
+                vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
+                vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
+                vip_event.cancelled_date = (
                     str(row["CancelledDate"])
                     if (
-                        vip_event.isCancelled is True
+                        vip_event.is_cancelled is True
                         and row["CancelledDate"] is not None
                     )
                     else None
                 )
                 events.append(vip_event)
 
-        events.sort(key=operator.attrgetter("eventDate", "title", "externalEventId"))
+        events.sort(key=operator.attrgetter("event_date", "title", "external_event_id"))
 
         return events
 
@@ -458,7 +458,7 @@ class EventService:
         seller_event_category_ids: list[int] = []
         if seller_id is not None:
             seller = Seller(seller_id)
-            seller_event_category_ids = seller.getSellerEventCategoryIds()
+            seller_event_category_ids = seller.get_seller_event_category_ids()
             # prevent against returning every event in the database
             if len(seller_event_category_ids) == 0:
                 return []
@@ -562,67 +562,67 @@ class EventService:
             event_id = int(row["EventId"])
             ticket_socket_order_id = int(row["Id"])
             order = VipOrder(order_id, event_id)
-            order.eventTitle = str(row["EventTitle"])
+            order.event_title = str(row["EventTitle"])
             order.venue = str(row["Venue"])
-            order.eventAddress = str(row["EventAddress"])
-            order.eventCity = str(row["EventCity"])
-            order.eventState = str(row["EventState"])
-            order.eventZip = str(row["EventZip"])
-            order.eventCountry = str(row["EventCountry"])
-            order.eventDate = str(row["EventDate"])
-            order.sellerName = str(row["SellerName"])
-            order.sellerId = int(row["seller_id"])
-            order.ticketSocketEventId = int(row["TicketSocketEventId"])
-            order.ticketSocketOrderId = ticket_socket_order_id
-            order.numTickets = int(row["NumTickets"])
-            order.purchaseDate = str(row["PurchaseDate"])
-            order.purchaseTimestamp = str(row["PurchaseTimestamp"])
-            order.userId = int(row["UserId"])
+            order.event_address = str(row["EventAddress"])
+            order.event_city = str(row["EventCity"])
+            order.event_state = str(row["EventState"])
+            order.event_zip = str(row["EventZip"])
+            order.event_country = str(row["EventCountry"])
+            order.event_date = str(row["EventDate"])
+            order.seller_name = str(row["SellerName"])
+            order.seller_id = int(row["seller_id"])
+            order.ticket_socket_event_id = int(row["TicketSocketEventId"])
+            order.ticket_socket_order_id = ticket_socket_order_id
+            order.num_tickets = int(row["NumTickets"])
+            order.purchase_date = str(row["PurchaseDate"])
+            order.purchase_timestamp = str(row["PurchaseTimestamp"])
+            order.user_id = int(row["UserId"])
             order.phone = str(row["Phone"]) if row["Phone"] is not None else None
             order.email = str(row["Email"]) if row["Email"] is not None else None
-            order.purchaserLastName = (
+            order.purchaser_last_name = (
                 str(row["PurchaserLastName"])
                 if row["PurchaserLastName"] is not None
                 else None
             )
-            order.purchaserFirstName = (
+            order.purchaser_first_name = (
                 str(row["PurchaserFirstName"])
                 if row["PurchaserFirstName"] is not None
                 else None
             )
-            order.purchaserCity = (
+            order.purchaser_city = (
                 str(row["PurchaserCity"]) if row["PurchaserCity"] is not None else None
             )
-            order.purchaserState = (
+            order.purchaser_state = (
                 str(row["PurchaserState"])
                 if row["PurchaserState"] is not None
                 else None
             )
-            order.purchaserZipCode = (
+            order.purchaser_zip_code = (
                 str(row["PurchaserZip"]) if row["PurchaserZip"] is not None else None
             )
-            order.purchaserCountry = (
+            order.purchaser_country = (
                 str(row["PurchaserCountry"])
                 if row["PurchaserCountry"] is not None
                 else None
             )
-            order.purchaserIpAddress = (
+            order.purchaser_ip_address = (
                 str(row["PurchaserIpAddress"])
                 if row["PurchaserIpAddress"] is not None
                 else None
             )
             order.revenue = float(row["Revenue"])
-            order.serviceFees = float(row["ServiceFees"])
-            order.exchangeRate = float(row["ExchangeRate"])
-            order.currencyAbbrev = str(row["CurrencyAbbrev"])
-            order.currencySymbol = str(row["Symbol"])
+            order.service_fees = float(row["ServiceFees"])
+            order.exchange_rate = float(row["ExchangeRate"])
+            order.currency_abbrev = str(row["CurrencyAbbrev"])
+            order.currency_symbol = str(row["Symbol"])
             order.is_active = True if int(row["IsActive"]) == 1 else False
-            order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
-            order.isHidden = True if int(row["IsHidden"]) == 1 else False
+            order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
+            order.is_hidden = True if int(row["IsHidden"]) == 1 else False
 
-            if order.isDeleted is True:
+            if order.is_deleted is True:
                 order.is_active = False
-                order.isHidden = False
+                order.is_hidden = False
             shirt_str = (
                 str(row["Shirts"]).strip() if row["Shirts"] is not None else None
             )
@@ -634,7 +634,7 @@ class EventService:
             order.shirts = shirts
             tickets = self.__get_tickets_from_order_id(ticket_socket_order_id)
             order.tickets = tickets
-            order.getTotals()
+            order.get_totals()
             orders.append(order)
         return orders
 
@@ -669,11 +669,11 @@ class EventService:
         refund_orders: int = 0
 
         for order in orders:
-            if order.isDeleted is True:
+            if order.is_deleted is True:
                 continue
 
             purchase_timestamp = datetime.strptime(
-                order.purchaseDate, "%Y-%m-%d"
+                order.purchase_date, "%Y-%m-%d"
             ).timestamp()
 
             order_data: DailyOrderData = None
@@ -683,59 +683,61 @@ class EventService:
             found_refund_index: int = -1
 
             for idx, x in enumerate(daily_order_data):
-                if x.ticketSocketEventId == order.ticketSocketEventId:
+                if x.ticket_socket_event_id == order.ticket_socket_event_id:
                     if (
-                        order.hasRefunds is True
-                        and x.ticketSocketOrderId == order.ticketSocketOrderId
+                        order.has_refunds is True
+                        and x.ticket_socket_order_id == order.ticket_socket_order_id
                     ) or (
-                        order.hasChargebacks is True
-                        and x.ticketSocketOrderId == order.ticketSocketOrderId
+                        order.has_chargebacks is True
+                        and x.ticket_socket_order_id == order.ticket_socket_order_id
                     ):
                         refund_order_data = x
                         found_refund_index = idx
-                    elif x.purchaseDate == order.purchaseDate:
+                    elif x.purchase_date == order.purchase_date:
                         order_data = x
                         found_index = idx
                         break
 
-            if order.hasRefunds is True and refund_order_data is None:
+            if order.has_refunds is True and refund_order_data is None:
                 refund_order_data = DailyOrderData(
-                    order.refundDate, order.ticketSocketEventId
+                    order.refundDate, order.ticket_socket_event_id
                 )
-                refund_order_data.ticketSocketOrderId = order.ticketSocketOrderId
-                refund_order_data.isRefunded = True
-                refund_order_data.isChargeback = False
-            elif order.hasChargebacks is True and refund_order_data is None:
+                refund_order_data.ticket_socket_order_id = order.ticket_socket_order_id
+                refund_order_data.is_refunded = True
+                refund_order_data.is_charged_back = False
+            elif order.has_chargebacks is True and refund_order_data is None:
                 refund_order_data = DailyOrderData(
-                    order.chargebackDate, order.ticketSocketEventId
+                    order.chargebackDate, order.ticket_socket_event_id
                 )
-                refund_order_data.ticketSocketOrderId = order.ticketSocketOrderId
-                refund_order_data.isRefunded = False
-                refund_order_data.isChargeback = True
+                refund_order_data.ticket_socket_order_id = order.ticket_socket_order_id
+                refund_order_data.is_refunded = False
+                refund_order_data.is_charged_back = True
 
             if order_data is None and (
                 purchase_timestamp >= start and purchase_timestamp <= end
             ):
                 order_data = DailyOrderData(
-                    order.purchaseDate, order.ticketSocketEventId
+                    order.purchase_date, order.ticket_socket_event_id
                 )
-                order_data.ticketSocketOrderId = None
-                order_data.isRefunded = False
-                order_data.isChargeback = False
+                order_data.ticket_socket_order_id = None
+                order_data.is_refunded = False
+                order_data.is_charged_back = False
 
             if refund_order_data is not None:
-                refund_order_data.numTicketsRefunded += order.numTicketsRefunded
-                refund_order_data.revenueRefunded += order.revenueRefunded
-                refund_order_data.serviceFeeRevenueRefunded += (
-                    order.serviceFeeRevenueRefunded
+                refund_order_data.num_tickets_refunded += order.num_tickets_refunded
+                refund_order_data.revenue_refunded += order.revenue_refunded
+                refund_order_data.service_fee_revenue_refunded += (
+                    order.service_fee_revenue_refunded
                 )
 
             if order_data is not None:
                 order_data.orders += 1
-                order_data.tickets += order.numTickets
-                order_data.ticketRevenueUsd += order.revenueUsd
-                order_data.serviceFeesRevenueUsd += order.serviceFeesUsd
-                order_data.totalRevenueUsd += order.revenueUsd + order.serviceFeesUsd
+                order_data.tickets += order.num_tickets
+                order_data.ticket_revenue_usd += order.revenue_usd
+                order_data.service_fees_revenue_usd += order.service_fees_usd
+                order_data.total_revenue_usd += (
+                    order.revenue_usd + order.service_fees_usd
+                )
 
             if order_data is not None:
                 regular_orders += 1
@@ -782,32 +784,32 @@ class EventService:
                         WHERE TicketSocketEventId=%(ticketSocketEventId)s
                         AND PurchaseDate=DATE(%(purchaseDate)s)"""
             data = {
-                "ticketSocketEventId": order_data.ticketSocketEventId,
-                "purchaseDate": order_data.purchaseDate,
+                "ticketSocketEventId": order_data.ticket_socket_event_id,
+                "purchaseDate": order_data.purchase_date,
             }
 
-            if order_data.ticketSocketOrderId is not None:
+            if order_data.ticket_socket_order_id is not None:
                 sql += """ AND TicketSocketOrderId=%(ticketSocketOrderId)s"""
-                data["ticketSocketOrderId"] = order_data.ticketSocketOrderId
+                data["ticketSocketOrderId"] = order_data.ticket_socket_order_id
             else:
                 sql += """ AND TicketSocketOrderId IS NULL"""
 
             existing_data = db_query_one(sql, data)
 
             update_data = {
-                "purchaseDate": order_data.purchaseDate,
-                "ticketSocketEventId": order_data.ticketSocketEventId,
+                "purchaseDate": order_data.purchase_date,
+                "ticketSocketEventId": order_data.ticket_socket_event_id,
                 "orders": order_data.orders,
                 "tickets": order_data.tickets,
-                "ticketRevenue": order_data.ticketRevenueUsd,
-                "serviceFeeRevenue": order_data.serviceFeesRevenueUsd,
-                "totalRevenue": order_data.totalRevenueUsd,
-                "isRefunded": 1 if order_data.isRefunded is True else 0,
-                "isChargeback": 1 if order_data.isChargeback is True else 0,
-                "numTicketsRefunded": order_data.numTicketsRefunded,
-                "revenueRefunded": order_data.revenueRefunded,
-                "serviceFeeRevenueRefunded": order_data.serviceFeeRevenueRefunded,
-                "ticketSocketOrderId": order_data.ticketSocketOrderId,
+                "ticketRevenue": order_data.ticket_revenue_usd,
+                "serviceFeeRevenue": order_data.service_fees_revenue_usd,
+                "totalRevenue": order_data.total_revenue_usd,
+                "isRefunded": 1 if order_data.is_refunded is True else 0,
+                "isChargeback": 1 if order_data.is_charged_back is True else 0,
+                "numTicketsRefunded": order_data.num_tickets_refunded,
+                "revenueRefunded": order_data.revenue_refunded,
+                "serviceFeeRevenueRefunded": order_data.service_fee_revenue_refunded,
+                "ticketSocketOrderId": order_data.ticket_socket_order_id,
             }
 
             if existing_data:
@@ -847,7 +849,7 @@ class EventService:
                 break
 
         duration = time.time() - timer
-        history.setOrderUpdateSuccess(success, duration, inserts, updates)
+        history.set_order_update_success(success, duration, inserts, updates)
 
         log_message(f"Daily order data - update complete in {duration} seconds")
 
@@ -912,8 +914,8 @@ class EventService:
             purchase_date = str(row["PurchaseDate"])
             ticket_socket_event_id = int(row["TicketSocketEventId"])
             order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
-            order_data.eventTitle = str(row["EventTitle"])
-            order_data.eventDate = str(row["EventDate"])
+            order_data.event_title = str(row["EventTitle"])
+            order_data.event_date = str(row["EventDate"])
             order_data.seller_id = int(row["seller_id"])
             order_data.seller_name = str(row["SellerName"])
             order_data.venue = str(row["Venue"])
@@ -923,42 +925,45 @@ class EventService:
             order_data.zip = str(row["Zip"])
             order_data.tickets = int(row["Tickets"])
             order_data.orders = int(row["Orders"])
-            order_data.ticketRevenueUsd = float(row["TicketRevenue"])
-            order_data.serviceFeesRevenueUsd = float(row["ServiceFeeRevenue"])
-            order_data.totalRevenueUsd = float(row["TotalRevenue"])
-            order_data.ticketSocketId = int(row["TicketSocketId"])
+            order_data.ticket_revenue_usd = float(row["TicketRevenue"])
+            order_data.service_fees_revenue_usd = float(row["ServiceFeeRevenue"])
+            order_data.total_revenue_usd = float(row["TotalRevenue"])
+            order_data.ticket_socket_id = int(row["TicketSocketId"])
             order_data.ticket_socket_order_id = (
                 int(row["TicketSocketOrderId"])
                 if row["TicketSocketOrderId"] is not None
                 else None
             )
-            order_data.isRefunded = True if int(row["IsRefunded"]) == 1 else False
-            order_data.isChargeback = True if int(row["IsChargeback"]) == 1 else False
-            order_data.numTicketsRefunded = int(row["NumTicketsRefunded"])
-            order_data.revenueRefunded = float(row["RevenueRefunded"])
-            order_data.serviceFeeRevenueRefunded = float(
+            order_data.is_refunded = True if int(row["IsRefunded"]) == 1 else False
+            order_data.is_charged_back = (
+                True if int(row["IsChargeback"]) == 1 else False
+            )
+            order_data.num_tickets_refunded = int(row["NumTicketsRefunded"])
+            order_data.revenue_refunded = float(row["RevenueRefunded"])
+            order_data.service_fee_revenue_refunded = float(
                 row["ServiceFeeRevenueRefunded"]
             )
 
             dash_totals.tickets += order_data.tickets
             dash_totals.orders += order_data.orders
-            dash_totals.numTicketsRefunded += order_data.numTicketsRefunded
-            dash_totals.revenueRefunded += order_data.revenueRefunded
-            dash_totals.serviceFeeRevenueRefunded += (
-                order_data.serviceFeeRevenueRefunded
+            dash_totals.num_tickets_refunded += order_data.num_tickets_refunded
+            dash_totals.revenue_refunded += order_data.revenue_refunded
+            dash_totals.service_fee_revenue_refunded += (
+                order_data.service_fee_revenue_refunded
             )
-            dash_totals.ticketRevenueUsd += order_data.ticketRevenueUsd
-            dash_totals.serviceFeesRevenueUsd += order_data.serviceFeesRevenueUsd
-            dash_totals.totalRevenueUsd += order_data.totalRevenueUsd
+            dash_totals.ticket_revenue_usd += order_data.ticket_revenue_usd
+            dash_totals.service_fees_revenue_usd += order_data.service_fees_revenue_usd
+            dash_totals.total_revenue_usd += order_data.total_revenue_usd
 
             daily_order_data.append(order_data)
 
         dash_totals.daily_order_data = daily_order_data
-        dash_totals.pricePerTicket = (
-            dash_totals.ticketRevenueUsd - dash_totals.revenueRefunded
+        dash_totals.price_per_ticket = (
+            dash_totals.ticket_revenue_usd - dash_totals.revenue_refunded
         ) / dash_totals.tickets
-        dash_totals.serviceFeePerTicket = (
-            dash_totals.serviceFeesRevenueUsd - dash_totals.serviceFeeRevenueRefunded
+        dash_totals.service_fee_per_ticket = (
+            dash_totals.service_fees_revenue_usd
+            - dash_totals.service_fee_revenue_refunded
         ) / dash_totals.tickets
         return dash_totals
 
@@ -1042,66 +1047,66 @@ class EventService:
             ticket_socket_order_id = int(row["Id"])
             order = VipOrder(order_id, event_id)
             order.venue = str(row["Venue"])
-            order.eventTitle = str(row["EventTitle"])
-            order.eventAddress = str(row["EventAddress"])
-            order.eventCity = str(row["EventCity"])
-            order.eventState = str(row["EventState"])
-            order.eventZip = str(row["EventZip"])
-            order.eventCountry = str(row["EventCountry"])
-            order.eventDate = str(row["EventDate"])
+            order.event_title = str(row["EventTitle"])
+            order.event_address = str(row["EventAddress"])
+            order.event_city = str(row["EventCity"])
+            order.event_state = str(row["EventState"])
+            order.event_zip = str(row["EventZip"])
+            order.event_country = str(row["EventCountry"])
+            order.event_date = str(row["EventDate"])
             order.seller_name = str(row["SellerName"])
-            order.sellerId = int(row["seller_id"])
-            order.ticketSocketEventId = ticket_socket_event_id
-            order.ticketSocketOrderId = ticket_socket_order_id
-            order.numTickets = int(row["NumTickets"])
-            order.purchaseDate = str(row["PurchaseDate"])
-            order.purchaseTimestamp = str(row["PurchaseTimestamp"])
+            order.seller_id = int(row["seller_id"])
+            order.ticket_socket_event_id = ticket_socket_event_id
+            order.ticket_socket_order_id = ticket_socket_order_id
+            order.num_tickets = int(row["NumTickets"])
+            order.purchase_date = str(row["PurchaseDate"])
+            order.purchase_timestamp = str(row["PurchaseTimestamp"])
             order.user_id = int(row["UserId"])
             order.phone = str(row["Phone"]) if row["Phone"] is not None else None
             order.email = str(row["Email"]) if row["Email"] is not None else None
-            order.purchaserLastName = (
+            order.purchaser_last_name = (
                 str(row["PurchaserLastName"])
                 if row["PurchaserLastName"] is not None
                 else None
             )
-            order.purchaserFirstName = (
+            order.purchaser_first_name = (
                 str(row["PurchaserFirstName"])
                 if row["PurchaserFirstName"] is not None
                 else None
             )
-            order.purchaserCity = (
+            order.purchaser_city = (
                 str(row["PurchaserCity"]) if row["PurchaserCity"] is not None else None
             )
-            order.purchaserState = (
+            order.purchaser_state = (
                 str(row["PurchaserState"])
                 if row["PurchaserState"] is not None
                 else None
             )
-            order.purchaserZipCode = (
+            order.purchaser_zip_code = (
                 str(row["PurchaserZip"]) if row["PurchaserZip"] is not None else None
             )
-            order.purchaserCountry = (
+            order.purchaser_country = (
                 str(row["PurchaserCountry"])
                 if row["PurchaserCountry"] is not None
                 else None
             )
-            order.purchaserIpAddress = (
+            order.purchaser_ip_address = (
                 str(row["PurchaserIpAddress"])
                 if row["PurchaserIpAddress"] is not None
                 else None
             )
             order.revenue = float(row["Revenue"])
-            order.serviceFees = float(row["ServiceFees"])
-            order.exchangeRate = float(row["ExchangeRate"])
-            order.currencyAbbrev = str(row["CurrencyAbbrev"])
-            order.currencySymbol = str(row["Symbol"])
-            order.isActive = True if int(row["IsActive"]) == 1 else False
-            order.isDeleted = True if int(row["IsDeleted"]) == 1 else False
-            order.isHidden = True if int(row["IsHidden"]) == 1 else False
+            order.service_fees = float(row["ServiceFees"])
+            order.exchange_rate = float(row["ExchangeRate"])
+            order.currency_abbrev = str(row["CurrencyAbbrev"])
+            order.currency_symbol = str(row["Symbol"])
+            order.is_active = True if int(row["IsActive"]) == 1 else False
+            order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
+            order.is_hidden = True if int(row["IsHidden"]) == 1 else False
 
-            if order.isDeleted is True:
+            if order.is_deleted is True:
                 order.is_active = False
-                order.isHidden = False
+                order.is_hidden = False
             shirt_str = (
                 str(row["Shirts"]).strip() if row["Shirts"] is not None else None
             )
@@ -1113,7 +1118,7 @@ class EventService:
             order.shirts = shirts
             tickets = self.__get_tickets_from_order_id(ticket_socket_order_id)
             order.tickets = tickets
-            order.getTotals()
+            order.get_totals()
             orders.append(order)
         return orders
 
@@ -1146,15 +1151,15 @@ class EventService:
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
             ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
             is_refunded: bool = True if int(row["IsRefunded"]) == 1 else False
-            ticket.isRefunded = is_refunded
-            ticket.refundDate = (
+            ticket.is_refunded = is_refunded
+            ticket.refund_date = (
                 str(row["RefundDate"])
                 if (is_refunded is True and row["RefundDate"] is not None)
                 else None
             )
             is_charged_back: bool = True if int(row["IsChargedback"]) == 1 else False
-            ticket.isChargedBack = is_charged_back
-            ticket.chargebackDate = (
+            ticket.is_charged_back = is_charged_back
+            ticket.chargeback_date = (
                 str(row["ChargebackDate"])
                 if (is_charged_back is True and row["ChargebackDate"] is not None)
                 else None
@@ -1374,10 +1379,10 @@ class EventService:
         Update single event from admin
         """
         success: bool = True
-        if event_to_update is None or event_to_update.ticketSocketEventId <= 0:
+        if event_to_update is None or event_to_update.ticket_socket_event_id <= 0:
             return False
 
-        ticket_socket_event_id: int = event_to_update.ticketSocketEventId
+        ticket_socket_event_id: int = event_to_update.ticket_socket_event_id
         sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticket_socket_event_id)s"""
         data = {"ticket_socket_event_id": ticket_socket_event_id}
         existing_event: VipEvent = db_query_one(sql, data)
@@ -1395,32 +1400,32 @@ class EventService:
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "is_active": (
                     1
-                    if event_to_update.isActive is True
-                    and event_to_update.isDeleted is False
+                    if event_to_update.is_active is True
+                    and event_to_update.is_deleted is False
                     else 0
                 ),
-                "isDeleted": 1 if event_to_update.isDeleted is True else 0,
+                "isDeleted": 1 if event_to_update.is_deleted is True else 0,
                 "isAddedToBandsInTown": (
-                    1 if event_to_update.isAddedToBandsInTown is True else 0
+                    1 if event_to_update.is_added_to_bands_in_town is True else 0
                 ),
-                "isHidden": 1 if event_to_update.isHidden is True else 0,
-                "announceDate": event_to_update.announceDate,
+                "isHidden": 1 if event_to_update.is_hidden is True else 0,
+                "announceDate": event_to_update.announce_date,
             }
             success = db_update(update_sql, update_data)
 
             if (
-                event_to_update.isDeleted is False
-                and len(event_to_update.ticketTypes) > 0
+                event_to_update.is_deleted is False
+                and len(event_to_update.ticket_types) > 0
             ):
-                for ticket_type in event_to_update.ticketTypes:
+                for ticket_type in event_to_update.ticket_types:
                     ticket_type_wql = """UPDATE TicketSocketTicketTypes
                                         SET IsActive=%(is_active)s, LastUpdate=CURRENT_TIMESTAMP 
                                         WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
                                         AND TicketSocketEventId=%(ticket_socket_event_id)s"""
                     ticket_type_data = {
-                        "ticket_type_id": ticket_type.ticketTypeId,
+                        "ticket_type_id": ticket_type.ticket_type_id,
                         "ticket_socket_event_id": ticket_socket_event_id,
-                        "is_active": 1 if ticket_type.isActive is True else 0,
+                        "is_active": 1 if ticket_type.is_active is True else 0,
                     }
                     success = db_update(ticket_type_wql, ticket_type_data)
                     if success is False:
@@ -1432,10 +1437,10 @@ class EventService:
         Update single order from admin
         """
         success: bool = True
-        if order_to_update is None or order_to_update.ticketSocketOrderId <= 0:
+        if order_to_update is None or order_to_update.ticket_socket_order_id <= 0:
             return False
 
-        ticket_socket_order_id: int = order_to_update.ticketSocketOrderId
+        ticket_socket_order_id: int = order_to_update.ticket_socket_order_id
         sql = """SELECT * FROM TicketSocketOrders WHERE Id=%(ticket_socket_order_id)s"""
         data = {"ticket_socket_order_id": ticket_socket_order_id}
         existing_order: VipOrder = db_query_one(sql, data)
@@ -1455,16 +1460,16 @@ class EventService:
                     order_to_update.revenue if order_to_update.revenue != "None" else 0
                 ),
                 "serviceFees": (
-                    order_to_update.serviceFees
-                    if order_to_update.serviceFees != "None"
+                    order_to_update.service_fees
+                    if order_to_update.service_fees != "None"
                     else 0
                 ),
                 "is_active": 1 if order_to_update.is_active is True else 0,
-                "isDeleted": 1 if order_to_update.isDeleted is True else 0,
-                "isHidden": 1 if order_to_update.isHidden is True else 0,
+                "isDeleted": 1 if order_to_update.is_deleted is True else 0,
+                "isHidden": 1 if order_to_update.is_hidden is True else 0,
             }
             success = db_update(update_sql, update_data)
-            if order_to_update.isDeleted is False and len(order_to_update.tickets) > 0:
+            if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
                 for ticket in order_to_update.tickets:
                     order_ticket_sql = """UPDATE TicketSocketOrderTickets
                                             SET Price=%(price)s, 
@@ -1475,9 +1480,9 @@ class EventService:
                                             AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
                     order_ticket_data = {
                         "ticketId": ticket.id,
-                        "ticket_socket_order_id": ticket.ticketSocketOrderId,
+                        "ticket_socket_order_id": ticket.ticket_socket_order_id,
                         "price": ticket.price,
-                        "serviceFee": ticket.serviceFee,
+                        "serviceFee": ticket.service_fee,
                         "is_checked_in": 1 if ticket.is_checked_in is True else 0,
                     }
                     success = db_update(order_ticket_sql, order_ticket_data)
@@ -1512,13 +1517,15 @@ class EventService:
             event_category_id: int = None
             seller_event_category: SellerEventCategory = None
             if seller is not None:
-                seller_event_category = seller.getSellerEventCategory(ticket_socket_id)
+                seller_event_category = seller.get_seller_event_category(
+                    ticket_socket_id
+                )
 
                 # if we are restricting by seller and the seller doesn't have
                 # a category on this TS service, just skip it or the service will
                 # return everything for everyone in the time period
                 if seller_event_category is not None:
-                    event_category_id = seller_event_category.eventCategoryId
+                    event_category_id = seller_event_category.event_category_id
                 else:
                     continue
 
@@ -1529,24 +1536,24 @@ class EventService:
                     # convert ts events to vip events
                     vip_event = VipEvent(event.id, event.title)
                     vip_event.__dict__.update(event.__dict__)
-                    vip_event.isVip = is_vip_service
+                    vip_event.is_vip = is_vip_service
 
                     # populate sellerEventCategoryId, which is required on our end
                     if seller_event_category is not None:
-                        vip_event.sellerEventCategoryId = (
-                            seller_event_category.sellerEventCategoryId
+                        vip_event.seller_event_category_id = (
+                            seller_event_category.seller_event_category_id
                         )
-                    elif vip_event.eventCategoryId is not None:
+                    elif vip_event.event_category_id is not None:
                         seller_ec_temp = SellerEventCategory(
-                            None, ticket_socket_id, vip_event.eventCategoryId
+                            None, ticket_socket_id, vip_event.event_category_id
                         )
-                        vip_event.sellerEventCategoryId = (
-                            seller_ec_temp.sellerEventCategoryId
+                        vip_event.seller_event_category_id = (
+                            seller_ec_temp.seller_event_category_id
                         )
 
                     # if this combo of TS and category does not exist on our side,
                     # we can't update this event
-                    if vip_event.sellerEventCategoryId is None:
+                    if vip_event.seller_event_category_id is None:
                         continue
 
                     # convert the orders
@@ -1621,13 +1628,13 @@ class EventService:
 
                 service_events: list[int] = []
                 for evt in all_events:
-                    if evt.sellerEventCategoryId <= 0:
+                    if evt.seller_event_category_id <= 0:
                         service_events_skipped.append(
                             evt.title
                             + " - eventId "
                             + str(evt.id)
                             + " ("
-                            + evt.ticketSocketUrl
+                            + evt.ticket_socket_url
                             + ")"
                         )
                         continue
@@ -1640,9 +1647,9 @@ class EventService:
 
                     event_data = {
                         "title": evt.title.strip(),
-                        "eventDate": evt.eventDate.strip(),
-                        "utcTime": evt.utcTime,
-                        "url": evt.ticketSocketUrl.strip(),
+                        "eventDate": evt.event_date.strip(),
+                        "utcTime": evt.utc_time,
+                        "url": evt.ticket_socket_url.strip(),
                         "venue": evt.venue.name.strip(),
                         "address": address.strip(),
                         "city": evt.venue.city.strip(),
@@ -1653,16 +1660,16 @@ class EventService:
                             if evt.venue.country is not None
                             else None
                         ),
-                        "onsale": 1 if evt.onSale else 0,
+                        "onsale": 1 if evt.on_sale else 0,
                         "thumbnail": (
                             evt.thumbnail.strip() if evt.thumbnail is not None else None
                         ),
                         "displayDate": (
-                            evt.displayDate.strip()
-                            if evt.displayDate is not None
+                            evt.display_date.strip()
+                            if evt.display_date is not None
                             else None
                         ),
-                        "isVip": 1 if evt.isVip else 0,
+                        "isVip": 1 if evt.is_vip else 0,
                     }
 
                     # determine if event already exists
@@ -1672,7 +1679,7 @@ class EventService:
 
                     data = {
                         "event_id": evt.id,
-                        "sellerEventCategoryId": evt.sellerEventCategoryId,
+                        "sellerEventCategoryId": evt.seller_event_category_id,
                     }
 
                     existing_event = db_query_one(event_sql, data, cnx)
@@ -1699,7 +1706,7 @@ class EventService:
                         # insert new event
                         event_data["event_id"] = int(evt.id)
                         event_data["sellerEventCategoryId"] = int(
-                            evt.sellerEventCategoryId
+                            evt.seller_event_category_id
                         )
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
                                     EventId, Title, EventDate, UtcTime,
@@ -1803,9 +1810,9 @@ class EventService:
                                 shirts = " / ".join(order.shirts)
 
                             order_data = {
-                                "numTickets": order.numTickets,
-                                "purchaseDate": order.purchaseDate.strip(),
-                                "purchaseTimestamp": order.purchaseTimestamp.strip(),
+                                "numTickets": order.num_tickets,
+                                "purchaseDate": order.purchase_date.strip(),
+                                "purchaseTimestamp": order.purchase_timestamp.strip(),
                                 "phone": (
                                     order.phone.strip()
                                     if order.phone is not None
@@ -1815,52 +1822,52 @@ class EventService:
                                 "user_id": order.user_id,
                                 "event_id": order.event_id,
                                 "purchaserLastName": (
-                                    order.purchaserLastName.strip()
-                                    if order.purchaserLastName is not None
+                                    order.purchaser_last_name.strip()
+                                    if order.purchaser_last_name is not None
                                     else None
                                 ),
                                 "purchaserFirstName": (
-                                    order.purchaserFirstName.strip()
-                                    if order.purchaserFirstName is not None
+                                    order.purchaser_first_name.strip()
+                                    if order.purchaser_first_name is not None
                                     else None
                                 ),
                                 "purchaserCity": (
-                                    order.purchaserCity.strip()
+                                    order.purchaser_city.strip()
                                     if (
-                                        order.purchaserCity is not None
-                                        and order.purchaserCity != ""
+                                        order.purchaser_city is not None
+                                        and order.purchaser_city != ""
                                     )
                                     else None
                                 ),
                                 "purchaserState": (
-                                    order.purchaserState.strip()
+                                    order.purchaser_state.strip()
                                     if (
-                                        order.purchaserState is not None
-                                        and order.purchaserState != ""
+                                        order.purchaser_state is not None
+                                        and order.purchaser_state != ""
                                     )
                                     else None
                                 ),
                                 "purchaserZip": (
-                                    order.purchaserZipCode.strip()
+                                    order.purchaser_zip_code.strip()
                                     if (
-                                        order.purchaserZipCode is not None
-                                        and order.purchaserZipCode != ""
+                                        order.purchaser_zip_code is not None
+                                        and order.purchaser_zip_code != ""
                                     )
                                     else None
                                 ),
                                 "purchaserCountry": (
-                                    order.purchaserCountry.strip()
+                                    order.purchaser_country.strip()
                                     if (
-                                        order.purchaserCountry is not None
-                                        and order.purchaserCountry != ""
+                                        order.purchaser_country is not None
+                                        and order.purchaser_country != ""
                                     )
                                     else None
                                 ),
                                 "purchaserIpAddress": (
-                                    order.purchaserIpAddress.strip()
+                                    order.purchaser_ip_address.strip()
                                     if (
-                                        order.purchaserIpAddress is not None
-                                        and order.purchaserIpAddress != ""
+                                        order.purchaser_ip_address is not None
+                                        and order.purchaser_ip_address != ""
                                     )
                                     else None
                                 ),
@@ -1874,8 +1881,8 @@ class EventService:
                             if order.revenue > 0:
                                 order_data["revenue"] = order.revenue
 
-                            if order.serviceFees > 0:
-                                order_data["serviceFees"] = order.serviceFees
+                            if order.service_fees > 0:
+                                order_data["serviceFees"] = order.service_fees
 
                             # determine if order already exists
                             order_sql = """SELECT TicketSocketOrders.*
@@ -1899,7 +1906,7 @@ class EventService:
                                 order_data["id"] = ticket_socket_order_id
                                 # if purchase date changed, clear out daily order data for event
                                 order_purchase_timestamp = datetime.strptime(
-                                    order.purchaseDate, "%Y-%m-%d"
+                                    order.purchase_date, "%Y-%m-%d"
                                 ).timestamp()
                                 existing_purchase_timestamp = datetime.strptime(
                                     str(existing_order["PurchaseDate"]), "%Y-%m-%d"
@@ -1948,7 +1955,7 @@ class EventService:
                                         Email=%(email)s, """
                                 if order.revenue > 0:
                                     sql += """Revenue=%(revenue)s, """
-                                if order.serviceFees > 0:
+                                if order.service_fees > 0:
                                     sql += """ServiceFees=%(serviceFees)s, """
                                 sql += (
                                     """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
@@ -1970,7 +1977,7 @@ class EventService:
                                             PurchaserIpAddress, Email"""
                                 if order.revenue > 0:
                                     sql += """, Revenue"""
-                                if order.serviceFees > 0:
+                                if order.service_fees > 0:
                                     sql += """, ServiceFees"""
                                 sql += """) VALUES
                                     (%(ticket_socket_event_id)s, %(order_id)s, %(numTickets)s,
@@ -1980,7 +1987,7 @@ class EventService:
                                     %(purchaserIpAddress)s,  %(email)s"""
                                 if order.revenue > 0:
                                     sql += """, %(revenue)s"""
-                                if order.serviceFees > 0:
+                                if order.service_fees > 0:
                                     sql += """, %(serviceFees)s"""
                                 sql += """)"""
 
@@ -2018,16 +2025,16 @@ class EventService:
                                         "ticket_type": ticket.ticket_type.strip(),
                                         "ticket_type_id": ticket.ticket_type_id,
                                         "serviceFee": (
-                                            ticket.serviceFee
-                                            if ticket.serviceFee is not None
+                                            ticket.service_fee
+                                            if ticket.service_fee is not None
                                             else 0
                                         ),
-                                        "availableScans": ticket.availableScans,
+                                        "availableScans": ticket.available_scans,
                                         "barcode": ticket.barcode,
-                                        "purchaseLocation": ticket.purchaseLocation,
-                                        "scannedTimestamp": ticket.scannedTimestamp,
-                                        "attendeeFirstName": ticket.attendeeFirstName,
-                                        "attendeeLastName": ticket.attendeeLastName,
+                                        "purchaseLocation": ticket.purchase_location,
+                                        "scannedTimestamp": ticket.scanned_timestamp,
+                                        "attendeeFirstName": ticket.attendee_first_name,
+                                        "attendeeLastName": ticket.attendee_last_name,
                                     }
 
                                     ticket_price = (
@@ -2066,7 +2073,7 @@ class EventService:
                                         )
                                         if is_checked_in != 1:
                                             is_checked_in = (
-                                                1 if ticket.scannedTimestamp != 0 else 0
+                                                1 if ticket.scanned_timestamp != 0 else 0
                                             )
                                         ticket_data["id"] = (
                                             ticket_socket_order_ticket_id
@@ -2096,7 +2103,7 @@ class EventService:
                                             ticket_socket_order_id
                                         )
                                         ticket_data["is_checked_in"] = (
-                                            1 if ticket.scannedTimestamp != 0 else 0
+                                            1 if ticket.scanned_timestamp != 0 else 0
                                         )
                                         sql = """INSERT INTO TicketSocketOrderTickets
                                             (TicketSocketOrderId, TicketId, TicketSocketTicketTypeId,
@@ -2171,9 +2178,9 @@ class EventService:
             )
             if user_id is not None and user_id > 0:
                 user_service = UserService()
-                user = user_service.getUserById(user_id)
+                user = user_service.get_user_by_id(user_id)
                 if user is not None:
-                    results.username = user.userFullname()
+                    results.username = user.user_full_name()
             else:
                 results.username = "System"
 
@@ -2297,15 +2304,15 @@ class EventService:
                 succeeded,
                 error_message,
             )
-            history.sellerName = seller_name
-            history.userName = username
-            history.orderDataUpdateSucceeded = order_data_update_succeeded
-            history.orderDataUpdateDuration = order_data_update_duration
-            history.orderDataRowsTotal = order_data_rows_total
-            history.orderDataRowsUpdated = order_data_rows_updated
-            history.orderDataRowsRemoved = order_data_rows_removed
-            history.orderDataRowsInserted = order_data_rows_inserted
-            history.totalDuration = total_duration
+            history.seller_name = seller_name
+            history.username = username
+            history.order_data_update_succeeded = order_data_update_succeeded
+            history.order_data_update_duration = order_data_update_duration
+            history.order_data_rows_total = order_data_rows_total
+            history.order_data_rows_updated = order_data_rows_updated
+            history.order_data_rows_removed = order_data_rows_removed
+            history.order_data_rows_inserted = order_data_rows_inserted
+            history.total_duration = total_duration
             logs.append(history)
 
         return logs
