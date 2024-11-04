@@ -1437,6 +1437,30 @@ class EventService:
         success = db_update(ticket_sql, ticket_data)
 
         return success
+    
+    def refund_ticket(self,
+        ticket_socket_order_ticket_id: int,
+        refund_service_fees: bool = False,
+        mark_chargeback: bool = False):
+        """
+        Refunds a single ticket
+        """
+        ticket_sql = (
+            """UPDATE TicketSocketOrderTickets SET LastUpdate=CURRENT_TIMESTAMP"""
+        )
+        if mark_chargeback is True:
+            ticket_sql += """, IsChargedBack=1, IsRefunded=0,
+                            ChargebackDate=CURRENT_TIMESTAMP, RefundDate=NULL"""
+        else:
+            ticket_sql += """, IsRefunded=1, IsChargedBack=0,
+                            RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
+        if refund_service_fees is True:
+            ticket_sql += """, ServiceFeeRevenueRefunded=ServiceFees"""
+        ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
+        ticket_data = {"ticket_socket_order_ticket_id": ticket_socket_order_ticket_id}
+        success = db_update(ticket_sql, ticket_data)
+
+        return success
 
     def update_event(self, event_to_update: VipEvent):
         """
