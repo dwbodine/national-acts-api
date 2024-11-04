@@ -64,7 +64,7 @@ class UserService:
                             user = self.__retrieve_user_from_database(
                                 username=username, fetch_sellers=True
                             )
-                            user.isAuthenticated = True
+                            user.is_authenticated = True
                 else:
                     error_message = "Incorrect username or password"
 
@@ -153,7 +153,7 @@ class UserService:
                         from national-acts.com.\n\nPlease use this security code
                         to confirm your email in our system:\n\n{str(code)}"""
                     subject = "National Acts VIP - Password Reset"
-                    to_name = user.firstName + " " + user.lastName
+                    to_name = user.first_name + " " + user.last_name
                     result = send_email(username, subject, html, to_name)
                     if result.success is not True:
                         user = None
@@ -189,7 +189,7 @@ class UserService:
             if user is None:
                 return UserResponse(None, "User not found")
 
-            user_id = user.userId
+            user_id = user.user_id
 
             sql = """SELECT * FROM ForgotPasswordToken
                         WHERE UserId=%(userId)s
@@ -218,7 +218,7 @@ class UserService:
 
         response = self.validate_password_reset_code(username, code)
 
-        if response.hasError():
+        if response.has_error():
             return response
 
         user = response.user
@@ -349,33 +349,33 @@ class UserService:
         rows = db_query_all(sql)
         for row in rows:
             user = User()
-            user.userId = int(row["UserId"])
-            user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
+            user.user_id = int(row["UserId"])
+            user.is_admin = True if int(row["IsAdmin"]) == 1 else False
             user.username = str(row["Username"])
-            user.firstName = str(row["FirstName"])
-            user.lastName = str(row["LastName"])
-            user.isActive = True if int(row["IsActive"]) == 1 else False
+            user.first_name = str(row["FirstName"])
+            user.last_name = str(row["LastName"])
+            user.is_active = True if int(row["IsActive"]) == 1 else False
             user.notes = str(row["Notes"])
             user.mobile = str(row["Mobile"])
-            user.requireResetPassword = (
+            user.require_reset_password = (
                 True if int(row["RequireResetPassword"]) == 1 else False
             )
-            user.sendEmailReset = True if int(row["SendEmailReset"]) == 1 else False
-            user.sendTextReset = True if int(row["SendTextReset"]) == 1 else False
-            user.disableCheckIn = True if int(row["DisableCheckIn"]) == 1 else False
+            user.send_email_reset = True if int(row["SendEmailReset"]) == 1 else False
+            user.send_text_reset = True if int(row["SendTextReset"]) == 1 else False
+            user.disable_check_in = True if int(row["DisableCheckIn"]) == 1 else False
             created_at = datetime.fromisoformat(str(row["CreatedAt"]))
             last_update = datetime.fromisoformat(str(row["LastUpdate"]))
-            user.createdAt = created_at.strftime("%m/%d/%Y")
-            user.lastUpdate = last_update.strftime("%m/%d/%Y")
+            user.created_at = created_at.strftime("%m/%d/%Y")
+            user.last_update = last_update.strftime("%m/%d/%Y")
 
-            sellers = self.__get_user_sellers(user.userId, user.isAdmin)
+            sellers = self.__get_user_sellers(user.user_id, user.is_admin)
             user.sellers = sellers
-            if user.isAdmin:
+            if user.is_admin:
                 user.category = "Admin"
             elif len(user.sellers) > 1:
                 user.category = "Multiple"
             elif len(user.sellers) > 0:
-                user.category = user.sellers[0].sellerName
+                user.category = user.sellers[0].seller_name
             users.append(user)
         return users
 
@@ -436,7 +436,7 @@ class UserService:
         if role_to_update.roleId > 0:
             existing_role = self.get_role_by_id(role_to_update.roleId)
         if existing_role is not None:
-            role_id = existing_role.roleId
+            role_id = existing_role.role_id
             update_sql = """UPDATE Roles SET RoleName=%(roleName)s,
                         LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
             update_data = {"roleName": role_to_update.roleName, "roleId": role_id}
@@ -479,17 +479,17 @@ class UserService:
         success: bool = True
         if (
             user_to_update is None
-            or user_to_update.userId is None
-            or user_to_update.userId <= 0
+            or user_to_update.user_id is None
+            or user_to_update.user_id <= 0
         ):
             return False
-        user_id: int = user_to_update.userId
+        user_id: int = user_to_update.user_id
         existing_user: User = self.__retrieve_user_from_database(user_id=user_id)
         if existing_user is not None:
             username = existing_user.username
             if user_to_update.username is not None and user_to_update.username != "":
                 username = user_to_update.username
-            send_text_reset = user_to_update.sendTextReset
+            send_text_reset = user_to_update.send_text_reset
             if (
                 user_to_update.mobile is None
                 or user_to_update.mobile == ""
@@ -511,23 +511,25 @@ class UserService:
                            LastUpdate=CURRENT_TIMESTAMP 
                            WHERE UserId=%(userId)s"""
             update_data = {
-                "isAdmin": 1 if user_to_update.isAdmin else 0,
+                "isAdmin": 1 if user_to_update.is_admin else 0,
                 "username": username,
-                "firstName": user_to_update.firstName,
-                "lastName": user_to_update.lastName,
+                "firstName": user_to_update.first_name,
+                "lastName": user_to_update.last_name,
                 "mobile": user_to_update.mobile,
                 "notes": user_to_update.notes,
-                "isActive": 1 if user_to_update.isActive else 0,
-                "requireResetPassword": 1 if user_to_update.requireResetPassword else 0,
-                "sendEmailReset": 1 if user_to_update.sendEmailReset else 0,
-                "disableCheckin": 1 if user_to_update.disableCheckIn else 0,
+                "isActive": 1 if user_to_update.is_active else 0,
+                "requireResetPassword": (
+                    1 if user_to_update.require_reset_password else 0
+                ),
+                "sendEmailReset": 1 if user_to_update.send_email_reset else 0,
+                "disableCheckin": 1 if user_to_update.disable_check_in else 0,
                 "sendTextReset": 1 if send_text_reset else 0,
                 "userId": user_id,
             }
             success = db_update(update_sql, update_data)
             if success is True:
                 success = self.__assign_user_to_sellers(
-                    user_id, user_to_update.isAdmin, user_to_update.sellers
+                    user_id, user_to_update.is_admin, user_to_update.sellers
                 )
         else:
             success = False
@@ -657,7 +659,7 @@ class UserService:
 
         if event_seller_id > 0:
             for seller in user.sellers:
-                if seller.sellerId == event_seller_id:
+                if seller.seller_id == event_seller_id:
                     user_seller = seller
                     break
 
@@ -704,19 +706,19 @@ class UserService:
                 delete_seller_data = {"userId": user_id}
                 db_delete(delete_seller_sql, delete_seller_data)
             else:
-                new_seller_ids = [seller.sellerId for seller in new_sellers]
+                new_seller_ids = [seller.seller_id for seller in new_sellers]
                 for existing_seller in existing_user.sellers:
-                    existing_seller_id = existing_seller.sellerId
+                    existing_seller_id = existing_seller.seller_id
                     if existing_seller_id in new_seller_ids:
                         new_seller: UserSeller = self.__get_user_seller_from_list_by_id(
                             new_sellers, existing_seller_id
                         )
-                        if existing_seller.roleId != new_seller.roleId:
+                        if existing_seller.role_id != new_seller.role_id:
                             update_role_sql = """UPDATE UserSeller SET RoleId=%(roleId)s,
                                                  LastUpdate=CURRENT_TIMESTAMP
                                                  WHERE UserSellerId=%(userSellerId)s"""
                             update_role_data = {
-                                "roleId": new_seller.roleId,
+                                "roleId": new_seller.role_id,
                                 "userSellerId": existing_seller.userSellerId,
                             }
                             success = db_update(update_role_sql, update_role_data)
@@ -743,7 +745,7 @@ class UserService:
                                 insert_seller_data = {
                                     "userId": user_id,
                                     "sellerId": new_seller_id,
-                                    "roleId": new_seller.roleId,
+                                    "roleId": new_seller.role_id,
                                 }
                                 user_seller_id = db_insert(
                                     insert_seller_sql, insert_seller_data
@@ -763,10 +765,10 @@ class UserService:
         success: bool = True
         if existing_role is not None:
             new_permission_ids = [
-                permission.permissionId for permission in new_permissions
+                permission.permission_id for permission in new_permissions
             ]
             for existing_permission in existing_role.permissions:
-                existing_permission_id = existing_permission.permissionId
+                existing_permission_id = existing_permission.permission_id
                 if existing_permission_id in new_permission_ids:
                     new_permission_ids.remove(existing_permission_id)
                 else:
@@ -808,7 +810,7 @@ class UserService:
         """
         user_seller: UserSeller = None
         for seller in sellers:
-            if seller.sellerId == user_seller_id:
+            if seller.seller_id == user_seller_id:
                 user_seller = seller
                 break
         return user_seller
@@ -821,7 +823,7 @@ class UserService:
         """
         permission: Permission = None
         for p in permissions:
-            if p.permissionId == permission_id:
+            if p.permission_id == permission_id:
                 permission = p
                 break
         return permission
@@ -857,7 +859,7 @@ class UserService:
         sql = """INSERT INTO ForgotPasswordToken
                 (UserId, Code, CreatedOn)
                 VALUES (%(userId)s, %(code)s, %(createdOn)s)"""
-        data = {"userId": user.userId, "code": code, "createdOn": created_on}
+        data = {"userId": user.user_id, "code": code, "createdOn": created_on}
         token_id = db_insert(sql, data)
         if token_id > 0:
             return code
@@ -904,34 +906,34 @@ class UserService:
             row = db_query_one(sql, data)
             if row:
                 user = User()
-                user.userId = int(row["UserId"])
-                user.isAdmin = True if int(row["IsAdmin"]) == 1 else False
+                user.user_id = int(row["UserId"])
+                user.is_admin = True if int(row["IsAdmin"]) == 1 else False
                 user.username = str(row["Username"])
-                user.firstName = str(row["FirstName"])
-                user.lastName = str(row["LastName"])
-                user.isActive = True if int(row["IsActive"]) == 1 else False
+                user.first_name = str(row["FirstName"])
+                user.last_name = str(row["LastName"])
+                user.is_active = True if int(row["IsActive"]) == 1 else False
                 user.notes = str(row["Notes"])
                 user.mobile = str(row["Mobile"])
-                user.requireResetPassword = (
+                user.require_reset_password = (
                     True if int(row["RequireResetPassword"]) else False
                 )
-                user.sendEmailReset = True if int(row["SendEmailReset"]) else False
-                user.sendTextReset = True if int(row["SendTextReset"]) else False
-                user.disableCheckIn = True if int(row["DisableCheckIn"]) else False
+                user.send_email_reset = True if int(row["SendEmailReset"]) else False
+                user.send_text_reset = True if int(row["SendTextReset"]) else False
+                user.disable_check_in = True if int(row["DisableCheckIn"]) else False
                 created_at = datetime.fromisoformat(str(row["CreatedAt"]))
                 last_update = datetime.fromisoformat(str(row["LastUpdate"]))
-                user.createdAt = created_at.strftime("%m/%d/%Y")
-                user.lastUpdate = last_update.strftime("%m/%d/%Y")
+                user.created_at = created_at.strftime("%m/%d/%Y")
+                user.last_update = last_update.strftime("%m/%d/%Y")
 
                 if fetch_sellers is True:
-                    sellers = self.__get_user_sellers(user.userId, user.isAdmin)
+                    sellers = self.__get_user_sellers(user.user_id, user.is_admin)
                     user.sellers = sellers
-                    if user.isAdmin:
+                    if user.is_admin:
                         user.category = "Admin"
                     elif len(user.sellers) > 1:
                         user.category = "Multiple"
                     elif len(user.sellers) > 0:
-                        user.category = user.sellers[0].sellerName
+                        user.category = user.sellers[0].seller_name
 
         return user
 
@@ -1041,7 +1043,7 @@ class UserService:
         if user is not None:
             html = "<table>"
             html += "<tr><td>User Email:</td><td>" + username + "</td></tr>"
-            html += "<tr><td>Submitted:</td><td>" + user.createdAt + "</td></tr>"
+            html += "<tr><td>Submitted:</td><td>" + user.created_at + "</td></tr>"
             html += "<tr><td><td>Notes:</td><td>" + user.notes + "</td></tr>"
             html += "</table>"
 
