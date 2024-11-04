@@ -11,12 +11,18 @@ def db_get_connection():
     """
     Connect to MySql database
     """
+    host = os.getenv("DB_HOST")
+    database = os.getenv("DB_DB")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+
     return mysql.connector.connect(
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        database=os.getenv("DB_DB"),
+        user=user,
+        password=password,
+        host=host,
+        database=database,
         connection_timeout=3600,
+        port=3306
     )
 
 
