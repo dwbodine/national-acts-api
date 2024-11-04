@@ -2073,7 +2073,9 @@ class EventService:
                                         )
                                         if is_checked_in != 1:
                                             is_checked_in = (
-                                                1 if ticket.scanned_timestamp != 0 else 0
+                                                1
+                                                if ticket.scanned_timestamp != 0
+                                                else 0
                                             )
                                         ticket_data["id"] = (
                                             ticket_socket_order_ticket_id
