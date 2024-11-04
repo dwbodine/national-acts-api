@@ -75,7 +75,7 @@ def __is_admin_logged_in():
     is_admin: bool = False
     user = __get_user_from_jwt()
     if user is not None:
-        is_admin = user.isAdmin
+        is_admin = user.is_admin
     return is_admin
 
 
@@ -507,7 +507,7 @@ def get_update_history():
     API method to fetch TS refresh history
     """
     user = __get_user_from_jwt()
-    if user is None or user.isAdmin is False:
+    if user is None or user.is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
     service = EventService()
@@ -527,7 +527,7 @@ def log_user_activity():
     activity_data = request.json.get("activityData")
 
     if user is not None and activity_type is not None:
-        user_id = user.userId
+        user_id = user.user_id
 
         service = UserService()
         data: str = str(activity_data) if activity_data is not None else ""
@@ -575,13 +575,13 @@ def refresh_events_from_service(seller_id: int = None):
     API method to refresh TS events from the admin
     """
     user = __get_user_from_jwt()
-    if user is None or user.isAdmin is False:
+    if user is None or user.is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
     service = EventService()
     start: int = None
     end: int = None
-    user_id: int = user.userId
+    user_id: int = user.user_id
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
@@ -784,9 +784,9 @@ def create_token():
     service = UserService()
     login_response = service.login(username, password)
 
-    if login_response.errorMessage is not None:
-        return {"msg": login_response.errorMessage}, 401
-    elif login_response.user is None or login_response.user.isAuthenticated is True:
+    if login_response.error_message is not None:
+        return {"msg": login_response.error_message}, 401
+    elif login_response.user is None or login_response.user.is_authenticated is True:
         return {"msg": "Invalid username or password"}, 401
 
     access_token = create_access_token(identity=username)
@@ -796,7 +796,7 @@ def create_token():
 
     user: User = login_response.user
     user.token = access_token
-    user.isAuthenticated = True
+    user.is_authenticated = True
 
     return convert_to_json(user)
 
