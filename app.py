@@ -288,6 +288,30 @@ def update_role():
     success = service.update_role(role)
     return convert_to_json(success)
 
+@app.route("/admin/tickets/refund", methods=["POST"])
+@jwt_required()
+def refund_ticket():
+    """
+    API method to refund single ticket
+    """
+    is_admin = __is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    ticket_id = request.json.get("ticketId", None)
+
+    if ticket_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    refund_service_fees_str = request.json.get("refundServiceFees", None)
+    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+
+    mark_chargeback_str = request.json.get("markChargeback", None)
+    mark_chargeback: bool = True if mark_chargeback_str == 1 else False
+
+    service = EventService()
+    success = service.refund_ticket(int(ticket_id), refund_service_fees, mark_chargeback)
+    return convert_to_json(success)
 
 @app.route("/admin/users")
 @jwt_required()

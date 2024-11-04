@@ -180,11 +180,13 @@ class VipOrder(TicketSocketOrder):
         self.total_shirts = len(self.shirts)
         for ticket in self.tickets:
             if ticket.is_refunded is True:
+                self.has_refunds = True
                 self.num_tickets_refunded += 1
                 self.revenue_refunded += ticket.price
                 if ticket.is_service_fee_refunded is True:
                     self.service_fee_revenue_refunded += ticket.service_fee
             elif ticket.is_charged_back is True:
+                self.has_chargebacks = True
                 self.num_tickets_charged_back += 1
                 self.revenue_charged_back += ticket.price
                 self.service_fee_revenue_charged_back += ticket.service_fee
@@ -392,8 +394,11 @@ class DailyOrderData:
     is_refunded: bool = False
     is_charged_back: bool = False
     num_tickets_refunded: int = 0
+    num_tickets_charged_back: int = 0
     revenue_refunded: float = 0
+    revenue_charged_back: float = 0
     service_fee_revenue_refunded: float = 0
+    service_fee_revenue_charged_back: float = 0
 
     def __init__(self, purchase_date: str, ticket_socket_event_id: int):
         self.purchase_date = purchase_date
@@ -408,11 +413,14 @@ class DashboardTotals:
     tickets: int = 0
     orders: int = 0
     num_tickets_refunded: int = 0
+    num_tickets_charged_back: int = 0
     ticket_revenue_usd: float = 0
     service_fees_revenue_usd: float = 0
     total_revenue_usd: float = 0
     revenue_refunded: float = 0
+    revenue_charged_back: float = 0
     service_fee_revenue_refunded: float = 0
+    service_fee_revenue_charged_back: float = 0
     price_per_ticket: float = 0
     service_fee_per_ticket: float = 0
     daily_order_data: list[DailyOrderData] = []
