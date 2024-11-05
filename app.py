@@ -181,6 +181,8 @@ def refund_order():
 
     service = EventService()
     success = service.refund_order(int(order_id), refund_service_fees, mark_chargeback)
+    if success is True:
+        service.rebuild_daily_order_data_for_order(int(order_id))
     return convert_to_json(success)
 
 
@@ -288,6 +290,7 @@ def update_role():
     success = service.update_role(role)
     return convert_to_json(success)
 
+
 @app.route("/admin/tickets/refund", methods=["POST"])
 @jwt_required()
 def refund_ticket():
@@ -310,8 +313,11 @@ def refund_ticket():
     mark_chargeback: bool = True if mark_chargeback_str == 1 else False
 
     service = EventService()
-    success = service.refund_ticket(int(ticket_id), refund_service_fees, mark_chargeback)
+    success = service.refund_ticket(
+        int(ticket_id), refund_service_fees, mark_chargeback
+    )
     return convert_to_json(success)
+
 
 @app.route("/admin/users")
 @jwt_required()
@@ -463,7 +469,9 @@ def get_user_activity():
             start, end, activity_type=int(activity_type), filter_admins=filter_admin_val
         )
     else:
-        activities = service.get_user_activity(start, end, filter_admins=filter_admin_val)
+        activities = service.get_user_activity(
+            start, end, filter_admins=filter_admin_val
+        )
     return convert_to_json(activities)
 
 

@@ -801,7 +801,10 @@ class EventService:
         return daily_order_data
 
     def update_daily_order_data(
-        self, history: TicketSocketRefreshHistory, year: int = 0, seller_id: int = None
+        self,
+        history: TicketSocketRefreshHistory = None,
+        year: int = 0,
+        seller_id: int = None,
     ):
         """
         Pulls order data from the database and rolls it up to DailyOrderData
@@ -813,11 +816,12 @@ class EventService:
         duration = time.time() - timer
         log_message(f"Daily order data fetch completed in {duration} seconds")
 
-        history.order_data_rows_total = len(daily_order_data)
+        if history is not None:
+            history.order_data_rows_total = len(daily_order_data)
 
-        if len(daily_order_data) <= 0:
-            history.order_data_update_succeeded = False
-            return history
+            if len(daily_order_data) <= 0:
+                history.order_data_update_succeeded = False
+                return history
 
         log_message("Daily order data - starting database update")
 
@@ -903,7 +907,8 @@ class EventService:
                 break
 
         duration = time.time() - timer
-        history.set_order_update_success(success, duration, inserts, updates)
+        if history is not None:
+            history.set_order_update_success(success, duration, inserts, updates)
 
         log_message(f"Daily order data - update complete in {duration} seconds")
 
@@ -1394,6 +1399,7 @@ class EventService:
             success = self.refund_all_event_orders(
                 ticket_socket_event_id, refund_service_fees
             )
+
         return success
 
     def refund_all_event_orders(
@@ -1418,6 +1424,8 @@ class EventService:
                 )
                 if success is False:
                     break
+        if success is True:
+            self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def refund_order(
@@ -1444,6 +1452,9 @@ class EventService:
         ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
         success = db_update(ticket_sql, ticket_data)
 
+        if success is True:
+            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+
         return success
 
     def refund_ticket(
@@ -1469,6 +1480,9 @@ class EventService:
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
         ticket_data = {"ticket_socket_order_ticket_id": ticket_socket_order_ticket_id}
         success = db_update(ticket_sql, ticket_data)
+
+        if success is True:
+            self.rebuild_daily_order_data_for_ticket(ticket_socket_order_ticket_id)
 
         return success
 
@@ -1586,7 +1600,78 @@ class EventService:
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
                         break
+            if success is True:
+                self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
         return success
+
+    def rebuild_daily_order_data_for_ticket(self, ticket_id: int):
+        """
+        Clean out daily order data for order attached to ticket
+        """
+        order_sql = """SELECT TicketSocketOrderId
+                        FROM TicketSocketOrderTickets
+                        WHERE Id=%(ticketId)s"""
+        order_data = {"ticketId": ticket_id}
+        row = db_query_one(order_sql, order_data)
+        if row:
+            order_id = int(row["TicketSocketOrderId"])
+            if order_id > 0:
+                self.rebuild_daily_order_data_for_order(order_id)
+
+    def rebuild_daily_order_data_for_event(self, event_id: int):
+        """
+        Clean out and rebuild daily order data for event
+        """
+        event_sql = """SELECT TicketSocketEvents.Id,
+                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
+                            SellerEventCategory.SellerId
+                            FROM TicketSocketEvents
+                            JOIN SellerEventCategory ON 
+                             TicketSocketEvents.SellerEventCategoryId = 
+                             SellerEventCategory.SellerEventCategoryId                         
+                            WHERE TicketSocketEvents.Id=%(ticket_socket_event_id)s"""
+        event_data = {"ticket_socket_event_id": event_id}
+        event_row = db_query_one(event_sql, event_data)
+        if event_row:
+            event_id: int = event_row["TicketSocketEventId"]
+            event_year: int = event_row["EventYear"]
+            event_seller_id: int = event_row["SellerId"]
+            self.__cleanup_daily_order_data_for_event(event_id)
+            self.update_daily_order_data(year=event_year, seller_id=event_seller_id)
+
+    def rebuild_daily_order_data_for_order(self, order_id: int):
+        """
+        Clean out and rebuild daily order data for order
+        """
+        event_sql = """SELECT TicketSocketEvents.Id,
+                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
+                            SellerEventCategory.SellerId
+                            FROM TicketSocketEvents
+                            JOIN TicketSocketOrders ON
+                             TicketSocketOrders.TicketSocketEventId = 
+                             TicketSocketEvents.Id        
+                            JOIN SellerEventCategory ON 
+                             TicketSocketEvents.SellerEventCategoryId = 
+                             SellerEventCategory.SellerEventCategoryId                         
+                            WHERE TicketSocketOrders.Id=%(ticket_socket_order_id)s"""
+        event_data = {"ticket_socket_order_id": order_id}
+        event_row = db_query_one(event_sql, event_data)
+        if event_row:
+            event_id: int = event_row["TicketSocketEventId"]
+            event_year: int = event_row["EventYear"]
+            event_seller_id: int = event_row["SellerId"]
+            self.__cleanup_daily_order_data_for_event(event_id)
+            self.update_daily_order_data(year=event_year, seller_id=event_seller_id)
+
+    def __cleanup_daily_order_data_for_event(self, event_id: int):
+        """
+        Clear out rows from DailyOrderData ahead of rebuild
+        (which would be needed in refunds, cancellations and chargebacks)
+        """
+        sql = """DELETE FROM DailyOrderData
+          WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        data = {"ticketSocketEventId": event_id}
+        db_delete(sql, data)
 
     def retrieve_ticket_socket_events_for_update(
         self, seller_id: int = None, start: int = None, end: int = None
