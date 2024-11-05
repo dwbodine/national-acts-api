@@ -711,7 +711,9 @@ class EventService:
                         refund_order_data = DailyOrderData(
                             ticket.refund_date, order.ticket_socket_event_id
                         )
-                        refund_order_data.ticket_socket_order_id = order.ticket_socket_order_id
+                        refund_order_data.ticket_socket_order_id = (
+                            order.ticket_socket_order_id
+                        )
                         refund_order_data.is_refunded = True
                         refund_order_data.is_charged_back = False
                     elif ticket.is_refunded is not True and order_data is None:
@@ -727,7 +729,9 @@ class EventService:
                         chargeback_order_data = DailyOrderData(
                             ticket.chargeback_date, order.ticket_socket_event_id
                         )
-                        chargeback_order_data.ticket_socket_order_id = order.ticket_socket_order_id
+                        chargeback_order_data.ticket_socket_order_id = (
+                            order.ticket_socket_order_id
+                        )
                         chargeback_order_data.is_refunded = False
                         chargeback_order_data.is_charged_back = True
                     elif ticket.is_charged_back is not True and order_data is None:
@@ -756,7 +760,9 @@ class EventService:
                 )
 
             if chargeback_order_data is not None:
-                chargeback_order_data.num_tickets_charged_back += order.num_tickets_charged_back
+                chargeback_order_data.num_tickets_charged_back += (
+                    order.num_tickets_charged_back
+                )
                 chargeback_order_data.revenue_charged_back += order.revenue_charged_back
                 chargeback_order_data.service_fee_revenue_charged_back += (
                     order.service_fee_revenue_charged_back
@@ -790,7 +796,7 @@ class EventService:
                 if found_chargeback_index >= 0:
                     daily_order_data[found_chargeback_index] = chargeback_order_data
                 else:
-                    daily_order_data.append(chargeback_order_data)                
+                    daily_order_data.append(chargeback_order_data)
 
         return daily_order_data
 
@@ -848,8 +854,8 @@ class EventService:
                 "numTicketsRefunded": order_data.num_tickets_refunded,
                 "revenueRefunded": order_data.revenue_refunded,
                 "serviceFeeRevenueRefunded": order_data.service_fee_revenue_refunded,
-                "numTicketsChargedBack": order_data.num_tickets_charged_back, 
-                "revenueChargedBack": order_data.revenue_charged_back, 
+                "numTicketsChargedBack": order_data.num_tickets_charged_back,
+                "revenueChargedBack": order_data.revenue_charged_back,
                 "serviceFeeRevenueChargedBack": order_data.service_fee_revenue_charged_back,
                 "ticketSocketOrderId": order_data.ticket_socket_order_id,
             }
@@ -1020,9 +1026,11 @@ class EventService:
 
         dash_totals.daily_order_data = daily_order_data
         dash_totals.price_per_ticket = (
-            (dash_totals.ticket_revenue_usd - 
-             dash_totals.revenue_refunded - 
-             dash_totals.revenue_charged_back)
+            (
+                dash_totals.ticket_revenue_usd
+                - dash_totals.revenue_refunded
+                - dash_totals.revenue_charged_back
+            )
         ) / dash_totals.tickets
         dash_totals.service_fee_per_ticket = (
             dash_totals.service_fees_revenue_usd
@@ -1437,11 +1445,13 @@ class EventService:
         success = db_update(ticket_sql, ticket_data)
 
         return success
-    
-    def refund_ticket(self,
+
+    def refund_ticket(
+        self,
         ticket_socket_order_ticket_id: int,
         refund_service_fees: bool = False,
-        mark_chargeback: bool = False):
+        mark_chargeback: bool = False,
+    ):
         """
         Refunds a single ticket
         """
@@ -2170,18 +2180,17 @@ class EventService:
                                         )
                                         ticket_data["is_checked_in"] = is_checked_in
 
-                                        sql = """Update TicketSocketOrderTickets
+                                        sql = """UPDATE TicketSocketOrderTickets
                                                 SET TicketType=%(ticket_type)s,
                                                 TicketSocketTicketTypeId=%(ticket_type_id)s,
-                                                ServiceFee=%(serviceFee)s, 
                                                 BarCode=%(barcode)s,
                                                 AvailableScans=%(availableScans)s,
                                                 PurchaseLocation=%(purchaseLocation)s, 
                                                 ScannedTimestamp=%(scannedTimestamp)s,
-                                                IsCheckedIn=%(is_checked_in)s, """
-                                        if ticket_price > 0:
-                                            sql += """Price=%(price)s, """
-                                        sql += """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                                AttendeeFirstName=%(attendeeFirstName)s,
+                                                AttendeeLastName=%(attendeeLastName)s,
+                                                IsCheckedIn=%(is_checked_in)s,
+                                                LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticket_success = db_update(
                                             sql, ticket_data, cnx
                                         )

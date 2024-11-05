@@ -326,7 +326,9 @@ class TicketSocketService:
                 event.ticket_types = ticket_types
 
                 # orders
-                event.orders = self.get_orders_from_event_id(event.event_id, format_phones)
+                event.orders = self.get_orders_from_event_id(
+                    event.event_id, format_phones
+                )
 
                 self.events.append(event)
 
@@ -439,12 +441,17 @@ class TicketSocketService:
                             order.purchaser_first_name = fix_magic_quotes(
                                 item["billing_firstName"]
                             )
-                        if order.purchaser_last_name == "" and "billing_lastName" in item:
+                        if (
+                            order.purchaser_last_name == ""
+                            and "billing_lastName" in item
+                        ):
                             order.purchaser_last_name = fix_magic_quotes(
                                 item["billing_lastName"]
                             )
                         if order.purchaser_city is None and "billing_city" in item:
-                            order.purchaser_city = fix_magic_quotes(item["billing_city"])
+                            order.purchaser_city = fix_magic_quotes(
+                                item["billing_city"]
+                            )
                         if order.purchaser_state is None and "billing_state" in item:
                             order.purchaser_state = fix_magic_quotes(
                                 item["billing_state"]
@@ -453,7 +460,10 @@ class TicketSocketService:
                             order.purchaser_zip_code = fix_magic_quotes(
                                 item["billing_zip"]
                             )
-                        if order.purchaser_country is None and "billing_country" in item:
+                        if (
+                            order.purchaser_country is None
+                            and "billing_country" in item
+                        ):
                             order.purchaser_country = fix_magic_quotes(
                                 item["billing_country"]
                             )
