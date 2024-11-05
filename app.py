@@ -555,7 +555,7 @@ def log_user_activity():
 
         service = UserService()
         data: str = str(activity_data) if activity_data is not None else ""
-        success = service.log_user_activity(user_id, int(activity_data), data)
+        success = service.log_user_activity(user_id, int(activity_type), data)
     return convert_to_json(success)
 
 
@@ -810,7 +810,7 @@ def create_token():
 
     if login_response.error_message is not None:
         return {"msg": login_response.error_message}, 401
-    elif login_response.user is None or login_response.user.is_authenticated is True:
+    elif login_response.user is None or login_response.user.is_authenticated is False:
         return {"msg": "Invalid username or password"}, 401
 
     access_token = create_access_token(identity=username)

@@ -329,8 +329,8 @@ class EventService:
                 )
                 external_data["search_term"] = "*" + search_term + "*"
             if seller_id is not None:
-                externalwhere_clause.append("ExternalEvents.seller_id = %(seller_id)s")
-                external_data["seller_id"] = seller_id
+                externalwhere_clause.append("ExternalEvents.SellerId = %(sellerId)s")
+                external_data["sellerId"] = seller_id
             if start is not None and end is not None:
                 externalwhere_clause.append(
                     "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s"
@@ -571,7 +571,7 @@ class EventService:
             order.event_country = str(row["EventCountry"])
             order.event_date = str(row["EventDate"])
             order.seller_name = str(row["SellerName"])
-            order.seller_id = int(row["seller_id"])
+            order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = int(row["TicketSocketEventId"])
             order.ticket_socket_order_id = ticket_socket_order_id
             order.num_tickets = int(row["NumTickets"])
@@ -970,7 +970,7 @@ class EventService:
             order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
             order_data.event_title = str(row["EventTitle"])
             order_data.event_date = str(row["EventDate"])
-            order_data.seller_id = int(row["seller_id"])
+            order_data.seller_id = int(row["SellerId"])
             order_data.seller_name = str(row["SellerName"])
             order_data.venue = str(row["Venue"])
             order_data.city = str(row["City"])
@@ -1127,7 +1127,7 @@ class EventService:
             order.event_country = str(row["EventCountry"])
             order.event_date = str(row["EventDate"])
             order.seller_name = str(row["SellerName"])
-            order.seller_id = int(row["seller_id"])
+            order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = ticket_socket_event_id
             order.ticket_socket_order_id = ticket_socket_order_id
             order.num_tickets = int(row["NumTickets"])
@@ -1229,7 +1229,7 @@ class EventService:
                 if (is_refunded is True and row["RefundDate"] is not None)
                 else None
             )
-            is_charged_back: bool = True if int(row["IsChargedback"]) == 1 else False
+            is_charged_back: bool = True if int(row["IsChargedBack"]) == 1 else False
             ticket.is_charged_back = is_charged_back
             ticket.chargeback_date = (
                 str(row["ChargebackDate"])
@@ -2341,7 +2341,7 @@ class EventService:
                 username = "System"
             else:
                 username = str(row["UserName"]) + " (" + str(row["Email"]) + ")"
-            seller_id = int(row["seller_id"]) if row["seller_id"] is not None else None
+            seller_id = int(row["SellerId"]) if row["SellerId"] is not None else None
             seller_name = (
                 str(row["SellerName"]) if row["SellerName"] is not None else None
             )

@@ -298,7 +298,7 @@ class VipEvent(TicketSocketEvent):
             if order.is_deleted is not True:
                 total_revenue += order.revenue_usd
                 total_service_fees += order.service_fees_usd
-                total_tickets += order.numTickets
+                total_tickets += order.num_tickets
 
                 if len(order.tickets) > 0:
                     for ticket in order.tickets:
