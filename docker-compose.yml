@@ -29,19 +29,6 @@ services:
     networks:
       - app-network
 
-  nationalactsapi:
-    image: nationalactsapi
-    container_name: nationalactsapi
-    depends_on:
-      - phpmyadmin
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    networks:
-      - app-network
-    ports:
-      - 5000:5000    
-
 networks:
   app-network:
     driver: bridge
