@@ -188,7 +188,9 @@ class TicketSocketService:
                 if event_id == 0 or title == "":
                     continue
 
-                event = TicketSocketEvent(event_id, title)
+                event = TicketSocketEvent()
+                event.event_id = event_id
+                event.title = title
 
                 on_sale: str = ""
                 if "onsale" in item:
@@ -395,7 +397,9 @@ class TicketSocketService:
                 if order_id == 0:
                     continue
 
-                order = TicketSocketOrder(order_id, event_id)
+                order = TicketSocketOrder()
+                order.order_id = order_id
+                order.event_id = event_id
 
                 if "cancelled" in json_data:
                     order.cancelled = bool(json_data["cancelled"])
@@ -558,19 +562,18 @@ class TicketSocketService:
                         if ticket_id == 0 or ticket_type == "":
                             continue
 
-                        ticket = TicketSocketTicket(
-                            ticket_id,
-                            ticket_type,
-                            price,
-                            service_fee,
-                            ticket_type_id,
-                            barcode,
-                            available_scans,
-                            purchase_location,
-                            scanned_timestamp,
-                            attendee_first_name,
-                            attendee_last_name,
-                        )
+                        ticket = TicketSocketTicket()
+                        ticket.ticket_id = ticket_id
+                        ticket.ticket_type = ticket_type
+                        ticket.price = price
+                        ticket.service_fee = service_fee
+                        ticket.ticket_type_id = ticket_type_id
+                        ticket.barcode = barcode
+                        ticket.available_scans = available_scans
+                        ticket.purchase_location = purchase_location
+                        ticket.scanned_timestamp = scanned_timestamp
+                        ticket.attendee_first_name = attendee_first_name
+                        ticket.attendee_last_name = attendee_last_name
                         order_tickets.append(ticket)
 
                         order_revenue += price

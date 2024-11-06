@@ -197,12 +197,15 @@ class EventService:
         for row in event_rows:
             event_id = int(row["EventId"])
             ticket_socket_event_id = int(row["Id"])
-            vip_event = VipEvent(event_id, str(row["Title"]))
+            vip_event = VipEvent()
+            vip_event.event_id = event_id
+            vip_event.title = str(row["Title"])
             vip_event.seller_name = str(row["SellerName"])
             vip_event.is_external = False
             vip_event.ticket_socket_event_id = ticket_socket_event_id
             vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
             vip_event.event_date = str(row["EventDate"])
+            vip_event.announce_date = str(row["AnnounceDate"])
             vip_event.utc_time = int(row["UtcTime"])
             vip_event.display_date = (
                 str(row["DisplayDate"]) if row["DisplayDate"] is not None else None
@@ -329,8 +332,8 @@ class EventService:
                 )
                 external_data["search_term"] = "*" + search_term + "*"
             if seller_id is not None:
-                externalwhere_clause.append("ExternalEvents.seller_id = %(seller_id)s")
-                external_data["seller_id"] = seller_id
+                externalwhere_clause.append("ExternalEvents.SellerId = %(sellerId)s")
+                external_data["sellerId"] = seller_id
             if start is not None and end is not None:
                 externalwhere_clause.append(
                     "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s"
@@ -375,10 +378,13 @@ class EventService:
             externalevent_rows = db_query_all(external_sql, external_data)
             for row in externalevent_rows:
                 event_id = int(row["EventId"])
-                vip_event = VipEvent(event_id, str(row["Title"]))
+                vip_event = VipEvent()
+                vip_event.event_id = event_id
+                vip_event.title = str(row["Title"])
                 vip_event.seller_name = str(row["SellerName"])
                 vip_event.is_external = True
                 vip_event.event_date = str(row["EventDate"])
+                vip_event.announce_date = str(row["AnnounceDate"])
                 vip_event.thumbnail = str(row["Thumbnail"])
                 vip_event.external_url = str(row["URL"])
                 venue = TicketSocketVenue(
@@ -561,7 +567,9 @@ class EventService:
             order_id = int(row["OrderId"])
             event_id = int(row["EventId"])
             ticket_socket_order_id = int(row["Id"])
-            order = VipOrder(order_id, event_id)
+            order = VipOrder()
+            order.order_id = order_id
+            order.event_id = event_id
             order.event_title = str(row["EventTitle"])
             order.venue = str(row["Venue"])
             order.event_address = str(row["EventAddress"])
@@ -571,7 +579,7 @@ class EventService:
             order.event_country = str(row["EventCountry"])
             order.event_date = str(row["EventDate"])
             order.seller_name = str(row["SellerName"])
-            order.seller_id = int(row["seller_id"])
+            order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = int(row["TicketSocketEventId"])
             order.ticket_socket_order_id = ticket_socket_order_id
             order.num_tickets = int(row["NumTickets"])
@@ -801,7 +809,10 @@ class EventService:
         return daily_order_data
 
     def update_daily_order_data(
-        self, history: TicketSocketRefreshHistory, year: int = 0, seller_id: int = None
+        self,
+        history: TicketSocketRefreshHistory = None,
+        year: int = 0,
+        seller_id: int = None,
     ):
         """
         Pulls order data from the database and rolls it up to DailyOrderData
@@ -813,11 +824,12 @@ class EventService:
         duration = time.time() - timer
         log_message(f"Daily order data fetch completed in {duration} seconds")
 
-        history.order_data_rows_total = len(daily_order_data)
+        if history is not None:
+            history.order_data_rows_total = len(daily_order_data)
 
-        if len(daily_order_data) <= 0:
-            history.order_data_update_succeeded = False
-            return history
+            if len(daily_order_data) <= 0:
+                history.order_data_update_succeeded = False
+                return history
 
         log_message("Daily order data - starting database update")
 
@@ -903,7 +915,8 @@ class EventService:
                 break
 
         duration = time.time() - timer
-        history.set_order_update_success(success, duration, inserts, updates)
+        if history is not None:
+            history.set_order_update_success(success, duration, inserts, updates)
 
         log_message(f"Daily order data - update complete in {duration} seconds")
 
@@ -970,7 +983,7 @@ class EventService:
             order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
             order_data.event_title = str(row["EventTitle"])
             order_data.event_date = str(row["EventDate"])
-            order_data.seller_id = int(row["seller_id"])
+            order_data.seller_id = int(row["SellerId"])
             order_data.seller_name = str(row["SellerName"])
             order_data.venue = str(row["Venue"])
             order_data.city = str(row["City"])
@@ -1117,7 +1130,9 @@ class EventService:
             order_id = int(row["OrderId"])
             event_id = int(row["EventId"])
             ticket_socket_order_id = int(row["Id"])
-            order = VipOrder(order_id, event_id)
+            order = VipOrder()
+            order.order_id = order_id
+            order.event_id = event_id
             order.venue = str(row["Venue"])
             order.event_title = str(row["EventTitle"])
             order.event_address = str(row["EventAddress"])
@@ -1127,7 +1142,7 @@ class EventService:
             order.event_country = str(row["EventCountry"])
             order.event_date = str(row["EventDate"])
             order.seller_name = str(row["SellerName"])
-            order.seller_id = int(row["seller_id"])
+            order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = ticket_socket_event_id
             order.ticket_socket_order_id = ticket_socket_order_id
             order.num_tickets = int(row["NumTickets"])
@@ -1206,19 +1221,18 @@ class EventService:
             ticket_id: int = 0
             if row["TicketId"] is not None and row["TicketId"] != "":
                 ticket_id = int(row["TicketId"])
-            ticket = VipTicket(
-                ticket_id,
-                str(row["TicketType"]),
-                float(row["Price"]),
-                float(row["ServiceFee"]),
-                int(row["TicketSocketTicketTypeId"]),
-                str(row["BarCode"]),
-                int(row["AvailableScans"]),
-                str(row["PurchaseLocation"]),
-                int(row["ScannedTimestamp"]),
-                str(row["AttendeeFirstName"]),
-                str(row["AttendeeLastName"]),
-            )
+            ticket = VipTicket()
+            ticket.ticket_id = ticket_id
+            ticket.ticket_type = str(row["TicketType"])
+            ticket.price = float(row["Price"])
+            ticket.service_fee = float(row["ServiceFee"])
+            ticket.ticket_type_id = int(row["TicketSocketTicketTypeId"])
+            ticket.barcode = str(row["BarCode"])
+            ticket.available_scans = int(row["AvailableScans"])
+            ticket.purchase_location = str(row["PurchaseLocation"])
+            ticket.scanned_timestamp = int(row["ScannedTimestamp"])
+            ticket.attendee_first_name = str(row["AttendeeFirstName"])
+            ticket.attendee_last_name = str(row["AttendeeLastName"])
             ticket.ticket_socket_order_id = ticket_socket_order_id
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
             ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
@@ -1229,7 +1243,7 @@ class EventService:
                 if (is_refunded is True and row["RefundDate"] is not None)
                 else None
             )
-            is_charged_back: bool = True if int(row["IsChargedback"]) == 1 else False
+            is_charged_back: bool = True if int(row["IsChargedBack"]) == 1 else False
             ticket.is_charged_back = is_charged_back
             ticket.chargeback_date = (
                 str(row["ChargebackDate"])
@@ -1394,6 +1408,7 @@ class EventService:
             success = self.refund_all_event_orders(
                 ticket_socket_event_id, refund_service_fees
             )
+
         return success
 
     def refund_all_event_orders(
@@ -1418,6 +1433,8 @@ class EventService:
                 )
                 if success is False:
                     break
+        if success is True:
+            self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def refund_order(
@@ -1444,6 +1461,9 @@ class EventService:
         ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
         success = db_update(ticket_sql, ticket_data)
 
+        if success is True:
+            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+
         return success
 
     def refund_ticket(
@@ -1469,6 +1489,9 @@ class EventService:
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
         ticket_data = {"ticket_socket_order_ticket_id": ticket_socket_order_ticket_id}
         success = db_update(ticket_sql, ticket_data)
+
+        if success is True:
+            self.rebuild_daily_order_data_for_ticket(ticket_socket_order_ticket_id)
 
         return success
 
@@ -1507,7 +1530,11 @@ class EventService:
                     1 if event_to_update.is_added_to_bands_in_town is True else 0
                 ),
                 "isHidden": 1 if event_to_update.is_hidden is True else 0,
-                "announceDate": event_to_update.announce_date,
+                "announceDate": (
+                    event_to_update.announce_date
+                    if event_to_update.announce_date is not None
+                    else None
+                ),
             }
             success = db_update(update_sql, update_data)
 
@@ -1586,7 +1613,78 @@ class EventService:
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
                         break
+            if success is True:
+                self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
         return success
+
+    def rebuild_daily_order_data_for_ticket(self, ticket_id: int):
+        """
+        Clean out daily order data for order attached to ticket
+        """
+        order_sql = """SELECT TicketSocketOrderId
+                        FROM TicketSocketOrderTickets
+                        WHERE Id=%(ticketId)s"""
+        order_data = {"ticketId": ticket_id}
+        row = db_query_one(order_sql, order_data)
+        if row:
+            order_id = int(row["TicketSocketOrderId"])
+            if order_id > 0:
+                self.rebuild_daily_order_data_for_order(order_id)
+
+    def rebuild_daily_order_data_for_event(self, event_id: int):
+        """
+        Clean out and rebuild daily order data for event
+        """
+        event_sql = """SELECT TicketSocketEvents.Id,
+                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
+                            SellerEventCategory.SellerId
+                            FROM TicketSocketEvents
+                            JOIN SellerEventCategory ON 
+                             TicketSocketEvents.SellerEventCategoryId = 
+                             SellerEventCategory.SellerEventCategoryId                         
+                            WHERE TicketSocketEvents.Id=%(ticket_socket_event_id)s"""
+        event_data = {"ticket_socket_event_id": event_id}
+        event_row = db_query_one(event_sql, event_data)
+        if event_row:
+            event_id: int = event_row["TicketSocketEventId"]
+            event_year: int = event_row["EventYear"]
+            event_seller_id: int = event_row["SellerId"]
+            self.__cleanup_daily_order_data_for_event(event_id)
+            self.update_daily_order_data(year=event_year, seller_id=event_seller_id)
+
+    def rebuild_daily_order_data_for_order(self, order_id: int):
+        """
+        Clean out and rebuild daily order data for order
+        """
+        event_sql = """SELECT TicketSocketEvents.Id,
+                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
+                            SellerEventCategory.SellerId
+                            FROM TicketSocketEvents
+                            JOIN TicketSocketOrders ON
+                             TicketSocketOrders.TicketSocketEventId = 
+                             TicketSocketEvents.Id        
+                            JOIN SellerEventCategory ON 
+                             TicketSocketEvents.SellerEventCategoryId = 
+                             SellerEventCategory.SellerEventCategoryId                         
+                            WHERE TicketSocketOrders.Id=%(ticket_socket_order_id)s"""
+        event_data = {"ticket_socket_order_id": order_id}
+        event_row = db_query_one(event_sql, event_data)
+        if event_row:
+            event_id: int = event_row["TicketSocketEventId"]
+            event_year: int = event_row["EventYear"]
+            event_seller_id: int = event_row["SellerId"]
+            self.__cleanup_daily_order_data_for_event(event_id)
+            self.update_daily_order_data(year=event_year, seller_id=event_seller_id)
+
+    def __cleanup_daily_order_data_for_event(self, event_id: int):
+        """
+        Clear out rows from DailyOrderData ahead of rebuild
+        (which would be needed in refunds, cancellations and chargebacks)
+        """
+        sql = """DELETE FROM DailyOrderData
+          WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        data = {"ticketSocketEventId": event_id}
+        db_delete(sql, data)
 
     def retrieve_ticket_socket_events_for_update(
         self, seller_id: int = None, start: int = None, end: int = None
@@ -1632,7 +1730,7 @@ class EventService:
             if len(events) > 0:
                 for event in events:
                     # convert ts events to vip events
-                    vip_event = VipEvent(event.id, event.title)
+                    vip_event = VipEvent()
                     vip_event.__dict__.update(event.__dict__)
                     vip_event.is_vip = is_vip_service
 
@@ -1657,8 +1755,8 @@ class EventService:
                     # convert the orders
                     orders: list[VipEvent] = []
                     for order in event.orders:
-                        vip_order = VipOrder(order.id, order.eventId)
-                        vip_order.__dict__.db_update(order.__dict__)
+                        vip_order = VipOrder()
+                        vip_order.__dict__.update(order.__dict__)
                         orders.append(vip_order)
 
                     vip_event.orders = orders
@@ -2341,7 +2439,7 @@ class EventService:
                 username = "System"
             else:
                 username = str(row["UserName"]) + " (" + str(row["Email"]) + ")"
-            seller_id = int(row["seller_id"]) if row["seller_id"] is not None else None
+            seller_id = int(row["SellerId"]) if row["SellerId"] is not None else None
             seller_name = (
                 str(row["SellerName"]) if row["SellerName"] is not None else None
             )

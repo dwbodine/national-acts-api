@@ -403,7 +403,9 @@ class UserService:
         for row in rows:
             role_id = int(row["RoleId"])
             role_name = str(row["RoleName"])
-            role = Role(role_id, role_name)
+            role = Role()
+            role.role_id = role_id
+            role.role_name = role_name
             permissions = self.__get_permissions_for_role(role_id)
             role.permissions = permissions
             roles.append(role)
@@ -420,7 +422,9 @@ class UserService:
         if row:
             role_id = int(row["RoleId"])
             role_name = str(row["RoleName"])
-            role = Role(role_id, role_name)
+            role = Role()
+            role.role_id = role_id
+            role.role_name = role_name
             permissions = self.__get_permissions_for_role(role_id)
             role.permissions = permissions
         return role

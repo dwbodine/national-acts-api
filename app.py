@@ -17,7 +17,12 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-from common.utility import log_message, send_email, convert_to_json
+from common.utility import (
+    log_message,
+    send_email,
+    convert_to_json,
+    convert_to_snake_case,
+)
 from common.ticket_socket_service import TicketSocketService, get_all_accounts
 from common.event_service import EventService, VipEvent, VipOrder
 from common.update_service import UpdateService
@@ -149,9 +154,17 @@ def update_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
 
-    event: VipEvent = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
+
+    event_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    event = VipEvent()
+    event.__dict__.update(event_data.__dict__)
 
     service = EventService()
     success = service.update_event(event)
@@ -181,6 +194,8 @@ def refund_order():
 
     service = EventService()
     success = service.refund_order(int(order_id), refund_service_fees, mark_chargeback)
+    if success is True:
+        service.rebuild_daily_order_data_for_order(int(order_id))
     return convert_to_json(success)
 
 
@@ -194,9 +209,17 @@ def update_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
 
-    order: VipOrder = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    camel_case_order = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_order)
+
+    order_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    order = VipOrder()
+    order.__dict__.update(order_data.__dict__)
 
     service = EventService()
     success = service.update_order(order)
@@ -280,13 +303,22 @@ def update_role():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
 
-    role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    camel_case_role = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_role)
+
+    role_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    role = Role()
+    role.__dict__.update(role_data.__dict__)
 
     service = UserService()
     success = service.update_role(role)
     return convert_to_json(success)
+
 
 @app.route("/admin/tickets/refund", methods=["POST"])
 @jwt_required()
@@ -310,8 +342,11 @@ def refund_ticket():
     mark_chargeback: bool = True if mark_chargeback_str == 1 else False
 
     service = EventService()
-    success = service.refund_ticket(int(ticket_id), refund_service_fees, mark_chargeback)
+    success = service.refund_ticket(
+        int(ticket_id), refund_service_fees, mark_chargeback
+    )
     return convert_to_json(success)
+
 
 @app.route("/admin/users")
 @jwt_required()
@@ -358,9 +393,17 @@ def update_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
 
-    user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    camel_case_user = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_user)
+
+    user_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    user = User()
+    user.__dict__.update(user_data.__dict__)
 
     service = UserService()
     success = service.update_user(user)
@@ -463,7 +506,9 @@ def get_user_activity():
             start, end, activity_type=int(activity_type), filter_admins=filter_admin_val
         )
     else:
-        activities = service.get_user_activity(start, end, filter_admins=filter_admin_val)
+        activities = service.get_user_activity(
+            start, end, filter_admins=filter_admin_val
+        )
     return convert_to_json(activities)
 
 
@@ -555,7 +600,7 @@ def log_user_activity():
 
         service = UserService()
         data: str = str(activity_data) if activity_data is not None else ""
-        success = service.log_user_activity(user_id, int(activity_data), data)
+        success = service.log_user_activity(user_id, int(activity_type), data)
     return convert_to_json(success)
 
 
@@ -810,7 +855,7 @@ def create_token():
 
     if login_response.error_message is not None:
         return {"msg": login_response.error_message}, 401
-    elif login_response.user is None or login_response.user.is_authenticated is True:
+    elif login_response.user is None or login_response.user.is_authenticated is False:
         return {"msg": "Invalid username or password"}, 401
 
     access_token = create_access_token(identity=username)
