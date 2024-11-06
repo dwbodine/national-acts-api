@@ -203,6 +203,7 @@ class EventService:
             vip_event.ticket_socket_event_id = ticket_socket_event_id
             vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
             vip_event.event_date = str(row["EventDate"])
+            vip_event.announce_date = str(row["AnnounceDate"])
             vip_event.utc_time = int(row["UtcTime"])
             vip_event.display_date = (
                 str(row["DisplayDate"]) if row["DisplayDate"] is not None else None
@@ -379,6 +380,7 @@ class EventService:
                 vip_event.seller_name = str(row["SellerName"])
                 vip_event.is_external = True
                 vip_event.event_date = str(row["EventDate"])
+                vip_event.announce_date = str(row["AnnounceDate"])
                 vip_event.thumbnail = str(row["Thumbnail"])
                 vip_event.external_url = str(row["URL"])
                 venue = TicketSocketVenue(

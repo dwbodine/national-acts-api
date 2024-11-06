@@ -17,7 +17,12 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-from common.utility import log_message, send_email, convert_to_json
+from common.utility import (
+    log_message,
+    send_email,
+    convert_to_json,
+    convert_to_snake_case,
+)
 from common.ticket_socket_service import TicketSocketService, get_all_accounts
 from common.event_service import EventService, VipEvent, VipOrder
 from common.update_service import UpdateService
@@ -149,7 +154,13 @@ def update_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
 
     event: VipEvent = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -196,7 +207,13 @@ def update_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
 
     order: VipOrder = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -263,7 +280,13 @@ def delete_roles():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
 
     role_ids: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -282,7 +305,13 @@ def update_role():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
 
     role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -364,7 +393,13 @@ def update_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    data = convert_to_json(request.get_json())
+    camel_case_json = convert_to_json(request.get_json())
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
 
     user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 

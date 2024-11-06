@@ -9,17 +9,32 @@ from datetime import datetime
 import traceback
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
-from stringcase import camelcase
+from stringcase import camelcase, snakecase
 
-class GenericJsonEncoder(json.JSONEncoder):
+
+class CamelCaseJsonEncoder(json.JSONEncoder):
     """
     Custom JSON encoder
     """
+
     def default(self, o):
         d = o.__dict__
         for k in list(d):
             d[(camelcase(k))] = d.pop(k)
-        return { **d }
+        return {**d}
+
+
+class SnakeCaseJsonEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder
+    """
+
+    def default(self, o):
+        d = o.__dict__
+        for k in list(d):
+            d[(snakecase(k))] = d.pop(k)
+        return {**d}
+
 
 class SendEmailResult:
     """
@@ -75,7 +90,15 @@ def convert_to_json(obj: any):
     """
     Convert any object to JSON
     """
-    return json.dumps(obj, indent=4, ensure_ascii=False, cls=GenericJsonEncoder)
+    return json.dumps(obj, indent=4, ensure_ascii=False, cls=CamelCaseJsonEncoder)
+
+
+def convert_to_snake_case(obj: any):
+    """
+    Convert any object to snake-case JSON
+    """
+    return json.dumps(obj, indent=4, ensure_ascii=False, cls=SnakeCaseJsonEncoder)
+
 
 def format_phone(raw: str):
     """
