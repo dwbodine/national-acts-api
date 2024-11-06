@@ -17,12 +17,9 @@ class Role:
     """
     Single role with attached permissions in system
     """
-
+    role_id: int = 0
+    role_name: str = None
     permissions: list[Permission] = []
-
-    def __init__(self, role_id: int, role_name: str):
-        self.role_id = role_id
-        self.role_name = role_name
 
 
 class UserSeller:

@@ -162,7 +162,9 @@ def update_event():
 
     data = convert_to_snake_case(camel_case_event)
 
-    event: VipEvent = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    event_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    event = VipEvent()
+    event.__dict__.update(event_data.__dict__)
 
     service = EventService()
     success = service.update_event(event)
@@ -209,13 +211,15 @@ def update_order():
 
     camel_case_json = convert_to_json(request.get_json())
 
-    camel_case_event = json.loads(
+    camel_case_order = json.loads(
         camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
     )
 
-    data = convert_to_snake_case(camel_case_event)
+    data = convert_to_snake_case(camel_case_order)
 
-    order: VipOrder = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    order_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    order = VipOrder()
+    order.__dict__.update(order_data.__dict__)
 
     service = EventService()
     success = service.update_order(order)
@@ -280,13 +284,7 @@ def delete_roles():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    camel_case_json = convert_to_json(request.get_json())
-
-    camel_case_event = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
-    )
-
-    data = convert_to_snake_case(camel_case_event)
+    data = convert_to_json(request.get_json())
 
     role_ids: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
@@ -307,13 +305,15 @@ def update_role():
 
     camel_case_json = convert_to_json(request.get_json())
 
-    camel_case_event = json.loads(
+    camel_case_role = json.loads(
         camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
     )
 
-    data = convert_to_snake_case(camel_case_event)
+    data = convert_to_snake_case(camel_case_role)
 
-    role: Role = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    role_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    role = Role()
+    role.__dict__.update(role_data.__dict__)
 
     service = UserService()
     success = service.update_role(role)
@@ -395,13 +395,15 @@ def update_user():
 
     camel_case_json = convert_to_json(request.get_json())
 
-    camel_case_event = json.loads(
+    camel_case_user = json.loads(
         camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
     )
 
-    data = convert_to_snake_case(camel_case_event)
+    data = convert_to_snake_case(camel_case_user)
 
-    user: User = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    user_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    user = User()
+    user.__dict__.update(user_data.__dict__)
 
     service = UserService()
     success = service.update_user(user)

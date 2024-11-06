@@ -65,38 +65,24 @@ class TicketSocketTicket:
     Ticket object in TicketSocket API
     """
 
-    def __init__(
-        self,
-        ticket_id: int,
-        ticket_type: str,
-        price: float,
-        service_fee: float,
-        ticket_type_id: int,
-        barcode: str,
-        available_scans: int,
-        purchase_location: str,
-        scanned_timestamp: int,
-        attendee_first_name: str,
-        attendee_last_name: str,
-    ):
-        self.ticket_id = ticket_id
-        self.ticket_type = ticket_type
-        self.price = price
-        self.service_fee = service_fee
-        self.ticket_type_id = ticket_type_id
-        self.barcode = barcode
-        self.available_scans = available_scans
-        self.purchase_location = purchase_location
-        self.scanned_timestamp = scanned_timestamp
-        self.attendee_first_name = attendee_first_name
-        self.attendee_last_name = attendee_last_name
+    ticket_id: int = 0
+    ticket_type: str = None
+    price: float = 0
+    service_fee: float = 0
+    ticket_type_id: int = 0
+    barcode: str = None
+    available_scans: int = 0
+    purchase_location: str = None
+    scanned_timestamp: int = 0
+    attendee_first_name: str = None
+    attendee_last_name: str = None
 
 
 class TicketSocketOrder:
     """
     Order object from TicketSocket API
     """
-
+    order_id: int = 0
     event_id: int = 0
     user_id: int = 0
     num_tickets: int = 0
@@ -118,16 +104,13 @@ class TicketSocketOrder:
     cancelled: bool = False
     deleted: bool = False
 
-    def __init__(self, order_id: int, event_id: int):
-        self.order_id = order_id
-        self.event_id = event_id
-
-
 class TicketSocketEvent:
     """
     Event object from TicketSocket API
     """
 
+    event_id: int = 0
+    title: str = ''
     venue: TicketSocketVenue = None
     orders: list[TicketSocketOrder] = []
     event_category_id: int = 0
@@ -138,7 +121,3 @@ class TicketSocketEvent:
     thumbnail: str = ""
     ticket_socket_url: str = ""
     ticket_types: list[TicketSocketTicketType] = []
-
-    def __init__(self, event_id: int, title: str):
-        self.event_id = event_id
-        self.title = title
