@@ -7,6 +7,7 @@ import re
 import os
 from datetime import datetime
 import traceback
+from types import SimpleNamespace
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
@@ -35,6 +36,20 @@ class SnakeCaseJsonEncoder(json.JSONEncoder):
             d[(snakecase(k))] = d.pop(k)
         return {**d}
 
+def convert_json_to_snake_case_object(request_json: any):
+    """
+    Serializes any JSON to a simple dictionary object
+    in snake case
+    """
+    camel_case_json = convert_to_json(request_json)
+
+    camel_case_event = json.loads(
+        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    data = convert_to_snake_case(camel_case_event)
+
+    return json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
 class SendEmailResult:
     """
