@@ -21,7 +21,7 @@ from common.utility import (
     log_message,
     send_email,
     convert_to_json,
-    convert_to_snake_case,
+    convert_json_to_snake_case_object,
 )
 from common.ticket_socket_service import TicketSocketService, get_all_accounts
 from common.event_service import EventService, VipEvent, VipOrder
@@ -154,15 +154,7 @@ def update_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    camel_case_json = convert_to_json(request.get_json())
-
-    camel_case_event = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
-    )
-
-    data = convert_to_snake_case(camel_case_event)
-
-    event_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    event_data = convert_json_to_snake_case_object(request.get_json())
     event = VipEvent()
     event.__dict__.update(event_data.__dict__)
 
@@ -209,15 +201,7 @@ def update_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    camel_case_json = convert_to_json(request.get_json())
-
-    camel_case_order = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
-    )
-
-    data = convert_to_snake_case(camel_case_order)
-
-    order_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    order_data = convert_json_to_snake_case_object(request.get_json())
     order = VipOrder()
     order.__dict__.update(order_data.__dict__)
 
@@ -303,15 +287,7 @@ def update_role():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    camel_case_json = convert_to_json(request.get_json())
-
-    camel_case_role = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
-    )
-
-    data = convert_to_snake_case(camel_case_role)
-
-    role_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    role_data = convert_json_to_snake_case_object(request.get_json())
     role = Role()
     role.__dict__.update(role_data.__dict__)
 
@@ -393,15 +369,7 @@ def update_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    camel_case_json = convert_to_json(request.get_json())
-
-    camel_case_user = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
-    )
-
-    data = convert_to_snake_case(camel_case_user)
-
-    user_data = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    user_data = convert_json_to_snake_case_object(request.get_json())
     user = User()
     user.__dict__.update(user_data.__dict__)
 
