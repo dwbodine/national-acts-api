@@ -154,9 +154,7 @@ def update_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_data = convert_json_to_snake_case_object(request.get_json())
-    event = VipEvent()
-    event.__dict__.update(event_data.__dict__)
+    event = convert_json_to_snake_case_object(request.get_json(), VipEvent())
 
     service = EventService()
     success = service.update_event(event)
@@ -201,9 +199,7 @@ def update_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    order_data = convert_json_to_snake_case_object(request.get_json())
-    order = VipOrder()
-    order.__dict__.update(order_data.__dict__)
+    order = convert_json_to_snake_case_object(request.get_json(), VipOrder())
 
     service = EventService()
     success = service.update_order(order)
@@ -287,9 +283,7 @@ def update_role():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    role_data = convert_json_to_snake_case_object(request.get_json())
-    role = Role()
-    role.__dict__.update(role_data.__dict__)
+    role = convert_json_to_snake_case_object(request.get_json(), Role())
 
     service = UserService()
     success = service.update_role(role)
@@ -314,13 +308,8 @@ def refund_ticket():
     refund_service_fees_str = request.json.get("refundServiceFees", None)
     refund_service_fees: bool = True if refund_service_fees_str == 1 else False
 
-    mark_chargeback_str = request.json.get("markChargeback", None)
-    mark_chargeback: bool = True if mark_chargeback_str == 1 else False
-
     service = EventService()
-    success = service.refund_ticket(
-        int(ticket_id), refund_service_fees, mark_chargeback
-    )
+    success = service.refund_ticket(int(ticket_id), refund_service_fees)
     return convert_to_json(success)
 
 
@@ -369,9 +358,7 @@ def update_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    user_data = convert_json_to_snake_case_object(request.get_json())
-    user = User()
-    user.__dict__.update(user_data.__dict__)
+    user = convert_json_to_snake_case_object(request.get_json(), User())
 
     service = UserService()
     success = service.update_user(user)
@@ -692,6 +679,7 @@ def get_events():
         False,
         exclude_start,
         exclude_end,
+        False,
         False,
         False,
         False,

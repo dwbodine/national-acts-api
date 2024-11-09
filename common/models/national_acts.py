@@ -127,6 +127,7 @@ class VipTicket(TicketSocketTicket):
     ticket_socket_order_ticket_id: int = 0
     is_checked_in: bool = False
     is_refunded: bool = False
+    is_active: bool = False
     refund_date: str = None
     is_charged_back: bool = False
     chargeback_date: str = None

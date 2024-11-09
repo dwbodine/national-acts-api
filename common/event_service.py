@@ -53,7 +53,6 @@ class EventService:
         show_hidden: bool = False,
         ignore_flags: bool = False,
         show_cancelled: bool = False,
-        show_unannounced: bool = True,
     ):
         """
         main method to fetch events and orders
@@ -167,10 +166,10 @@ class EventService:
             elif get_orders is False or seller_id is None:
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
-            if show_unannounced is not True:
+            if ignore_flags is not True:
                 where_clause.append(
                     """COALESCE(TicketSocketEvents.AnnounceDate,
-                                     CURRENT_TIMESTAMP) >= CURRENT_TIMESTAMP"""
+                                     CURRENT_TIMESTAMP) <= CURRENT_TIMESTAMP"""
                 )
 
             if exclude_start is not None and exclude_end is not None:
@@ -469,7 +468,44 @@ class EventService:
             if len(seller_event_category_ids) == 0:
                 return []
 
-        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
+        sql = ""
+
+        if midnight_start is not None and midnight_end is not None:
+            sql += """
+                WITH
+                RefundOrders AS (
+                SELECT DISTINCT
+                    TicketSocketOrderTickets.TicketSocketOrderId As RefundOrderId
+                FROM
+                    TicketSocketOrderTickets
+                        WHERE (
+                            TicketSocketOrderTickets.IsRefunded = 1 
+                                AND TicketSocketOrderTickets.RefundDate 
+                                BETWEEN %(startDate)s AND %(endDate)s
+                        ) OR (
+                            TicketSocketOrderTickets.IsChargedBack = 1 
+                                AND TicketSocketOrderTickets.ChargebackDate 
+                                BETWEEN %(startDate)s AND %(endDate)s
+                        )
+                )"""
+        elif end is not None or start is not None or seller_id is None:
+            sql += """
+                WITH
+                RefundOrders AS (
+                SELECT DISTINCT
+                    TicketSocketOrderTickets.TicketSocketOrderId As RefundOrderId
+                FROM
+                    TicketSocketOrderTickets
+                        WHERE (
+                            TicketSocketOrderTickets.IsRefunded = 1 
+                                AND TicketSocketOrderTickets.RefundDate >= %(startDate)s
+                        ) OR(
+                            TicketSocketOrderTickets.IsChargedBack = 1 
+                                AND TicketSocketOrderTickets.ChargebackDate >= %(startDate)s
+                        )
+                )"""
+        sql += """
+                SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
                     ExchangeRates.Symbol,
                     UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, 
                     TicketSocketOrders.*,
@@ -523,20 +559,16 @@ class EventService:
                 + seller_event_category_id_str
             )
 
-        both_dates_sql = """((TicketSocketOrders.PurchaseDate
-                            BETWEEN %(startDate)s AND %(endDate)s) OR
-                            (TicketSocketOrders.RefundDate IS NOT NULL 
-                                AND TicketSocketOrders.RefundDate 
-                                BETWEEN %(startDate)s AND %(endDate)s) OR
-                            (TicketSocketOrders.ChargebackDate IS NOT NULL
-                                AND TicketSocketOrders.ChargebackDate
-                                BETWEEN %(startDate)s AND %(endDate)s))"""
+        both_dates_sql = """(TicketSocketOrders.PurchaseDate
+                            BETWEEN %(startDate)s AND %(endDate)s OR
+                            TicketSocketOrders.Id in (
+                                SELECT RefundOrderId FROM RefundOrders
+                            ))"""
 
-        start_date_sql = """((TicketSocketOrders.PurchaseDate >= %(startDate)s) OR
-                          (TicketSocketOrders.RefundDate IS NOT NULL
-                            AND TicketSocketOrders.RefundDate >= %(startDate)s) OR
-                          (TicketSocketOrders.ChargebackDate IS NOT NULL
-                            AND TicketSocketOrders.ChargebackDate >= %(startDate)s))"""
+        start_date_sql = """(TicketSocketOrders.PurchaseDate >= %(startDate)s OR
+                            TicketSocketOrders.Id in (
+                                SELECT RefundOrderId FROM RefundOrders
+                            ))"""
 
         if midnight_start is not None and midnight_end is not None:
             where_clause.append(both_dates_sql)
@@ -640,7 +672,9 @@ class EventService:
                 for shirt in shirt_array:
                     shirts.append(shirt.strip())
             order.shirts = shirts
-            tickets = self.__get_tickets_from_order_id(ticket_socket_order_id)
+            tickets = self.__get_tickets_from_order_id(
+                ticket_socket_order_id, ignore_flags
+            )
             order.tickets = tickets
             order.get_totals()
             orders.append(order)
@@ -899,13 +933,13 @@ class EventService:
                                     RevenueRefunded, ServiceFeeRevenueRefunded, NumTicketsChargedBack,
                                     RevenueChargedBack, ServiceFeeRevenueChargedBack,
                                     TicketSocketOrderId) VALUES (%(purchaseDate)s,
-                                    %(ticket_socket_event_id)s, %(orders)s, %(tickets)s,
+                                    %(ticketSocketEventId)s, %(orders)s, %(tickets)s,
                                     %(ticketRevenue)s, %(serviceFeeRevenue)s, %(totalRevenue)s,
                                     %(isRefunded)s, %(isChargeback)s, %(numTicketsRefunded)s,
                                     %(revenueRefunded)s, %(serviceFeeRevenueRefunded)s,
                                     %(numTicketsChargedBack)s, %(revenueChargedBack)s,
                                     %(serviceFeeRevenueChargedBack)s,
-                                    %(ticket_socket_order_id)s )"""
+                                    %(ticketSocketOrderId)s )"""
 
                 daily_order_data_id = db_insert(insert_sql, update_data)
                 success = daily_order_data_id > 0
@@ -1203,17 +1237,22 @@ class EventService:
                 for shirt in shirt_array:
                     shirts.append(shirt.strip())
             order.shirts = shirts
-            tickets = self.__get_tickets_from_order_id(ticket_socket_order_id)
+            tickets = self.__get_tickets_from_order_id(
+                ticket_socket_order_id, ignore_flags
+            )
             order.tickets = tickets
             order.get_totals()
             orders.append(order)
         return orders
 
-    def __get_tickets_from_order_id(self, ticket_socket_order_id: int):
+    def __get_tickets_from_order_id(
+        self, ticket_socket_order_id: int, ignore_flags: bool = False
+    ):
         tickets: list[VipTicket] = []
         sql = """SELECT * FROM TicketSocketOrderTickets
-                    WHERE TicketSocketOrderId=%(ticket_socket_order_id)s
-                    AND IsActive=1"""
+                    WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
+        if ignore_flags is not True:
+            sql += """ AND IsActive=1"""
         data = {"ticket_socket_order_id": ticket_socket_order_id}
 
         rows = db_query_all(sql, data)
@@ -1223,6 +1262,7 @@ class EventService:
                 ticket_id = int(row["TicketId"])
             ticket = VipTicket()
             ticket.ticket_id = ticket_id
+            ticket.is_active = True if int(row["IsActive"]) == 1 else False
             ticket.ticket_type = str(row["TicketType"])
             ticket.price = float(row["Price"])
             ticket.service_fee = float(row["ServiceFee"])
@@ -1237,6 +1277,9 @@ class EventService:
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
             ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
             is_refunded: bool = True if int(row["IsRefunded"]) == 1 else False
+            ticket.is_service_fee_refunded = (
+                True if int(row["IsServiceFeeRefunded"]) == 1 else False
+            )
             ticket.is_refunded = is_refunded
             ticket.refund_date = (
                 str(row["RefundDate"])
@@ -1455,8 +1498,8 @@ class EventService:
         else:
             ticket_sql += """, IsRefunded=1, IsChargedBack=0,
                             RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
-        if refund_service_fees is True:
-            ticket_sql += """, ServiceFeeRevenueRefunded=ServiceFees"""
+        if refund_service_fees is True or mark_chargeback is True:
+            ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
         ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
         success = db_update(ticket_sql, ticket_data)
@@ -1467,25 +1510,16 @@ class EventService:
         return success
 
     def refund_ticket(
-        self,
-        ticket_socket_order_ticket_id: int,
-        refund_service_fees: bool = False,
-        mark_chargeback: bool = False,
+        self, ticket_socket_order_ticket_id: int, refund_service_fees: bool = False
     ):
         """
         Refunds a single ticket
         """
-        ticket_sql = (
-            """UPDATE TicketSocketOrderTickets SET LastUpdate=CURRENT_TIMESTAMP"""
-        )
-        if mark_chargeback is True:
-            ticket_sql += """, IsChargedBack=1, IsRefunded=0,
-                            ChargebackDate=CURRENT_TIMESTAMP, RefundDate=NULL"""
-        else:
-            ticket_sql += """, IsRefunded=1, IsChargedBack=0,
-                            RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
+        ticket_sql = """UPDATE TicketSocketOrderTickets SET LastUpdate=CURRENT_TIMESTAMP,
+                    IsRefunded=1, IsChargedBack=0,
+                    RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
         if refund_service_fees is True:
-            ticket_sql += """, ServiceFeeRevenueRefunded=ServiceFees"""
+            ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
         ticket_data = {"ticket_socket_order_ticket_id": ticket_socket_order_ticket_id}
         success = db_update(ticket_sql, ticket_data)
@@ -1604,7 +1638,7 @@ class EventService:
                                             WHERE Id=%(ticketId)s 
                                             AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
                     order_ticket_data = {
-                        "ticketId": ticket.id,
+                        "ticketId": ticket.ticket_socket_order_ticket_id,
                         "ticket_socket_order_id": ticket.ticket_socket_order_id,
                         "price": ticket.price,
                         "serviceFee": ticket.service_fee,
@@ -1656,7 +1690,7 @@ class EventService:
         """
         Clean out and rebuild daily order data for order
         """
-        event_sql = """SELECT TicketSocketEvents.Id,
+        event_sql = """SELECT TicketSocketEvents.Id AS TicketSocketEventId,
                             YEAR(TicketSocketEvents.EventDate) AS EventYear, 
                             SellerEventCategory.SellerId
                             FROM TicketSocketEvents

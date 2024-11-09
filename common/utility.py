@@ -36,7 +36,19 @@ class SnakeCaseJsonEncoder(json.JSONEncoder):
             d[(snakecase(k))] = d.pop(k)
         return {**d}
 
-def convert_json_to_snake_case_object(request_json: any):
+
+def replace_none(data):
+    """
+    Utility to replace JSON string 'None' with actual None value
+    """
+    for k, v in data.items() if isinstance(data, dict) else enumerate(data):
+        if v == "None":
+            data[k] = None
+        elif isinstance(v, (dict, list)):
+            replace_none(v)
+
+
+def convert_json_to_snake_case_object(request_json: any, typed_object: any):
     """
     Serializes any JSON to a simple dictionary object
     in snake case
@@ -44,12 +56,21 @@ def convert_json_to_snake_case_object(request_json: any):
     camel_case_json = convert_to_json(request_json)
 
     camel_case_event = json.loads(
-        camel_case_json, object_hook=lambda d: SimpleNamespace(**d)
+        camel_case_json,
+        object_hook=lambda d: SimpleNamespace(**d),
     )
 
     data = convert_to_snake_case(camel_case_event)
 
-    return json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
+    simple_snake_case_object = json.loads(
+        data, object_hook=lambda d: SimpleNamespace(**d)
+    )
+
+    replace_none(simple_snake_case_object.__dict__)
+
+    typed_object.__dict__.update(simple_snake_case_object.__dict__)
+    return typed_object
+
 
 class SendEmailResult:
     """
