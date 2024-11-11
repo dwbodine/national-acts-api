@@ -629,6 +629,25 @@ def refresh_events_from_service(seller_id: int = None):
         results = None
     return convert_to_json(results)
 
+@app.route("/internal/updateDailyOrderData/<int:year>")
+def update_daily_order_data(year: int):
+    """
+    API method to refresh daily order data directly for an entire year
+    """
+    
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("INTERNAL_API_KEY"))
+    
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+    
+    if year < 2022:
+        return {"msg": "Bad Request"}, 400
+    
+    service = EventService()
+    results = service.update_daily_order_data(None, year, None)
+    return convert_to_json(results)
 
 # END INTERNAL ROUTES
 

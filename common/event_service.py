@@ -796,18 +796,18 @@ class EventService:
 
             if refund_order_data is not None:
                 refund_order_data.num_tickets_refunded += order.num_tickets_refunded
-                refund_order_data.revenue_refunded += order.revenue_refunded
+                refund_order_data.revenue_refunded += order.revenue_refunded_usd
                 refund_order_data.service_fee_revenue_refunded += (
-                    order.service_fee_revenue_refunded
+                    order.service_fee_revenue_refunded_usd
                 )
 
             if chargeback_order_data is not None:
                 chargeback_order_data.num_tickets_charged_back += (
                     order.num_tickets_charged_back
                 )
-                chargeback_order_data.revenue_charged_back += order.revenue_charged_back
+                chargeback_order_data.revenue_charged_back += order.revenue_charged_back_usd
                 chargeback_order_data.service_fee_revenue_charged_back += (
-                    order.service_fee_revenue_charged_back
+                    order.service_fee_revenue_charged_back_usd
                 )
 
             if order_data is not None:
@@ -1476,15 +1476,15 @@ class EventService:
                 )
                 if success is False:
                     break
-        if success is True:
-            self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+            if success is True:
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def refund_order(
         self,
         ticket_socket_order_id: int,
         refund_service_fees: bool = False,
-        mark_chargeback: bool = False,
+        mark_chargeback: bool = False
     ):
         """
         Refunds all tickets in an order
@@ -1503,9 +1503,6 @@ class EventService:
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
         ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
         success = db_update(ticket_sql, ticket_data)
-
-        if success is True:
-            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
 
         return success
 
@@ -1669,7 +1666,7 @@ class EventService:
         """
         Clean out and rebuild daily order data for event
         """
-        event_sql = """SELECT TicketSocketEvents.Id,
+        event_sql = """SELECT TicketSocketEvents.Id as TicketSocketEventId,
                             YEAR(TicketSocketEvents.EventDate) AS EventYear, 
                             SellerEventCategory.SellerId
                             FROM TicketSocketEvents
