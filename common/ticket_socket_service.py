@@ -147,9 +147,9 @@ class TicketSocketService:
         """
         Get all TS data for the specified category and time period
         """
-        url = """/api/v1/events?
-                includeEnded=true&includeOffSale=true
-                &includeTicketTypes=true&limit=9999"""
+        url = """/api/v1/events?"""
+        url += """includeEnded=true&includeOffSale=true"""
+        url += """&includeTicketTypes=true&limit=9999"""
 
         if event_category_id is not None and event_category_id > 0:
             url += "&category=" + str(event_category_id)
@@ -314,10 +314,10 @@ class TicketSocketService:
 
                 try:
                     event_date = datetime.strptime(event.display_date, "%m/%d/%Y")
-                    event.eventDate = event_date.strftime("%Y-%m-%d")
+                    event.event_date = event_date.strftime("%Y-%m-%d")
                 except RuntimeError:
                     event_time: int = event.utc_time + (self.utc_offset_hours * 60 * 60)
-                    event.eventDate = datetime.fromtimestamp(event_time).strftime(
+                    event.event_date = datetime.fromtimestamp(event_time).strftime(
                         "%Y-%m-%d"
                     )
 

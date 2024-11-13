@@ -236,9 +236,9 @@ def get_all_roles():
     return convert_to_json(roles)
 
 
-@app.route("/admin/roles/<int:roleId>")
+@app.route("/admin/roles/<int:role_id>")
 @jwt_required()
-def get_role_by_id(role_id):
+def get_role_by_id(role_id: int):
     """
     API method to get role by id
     """
@@ -492,7 +492,7 @@ def get_accounts():
     return convert_to_json(accounts)
 
 
-@app.route("/internal/<int:ticketSocketId>/categories")
+@app.route("/internal/<int:ticket_socket_id>/categories")
 def get_categories(ticket_socket_id: int):
     """
     API method to fetch categories
@@ -502,7 +502,7 @@ def get_categories(ticket_socket_id: int):
     return convert_to_json(categories)
 
 
-@app.route("/internal/getEventsFromService/<int:sellerId>")
+@app.route("/internal/getEventsFromService/<int:seller_id>")
 def get_events_from_service(seller_id: int = None):
     """
     API method to fetch methods from TicketSocket by sellerId
@@ -592,7 +592,7 @@ def send_mail():
     return convert_to_json(result)
 
 
-@app.route("/internal/refreshEventsFromService/<int:sellerId>")
+@app.route("/internal/refreshEventsFromService/<int:seller_id>")
 @jwt_required()
 def refresh_events_from_service(seller_id: int = None):
     """
@@ -629,25 +629,27 @@ def refresh_events_from_service(seller_id: int = None):
         results = None
     return convert_to_json(results)
 
+
 @app.route("/internal/updateDailyOrderData/<int:year>")
 def update_daily_order_data(year: int):
     """
     API method to refresh daily order data directly for an entire year
     """
-    
+
     # secured by internal api key
     sender_key = str(request.headers.get("x-api-key"))
     api_key = str(os.environ.get("INTERNAL_API_KEY"))
-    
+
     if sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
-    
+
     if year < 2022:
         return {"msg": "Bad Request"}, 400
-    
+
     service = EventService()
     results = service.update_daily_order_data(None, year, None)
     return convert_to_json(results)
+
 
 # END INTERNAL ROUTES
 
@@ -794,7 +796,7 @@ def get_events_and_orders_secured():
     return convert_to_json(results)
 
 
-@app.route("/user/getUserSellerFromEventId/<int:userId>/<int:eventId>")
+@app.route("/user/getUserSellerFromEventId/<int:user_id>/<int:event_id>")
 @jwt_required()
 def get_user_seller_from_event_id(user_id: int, event_id: int):
     """
@@ -867,7 +869,6 @@ def orders_secured():
     end: int = None
     show_inactive: bool = False
     show_deleted: bool = False
-    show_hidden: bool = False
     show_cancelled: bool = False
     ignore_flags: bool = False
     if request.args.get("sellerId") is not None:
@@ -880,8 +881,6 @@ def orders_secured():
         show_inactive = True if int(request.args.get("inactive")) == 1 else False
     if request.args.get("deleted") is not None:
         show_deleted = True if int(request.args.get("deleted")) == 1 else False
-    if request.args.get("hidden") is not None:
-        show_hidden = True if int(request.args.get("hidden")) == 1 else False
     if request.args.get("cancelled") is not None:
         show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
     if request.args.get("ignoreFlags") is not None:
@@ -893,14 +892,13 @@ def orders_secured():
         end,
         show_inactive,
         show_deleted,
-        show_hidden,
         ignore_flags,
         show_cancelled,
     )
     return convert_to_json(results)
 
 
-@app.route("/user/profile/<int:userId>")
+@app.route("/user/profile/<int:user_id>")
 @jwt_required()
 def get_user_profile(user_id: int):
     """
@@ -987,7 +985,7 @@ def reset_password_secured():
     return convert_to_json(result)
 
 
-@app.route("/user/sellers/<int:userId>")
+@app.route("/user/sellers/<int:user_id>")
 def get_user_sellers(user_id: int):
     """
     API method to get all sellers by user_id
@@ -1155,40 +1153,6 @@ def set_order_deleted_secured():
     service = EventService()
     if len(order_ids) > 0:
         result = service.delete_orders(order_ids, deleted)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
-    return convert_to_json(result)
-
-
-@app.route("/user/setOrderHiddenSecured", methods=["POST"])
-@jwt_required()
-def set_order_hidden_secured():
-    """
-    API method to set order(s) as hidden
-    """
-    ticket_socket_order_id = request.json.get("orderId", None)
-    ticket_socket_order_id_list = request.json.get("orderIdList", None)
-    is_hidden = request.json.get("isHidden", None)
-
-    if (
-        ticket_socket_order_id is None and ticket_socket_order_id_list is None
-    ) or is_hidden is None:
-        return {"msg": "Bad Request"}, 400
-
-    order_ids: list[int] = []
-    if ticket_socket_order_id_list is not None:
-        order_ids = json.loads(
-            ticket_socket_order_id_list, object_hook=lambda d: SimpleNamespace(**d)
-        )
-        if len(order_ids) == 0:
-            return {"msg": "Bad Request"}, 400
-    elif ticket_socket_order_id is not None:
-        order_ids.append(int(ticket_socket_order_id))
-
-    hidden: bool = True if int(is_hidden) == 1 else False
-    service = EventService()
-    if len(order_ids) > 0:
-        result = service.hide_orders(order_ids, hidden)
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convert_to_json(result)

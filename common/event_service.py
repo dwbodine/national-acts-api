@@ -293,7 +293,6 @@ class EventService:
                     ticket_socket_event_id,
                     show_inactive,
                     show_deleted,
-                    show_hidden,
                     ignore_flags,
                 )
                 vip_event.orders = orders
@@ -439,7 +438,6 @@ class EventService:
         end: int = None,
         show_inactive: bool = False,
         show_deleted: bool = False,
-        show_hidden: bool = False,
         ignore_flags: bool = False,
         show_cancelled: bool = False,
     ):
@@ -543,9 +541,6 @@ class EventService:
                 where_clause.append("TicketSocketOrders.IsActive = 0")
             else:
                 where_clause.append("TicketSocketOrders.IsActive = 1")
-
-            if show_hidden is not True:
-                where_clause.append("TicketSocketOrders.IsHidden = 0")
 
             if show_cancelled is not True:
                 where_clause.append("TicketSocketEvents.IsCancelled = 0")
@@ -658,11 +653,9 @@ class EventService:
             order.currency_symbol = str(row["Symbol"])
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
-            order.is_hidden = True if int(row["IsHidden"]) == 1 else False
 
             if order.is_deleted is True:
                 order.is_active = False
-                order.is_hidden = False
             shirt_str = (
                 str(row["Shirts"]).strip() if row["Shirts"] is not None else None
             )
@@ -805,7 +798,9 @@ class EventService:
                 chargeback_order_data.num_tickets_charged_back += (
                     order.num_tickets_charged_back
                 )
-                chargeback_order_data.revenue_charged_back += order.revenue_charged_back_usd
+                chargeback_order_data.revenue_charged_back += (
+                    order.revenue_charged_back_usd
+                )
                 chargeback_order_data.service_fee_revenue_charged_back += (
                     order.service_fee_revenue_charged_back_usd
                 )
@@ -1073,16 +1068,10 @@ class EventService:
 
         dash_totals.daily_order_data = daily_order_data
         dash_totals.price_per_ticket = (
-            (
-                dash_totals.ticket_revenue_usd
-                - dash_totals.revenue_refunded
-                - dash_totals.revenue_charged_back
-            )
+            (dash_totals.ticket_revenue_usd)
         ) / dash_totals.tickets
         dash_totals.service_fee_per_ticket = (
             dash_totals.service_fees_revenue_usd
-            - dash_totals.service_fee_revenue_refunded
-            - dash_totals.service_fee_revenue_charged_back
         ) / dash_totals.tickets
         return dash_totals
 
@@ -1116,7 +1105,6 @@ class EventService:
         ticket_socket_event_id: int,
         show_inactive: bool = False,
         show_deleted: bool = False,
-        show_hidden: bool = False,
         ignore_flags: bool = False,
     ):
         orders: list[VipOrder] = []
@@ -1149,9 +1137,6 @@ class EventService:
 
         if show_deleted is not True and ignore_flags is not True:
             sql += """ AND TicketSocketOrders.IsDeleted = 0"""
-
-        if show_hidden is not True and ignore_flags is not True:
-            sql += """ AND TicketSocketOrders.IsHidden = 0"""
 
         if show_inactive is not True and ignore_flags is not True:
             sql += """ AND TicketSocketOrders.IsActive = 1"""
@@ -1223,11 +1208,9 @@ class EventService:
             order.currency_symbol = str(row["Symbol"])
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
-            order.is_hidden = True if int(row["IsHidden"]) == 1 else False
 
             if order.is_deleted is True:
                 order.is_active = False
-                order.is_hidden = False
             shirt_str = (
                 str(row["Shirts"]).strip() if row["Shirts"] is not None else None
             )
@@ -1391,25 +1374,6 @@ class EventService:
                 break
         return success
 
-    def hide_orders(self, ticket_socket_order_ids: list[int], hidden: bool):
-        """
-        Marks orders as hidden
-        """
-        success: bool = True
-        for ticket_socket_order_id in ticket_socket_order_ids:
-            sql = """UPDATE TicketSocketOrders
-                        SET IsHidden=%(isHidden)s,
-                        LastUpdate=CURRENT_TIMESTAMP
-                        WHERE Id=%(ticket_socket_order_id)s"""
-            data = {
-                "ticket_socket_order_id": ticket_socket_order_id,
-                "isHidden": 1 if hidden is True else 0,
-            }
-            success = db_update(sql, data)
-            if success is False:
-                break
-        return success
-
     def check_in_tickets(
         self, ticket_socket_order_ticket_ids: list[int], checked_in: bool
     ):
@@ -1484,7 +1448,7 @@ class EventService:
         self,
         ticket_socket_order_id: int,
         refund_service_fees: bool = False,
-        mark_chargeback: bool = False
+        mark_chargeback: bool = False,
     ):
         """
         Refunds all tickets in an order
@@ -1605,7 +1569,6 @@ class EventService:
             update_sql = """UPDATE TicketSocketOrders
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
-                             IsHidden=%(isHidden)s, 
                              Revenue=%(revenue)s, 
                              ServiceFees=%(serviceFees)s, 
                              LastUpdate=CURRENT_TIMESTAMP 
@@ -1622,7 +1585,6 @@ class EventService:
                 ),
                 "is_active": 1 if order_to_update.is_active is True else 0,
                 "isDeleted": 1 if order_to_update.is_deleted is True else 0,
-                "isHidden": 1 if order_to_update.is_hidden is True else 0,
             }
             success = db_update(update_sql, update_data)
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
@@ -1859,14 +1821,14 @@ class EventService:
                         service_events_skipped.append(
                             evt.title
                             + " - eventId "
-                            + str(evt.id)
+                            + str(evt.event_id)
                             + " ("
                             + evt.ticket_socket_url
                             + ")"
                         )
                         continue
 
-                    service_events.append(evt.id)
+                    service_events.append(evt.event_id)
                     # compile event data for update
                     address = evt.venue.address1
                     if evt.venue and evt.venue.address2:
@@ -1881,7 +1843,7 @@ class EventService:
                         "address": address.strip(),
                         "city": evt.venue.city.strip(),
                         "state": evt.venue.state.strip(),
-                        "zip": evt.venue.postalCode.strip(),
+                        "zip": evt.venue.postal_code.strip(),
                         "country": (
                             evt.venue.country.strip()
                             if evt.venue.country is not None
@@ -1905,7 +1867,7 @@ class EventService:
                                     AND SellerEventCategoryId=%(sellerEventCategoryId)s"""
 
                     data = {
-                        "event_id": evt.id,
+                        "event_id": evt.event_id,
                         "sellerEventCategoryId": evt.seller_event_category_id,
                     }
 
@@ -1931,7 +1893,7 @@ class EventService:
                     else:
                         event_add_new = True
                         # insert new event
-                        event_data["event_id"] = int(evt.id)
+                        event_data["event_id"] = int(evt.event_id)
                         event_data["sellerEventCategoryId"] = int(
                             evt.seller_event_category_id
                         )
@@ -1954,7 +1916,7 @@ class EventService:
                             events_updated += 1
                     else:
                         # if that failed, just mark it failed and skip orders
-                        events_failed.append(evt.id)
+                        events_failed.append(evt.event_id)
                         update_success = False
                         continue
 
@@ -1966,8 +1928,8 @@ class EventService:
                             ticket_type_data = {
                                 "ticketSocketTicketTypeId": ticket_type.ticket_type_id,
                                 "ticket_socket_event_id": ticket_socket_event_id,
-                                "ticketTypeName": ticket_type.ticketTypeName,
-                                "totalAvailable": ticket_type.totalAvailable,
+                                "ticketTypeName": ticket_type.ticket_type_name,
+                                "totalAvailable": ticket_type.total_available,
                                 "is_active": 1 if ticket_type.is_active else 0,
                             }
 
@@ -2028,9 +1990,9 @@ class EventService:
                     if ticket_socket_event_id and len(evt.orders) > 0:
                         event_orders: list[int] = []
                         for order in evt.orders:
-                            if order.event_id != evt.id:
+                            if order.event_id != evt.event_id:
                                 continue
-                            event_orders.append(order.id)
+                            event_orders.append(order.order_id)
                             # compile order data for update
                             shirts: str = None
                             if len(order.shirts) > 0:
@@ -2119,7 +2081,7 @@ class EventService:
 
                             data = {
                                 "ticket_socket_event_id": ticket_socket_event_id,
-                                "order_id": order.id,
+                                "order_id": order.order_id,
                             }
 
                             existing_order = db_query_one(order_sql, data, cnx)
@@ -2192,7 +2154,7 @@ class EventService:
                             else:
                                 order_add_new = True
                                 # insert new order
-                                order_data["order_id"] = int(order.id)
+                                order_data["order_id"] = int(order.order_id)
                                 order_data["ticket_socket_event_id"] = (
                                     ticket_socket_event_id
                                 )
@@ -2229,7 +2191,7 @@ class EventService:
                                     orders_updated += 1
                             else:
                                 # if that failed, just mark it failed and skip orders
-                                orders_failed.append(order.id)
+                                orders_failed.append(order.order_id)
                                 update_success = False
                                 continue
 
@@ -2246,7 +2208,7 @@ class EventService:
                                 db_delete(delete_sql, delete_data)
 
                                 for ticket in order.tickets:
-                                    order_tickets.append(ticket.id)
+                                    order_tickets.append(ticket.ticket_id)
                                     # compile ticket data for update
                                     ticket_data = {
                                         "ticket_type": ticket.ticket_type.strip(),
@@ -2279,7 +2241,7 @@ class EventService:
 
                                     data = {
                                         "ticket_socket_order_id": ticket_socket_order_id,
-                                        "ticketId": ticket.id,
+                                        "ticketId": ticket.ticket_id,
                                     }
 
                                     existing_ticket = db_query_one(
@@ -2326,7 +2288,7 @@ class EventService:
                                     else:
                                         # insert new ticket
                                         ticket_add_new = True
-                                        ticket_data["ticketId"] = int(ticket.id)
+                                        ticket_data["ticketId"] = int(ticket.ticket_id)
                                         ticket_data["ticket_socket_order_id"] = (
                                             ticket_socket_order_id
                                         )
@@ -2364,7 +2326,7 @@ class EventService:
                                             tickets_updated += 1
                                     else:
                                         # if that failed, just mark it failed and skip orders
-                                        tickets_failed.append(ticket.id)
+                                        tickets_failed.append(ticket.ticket_id)
                                         update_success = False
                                         continue
             else:

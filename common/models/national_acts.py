@@ -172,7 +172,6 @@ class VipOrder(TicketSocketOrder):
     currency_symbol: str = None
     currency_abbrev: str = None
     tickets: list[VipTicket] = []
-    is_hidden: bool = False
 
     def get_totals(self):
         """
