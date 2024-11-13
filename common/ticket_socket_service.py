@@ -380,7 +380,7 @@ class TicketSocketService:
         conn = http.client.HTTPSConnection(self.service_url, timeout=600)
 
         # loop through and append orders
-        orders = []
+        orders: list[TicketSocketOrder] = []
         for order_id in order_ids:
             url = base_url + str(order_id)
             conn.request("GET", url, headers=headers)
@@ -389,206 +389,56 @@ class TicketSocketService:
             if response.status == 200:
                 json_response = json.loads(response.read())
                 json_data = json_response["data"]
-                # get data from order
-                order_id: int = 0
-                if "id" in json_data:
-                    order_id = int(json_data["id"])
 
-                if order_id == 0:
+                incoming_order_id: int = 0
+                if "id" in json_data:
+                    incoming_order_id = int(json_data["id"])
+
+                if incoming_order_id == 0 or incoming_order_id != order_id:
                     continue
 
-                order = TicketSocketOrder()
-                order.order_id = order_id
-                order.event_id = event_id
+                order: TicketSocketOrder = self.__parse_response_to_order_object(
+                    incoming_order_id, event_id, format_phone_numbers, json_data
+                )
 
-                if "cancelled" in json_data:
-                    order.cancelled = bool(json_data["cancelled"])
-
-                if "deleted" in json_data:
-                    order.deleted = True if int(json_data["deleted"]) == 1 else False
-
-                tickets = None
-                if "tickets" in json_data:
-                    tickets = json_data["tickets"]
-
-                num_tickets: int = 0
-                total_count: int = 0
-                if tickets is not None:
-                    if "totalCount" in tickets:
-                        total_count = int(tickets["totalCount"])
-
-                order_revenue: float = 0
-                order_service_fees: float = 0
-                order_tickets = []
-                order_shirts = []
-                if total_count > 0:
-                    ticket_data = tickets["data"]
-                    for item in ticket_data:
-                        # if the ticket doesn't belong to this event, move along
-                        # and yes that happens that an order can contain tickets to multiple events
-
-                        item_event_id: int = 0
-                        if "eventId" in item:
-                            item_event_id = int(item["eventId"])
-                        if item_event_id != int(event_id):
-                            continue
-
-                        num_tickets += 1
-
-                        # set properties on order from ticket data if not present
-                        if order.user_id == 0 and "userId" in item:
-                            order.user_id = int(item["userId"])
-                        if (
-                            order.purchaser_first_name == ""
-                            and "billing_firstName" in item
-                        ):
-                            order.purchaser_first_name = fix_magic_quotes(
-                                item["billing_firstName"]
-                            )
-                        if (
-                            order.purchaser_last_name == ""
-                            and "billing_lastName" in item
-                        ):
-                            order.purchaser_last_name = fix_magic_quotes(
-                                item["billing_lastName"]
-                            )
-                        if order.purchaser_city is None and "billing_city" in item:
-                            order.purchaser_city = fix_magic_quotes(
-                                item["billing_city"]
-                            )
-                        if order.purchaser_state is None and "billing_state" in item:
-                            order.purchaser_state = fix_magic_quotes(
-                                item["billing_state"]
-                            )
-                        if order.purchaser_zip_code is None and "billing_zip" in item:
-                            order.purchaser_zip_code = fix_magic_quotes(
-                                item["billing_zip"]
-                            )
-                        if (
-                            order.purchaser_country is None
-                            and "billing_country" in item
-                        ):
-                            order.purchaser_country = fix_magic_quotes(
-                                item["billing_country"]
-                            )
-                        if order.purchaser_ip_address is None and "remoteAddr" in item:
-                            order.purchaser_ip_address = fix_magic_quotes(
-                                item["remoteAddr"]
-                            )
-                        if order.purchase_date == "" and "purchaseDate" in item:
-                            # datetime is not serializable in python,
-                            # convert it to ISO-compatible string
-                            purchase_date = datetime.fromtimestamp(
-                                float(item["purchaseDate"])
-                            )
-                            order.purchase_date = purchase_date.strftime("%Y-%m-%d")
-                            order.purchase_timestamp = purchase_date.strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            )
-                        if order.email == "" and "email" in item:
-                            order.email = item["email"]
-
-                        # get shirt and phone data from questions
-                        purchaser_questions: list = []
-                        attendee_questions: list = []
-                        if "purchaserQuestions" in item:
-                            purchaser_questions = list(item["purchaserQuestions"])
-                        if "attendeeQuestions" in item:
-                            attendee_questions = list(item["attendeeQuestions"])
-                        questions = purchaser_questions + attendee_questions
-                        if len(questions) > 0:
-                            for question_item in questions:
-                                question: str = ""
-                                if "question" in question_item:
-                                    question = str(question_item["question"]).lower()
-
-                                if question == "":
-                                    continue
-
-                                answer: str = ""
-                                if "answerText" in question_item:
-                                    answer = str(question_item["answerText"])
-
-                                if answer != "":
-                                    if (
-                                        question.find("phone") >= 0
-                                        and order.phone == ""
-                                    ):
-                                        if format_phone_numbers:
-                                            order.phone = format_phone(answer)
-                                        else:
-                                            order.phone = answer
-                                    elif question.find("shirt") >= 0:
-                                        order_shirts.append(answer)
-
-                        # create the ticket object
-                        price: float = 0
-                        if "price" in item:
-                            price = float(item["price"])
-
-                        ticket_id: int = 0
-                        if "id" in item:
-                            ticket_id = int(item["id"])
-                        ticket_type: str = ""
-                        if "ticketTypeName" in item:
-                            ticket_type = item["ticketTypeName"]
-                        service_fee: float = 0
-                        if "fee1Amount" in item:
-                            service_fee = float(item["fee1Amount"])
-                        ticket_type_id: int = 0
-                        if "typeId" in item:
-                            ticket_type_id = int(item["typeId"])
-                        barcode: str = ""
-                        if "barcode" in item:
-                            barcode = str(item["barcode"])
-                        available_scans: int = 0
-                        if "availableScans" in item:
-                            available_scans = int(item["availableScans"])
-                        purchase_location: str = ""
-                        if "purchaseLocation" in item:
-                            purchase_location = str(item["purchaseLocation"])
-                        scanned_timestamp: int = 0
-                        if "scannedTimestamp" in item:
-                            scanned_timestamp = int(item["scannedTimestamp"])
-                        attendee_first_name: str = ""
-                        if "partyMember" in item:
-                            attendee_first_name = fix_magic_quotes(item["partyMember"])
-                        attendee_last_name: str = ""
-                        if "partyMemberLastName" in item:
-                            attendee_last_name = fix_magic_quotes(
-                                item["partyMemberLastName"]
-                            )
-
-                        if ticket_id == 0 or ticket_type == "":
-                            continue
-
-                        ticket = TicketSocketTicket()
-                        ticket.ticket_id = ticket_id
-                        ticket.ticket_type = ticket_type
-                        ticket.price = price
-                        ticket.service_fee = service_fee
-                        ticket.ticket_type_id = ticket_type_id
-                        ticket.barcode = barcode
-                        ticket.available_scans = available_scans
-                        ticket.purchase_location = purchase_location
-                        ticket.scanned_timestamp = scanned_timestamp
-                        ticket.attendee_first_name = attendee_first_name
-                        ticket.attendee_last_name = attendee_last_name
-                        order_tickets.append(ticket)
-
-                        order_revenue += price
-                        order_service_fees += service_fee
-
-                if len(order_tickets) > 0:
-                    order.num_tickets = num_tickets
-                    order.tickets = order_tickets
-                    order.shirts = order_shirts
-                    order.revenue = order_revenue
-                    order.service_fees = order_service_fees
-
-                    orders.append(order)
+                orders.append(order)
 
         return orders
+
+    def get_order_from_order_id(
+        self, order_id: int, event_id: int = 0, format_phone_numbers: bool = True
+    ):
+        """
+        API method to only return TS data for one order
+        """
+        order: TicketSocketOrder = None
+        # common service settings
+        base_url: str = "/api/v1/orders/"
+        headers = {
+            "Accept": "application/json",
+            "Content-type": "application/json;charset=UTF-8",
+            "Authorization": "Bearer " + self.token,
+        }
+        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
+
+        url = base_url + str(order_id)
+        conn.request("GET", url, headers=headers)
+        response = conn.getresponse()
+
+        if response.status == 200:
+            json_response = json.loads(response.read())
+            json_data = json_response["data"]
+
+            incoming_order_id: int = 0
+            if "id" in json_data:
+                incoming_order_id = int(json_data["id"])
+
+            if incoming_order_id != 0 or incoming_order_id != order_id:
+                order = self.__parse_response_to_order_object(
+                    incoming_order_id, event_id, format_phone_numbers, json_data
+                )
+
+        return order
 
     def get_order_ids_from_event_id(self, event_id: int):
         """
@@ -618,6 +468,190 @@ class TicketSocketService:
                     order_ids.append(order_id)
 
         return order_ids
+
+    def __parse_response_to_order_object(
+        self, order_id: int, event_id: int, format_phone_numbers: bool, json_data: any
+    ):
+        # get data from order
+        order = TicketSocketOrder()
+        order.order_id = order_id
+        order.event_id = event_id
+
+        if "cancelled" in json_data:
+            order.cancelled = bool(json_data["cancelled"])
+
+        if "deleted" in json_data:
+            order.deleted = True if int(json_data["deleted"]) == 1 else False
+
+        tickets = None
+        if "tickets" in json_data:
+            tickets = json_data["tickets"]
+
+        num_tickets: int = 0
+        total_count: int = 0
+        if tickets is not None:
+            if "totalCount" in tickets:
+                total_count = int(tickets["totalCount"])
+
+        order_revenue: float = 0
+        order_service_fees: float = 0
+        order_tickets = []
+        if total_count > 0:
+            ticket_data = tickets["data"]
+            for item in ticket_data:
+                # if the ticket doesn't belong to this event, move along
+                # and yes that happens that an order can contain tickets to multiple events
+
+                shirt_size: str = None
+                item_event_id: int = 0
+                if "eventId" in item:
+                    item_event_id = int(item["eventId"])
+                if item_event_id != int(event_id):
+                    continue
+
+                num_tickets += 1
+
+                # set properties on order from ticket data if not present
+                if order.user_id == 0 and "userId" in item:
+                    order.user_id = int(item["userId"])
+                if order.purchaser_first_name == "" and "billing_firstName" in item:
+                    order.purchaser_first_name = fix_magic_quotes(
+                        item["billing_firstName"]
+                    )
+                if order.purchaser_last_name == "" and "billing_lastName" in item:
+                    order.purchaser_last_name = fix_magic_quotes(
+                        item["billing_lastName"]
+                    )
+                if order.purchaser_city is None and "billing_city" in item:
+                    order.purchaser_city = fix_magic_quotes(item["billing_city"])
+                if order.purchaser_state is None and "billing_state" in item:
+                    order.purchaser_state = fix_magic_quotes(item["billing_state"])
+                if order.purchaser_zip_code is None and "billing_zip" in item:
+                    order.purchaser_zip_code = fix_magic_quotes(item["billing_zip"])
+                if order.purchaser_country is None and "billing_country" in item:
+                    order.purchaser_country = fix_magic_quotes(item["billing_country"])
+                if order.purchaser_ip_address is None and "remoteAddr" in item:
+                    order.purchaser_ip_address = fix_magic_quotes(item["remoteAddr"])
+                if order.purchase_date == "" and "purchaseDate" in item:
+                    # datetime is not serializable in python,
+                    # convert it to ISO-compatible string
+                    purchase_date = datetime.fromtimestamp(float(item["purchaseDate"]))
+                    order.purchase_date = purchase_date.strftime("%Y-%m-%d")
+                    order.purchase_timestamp = purchase_date.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                if order.email == "" and "email" in item:
+                    order.email = item["email"]
+
+                # get shirt and phone data from questions
+                purchaser_questions: list = []
+                attendee_questions: list = []
+                if "purchaserQuestions" in item:
+                    purchaser_questions = list(item["purchaserQuestions"])
+                if "attendeeQuestions" in item:
+                    attendee_questions = list(item["attendeeQuestions"])
+                questions = purchaser_questions + attendee_questions
+                if len(questions) > 0:
+                    for question_item in questions:
+                        question: str = ""
+                        if "question" in question_item:
+                            question = str(question_item["question"]).lower()
+
+                        if question == "":
+                            continue
+
+                        answer: str = ""
+                        if "answerText" in question_item:
+                            answer = str(question_item["answerText"])
+
+                        if answer != "":
+                            if question.find("phone") >= 0 and order.phone == "":
+                                if format_phone_numbers:
+                                    order.phone = format_phone(answer)
+                                else:
+                                    order.phone = answer
+                            elif question.find("shirt") >= 0:
+                                shirt_size = answer
+
+                # create the ticket object
+                price: float = 0
+                if "price" in item:
+                    price = float(item["price"])
+
+                ticket_id: int = 0
+                if "id" in item:
+                    ticket_id = int(item["id"])
+                ticket_type: str = ""
+                if "ticketTypeName" in item:
+                    ticket_type = item["ticketTypeName"]
+                service_fee: float = 0
+                if "fee1Amount" in item:
+                    service_fee = float(item["fee1Amount"])
+                ticket_type_id: int = 0
+                if "typeId" in item:
+                    ticket_type_id = int(item["typeId"])
+                barcode: str = ""
+                if "barcode" in item:
+                    barcode = str(item["barcode"])
+                available_scans: int = 0
+                if "availableScans" in item:
+                    available_scans = int(item["availableScans"])
+                purchase_location: str = ""
+                if "purchaseLocation" in item:
+                    purchase_location = str(item["purchaseLocation"])
+                scanned_timestamp: int = 0
+                if "scannedTimestamp" in item:
+                    scanned_timestamp = int(item["scannedTimestamp"])
+                attendee_first_name: str = ""
+                if "partyMember" in item:
+                    attendee_first_name = fix_magic_quotes(item["partyMember"])
+                attendee_last_name: str = ""
+                if "partyMemberLastName" in item:
+                    attendee_last_name = fix_magic_quotes(item["partyMemberLastName"])
+
+                if ticket_id == 0 or ticket_type == "":
+                    continue
+
+                ticket = TicketSocketTicket()
+                ticket.ticket_id = ticket_id
+                ticket.ticket_type = ticket_type
+                ticket.price = price
+                ticket.service_fee = service_fee
+                ticket.ticket_type_id = ticket_type_id
+                ticket.barcode = barcode
+                ticket.available_scans = available_scans
+                ticket.purchase_location = purchase_location
+                ticket.scanned_timestamp = scanned_timestamp
+                ticket.attendee_first_name = attendee_first_name
+                ticket.attendee_last_name = attendee_last_name
+                if shirt_size is not None:
+                    shirt_size = shirt_size.strip()
+                    if shirt_size.lower() == "3xl":
+                        shirt_size = "XXXL"
+                    elif shirt_size.lower() == "2xl":
+                        shirt_size = "XXL"
+                    elif shirt_size.lower() == "extra large":
+                        shirt_size = "XL"
+                    elif shirt_size.lower() == "large":
+                        shirt_size = "L"
+                    elif shirt_size.lower() == "medium":
+                        shirt_size = "M"
+                    elif shirt_size.lower() == "small":
+                        shirt_size = "S"
+                    elif shirt_size.lower() == "extra small":
+                        shirt_size = "XS"
+                ticket.shirt_size = shirt_size
+                order_tickets.append(ticket)
+
+                order_revenue += price
+                order_service_fees += service_fee
+
+        if len(order_tickets) > 0:
+            order.num_tickets = num_tickets
+            order.tickets = order_tickets
+            order.revenue = order_revenue
+            order.service_fees = order_service_fees
+        return order
 
 
 def get_all_accounts():

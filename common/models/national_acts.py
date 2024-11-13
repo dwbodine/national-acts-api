@@ -177,8 +177,10 @@ class VipOrder(TicketSocketOrder):
         """
         Roll up data from tickets to order
         """
-        self.total_shirts = len(self.shirts)
+        total_shirts: int = 0
         for ticket in self.tickets:
+            if ticket.shirt_size is not None:
+                total_shirts += 1
             if ticket.is_refunded is True:
                 self.has_refunds = True
                 self.num_tickets_refunded += 1
@@ -191,6 +193,7 @@ class VipOrder(TicketSocketOrder):
                 self.revenue_charged_back += ticket.price
                 self.service_fee_revenue_charged_back += ticket.service_fee
 
+        self.total_shirts = total_shirts
         self.revenue_usd = self.revenue * self.exchange_rate
         self.service_fees_usd = self.service_fees * self.exchange_rate
         self.revenue_refunded_usd = self.revenue_refunded * self.exchange_rate
@@ -285,7 +288,7 @@ class VipEvent(TicketSocketEvent):
                 self.non_usa_currency_abbrev = order.currency_abbrev
                 self.non_usa_currency_symbol = order.currency_symbol
 
-            if self.has_shirt_data is False and len(order.shirts) > 0:
+            if self.has_shirt_data is False and order.total_shirts > 0:
                 self.has_shirt_data = True
 
             if (
@@ -305,9 +308,10 @@ class VipEvent(TicketSocketEvent):
                         if ticket.is_checked_in:
                             total_checked_in += 1
 
-                if len(order.shirts) > 0:
-                    total_shirts += len(order.shirts)
-                    for size in order.shirts:
+                if order.total_shirts > 0:
+                    total_shirts += order.total_shirts
+                    for ticket in order.tickets:
+                        size = ticket.shirt_size
                         if size in shirtd:
                             shirtd[size] = int(shirtd[size]) + 1
                         else:

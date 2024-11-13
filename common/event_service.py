@@ -656,15 +656,7 @@ class EventService:
 
             if order.is_deleted is True:
                 order.is_active = False
-            shirt_str = (
-                str(row["Shirts"]).strip() if row["Shirts"] is not None else None
-            )
-            shirts = []
-            if shirt_str is not None and shirt_str != "":
-                shirt_array = shirt_str.split("/")
-                for shirt in shirt_array:
-                    shirts.append(shirt.strip())
-            order.shirts = shirts
+
             tickets = self.__get_tickets_from_order_id(
                 ticket_socket_order_id, ignore_flags
             )
@@ -1211,15 +1203,7 @@ class EventService:
 
             if order.is_deleted is True:
                 order.is_active = False
-            shirt_str = (
-                str(row["Shirts"]).strip() if row["Shirts"] is not None else None
-            )
-            shirts = []
-            if shirt_str is not None and shirt_str != "":
-                shirt_array = shirt_str.split("/")
-                for shirt in shirt_array:
-                    shirts.append(shirt.strip())
-            order.shirts = shirts
+
             tickets = self.__get_tickets_from_order_id(
                 ticket_socket_order_id, ignore_flags
             )
@@ -1256,6 +1240,7 @@ class EventService:
             ticket.scanned_timestamp = int(row["ScannedTimestamp"])
             ticket.attendee_first_name = str(row["AttendeeFirstName"])
             ticket.attendee_last_name = str(row["AttendeeLastName"])
+            ticket.shirt_size = str(row["ShirtSize"])
             ticket.ticket_socket_order_id = ticket_socket_order_id
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
             ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
@@ -1994,9 +1979,6 @@ class EventService:
                                 continue
                             event_orders.append(order.order_id)
                             # compile order data for update
-                            shirts: str = None
-                            if len(order.shirts) > 0:
-                                shirts = " / ".join(order.shirts)
 
                             order_data = {
                                 "numTickets": order.num_tickets,
@@ -2007,7 +1989,6 @@ class EventService:
                                     if order.phone is not None
                                     else None
                                 ),
-                                "shirts": shirts,
                                 "user_id": order.user_id,
                                 "event_id": order.event_id,
                                 "purchaserLastName": (
@@ -2135,7 +2116,7 @@ class EventService:
                                 # update existing order
                                 sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s,
                                         PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s,
-                                        Phone=%(phone)s, Shirts=%(shirts)s, EventId=%(event_id)s,
+                                        Phone=%(phone)s, EventId=%(event_id)s,
                                         UserId=%(user_id)s, PurchaserLastName=%(purchaserLastName)s,
                                         PurchaserFirstName=%(purchaserFirstName)s, PurchaserCity=%(purchaserCity)s, 
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s,
@@ -2160,7 +2141,7 @@ class EventService:
                                 )
                                 sql = """INSERT INTO TicketSocketOrders
                                             (TicketSocketEventId, OrderId, NumTickets,
-                                            PurchaseDate, PurchaseTimestamp, Phone, Shirts, EventId, UserId,
+                                            PurchaseDate, PurchaseTimestamp, Phone, EventId, UserId,
                                             PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState,
                                             PurchaserZip, PurchaserCountry,
                                             PurchaserIpAddress, Email"""
@@ -2170,7 +2151,7 @@ class EventService:
                                     sql += """, ServiceFees"""
                                 sql += """) VALUES
                                     (%(ticket_socket_event_id)s, %(order_id)s, %(numTickets)s,
-                                    %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(shirts)s,
+                                    %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s,
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
                                     %(purchaserIpAddress)s,  %(email)s"""

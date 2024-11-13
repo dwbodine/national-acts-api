@@ -76,6 +76,7 @@ class TicketSocketTicket:
     scanned_timestamp: int = 0
     attendee_first_name: str = None
     attendee_last_name: str = None
+    shirt_size: str = None
 
 
 class TicketSocketOrder:
@@ -88,7 +89,6 @@ class TicketSocketOrder:
     num_tickets: int = 0
     tickets: list[TicketSocketTicket] = []
     phone: str = ""
-    shirts: list[str] = []
     purchaser_first_name: str = ""
     purchaser_last_name: str = ""
     purchaser_city: str = None
