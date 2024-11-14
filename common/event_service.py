@@ -1240,7 +1240,9 @@ class EventService:
             ticket.scanned_timestamp = int(row["ScannedTimestamp"])
             ticket.attendee_first_name = str(row["AttendeeFirstName"])
             ticket.attendee_last_name = str(row["AttendeeLastName"])
-            ticket.shirt_size = str(row["ShirtSize"])
+            ticket.shirt_size = (
+                str(row["ShirtSize"]) if row["ShirtSize"] is not None else None
+            )
             ticket.ticket_socket_order_id = ticket_socket_order_id
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
             ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
