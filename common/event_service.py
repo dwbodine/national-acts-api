@@ -2207,6 +2207,7 @@ class EventService:
                                         "scannedTimestamp": ticket.scanned_timestamp,
                                         "attendeeFirstName": ticket.attendee_first_name,
                                         "attendeeLastName": ticket.attendee_last_name,
+                                        "shirtSize": ticket.shirt_size if len(ticket.shirt_size) > 0 else None
                                     }
 
                                     ticket_price = (
@@ -2264,6 +2265,7 @@ class EventService:
                                                 AttendeeFirstName=%(attendeeFirstName)s,
                                                 AttendeeLastName=%(attendeeLastName)s,
                                                 IsCheckedIn=%(is_checked_in)s,
+                                                ShirtSize=%(shirtSize)s,
                                                 LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticket_success = db_update(
                                             sql, ticket_data, cnx
@@ -2282,7 +2284,7 @@ class EventService:
                                             (TicketSocketOrderId, TicketId, TicketSocketTicketTypeId,
                                             TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation,
                                             ScannedTimestamp, IsCheckedIn,
-                                            AttendeeFirstName, AttendeeLastName"""
+                                            AttendeeFirstName, AttendeeLastName, ShirtSize"""
                                         if ticket_price > 0:
                                             sql += ", Price"
                                         sql += """) """
@@ -2290,7 +2292,7 @@ class EventService:
                                             %(ticket_type_id)s, %(ticket_type)s, %(serviceFee)s, %(barcode)s,
                                             %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s,
                                             %(is_checked_in)s, %(attendeeFirstName)s,
-                                            %(attendeeLastName)s"""
+                                            %(attendeeLastName)s, %(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", %(price)s"
                                         sql += """)"""

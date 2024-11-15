@@ -2,10 +2,9 @@
 Perform Cron job updates
 """
 
-from common.db import db_query_all, db_query_one, db_update
+from common.db import db_query_all
 from common.exchange_rate_service import ExchangeRateService, ExchangeRate
 from common.event_service import EventService
-from common.ticket_socket_service import TicketSocketService
 
 
 class UpdateService:
