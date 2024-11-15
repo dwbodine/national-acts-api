@@ -132,6 +132,9 @@ class VipTicket(TicketSocketTicket):
     is_charged_back: bool = False
     chargeback_date: str = None
     is_service_fee_refunded: bool = False
+    attendee_phone: str = None
+    attendee_email: str = None
+    last_update: str = None
 
 
 class VipOrder(TicketSocketOrder):

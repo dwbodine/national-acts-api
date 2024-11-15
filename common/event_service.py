@@ -1242,6 +1242,9 @@ class EventService:
             ticket.scanned_timestamp = int(row["ScannedTimestamp"])
             ticket.attendee_first_name = str(row["AttendeeFirstName"])
             ticket.attendee_last_name = str(row["AttendeeLastName"])
+            ticket.last_update = str(row["LastUpdate"])
+            ticket.attendee_phone = str(row["AttendeePhone"]) if row["AttendeePhone"] is not None else None
+            ticket.attendee_email = str(row["AttendeeEmail"]) if row["AttendeeEmail"] is not None else None
             ticket.shirt_size = (
                 str(row["ShirtSize"]) if row["ShirtSize"] is not None else None
             )
@@ -1528,13 +1531,16 @@ class EventService:
             ):
                 for ticket_type in event_to_update.ticket_types:
                     ticket_type_wql = """UPDATE TicketSocketTicketTypes
-                                        SET IsActive=%(is_active)s, LastUpdate=CURRENT_TIMESTAMP 
+                                        SET IsActive=%(is_active)s,
+                                        TicketTypeName=%(ticketTypeName)s,
+                                        LastUpdate=CURRENT_TIMESTAMP 
                                         WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
                                         AND TicketSocketEventId=%(ticket_socket_event_id)s"""
                     ticket_type_data = {
                         "ticket_type_id": ticket_type.ticket_type_id,
                         "ticket_socket_event_id": ticket_socket_event_id,
                         "is_active": 1 if ticket_type.is_active is True else 0,
+                        "ticketTypeName": ticket_type.ticket_type_name
                     }
                     success = db_update(ticket_type_wql, ticket_type_data)
                     if success is False:
@@ -1584,6 +1590,11 @@ class EventService:
                                             SET Price=%(price)s, 
                                             ServiceFee=%(serviceFee)s, 
                                             IsCheckedIn=%(is_checked_in)s, 
+                                            AttendeeFirstName=%(attendeeFirstName)s,
+                                            AttendeeLastName=%(attendeeLastName)s,
+                                            AttendeePhone=%(attendeePhone)s,
+                                            AttendeeEmail=%(attendeeEmail)s,
+                                            ShirtSize=%(shirtSize)s,
                                             LastUpdate=CURRENT_TIMESTAMP 
                                             WHERE Id=%(ticketId)s 
                                             AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
@@ -1593,6 +1604,11 @@ class EventService:
                         "price": ticket.price,
                         "serviceFee": ticket.service_fee,
                         "is_checked_in": 1 if ticket.is_checked_in is True else 0,
+                        "attendeeFirstName": ticket.attendee_first_name,
+                        "attendeeLastName": ticket.attendee_last_name,
+                        "attendeeEmail": ticket.attendee_email,
+                        "attendeePhone": ticket.attendee_phone,
+                        "shirtSize": ticket.shirt_size
                     }
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
@@ -1613,7 +1629,26 @@ class EventService:
         data = {"ticket_socket_event_id": ticket_socket_event_id}
         existing_event: VipEvent = db_query_one(sql, data)
 
-        if existing_event is not None:
+        if existing_event:
+            type_test = """SELECT * FROM TicketSocketTickeTypes
+                            WHERE TicketSocketEventId=%(ticket_socket_event_id)s
+                            AND TicketSocketTicketTypeId=0"""
+            type_test_data = {"ticket_socket_event_id": ticket_socket_event_id}
+            existing_type: TicketSocketTicketType = db_query_one(
+                type_test, type_test_data
+            )
+            if not existing_type:
+                type_sql = """UPDATE TicketSocketTickeTypes SET IsActive=1, LastUpdate=CURRENT_TIMESTAMP
+                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
+                            AND TicketSocketTicketTypeId=0"""
+                success = db_update(type_sql, type_test_data)
+            else:
+                type_sql = """INSERT INTO TicketSocketTickeTypes (
+                            TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable)
+                             VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0)"""
+                type_id = db_insert(type_sql, type_test_data)
+                success = type_id >= 0
+
             add_sql = """INSERT INTO TicketSocketOrders (
                              IsComped, EventId, OrderId, NumTickets, PurchaseDate,
                              UserId, PurchaserFirstName, PurchaserLastName,
@@ -1629,7 +1664,19 @@ class EventService:
             order_id = db_insert(add_sql, add_data)
             success = True if order_id > 0 else False
             if success is True:
-                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+                ticket_sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId,
+                        TicketSocketTicketTypeId, TicketId, TicketType) VALUES (
+                            %(order_id)s, 0, %(ticketId)s, 'Comp')"""
+
+                for x in range(0, num_tickets):
+                    ticket_id = x + order_id
+                    ticket_data = {"order_id": order_id, "ticketId": ticket_id}
+                    new_ticket_id = db_insert(ticket_sql, ticket_data)
+                    success = new_ticket_id > 0
+                    if success is not True:
+                        break
+                if success is True:
+                    self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def rebuild_daily_order_data_for_ticket(self, ticket_id: int):
