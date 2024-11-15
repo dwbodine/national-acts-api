@@ -254,6 +254,7 @@ class VipEvent(TicketSocketEvent):
     is_cancelled: bool = False
     cancelled_date: str = None
     announce_date: str = None
+    num_tickets_comped: int = 0
 
     def get_totals(self):
         """
@@ -265,6 +266,7 @@ class VipEvent(TicketSocketEvent):
         total_shirts: int = 0
         total_tickets_refunded: int = 0
         total_tickets_charged_back: int = 0
+        total_tickets_comped: int = 0
         total_revenue_refunded: float = 0
         total_revenue_charged_back: float = 0
         total_service_fee_revenue_refunded: float = 0
@@ -273,7 +275,7 @@ class VipEvent(TicketSocketEvent):
         shirtd: dict = {}
         for order in self.orders:
             if order.is_comped is True:
-                continue
+                total_tickets_comped += order.num_tickets
             if order.has_refunds is True:
                 total_tickets_refunded += order.num_tickets_refunded
                 total_revenue_refunded += order.revenue_refunded_usd
@@ -301,7 +303,7 @@ class VipEvent(TicketSocketEvent):
             ):
                 self.has_phone_data = True
 
-            if order.is_deleted is not True:
+            if order.is_deleted is not True and order.is_comped is not True:
                 total_revenue += order.revenue_usd
                 total_service_fees += order.service_fees_usd
                 total_tickets += order.num_tickets
@@ -320,6 +322,7 @@ class VipEvent(TicketSocketEvent):
                         else:
                             shirtd[size] = 1
 
+        self.num_tickets_comped = total_tickets_comped
         self.total_revenue = total_revenue
         self.total_service_fees = total_service_fees
         self.total_tickets = total_tickets

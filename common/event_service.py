@@ -1626,7 +1626,8 @@ class EventService:
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "numTickets": num_tickets,
             }
-            success = db_insert(add_sql, add_data)
+            order_id = db_insert(add_sql, add_data)
+            success = True if order_id > 0 else False
             if success is True:
                 self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
