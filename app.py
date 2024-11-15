@@ -161,6 +161,27 @@ def update_event():
     return convert_to_json(success)
 
 
+@app.route("/admin/orders/comp", methods=["POST"])
+@jwt_required()
+def comp_order():
+    """
+    API method to add a comped order
+    """
+    is_admin = __is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_id = request.json.get("eventId", None)
+    num_tickets = request.json.get("numTickets", None)
+
+    if event_id is None or num_tickets is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = EventService()
+    success = service.add_comped_order(int(event_id), int(num_tickets))
+    return convert_to_json(success)
+
+
 @app.route("/admin/orders/refund", methods=["POST"])
 @jwt_required()
 def refund_order():

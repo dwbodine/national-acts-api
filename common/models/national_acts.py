@@ -153,6 +153,7 @@ class VipOrder(TicketSocketOrder):
     event_date: str = None
     is_active: bool = True
     is_deleted: bool = False
+    is_comped: bool = False
     has_refunds: bool = False
     has_chargebacks: bool = False
     num_tickets_refunded: int = 0
@@ -271,6 +272,8 @@ class VipEvent(TicketSocketEvent):
         total_checked_in: int = 0
         shirtd: dict = {}
         for order in self.orders:
+            if order.is_comped is True:
+                continue
             if order.has_refunds is True:
                 total_tickets_refunded += order.num_tickets_refunded
                 total_revenue_refunded += order.revenue_refunded_usd

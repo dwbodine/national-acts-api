@@ -653,6 +653,7 @@ class EventService:
             order.currency_symbol = str(row["Symbol"])
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
+            order.is_comped = True if int(row["IsComped"]) == 1 else False
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -697,7 +698,7 @@ class EventService:
         chargeback_orders: int = 0
 
         for order in orders:
-            if order.is_deleted is True:
+            if order.is_deleted is True or order.is_comped is True:
                 continue
 
             purchase_timestamp = datetime.strptime(
@@ -1200,6 +1201,7 @@ class EventService:
             order.currency_symbol = str(row["Symbol"])
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
+            order.is_comped = True if int(row["IsComped"]) == 1 else False
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -1556,6 +1558,7 @@ class EventService:
             update_sql = """UPDATE TicketSocketOrders
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
+                             IsComped=%(isComped)s,
                              Revenue=%(revenue)s, 
                              ServiceFees=%(serviceFees)s, 
                              LastUpdate=CURRENT_TIMESTAMP 
@@ -1572,6 +1575,7 @@ class EventService:
                 ),
                 "is_active": 1 if order_to_update.is_active is True else 0,
                 "isDeleted": 1 if order_to_update.is_deleted is True else 0,
+                "isComped": 1 if order_to_update.is_comped is True else 0,
             }
             success = db_update(update_sql, update_data)
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
@@ -1595,6 +1599,36 @@ class EventService:
                         break
             if success is True:
                 self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+        return success
+
+    def add_comped_order(self, ticket_socket_event_id: int, num_tickets: int):
+        """
+        Add a comped order from admin
+        """
+        success: bool = True
+        if ticket_socket_event_id <= 0 or num_tickets <= 0:
+            return False
+
+        sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticket_socket_event_id)s"""
+        data = {"ticket_socket_event_id": ticket_socket_event_id}
+        existing_event: VipEvent = db_query_one(sql, data)
+
+        if existing_event is not None:
+            add_sql = """INSERT INTO TicketSocketOrders (
+                             IsComped, EventId, OrderId, NumTickets, PurchaseDate,
+                             UserId, PurchaserFirstName, PurchaserLastName,
+                             TicketSocketEventId
+                             ) VALUES (
+                                 1, 0, 0, %(numTickets)s, CURRENT_TIMESTAMP,
+                                 0, 'Comped', 'Order', %(ticket_socket_event_id)s
+                             )"""
+            add_data = {
+                "ticket_socket_event_id": ticket_socket_event_id,
+                "numTickets": num_tickets,
+            }
+            success = db_insert(add_sql, add_data)
+            if success is True:
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def rebuild_daily_order_data_for_ticket(self, ticket_id: int):
@@ -2207,7 +2241,12 @@ class EventService:
                                         "scannedTimestamp": ticket.scanned_timestamp,
                                         "attendeeFirstName": ticket.attendee_first_name,
                                         "attendeeLastName": ticket.attendee_last_name,
-                                        "shirtSize": ticket.shirt_size if len(ticket.shirt_size) > 0 else None
+                                        "shirtSize": (
+                                            ticket.shirt_size
+                                            if ticket.shirt_size is not None
+                                            and len(ticket.shirt_size) > 0
+                                            else None
+                                        ),
                                     }
 
                                     ticket_price = (
