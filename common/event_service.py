@@ -1070,7 +1070,7 @@ class EventService:
 
     def __get_ticket_types_from_event_id(self, ticket_socket_event_id: int):
         """
-        Fetch from TicketSocketTickeTypes based on event Id
+        Fetch from TicketSocketTicketTypes based on event Id
         """
         ticket_types: list[TicketSocketTicketType] = []
 
@@ -1630,7 +1630,7 @@ class EventService:
         existing_event: VipEvent = db_query_one(sql, data)
 
         if existing_event:
-            type_test = """SELECT * FROM TicketSocketTickeTypes
+            type_test = """SELECT * FROM TicketSocketTicketTypes
                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                             AND TicketSocketTicketTypeId=0"""
             type_test_data = {"ticket_socket_event_id": ticket_socket_event_id}
@@ -1638,12 +1638,12 @@ class EventService:
                 type_test, type_test_data
             )
             if not existing_type:
-                type_sql = """UPDATE TicketSocketTickeTypes SET IsActive=1, LastUpdate=CURRENT_TIMESTAMP
+                type_sql = """UPDATE TicketSocketTicketTypes SET IsActive=1, LastUpdate=CURRENT_TIMESTAMP
                              WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                             AND TicketSocketTicketTypeId=0"""
                 success = db_update(type_sql, type_test_data)
             else:
-                type_sql = """INSERT INTO TicketSocketTickeTypes (
+                type_sql = """INSERT INTO TicketSocketTicketTypes (
                             TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable)
                              VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0)"""
                 type_id = db_insert(type_sql, type_test_data)

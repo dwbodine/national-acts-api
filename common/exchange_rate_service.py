@@ -49,6 +49,10 @@ class ExchangeRateService:
         """
         Get exchange rate from history for a specific date
         """
+        
+        if self.exchange_rate is None:
+            return 1
+        
         utc_date_incoming = datetime.fromtimestamp(unix_time)
 
         utci_yr = int(utc_date_incoming.strftime("%Y"))
