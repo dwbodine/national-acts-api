@@ -1243,8 +1243,12 @@ class EventService:
             ticket.attendee_first_name = str(row["AttendeeFirstName"])
             ticket.attendee_last_name = str(row["AttendeeLastName"])
             ticket.last_update = str(row["LastUpdate"])
-            ticket.attendee_phone = str(row["AttendeePhone"]) if row["AttendeePhone"] is not None else None
-            ticket.attendee_email = str(row["AttendeeEmail"]) if row["AttendeeEmail"] is not None else None
+            ticket.attendee_phone = (
+                str(row["AttendeePhone"]) if row["AttendeePhone"] is not None else None
+            )
+            ticket.attendee_email = (
+                str(row["AttendeeEmail"]) if row["AttendeeEmail"] is not None else None
+            )
             ticket.shirt_size = (
                 str(row["ShirtSize"]) if row["ShirtSize"] is not None else None
             )
@@ -1540,7 +1544,7 @@ class EventService:
                         "ticket_type_id": ticket_type.ticket_type_id,
                         "ticket_socket_event_id": ticket_socket_event_id,
                         "is_active": 1 if ticket_type.is_active is True else 0,
-                        "ticketTypeName": ticket_type.ticket_type_name
+                        "ticketTypeName": ticket_type.ticket_type_name,
                     }
                     success = db_update(ticket_type_wql, ticket_type_data)
                     if success is False:
@@ -1608,7 +1612,7 @@ class EventService:
                         "attendeeLastName": ticket.attendee_last_name,
                         "attendeeEmail": ticket.attendee_email,
                         "attendeePhone": ticket.attendee_phone,
-                        "shirtSize": ticket.shirt_size
+                        "shirtSize": ticket.shirt_size,
                     }
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
