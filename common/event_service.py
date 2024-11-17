@@ -1641,17 +1641,22 @@ class EventService:
             existing_type: TicketSocketTicketType = db_query_one(
                 type_test, type_test_data
             )
-            if not existing_type:
-                type_sql = """UPDATE TicketSocketTicketTypes SET IsActive=1, LastUpdate=CURRENT_TIMESTAMP
+            if existing_type:
+                type_sql = """UPDATE TicketSocketTicketTypes SET IsActive=1,
+                             LastUpdate=CURRENT_TIMESTAMP
                              WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                             AND TicketSocketTicketTypeId=0"""
                 success = db_update(type_sql, type_test_data)
             else:
                 type_sql = """INSERT INTO TicketSocketTicketTypes (
-                            TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable)
+                            TicketSocketTicketTypeId, TicketSocketEventId,
+                            TicketTypeName, TotalAvailable)
                              VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0)"""
                 type_id = db_insert(type_sql, type_test_data)
                 success = type_id >= 0
+
+            if success is not True:
+                return False
 
             add_sql = """INSERT INTO TicketSocketOrders (
                              IsComped, EventId, OrderId, NumTickets, PurchaseDate,
