@@ -20,11 +20,15 @@ class ExchangeRateService:
     def __init__(self, exchange_rate: ExchangeRate):
         self.exchange_rate = exchange_rate
 
-    def __get_current_rate(self):
+    def __get_current_rate(self, unix_time: int = None):
         """
         Call to Stripe for exchange rate
         """
         url = "/rates/" + self.exchange_rate.exchange_rate_slug
+
+        if unix_time is not None:
+            exchange_date = datetime.fromtimestamp(unix_time)
+            url += "/" + exchange_date.isoformat()
 
         headers = {
             "Accept": "application/json",
@@ -45,14 +49,16 @@ class ExchangeRateService:
 
         return round(exchange_rate_value, 5)
 
-    def get_exchange_rate_by_time(self, unix_time: int = time.time()):
+    def get_exchange_rate_by_time(
+        self, unix_time: int = time.time(), force_update: bool = False
+    ):
         """
         Get exchange rate from history for a specific date
         """
-        
+
         if self.exchange_rate is None:
             return 1
-        
+
         utc_date_incoming = datetime.fromtimestamp(unix_time)
 
         utci_yr = int(utc_date_incoming.strftime("%Y"))
@@ -67,34 +73,40 @@ class ExchangeRateService:
         utcc_dy = int(utc_date_current.strftime("%d"))
         utc_current_midnight_time = datetime(utcc_yr, utcc_mo, utcc_dy)
 
+        existing_rate: float = 0
+
         sql = """SELECT * FROM ExchangeRateHistory
-                 WHERE ExchangeRateId=%(exchangeRateId)s 
-                 AND MidnightDate=%(midnightDate)s"""
+                WHERE ExchangeRateId=%(exchangeRateId)s 
+                AND MidnightDate=%(midnightDate)s"""
 
         data = {
             "exchangeRateId": self.exchange_rate.exchange_rate_id,
             "midnightDate": midnight_date,
         }
 
-        existing_rate: float = 0
         row = db_query_one(sql, data)
         if row:
             existing_rate = float(row["USDRate"])
 
         success: bool = True
         if (
-            existing_rate == 0
+            force_update is True
+            or existing_rate == 0
             or utc_incoming_midnight_time.timestamp()
             >= utc_current_midnight_time.timestamp()
         ):
-            current_rate: float = self.__get_current_rate()
+
+            if force_update is not True:
+                unix_time = None
+
+            current_rate: float = self.__get_current_rate(unix_time)
 
             if existing_rate == 0:
                 sql2 = """INSERT INTO ExchangeRateHistory (ExchangeRateId, MidnightDate, USDRate)
                            VALUES(%(exchangeRateId)s, %(midnightDate)s, %(currentRate)s)"""
 
                 data2 = {
-                    "exchangeRateId": self.exchange_rate.exchangeRateId,
+                    "exchangeRateId": self.exchange_rate.exchange_rate_id,
                     "midnightDate": midnight_date,
                     "currentRate": current_rate,
                 }

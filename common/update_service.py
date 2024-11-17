@@ -12,7 +12,9 @@ class UpdateService:
     Service to perform update/migration tasks
     """
 
-    def update_all_exchange_rates_from_stripe(self):
+    def update_all_exchange_rates_from_stripe(
+        self, unix_time: int = None, force_update: bool = False
+    ):
         """
         Update all exchange rates from Stripe
         """
@@ -27,7 +29,7 @@ class UpdateService:
                     float(row["Multiplier"]),
                 )
             )
-            rate = service.get_exchange_rate_by_time()
+            rate = service.get_exchange_rate_by_time(unix_time, force_update)
             rates.append(rate)
         return rates
 

@@ -424,6 +424,29 @@ def update_all_exchange_rates():
     return convert_to_json(rates)
 
 
+@app.route("/cron/updateHistoricalExchangeRate/<string:exchange_date_str>")
+def update_historical_exchange_rate(exchange_date_str: str):
+    """
+    API for cron to update historical exchange rate from Stripe
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    if exchange_date_str is None:
+        return {"msg": "Bad Request"}, 400
+
+    exchange_date: datetime = datetime.strptime(exchange_date_str, "%Y-%m-%d")
+    unix_time: int = int(exchange_date.timestamp())
+
+    service = UpdateService()
+    rates = service.update_all_exchange_rates_from_stripe(unix_time, True)
+    return convert_to_json(rates)
+
+
 # END CRON JOB ROUTES
 
 
