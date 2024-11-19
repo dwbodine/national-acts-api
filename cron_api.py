@@ -1,0 +1,74 @@
+"""
+Cron API routes
+"""
+
+import os
+from datetime import datetime
+
+from flask import Blueprint, request
+
+from common.update_service import UpdateService
+from common.utility import convert_to_json
+
+cron_api = Blueprint("cron_api", __name__)
+
+
+# BEGIN CRON JOB ROUTES
+@cron_api.route("/cron/updateAllEventsFromService")
+def update_all_events_from_service():
+    """
+    API for cron to update events/orders/tickets from TicketSocket
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = UpdateService()
+    results = service.update_all_events_from_ticket_socket()
+    return convert_to_json(results)
+
+
+@cron_api.route("/cron/updateAllExchangeRates")
+def update_all_exchange_rates():
+    """
+    API for cron to update exchange rates from Stripe
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = UpdateService()
+    rates = service.update_all_exchange_rates_from_stripe()
+    return convert_to_json(rates)
+
+
+@cron_api.route("/cron/updateHistoricalExchangeRate/<string:exchange_date_str>")
+def update_historical_exchange_rate(exchange_date_str: str):
+    """
+    API for cron to update historical exchange rate from Stripe
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    if exchange_date_str is None:
+        return {"msg": "Bad Request"}, 400
+
+    exchange_date: datetime = datetime.strptime(exchange_date_str, "%Y-%m-%d")
+    unix_time: int = int(exchange_date.timestamp())
+
+    service = UpdateService()
+    rates = service.update_all_exchange_rates_from_stripe(unix_time, True)
+    return convert_to_json(rates)
+
+
+# END CRON JOB ROUTES

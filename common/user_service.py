@@ -9,12 +9,10 @@ import random
 from common.models.user import (
     UserResponse,
     User,
-    Role,
-    Permission,
-    UserActivity,
     UserSeller,
 )
 from common.db import db_query_all, db_query_one, db_update, db_insert, db_delete
+from common.role_service import RoleService
 from common.utility import (
     log_message,
     send_email,
@@ -379,103 +377,6 @@ class UserService:
             users.append(user)
         return users
 
-    def get_all_permissions(self):
-        """
-        Get all permissions in the system
-        """
-        permissions: list[Permission] = []
-        sql = """SELECT * FROM Permissions ORDER BY PermissionName"""
-        rows = db_query_all(sql)
-        for row in rows:
-            permission_id = int(row["PermissionId"])
-            name = str(row["PermissionName"])
-            permission = Permission(permission_id, name)
-            permissions.append(permission)
-        return permissions
-
-    def get_all_roles(self):
-        """
-        Get all roles in the system
-        """
-        roles: list[Role] = []
-        sql = """SELECT * FROM Roles ORDER BY RoleId"""
-        rows = db_query_all(sql)
-        for row in rows:
-            role_id = int(row["RoleId"])
-            role_name = str(row["RoleName"])
-            role = Role()
-            role.role_id = role_id
-            role.role_name = role_name
-            permissions = self.__get_permissions_for_role(role_id)
-            role.permissions = permissions
-            roles.append(role)
-        return roles
-
-    def get_role_by_id(self, role_id: int):
-        """
-        Get role by role_id
-        """
-        role: Role = None
-        sql = """SELECT * FROM Roles WHERE RoleId=%(roleId)s"""
-        data = {"roleId": role_id}
-        row = db_query_one(sql, data)
-        if row:
-            role_id = int(row["RoleId"])
-            role_name = str(row["RoleName"])
-            role = Role()
-            role.role_id = role_id
-            role.role_name = role_name
-            permissions = self.__get_permissions_for_role(role_id)
-            role.permissions = permissions
-        return role
-
-    def update_role(self, role_to_update: Role):
-        """
-        Update or Create role
-        """
-        success: bool = True
-        if role_to_update is None:
-            return False
-        existing_role: Role = None
-        if role_to_update.roleId > 0:
-            existing_role = self.get_role_by_id(role_to_update.roleId)
-        if existing_role is not None:
-            role_id = existing_role.role_id
-            update_sql = """UPDATE Roles SET RoleName=%(roleName)s,
-                        LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
-            update_data = {"roleName": role_to_update.roleName, "roleId": role_id}
-            success = db_update(update_sql, update_data)
-            if success is True:
-                success = self.__assign_permissions_to_role_id(
-                    role_id, role_to_update.permissions
-                )
-        else:
-            insert_sql = """INSERT INTO Roles (RoleName) VALUES (%(roleName)s)"""
-            insert_data = {"roleName": role_to_update.roleName}
-            role_id = db_insert(insert_sql, insert_data)
-            if role_id > 1:
-                success = self.__assign_permissions_to_role_id(
-                    role_id, role_to_update.permissions
-                )
-        return success
-
-    def delete_roles(self, role_ids_to_delete: list[int]):
-        """
-        Delete list of roles
-        """
-        success: bool = True
-        if len(role_ids_to_delete) > 0:
-            role_id_list = ",".join(str(x) for x in role_ids_to_delete)
-            delete_permission_sql = (
-                """DELETE FROM RolePermissions WHERE RoleId IN (%(roleList)s)"""
-            )
-            delete_role_data = {"roleList": role_id_list}
-            success = db_delete(delete_permission_sql, delete_role_data)
-            if success is True:
-                delete_row_sql = """DELETE FROM Roles WHERE RoleId IN (%(roleList)s)"""
-                success = db_delete(delete_row_sql, delete_role_data)
-        return success
-
     def update_user(self, user_to_update: User):
         """
         Update existing user (does not create)
@@ -561,84 +462,6 @@ class UserService:
 
         return success
 
-    def log_user_activity(self, user_id: int, activity_id: int, activity_data: str):
-        """
-        Log user activity from the UI
-        """
-        sql = ""
-        data = {"userId": user_id, "activityId": activity_id}
-        if len(activity_data) > 0:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId, ActivityData)
-                         VALUES (%(userId)s, %(activityId)s, %(activityData)s)"""
-            data["activityData"] = activity_data
-        else:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId)
-                         VALUES (%(userId)s, %(activityId)s)"""
-
-        success = db_update(sql, data)
-        return success
-
-    def get_user_activity(
-        self,
-        start: int,
-        end: int,
-        user_id: int = None,
-        activity_type: int = None,
-        filter_admins: bool = False,
-    ):
-        """
-        Get a report of user activity
-        """
-        activities: list[UserActivity] = []
-        sql = """SELECT UserActivity.*, Activity.ActivityName, Users.Username
-                     FROM UserActivity 
-                    JOIN Activity ON Activity.ActivityId=UserActivity.ActivityId 
-                    JOIN Users ON Users.UserId=UserActivity.UserId 
-                    WHERE UserActivity.Timestamp BETWEEN %(startDate)s AND %(endDate)s"""
-        data = {
-            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
-            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
-        }
-
-        where_clause: list[str] = []
-
-        if user_id is not None:
-            where_clause.append("UserActivity.UserId = %(userId)s")
-            data["userId"] = user_id
-
-        if activity_type is not None:
-            where_clause.append("UserActivity.ActivityId = %(activityId)s")
-            data["activityId"] = activity_type
-
-        if filter_admins is True:
-            where_clause.append("Users.IsAdmin <> 1")
-
-        if len(where_clause) > 0:
-            sql += " AND "
-            sql += " AND ".join(where_clause)
-
-        sql += " ORDER BY UserActivity.Timestamp DESC, Username ASC"
-
-        rows = db_query_all(sql, data)
-        for row in rows:
-            activity_user_id = int(row["UserId"])
-            activity_type = int(row["ActivityId"])
-            activity_name = str(row["ActivityName"])
-            username = str(row["Username"])
-            activity_data = str(row["ActivityData"])
-            activity_time = str(row["Timestamp"])
-            activity = UserActivity(
-                activity_user_id,
-                activity_type,
-                activity_data,
-                activity_time,
-                activity_name,
-                username,
-            )
-            activities.append(activity)
-
-        return activities
-
     def get_user_seller_by_event_id(self, user_id: int, event_id: int):
         """
         Get user seller from event_id and user_id
@@ -668,31 +491,6 @@ class UserService:
                     break
 
         return user_seller
-
-    def __get_permissions_for_role(self, role_id: int):
-        permissions: list[Permission] = []
-        if role_id is None:
-            return permissions
-
-        sql = ""
-        if role_id > 1:
-            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName
-                     FROM Permissions 
-                    JOIN RolePermissions
-                        ON RolePermissions.PermissionId = Permissions.PermissionId 
-                    WHERE RolePermissions.RoleId=%(roleId)s"""
-        else:
-            sql = """SELECT Permissions.PermissionId, Permissions.PermissionName
-                     FROM Permissions"""
-
-        data = {"roleId": role_id}
-        rows = db_query_all(sql, data)
-        for row in rows:
-            permission_id = int(row["PermissionId"])
-            permission_name = str(row["PermissionName"])
-            permission = Permission(permission_id, permission_name)
-            permissions.append(permission)
-        return permissions
 
     def __assign_user_to_sellers(
         self, user_id: int, is_admin: bool, new_sellers: list[UserSeller]
@@ -759,53 +557,6 @@ class UserService:
             success = False
         return success
 
-    def __assign_permissions_to_role_id(
-        self, role_id: int, new_permissions: list[Permission]
-    ):
-        """
-        Update permissions for selected role
-        """
-        existing_role = self.get_role_by_id(role_id)
-        success: bool = True
-        if existing_role is not None:
-            new_permission_ids = [
-                permission.permission_id for permission in new_permissions
-            ]
-            for existing_permission in existing_role.permissions:
-                existing_permission_id = existing_permission.permission_id
-                if existing_permission_id in new_permission_ids:
-                    new_permission_ids.remove(existing_permission_id)
-                else:
-                    delete_row_sql = """DELETE FROM RolePermissions
-                                    WHERE RoleId=%(roleId)s
-                                    AND PermissionId=%(permissionId)s"""
-                    delete_role_data = {
-                        "permissionId": existing_permission_id,
-                        "roleId": role_id,
-                    }
-                    success = db_delete(delete_row_sql, delete_role_data)
-            if len(new_permission_ids) > 0:
-                for new_permission_id in new_permission_ids:
-                    if new_permission_id > 0:
-                        new_permission: Permission = (
-                            self.__get_permission_from_list_by_id(
-                                new_permissions, new_permission_id
-                            )
-                        )
-                        if new_permission is not None:
-                            insert_permission_sql = """INSERT INTO RolePermissions
-                                                    (RoleId, PermissionId)
-                                                    VALUES (%(roleId)s, %(permissionId)s)"""
-                            insert_permission_data = {
-                                "roleId": role_id,
-                                "permissionId": new_permission_id,
-                            }
-                            role_permission_id = db_insert(
-                                insert_permission_sql, insert_permission_data
-                            )
-                            success = role_permission_id > 0
-        return success
-
     def __get_user_seller_from_list_by_id(
         self, sellers: list[UserSeller], user_seller_id: int
     ):
@@ -818,19 +569,6 @@ class UserService:
                 user_seller = seller
                 break
         return user_seller
-
-    def __get_permission_from_list_by_id(
-        self, permissions: list[Permission], permission_id: int
-    ):
-        """
-        Filter one permission from list by id
-        """
-        permission: Permission = None
-        for p in permissions:
-            if p.permission_id == permission_id:
-                permission = p
-                break
-        return permission
 
     def __expire_all_user_tokens(self, username: str):
         """
@@ -976,34 +714,12 @@ class UserService:
                 user_seller_id, seller_id, seller_name, seller_type, role_id
             )
             if is_admin is False:
-                permissions = self.__get_user_seller_permissions(user_seller_id)
+                role_service = RoleService()
+                permissions = role_service.get_user_seller_permissions(user_seller_id)
                 us.permissions = permissions
             sellers.append(us)
 
         return sellers
-
-    def __get_user_seller_permissions(self, user_seller_id: int):
-        """
-        Get permissions for user by seller
-        """
-        permissions: list[int] = []
-        if user_seller_id is None or user_seller_id <= 1:
-            return permissions
-
-        sql = """SELECT Permissions.PermissionId FROM Permissions
-                    JOIN RolePermissions ON RolePermissions.PermissionId = Permissions.PermissionId 
-                    JOIN UserSeller ON UserSeller.RoleId = RolePermissions.RoleId 
-                    WHERE UserSeller.UserSellerId=%(userSellerId)s 
-                    ORDER BY Permissions.PermissionId"""
-        data = {"userSellerId": user_seller_id}
-
-        rows = db_query_all(sql, data)
-
-        for row in rows:
-            permission_id = int(row["PermissionId"])
-            permissions.append(permission_id)
-
-        return permissions
 
     def __validate_username(self, username: str):
         """

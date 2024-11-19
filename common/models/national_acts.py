@@ -118,6 +118,18 @@ class ShirtSales:
         self.total = total
 
 
+class EventNote:
+    """
+    Note system for event or order
+    """
+
+    note_id: int = 0
+    ticket_socket_event_id: int = 0
+    ticket_socker_order_id: int = None
+    note: str = None
+    note_timestamp: str = None
+
+
 class VipTicket(TicketSocketTicket):
     """
     National acts specific verison of TS tickets
@@ -176,6 +188,7 @@ class VipOrder(TicketSocketOrder):
     currency_symbol: str = None
     currency_abbrev: str = None
     tickets: list[VipTicket] = []
+    notes: list[EventNote] = []
 
     def get_totals(self):
         """
@@ -258,6 +271,7 @@ class VipEvent(TicketSocketEvent):
     cancelled_date: str = None
     announce_date: str = None
     num_tickets_comped: int = 0
+    notes: list[EventNote] = []
 
     def get_totals(self):
         """

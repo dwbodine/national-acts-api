@@ -2,9 +2,12 @@
 Perform Cron job updates
 """
 
+from datetime import datetime
 from common.db import db_query_all
 from common.exchange_rate_service import ExchangeRateService, ExchangeRate
-from common.event_service import EventService
+from common.data_refresh_service import DataRefreshService
+from common.daily_order_service import DailyOrderService
+from common.order_service import OrderService
 
 
 class UpdateService:
@@ -37,9 +40,24 @@ class UpdateService:
         """
         Update all upcoming events/orders/tickets/ticket types from TS
         """
-        service = EventService()
+        service = DataRefreshService()
         results = service.refresh_database_from_ticket_socket()
         if results is not None and results.succeeded is True:
-            results = service.update_daily_order_data(results)
+            current_year = datetime.now().year
+            month = datetime.now().month
+            day = datetime.now().day
+
+            start = datetime.strptime(
+                f"{current_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
+            ).timestamp()
+            end = datetime(current_year, month, day).timestamp()
+
+            order_service = OrderService()
+            orders = order_service.get_orders(start=start, end=end)
+
+            daily_order_service = DailyOrderService()
+            results = daily_order_service.update_daily_order_data(
+                orders, start, end, results
+            )
 
         return results

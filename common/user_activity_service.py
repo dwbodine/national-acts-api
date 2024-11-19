@@ -1,0 +1,93 @@
+"""
+User activity service module
+"""
+
+from datetime import datetime
+
+from common.models.user import UserActivity
+from common.db import db_query_all, db_update
+
+
+class UserActivityService:
+    """
+    Service to deal with user operations
+    """
+
+    # PUBLIC METHODS
+    def log_user_activity(self, user_id: int, activity_id: int, activity_data: str):
+        """
+        Log user activity from the UI
+        """
+        sql = ""
+        data = {"userId": user_id, "activityId": activity_id}
+        if len(activity_data) > 0:
+            sql = """INSERT INTO UserActivity (UserId, ActivityId, ActivityData)
+                         VALUES (%(userId)s, %(activityId)s, %(activityData)s)"""
+            data["activityData"] = activity_data
+        else:
+            sql = """INSERT INTO UserActivity (UserId, ActivityId)
+                         VALUES (%(userId)s, %(activityId)s)"""
+
+        success = db_update(sql, data)
+        return success
+
+    def get_user_activity(
+        self,
+        start: int,
+        end: int,
+        user_id: int = None,
+        activity_type: int = None,
+        filter_admins: bool = False,
+    ):
+        """
+        Get a report of user activity
+        """
+        activities: list[UserActivity] = []
+        sql = """SELECT UserActivity.*, Activity.ActivityName, Users.Username
+                     FROM UserActivity 
+                    JOIN Activity ON Activity.ActivityId=UserActivity.ActivityId 
+                    JOIN Users ON Users.UserId=UserActivity.UserId 
+                    WHERE UserActivity.Timestamp BETWEEN %(startDate)s AND %(endDate)s"""
+        data = {
+            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
+            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
+        }
+
+        where_clause: list[str] = []
+
+        if user_id is not None:
+            where_clause.append("UserActivity.UserId = %(userId)s")
+            data["userId"] = user_id
+
+        if activity_type is not None:
+            where_clause.append("UserActivity.ActivityId = %(activityId)s")
+            data["activityId"] = activity_type
+
+        if filter_admins is True:
+            where_clause.append("Users.IsAdmin <> 1")
+
+        if len(where_clause) > 0:
+            sql += " AND "
+            sql += " AND ".join(where_clause)
+
+        sql += " ORDER BY UserActivity.Timestamp DESC, Username ASC"
+
+        rows = db_query_all(sql, data)
+        for row in rows:
+            activity_user_id = int(row["UserId"])
+            activity_type = int(row["ActivityId"])
+            activity_name = str(row["ActivityName"])
+            username = str(row["Username"])
+            activity_data = str(row["ActivityData"])
+            activity_time = str(row["Timestamp"])
+            activity = UserActivity(
+                activity_user_id,
+                activity_type,
+                activity_data,
+                activity_time,
+                activity_name,
+                username,
+            )
+            activities.append(activity)
+
+        return activities
