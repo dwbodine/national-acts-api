@@ -162,8 +162,8 @@ def refresh_events_from_service(seller_id: int = None):
             year = 0
             if start is not None:
                 year = datetime.fromtimestamp(start).year
-                current_year = datetime.now().year
-                if year >= current_year or year < 2022:
+                now_year = datetime.now().year
+                if year >= now_year or year < 2022:
                     year = 0
 
             order_service = OrderService()
@@ -184,7 +184,9 @@ def refresh_events_from_service(seller_id: int = None):
                 f"{current_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
             ).timestamp()
             end = datetime(current_year, month, day).timestamp()
-            orders: list[VipOrder] = order_service.get_orders(start=start, end=end)
+            orders: list[VipOrder] = order_service.get_orders(
+                seller_id=seller_id, start=start, end=end
+            )
 
             daily_order_service = DailyOrderService()
             results = daily_order_service.update_daily_order_data(

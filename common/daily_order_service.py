@@ -11,7 +11,6 @@ from common.db import (
     db_insert,
     db_delete,
 )
-from common.utility import log_message
 from common.models.national_acts import (
     VipOrder,
     DailyOrderData,
@@ -34,12 +33,10 @@ class DailyOrderService:
         """
         Pulls order data from the database and rolls it up to DailyOrderData
         """
-        log_message("Starting update of daily order data")
         timer: float = time.time()
         duration: float = 0
         daily_order_data = self.__get_daily_order_data_from_orders(orders, start, end)
         duration = time.time() - timer
-        log_message(f"Daily order data fetch completed in {duration} seconds")
 
         if history is not None:
             history.order_data_rows_total = len(daily_order_data)
@@ -47,8 +44,6 @@ class DailyOrderService:
             if len(daily_order_data) <= 0:
                 history.order_data_update_succeeded = False
                 return history
-
-        log_message("Daily order data - starting database update")
 
         success = True
         updates: int = 0
@@ -134,8 +129,6 @@ class DailyOrderService:
         duration = time.time() - timer
         if history is not None:
             history.set_order_update_success(success, duration, inserts, updates)
-
-        log_message(f"Daily order data - update complete in {duration} seconds")
 
         return history
 

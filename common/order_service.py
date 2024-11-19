@@ -426,28 +426,12 @@ class OrderService:
             event_year: int = event_row["EventYear"]
             event_seller_id: int = event_row["SellerId"]
 
-            month: int = 0
-            day: int = 0
-            current_year: int = 0
-
-            if event_year > 0:
-                current_year = event_year
-                month = 12
-                day = 31
-            else:
-                current_year = datetime.now().year
-                month = datetime.now().month
-                day = datetime.now().day
-
             start = datetime.strptime(
-                f"{current_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
+                f"{event_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
             ).timestamp()
-            end = datetime(current_year, month, day).timestamp()
+            end = datetime(event_year, 12, 31).timestamp()
 
-            order_service = OrderService()
-            orders = order_service.get_orders(
-                start=start, end=end, seller_id=event_seller_id
-            )
+            orders = self.get_orders(start=start, end=end, seller_id=event_seller_id)
 
             daily_order_service = DailyOrderService()
             daily_order_service.cleanup_daily_order_data_for_event(event_id)
