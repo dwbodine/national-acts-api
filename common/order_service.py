@@ -681,6 +681,7 @@ class OrderService:
                 for ticket in order_to_update.tickets:
                     order_ticket_sql = """UPDATE TicketSocketOrderTickets
                                             SET Price=%(price)s, 
+                                            IsActive=%(isActive)s,
                                             ServiceFee=%(serviceFee)s, 
                                             IsCheckedIn=%(is_checked_in)s, 
                                             AttendeeFirstName=%(attendeeFirstName)s,
@@ -702,6 +703,7 @@ class OrderService:
                         "attendeeEmail": ticket.attendee_email,
                         "attendeePhone": ticket.attendee_phone,
                         "shirtSize": ticket.shirt_size,
+                        "isActive": ticket.is_active,
                     }
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:

@@ -17,6 +17,7 @@ class Role:
     """
     Single role with attached permissions in system
     """
+
     role_id: int = 0
     role_name: str = None
     permissions: list[Permission] = []
@@ -57,6 +58,8 @@ class UserActivity:
         activity_time: str,
         activity_name: str,
         username: str,
+        full_name: str,
+        seller_name: str,
     ):
         self.user_id = user_id
         self.activity_type = activity_type
@@ -64,6 +67,8 @@ class UserActivity:
         self.activity_time = activity_time
         self.activity_name = activity_name
         self.username = username
+        self.full_name = full_name
+        self.seller_name = seller_name
 
 
 class User:

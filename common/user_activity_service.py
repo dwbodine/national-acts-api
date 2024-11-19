@@ -43,10 +43,45 @@ class UserActivityService:
         Get a report of user activity
         """
         activities: list[UserActivity] = []
-        sql = """SELECT UserActivity.*, Activity.ActivityName, Users.Username
-                     FROM UserActivity 
-                    JOIN Activity ON Activity.ActivityId=UserActivity.ActivityId 
-                    JOIN Users ON Users.UserId=UserActivity.UserId 
+        sql = """
+                WITH
+                UserSellerCount AS(
+                SELECT
+                    Users.UserId,
+                    COUNT(*) AS NumAccounts
+                FROM
+                    Users
+                JOIN UserSeller ON Users.UserId = UserSeller.UserId
+                GROUP BY
+                    Users.UserId
+            )
+            SELECT
+                UserActivity.*,
+                Activity.ActivityName,
+                Users.Username,
+                CONCAT(
+                    Users.FirstName,
+                    ' ',
+                    Users.LastName
+                ) AS UserFullName,
+                CASE
+                    WHEN Users.IsAdmin = 1 THEN 'Admin'
+                    WHEN UserSellerCount.NumAccounts > 1 THEN 'Multiple'
+                    WHEN UserSellerCount.NumAccounts = 1 THEN(
+                            SELECT NAME
+                        FROM
+                            Sellers
+                        JOIN UserSeller ON UserSeller.SellerId = Sellers.SellerId
+                        WHERE
+                            UserSeller.UserId = Users.UserId
+                        )
+                    ELSE 'None'
+                END AS SellerName
+            FROM
+                UserActivity
+            JOIN Activity ON Activity.ActivityId = UserActivity.ActivityId
+            JOIN Users ON Users.UserId = UserActivity.UserId
+            LEFT JOIN UserSellerCount ON UserSellerCount.UserId = Users.UserId
                     WHERE UserActivity.Timestamp BETWEEN %(startDate)s AND %(endDate)s"""
         data = {
             "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
@@ -80,6 +115,8 @@ class UserActivityService:
             username = str(row["Username"])
             activity_data = str(row["ActivityData"])
             activity_time = str(row["Timestamp"])
+            full_name = str(row["UserFullName"])
+            seller_name = str(row["SellerName"])
             activity = UserActivity(
                 activity_user_id,
                 activity_type,
@@ -87,6 +124,8 @@ class UserActivityService:
                 activity_time,
                 activity_name,
                 username,
+                full_name,
+                seller_name
             )
             activities.append(activity)
 
