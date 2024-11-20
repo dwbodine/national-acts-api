@@ -7,8 +7,7 @@ import json
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
-from common_api import is_admin_logged_in
-
+from common.common_api import is_admin_logged_in
 from common.event_service import EventService
 from common.order_service import OrderService
 from common.role_service import RoleService

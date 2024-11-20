@@ -61,3 +61,20 @@ class UpdateService:
             )
 
         return results
+
+    def update_historical_events_from_ticket_socket(self, start: int, end: int):
+        """
+        Update all upcoming events/orders/tickets/ticket types from TS
+        """
+        service = DataRefreshService()
+        results = service.refresh_database_from_ticket_socket(start=start, end=end)
+        if results is not None and results.succeeded is True:
+            order_service = OrderService()
+            orders = order_service.get_orders(start=start, end=end)
+
+            daily_order_service = DailyOrderService()
+            results = daily_order_service.update_daily_order_data(
+                orders, start, end, results
+            )
+
+        return results

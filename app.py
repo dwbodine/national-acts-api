@@ -14,12 +14,12 @@ from flask_jwt_extended import (
     JWTManager,
 )
 
-from admin_api import admin_api
-from cron_api import cron_api
-from dashboard_api import dashboard_api
-from internal_api import internal_api
-from public_api import public_api
-from user_api import user_api
+from api.admin_api import admin_api
+from api.cron_api import cron_api
+from api.dashboard_api import dashboard_api
+from api.internal_api import internal_api
+from api.public_api import public_api
+from api.user_api import user_api
 
 from common.utility import log_message
 from common.environment import load_env

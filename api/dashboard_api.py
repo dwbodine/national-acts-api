@@ -7,8 +7,7 @@ from datetime import datetime
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
-from common_api import is_admin_logged_in
-
+from common.common_api import is_admin_logged_in
 from common.dashboard_service import DashboardService
 from common.user_activity_service import UserActivityService
 from common.models.user import UserActivity

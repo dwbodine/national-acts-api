@@ -7,8 +7,7 @@ from datetime import datetime
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
-from common_api import get_user_from_jwt
-
+from common.common_api import get_user_from_jwt
 from common.daily_order_service import DailyOrderService
 from common.order_service import OrderService
 from common.data_refresh_service import DataRefreshService

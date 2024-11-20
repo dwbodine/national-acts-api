@@ -71,4 +71,32 @@ def update_historical_exchange_rate(exchange_date_str: str):
     return convert_to_json(rates)
 
 
+@cron_api.route("/cron/updateMonthOfHistoralEventData")
+def update_historical_event_data():
+    """
+    API for cron to update historical exchange rate from Stripe
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    start: int = None
+    end: int = None
+
+    if request.args.get("start") is not None:
+        start = int(request.args.get("start"))
+    if request.args.get("end") is not None:
+        end = int(request.args.get("end"))
+
+    if start is None or end is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = UpdateService()
+    results = service.update_historical_events_from_ticket_socket(start, end)
+    return convert_to_json(results)
+
+
 # END CRON JOB ROUTES
