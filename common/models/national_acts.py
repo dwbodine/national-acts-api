@@ -634,7 +634,7 @@ class TicketSocketRefreshHistory:
             sql = """DELETE FROM TicketSocketRefreshHistory WHERE EndTimer <= %(weekAgo)s"""
             data = {"weekAgo": week_ago}
             db_delete(sql, data, cnx)
-        except RuntimeError as error:
+        except Exception as error: # pylint: disable=broad-exception-caught
             success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
             log_message(error_message)

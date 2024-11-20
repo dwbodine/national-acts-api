@@ -736,15 +736,7 @@ class DataRefreshService:
             if cnx is not None and cnx.is_connected:
                 cnx.close()
 
-        except (
-            IndexError,
-            MemoryError,
-            EOFError,
-            BufferError,
-            SystemError,
-            TimeoutError,
-            RuntimeError,
-        ) as error:
+        except Exception as error: # pylint: disable=broad-exception-caught
             update_success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
             log_message(error_message)

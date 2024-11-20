@@ -116,7 +116,7 @@ def send_email(
         sg = SendGridAPIClient(send_grid_key)
         sg.send(message)
         result = SendEmailResult(True, None)
-    except (SystemError, RuntimeError, TimeoutError) as e:
+    except Exception as e: # pylint: disable=broad-exception-caught
         result = SendEmailResult(False, str(e) + "\n" + traceback.format_exc())
 
     return result

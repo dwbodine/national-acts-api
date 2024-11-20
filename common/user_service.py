@@ -66,7 +66,7 @@ class UserService:
                 else:
                     error_message = "Incorrect username or password"
 
-        except RuntimeError as err:
+        except Exception as err: # pylint: disable=broad-exception-caught
             user = None
             error_message: str = "Error occurred during login"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -126,7 +126,7 @@ class UserService:
             else:
                 error_message = """Error occurred during user registration,
                             please contact your administrator"""
-        except RuntimeError as err:
+        except Exception as err: # pylint: disable=broad-exception-caught
             user = None
             error_message = """Error occurred during user registration,
                             please contact your administrator"""
@@ -163,7 +163,7 @@ class UserService:
                     error_message = "Error occurred during password reset"
             else:
                 error_message = "User not found"
-        except RuntimeError as err:
+        except Exception as err: # pylint: disable=broad-exception-caught
             user = None
             error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -197,7 +197,7 @@ class UserService:
             if not row:
                 user = None
                 error_message = "Invalid code"
-        except RuntimeError as err:
+        except Exception as err: # pylint: disable=broad-exception-caught
             user = None
             error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -456,7 +456,7 @@ class UserService:
 
             user_sql = """DELETE FROM Users WHERE UserId=%(userId)s"""
             success = db_delete(user_sql, data)
-        except RuntimeError as err:
+        except Exception as err: # pylint: disable=broad-exception-caught
             success = False
             log_message(f"Unexpected {err=}, {type(err)=}")
 
