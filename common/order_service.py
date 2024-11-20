@@ -199,7 +199,6 @@ class OrderService:
             order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = int(row["TicketSocketEventId"])
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.num_tickets = int(row["NumTickets"])
             order.purchase_date = str(row["PurchaseDate"])
             order.purchase_timestamp = str(row["PurchaseTimestamp"])
             order.user_id = int(row["UserId"])
@@ -236,8 +235,6 @@ class OrderService:
                 if row["PurchaserIpAddress"] is not None
                 else None
             )
-            order.revenue = float(row["Revenue"])
-            order.service_fees = float(row["ServiceFees"])
             order.exchange_rate = float(row["ExchangeRate"])
             order.currency_abbrev = str(row["CurrencyAbbrev"])
             order.currency_symbol = str(row["Symbol"])
@@ -328,7 +325,6 @@ class OrderService:
             order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = ticket_socket_event_id
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.num_tickets = int(row["NumTickets"])
             order.purchase_date = str(row["PurchaseDate"])
             order.purchase_timestamp = str(row["PurchaseTimestamp"])
             order.user_id = int(row["UserId"])
@@ -365,8 +361,7 @@ class OrderService:
                 if row["PurchaserIpAddress"] is not None
                 else None
             )
-            order.revenue = float(row["Revenue"])
-            order.service_fees = float(row["ServiceFees"])
+            
             order.exchange_rate = float(row["ExchangeRate"])
             order.currency_abbrev = str(row["CurrencyAbbrev"])
             order.currency_symbol = str(row["Symbol"])
@@ -658,20 +653,10 @@ class OrderService:
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
                              IsComped=%(isComped)s,
-                             Revenue=%(revenue)s, 
-                             ServiceFees=%(serviceFees)s, 
                              LastUpdate=CURRENT_TIMESTAMP 
                              WHERE Id=%(ticket_socket_order_id)s"""
             update_data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
-                "revenue": (
-                    order_to_update.revenue if order_to_update.revenue != "None" else 0
-                ),
-                "serviceFees": (
-                    order_to_update.service_fees
-                    if order_to_update.service_fees != "None"
-                    else 0
-                ),
                 "is_active": 1 if order_to_update.is_active is True else 0,
                 "isDeleted": 1 if order_to_update.is_deleted is True else 0,
                 "isComped": 1 if order_to_update.is_comped is True else 0,
@@ -751,16 +736,15 @@ class OrderService:
                 return False
 
             add_sql = """INSERT INTO TicketSocketOrders (
-                             IsComped, EventId, OrderId, NumTickets, PurchaseDate,
+                             IsComped, EventId, OrderId, PurchaseDate,
                              UserId, PurchaserFirstName, PurchaserLastName,
                              TicketSocketEventId
                              ) VALUES (
-                                 1, 0, 0, %(numTickets)s, CURRENT_TIMESTAMP,
+                                 1, 0, 0, CURRENT_TIMESTAMP,
                                  0, 'Comped', 'Order', %(ticket_socket_event_id)s
                              )"""
             add_data = {
-                "ticket_socket_event_id": ticket_socket_event_id,
-                "numTickets": num_tickets,
+                "ticket_socket_event_id": ticket_socket_event_id
             }
             order_id = db_insert(add_sql, add_data)
             success = True if order_id > 0 else False

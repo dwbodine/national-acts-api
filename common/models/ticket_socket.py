@@ -83,10 +83,10 @@ class TicketSocketOrder:
     """
     Order object from TicketSocket API
     """
+
     order_id: int = 0
     event_id: int = 0
     user_id: int = 0
-    num_tickets: int = 0
     tickets: list[TicketSocketTicket] = []
     phone: str = ""
     purchaser_first_name: str = ""
@@ -99,10 +99,9 @@ class TicketSocketOrder:
     purchase_date: str = ""
     purchase_timestamp: str = ""
     email: str = ""
-    revenue: float = 0
-    service_fees: float = 0
     cancelled: bool = False
     deleted: bool = False
+
 
 class TicketSocketEvent:
     """
@@ -110,7 +109,7 @@ class TicketSocketEvent:
     """
 
     event_id: int = 0
-    title: str = ''
+    title: str = ""
     venue: TicketSocketVenue = None
     orders: list[TicketSocketOrder] = []
     event_category_id: int = 0

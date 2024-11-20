@@ -315,7 +315,7 @@ class TicketSocketService:
                 try:
                     event_date = datetime.strptime(event.display_date, "%m/%d/%Y")
                     event.event_date = event_date.strftime("%Y-%m-%d")
-                except Exception: # pylint: disable=broad-exception-caught
+                except Exception:  # pylint: disable=broad-exception-caught
                     event_time: int = event.utc_time + (self.utc_offset_hours * 60 * 60)
                     event.event_date = datetime.fromtimestamp(event_time).strftime(
                         "%Y-%m-%d"
@@ -487,30 +487,25 @@ class TicketSocketService:
         if "tickets" in json_data:
             tickets = json_data["tickets"]
 
-        num_tickets: int = 0
         total_count: int = 0
         if tickets is not None:
             if "totalCount" in tickets:
                 total_count = int(tickets["totalCount"])
 
-        order_revenue: float = 0
-        order_service_fees: float = 0
         order_tickets = []
         if total_count > 0:
             ticket_data = tickets["data"]
             for item in ticket_data:
                 # if the ticket doesn't belong to this event, move along
                 # and yes that happens that an order can contain tickets to multiple events
-
-                shirt_size: str = None
                 item_event_id: int = 0
                 if "eventId" in item:
                     item_event_id = int(item["eventId"])
+
                 if item_event_id != int(event_id):
                     continue
 
-                num_tickets += 1
-
+                shirt_size: str = None
                 # set properties on order from ticket data if not present
                 if order.user_id == 0 and "userId" in item:
                     order.user_id = int(item["userId"])
@@ -643,14 +638,8 @@ class TicketSocketService:
                 ticket.shirt_size = shirt_size
                 order_tickets.append(ticket)
 
-                order_revenue += price
-                order_service_fees += service_fee
-
         if len(order_tickets) > 0:
-            order.num_tickets = num_tickets
             order.tickets = order_tickets
-            order.revenue = order_revenue
-            order.service_fees = order_service_fees
         return order
 
 

@@ -154,8 +154,8 @@ class DataRefreshService:
             )
             # log_message('events retrieved')
 
-            #service_timer = time.time()
-            #service_duration = service_timer - start_timer
+            # service_timer = time.time()
+            # service_duration = service_timer - start_timer
             # log_message("Service fetch done in " + str(service_duration) + " seconds")
 
             # get total number of events grabbed from service
@@ -348,7 +348,6 @@ class DataRefreshService:
                             # compile order data for update
 
                             order_data = {
-                                "numTickets": order.num_tickets,
                                 "purchaseDate": order.purchase_date.strip(),
                                 "purchaseTimestamp": order.purchase_timestamp.strip(),
                                 "phone": (
@@ -415,12 +414,6 @@ class DataRefreshService:
                                 ),
                             }
 
-                            if order.revenue > 0:
-                                order_data["revenue"] = order.revenue
-
-                            if order.service_fees > 0:
-                                order_data["serviceFees"] = order.service_fees
-
                             # determine if order already exists
                             order_sql = """SELECT TicketSocketOrders.*
                                             FROM TicketSocketOrders
@@ -481,22 +474,15 @@ class DataRefreshService:
                                                 daily_order_data_rows_removed += 1
 
                                 # update existing order
-                                sql = """UPDATE TicketSocketOrders SET NumTickets=%(numTickets)s,
-                                        PurchaseDate=%(purchaseDate)s, PurchaseTimestamp=%(purchaseTimestamp)s,
+                                sql = """UPDATE TicketSocketOrders SET PurchaseDate=%(purchaseDate)s,
+                                        PurchaseTimestamp=%(purchaseTimestamp)s,
                                         Phone=%(phone)s, EventId=%(event_id)s,
                                         UserId=%(user_id)s, PurchaserLastName=%(purchaserLastName)s,
                                         PurchaserFirstName=%(purchaserFirstName)s, PurchaserCity=%(purchaserCity)s, 
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s,
                                         PurchaserCountry=%(purchaserCountry)s,
-                                        PurchaserIpAddress=%(purchaserIpAddress)s,
-                                        Email=%(email)s, """
-                                if order.revenue > 0:
-                                    sql += """Revenue=%(revenue)s, """
-                                if order.service_fees > 0:
-                                    sql += """ServiceFees=%(serviceFees)s, """
-                                sql += (
-                                    """LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
-                                )
+                                        PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
+                                        LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
 
                                 order_success = db_update(sql, order_data, cnx)
                             else:
@@ -507,26 +493,16 @@ class DataRefreshService:
                                     ticket_socket_event_id
                                 )
                                 sql = """INSERT INTO TicketSocketOrders
-                                            (TicketSocketEventId, OrderId, NumTickets,
+                                            (TicketSocketEventId, OrderId,
                                             PurchaseDate, PurchaseTimestamp, Phone, EventId, UserId,
                                             PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState,
                                             PurchaserZip, PurchaserCountry,
-                                            PurchaserIpAddress, Email"""
-                                if order.revenue > 0:
-                                    sql += """, Revenue"""
-                                if order.service_fees > 0:
-                                    sql += """, ServiceFees"""
-                                sql += """) VALUES
-                                    (%(ticket_socket_event_id)s, %(order_id)s, %(numTickets)s,
+                                            PurchaserIpAddress, Email) VALUES
+                                    (%(ticket_socket_event_id)s, %(order_id)s,
                                     %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s,
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
-                                    %(purchaserIpAddress)s,  %(email)s"""
-                                if order.revenue > 0:
-                                    sql += """, %(revenue)s"""
-                                if order.service_fees > 0:
-                                    sql += """, %(serviceFees)s"""
-                                sql += """)"""
+                                    %(purchaserIpAddress)s,  %(email)s)"""
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
@@ -635,8 +611,10 @@ class DataRefreshService:
                                                 AttendeeFirstName=%(attendeeFirstName)s,
                                                 AttendeeLastName=%(attendeeLastName)s,
                                                 IsCheckedIn=%(is_checked_in)s,
-                                                ShirtSize=%(shirtSize)s,
-                                                LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                                ShirtSize=%(shirtSize)s"""
+                                        if ticket_price > 0:
+                                            sql += ", Price=%(price)s"
+                                        sql += """, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
                                         ticket_success = db_update(
                                             sql, ticket_data, cnx
                                         )
@@ -690,10 +668,10 @@ class DataRefreshService:
             end_timer = time.time()
             duration = end_timer - start_timer
 
-            #database_duration = end_timer - service_timer
-            #log_message(
+            # database_duration = end_timer - service_timer
+            # log_message(
             #    "database update complete in " + str(database_duration) + " seconds"
-            #)
+            # )
 
             results = TicketSocketRefreshHistory(
                 service_events_skipped,
@@ -736,7 +714,7 @@ class DataRefreshService:
             if cnx is not None and cnx.is_connected:
                 cnx.close()
 
-        except Exception as error: # pylint: disable=broad-exception-caught
+        except Exception as error:  # pylint: disable=broad-exception-caught
             update_success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
             log_message(error_message)

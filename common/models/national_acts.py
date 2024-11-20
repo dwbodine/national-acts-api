@@ -171,6 +171,7 @@ class VipOrder(TicketSocketOrder):
     is_comped: bool = False
     has_refunds: bool = False
     has_chargebacks: bool = False
+    num_tickets: int = 0
     num_tickets_refunded: int = 0
     num_tickets_charged_back: int = 0
     revenue_refunded: float = 0
@@ -182,7 +183,9 @@ class VipOrder(TicketSocketOrder):
     service_fee_revenue_charged_back: float = 0
     service_fee_revenue_charged_back_usd: float = 0
     total_shirts: int = 0
+    revenue: float = 0
     revenue_usd: float = 0
+    service_fees: float = 0
     service_fees_usd: float = 0
     exchange_rate: float = 1.0
     currency_symbol: str = None
@@ -194,8 +197,15 @@ class VipOrder(TicketSocketOrder):
         """
         Roll up data from tickets to order
         """
+        total_revenue: float = 0
+        total_service_fees: float = 0
         total_shirts: int = 0
+        total_tickets: int = 0
+
         for ticket in self.tickets:
+            total_tickets += 1
+            total_revenue += ticket.price
+            total_service_fees += ticket.service_fee
             if ticket.shirt_size is not None:
                 total_shirts += 1
             if ticket.is_refunded is True:
@@ -210,7 +220,11 @@ class VipOrder(TicketSocketOrder):
                 self.revenue_charged_back += ticket.price
                 self.service_fee_revenue_charged_back += ticket.service_fee
 
+        self.num_tickets = total_tickets
+        self.revenue = total_revenue
+        self.service_fees = total_service_fees
         self.total_shirts = total_shirts
+
         self.revenue_usd = self.revenue * self.exchange_rate
         self.service_fees_usd = self.service_fees * self.exchange_rate
         self.revenue_refunded_usd = self.revenue_refunded * self.exchange_rate
@@ -634,7 +648,7 @@ class TicketSocketRefreshHistory:
             sql = """DELETE FROM TicketSocketRefreshHistory WHERE EndTimer <= %(weekAgo)s"""
             data = {"weekAgo": week_ago}
             db_delete(sql, data, cnx)
-        except Exception as error: # pylint: disable=broad-exception-caught
+        except Exception as error:  # pylint: disable=broad-exception-caught
             success = False
             error_message: str = str(error) + "\n" + traceback.format_exc()
             log_message(error_message)
