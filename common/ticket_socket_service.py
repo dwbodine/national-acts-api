@@ -315,7 +315,7 @@ class TicketSocketService:
                 try:
                     event_date = datetime.strptime(event.display_date, "%m/%d/%Y")
                     event.event_date = event_date.strftime("%Y-%m-%d")
-                except Exception as error: # pylint: disable=broad-exception-caught
+                except Exception: # pylint: disable=broad-exception-caught
                     event_time: int = event.utc_time + (self.utc_offset_hours * 60 * 60)
                     event.event_date = datetime.fromtimestamp(event_time).strftime(
                         "%Y-%m-%d"
