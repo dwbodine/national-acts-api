@@ -50,7 +50,7 @@ class ExchangeRateService:
         return round(exchange_rate_value, 5)
 
     def get_exchange_rate_by_time(
-        self, unix_time: int = time.time(), force_update: bool = False
+        self, unix_time: int = None, force_update: bool = False
     ):
         """
         Get exchange rate from history for a specific date
@@ -58,6 +58,9 @@ class ExchangeRateService:
 
         if self.exchange_rate is None:
             return 1
+        
+        if unix_time is None:
+            unix_time = time.time()
 
         utc_date_incoming = datetime.fromtimestamp(unix_time)
 
