@@ -148,20 +148,20 @@ class DataRefreshService:
         results: TicketSocketRefreshHistory = None
 
         try:
-            log_message("retrieving events from TicketSocket Service")
+            # log_message("retrieving events from TicketSocket Service")
             all_events = self.retrieve_ticket_socket_events_for_update(
                 seller_id, start, end
             )
             # log_message('events retrieved')
 
-            service_timer = time.time()
-            service_duration = service_timer - start_timer
-            log_message("Service fetch done in " + str(service_duration) + " seconds")
+            #service_timer = time.time()
+            #service_duration = service_timer - start_timer
+            # log_message("Service fetch done in " + str(service_duration) + " seconds")
 
             # get total number of events grabbed from service
             total_events_from_service = len(all_events)
 
-            log_message("starting database update - opening connection")
+            # log_message("starting database update - opening connection")
             # get one database connection
             cnx = db_get_connection()
 
@@ -690,10 +690,10 @@ class DataRefreshService:
             end_timer = time.time()
             duration = end_timer - start_timer
 
-            database_duration = end_timer - service_timer
-            log_message(
-                "database update complete in " + str(database_duration) + " seconds"
-            )
+            #database_duration = end_timer - service_timer
+            #log_message(
+            #    "database update complete in " + str(database_duration) + " seconds"
+            #)
 
             results = TicketSocketRefreshHistory(
                 service_events_skipped,

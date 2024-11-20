@@ -12,6 +12,7 @@ from flask_jwt_extended import (
     get_jwt,
     get_jwt_identity,
     JWTManager,
+    jwt_required,
 )
 
 from api.admin_api import admin_api
@@ -21,7 +22,8 @@ from api.internal_api import internal_api
 from api.public_api import public_api
 from api.user_api import user_api
 
-from common.utility import log_message
+from common.common_api import is_admin_logged_in
+from common.utility import log_message, convert_to_json
 from common.environment import load_env
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -76,7 +78,6 @@ def after_request(response):
     return response
 
 
-# BEGIN HEALTH CHECK ROUTES
 @app.route("/")
 def health():
     """
@@ -85,7 +86,22 @@ def health():
     return "All is Well\r\n"
 
 
-# END HEALTH CHECK ROUTES
+@app.route("/log")
+@jwt_required()
+def view_log():
+    """
+    View log for admins only
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    log_data: str = None
+    with open("passenger.log", "r", encoding="utf8") as f:
+        log_data = f.read()
+
+    return convert_to_json(log_data)
+
 
 if __name__ == "__main__":
     app.run()
