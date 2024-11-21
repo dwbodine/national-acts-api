@@ -69,7 +69,7 @@ def after_request(response):
             if target_timestamp > exp_timestamp:
                 access_token = create_access_token(identity=get_jwt_identity())
                 data = response.get_json()
-                if isinstance(data) is dict:
+                if isinstance(data, dict):
                     data["access_token"] = access_token
                     response.data = json.dumps(data)
     except (RuntimeError, KeyError):
