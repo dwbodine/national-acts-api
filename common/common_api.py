@@ -2,10 +2,12 @@
 Common API tasks
 """
 
+import traceback
 from flask import request
 from flask_jwt_extended import get_jwt
 from common.user_service import UserService
 from common.models.user import User
+from common.utility import log_message
 
 
 def is_admin_logged_in():
@@ -26,6 +28,8 @@ def get_user_from_jwt():
             username = get_jwt()["sub"]
             service = UserService()
             user = service.get_user_by_user_name(username)
-    except (RuntimeError, KeyError):
+    except Exception as error:  # pylint: disable=broad-exception-caught
         user = None
+        error_message: str = str(error) + "\n" + traceback.format_exc()
+        log_message(error_message)
     return user

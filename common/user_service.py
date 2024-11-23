@@ -521,7 +521,7 @@ class UserService:
                                                  WHERE UserSellerId=%(userSellerId)s"""
                             update_role_data = {
                                 "roleId": new_seller.role_id,
-                                "userSellerId": existing_seller.userSellerId,
+                                "userSellerId": existing_seller.user_seller_id,
                             }
                             success = db_update(update_role_sql, update_role_data)
                         new_seller_ids.remove(existing_seller_id)
@@ -529,7 +529,7 @@ class UserService:
                         delete_seller_sql = """DELETE FROM UserSeller
                                             WHERE UserSellerId=%(userSellerId)s"""
                         delete_seller_data = {
-                            "userSellerId": existing_seller.userSellerId
+                            "userSellerId": existing_seller.user_seller_id
                         }
                         success = db_delete(delete_seller_sql, delete_seller_data)
                 if len(new_seller_ids) > 0:

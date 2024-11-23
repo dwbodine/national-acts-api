@@ -361,7 +361,7 @@ class OrderService:
                 if row["PurchaserIpAddress"] is not None
                 else None
             )
-            
+
             order.exchange_rate = float(row["ExchangeRate"])
             order.currency_abbrev = str(row["CurrencyAbbrev"])
             order.currency_symbol = str(row["Symbol"])
@@ -664,19 +664,6 @@ class OrderService:
             success = db_update(update_sql, update_data)
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
                 for ticket in order_to_update.tickets:
-                    order_ticket_sql = """UPDATE TicketSocketOrderTickets
-                                            SET Price=%(price)s, 
-                                            IsActive=%(isActive)s,
-                                            ServiceFee=%(serviceFee)s, 
-                                            IsCheckedIn=%(is_checked_in)s, 
-                                            AttendeeFirstName=%(attendeeFirstName)s,
-                                            AttendeeLastName=%(attendeeLastName)s,
-                                            AttendeePhone=%(attendeePhone)s,
-                                            AttendeeEmail=%(attendeeEmail)s,
-                                            ShirtSize=%(shirtSize)s,
-                                            LastUpdate=CURRENT_TIMESTAMP 
-                                            WHERE Id=%(ticketId)s 
-                                            AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
                     order_ticket_data = {
                         "ticketId": ticket.ticket_socket_order_ticket_id,
                         "ticket_socket_order_id": ticket.ticket_socket_order_id,
@@ -690,6 +677,29 @@ class OrderService:
                         "shirtSize": ticket.shirt_size,
                         "isActive": ticket.is_active,
                     }
+
+                    order_ticket_sql = """UPDATE TicketSocketOrderTickets
+                                            SET Price=%(price)s, 
+                                            IsActive=%(isActive)s,
+                                            ServiceFee=%(serviceFee)s, 
+                                            IsCheckedIn=%(is_checked_in)s, 
+                                            AttendeeFirstName=%(attendeeFirstName)s,
+                                            AttendeeLastName=%(attendeeLastName)s,
+                                            AttendeePhone=%(attendeePhone)s,
+                                            AttendeeEmail=%(attendeeEmail)s,
+                                            ShirtSize=%(shirtSize)s,"""
+
+                    if ticket.is_refunded is True:
+                        order_ticket_data["refundDate"] = ticket.refund_date
+                        order_ticket_sql += """ RefundDate=%(refundDate)s,"""
+                    elif ticket.is_charged_back is True:
+                        order_ticket_data["chargebackDate"] = ticket.chargeback_date
+                        order_ticket_sql += """ ChargebackDate=%(chargebackDate)s,"""
+
+                    order_ticket_sql += """ LastUpdate=CURRENT_TIMESTAMP 
+                                            WHERE Id=%(ticketId)s 
+                                            AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
+
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:
                         break
@@ -743,9 +753,7 @@ class OrderService:
                                  1, 0, 0, CURRENT_TIMESTAMP,
                                  0, 'Comped', 'Order', %(ticket_socket_event_id)s
                              )"""
-            add_data = {
-                "ticket_socket_event_id": ticket_socket_event_id
-            }
+            add_data = {"ticket_socket_event_id": ticket_socket_event_id}
             order_id = db_insert(add_sql, add_data)
             success = True if order_id > 0 else False
             if success is True:

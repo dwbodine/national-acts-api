@@ -88,10 +88,10 @@ def log_user_activity():
     success: bool = False
     user = get_user_from_jwt()
     activity_type = request.json.get("activityType")
-    activity_data = request.json.get("activityData")
 
     if user is not None and activity_type is not None:
-        user_id = user.user_id
+        user_id = user.user_id        
+        activity_data = request.json.get("activityData")
 
         service = UserActivityService()
         data: str = str(activity_data) if activity_data is not None else ""

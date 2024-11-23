@@ -14,6 +14,7 @@ from flask_jwt_extended import (
     JWTManager,
     jwt_required,
 )
+import traceback
 
 from api.admin_api import admin_api
 from api.cron_api import cron_api
@@ -75,6 +76,9 @@ def after_request(response):
     except (RuntimeError, KeyError):
         # Case where there is not a valid JWT. Just return the original respone
         log_message("JWT not found")
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        error_message: str = str(error) + "\n" + traceback.format_exc()
+        log_message(error_message)
     return response
 
 
