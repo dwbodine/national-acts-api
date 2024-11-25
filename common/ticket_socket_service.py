@@ -4,7 +4,6 @@ Ticket Socket API service module
 
 import os
 import json
-import http.client
 import time
 from datetime import datetime
 from typing import Any

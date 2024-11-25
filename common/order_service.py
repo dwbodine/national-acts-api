@@ -506,7 +506,6 @@ class OrderService:
             )
             ticket.ticket_socket_order_id = ticket_socket_order_id
             ticket.ticket_socket_order_ticket_id = int(row["Id"])
-            ticket.is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
             is_refunded: bool = True if int(row["IsRefunded"]) == 1 else False
             ticket.is_service_fee_refunded = (
                 True if int(row["IsServiceFeeRefunded"]) == 1 else False
@@ -515,6 +514,13 @@ class OrderService:
             ticket.refund_date = (
                 str(row["RefundDate"])
                 if (is_refunded is True and row["RefundDate"] is not None)
+                else None
+            )
+            is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
+            ticket.is_checked_in = is_checked_in
+            ticket.checked_in_date = (
+                str(row["CheckedInDate"])
+                if (is_checked_in is True and row["CheckedInDate"] is not None)
                 else None
             )
             is_charged_back: bool = True if int(row["IsChargedBack"]) == 1 else False
@@ -575,11 +581,17 @@ class OrderService:
         for ticket_socket_order_ticket_id in ticket_socket_order_ticket_ids:
             sql = """UPDATE TicketSocketOrderTickets
                         SET IsCheckedIn=%(checkedIn)s,
+                        CheckedInDate=%(checkedInDate)s,
                         LastUpdate=CURRENT_TIMESTAMP
                         WHERE Id=%(ticket_socket_order_ticket_id)s"""
             data = {
                 "ticket_socket_order_ticket_id": ticket_socket_order_ticket_id,
                 "checkedIn": 1 if checked_in is True else 0,
+                "checkedInDate": (
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    if checked_in is True
+                    else None
+                ),
             }
             success = db_update(sql, data)
             if success is False:
