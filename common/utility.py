@@ -224,7 +224,14 @@ def get_https_response(
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
-        log_message(error_message)
+        subject = "Error in get_https_response - " + datetime.now().strftime(
+            "%m/%d/%Y %H:%M:%S"
+        )
+        html = f"get_https_response failed for {host}{url}\n"
+        html += error_message
+        to = "dwbodine@gmail.com"
+        to_name = "dB"
+        send_email(to, subject, html, to_name)
     finally:
         if conn is not None:
             conn.close()
@@ -262,7 +269,14 @@ def post_https_response(
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
-        log_message(error_message)
+        subject = "Error in post_https_response - " + datetime.now().strftime(
+            "%m/%d/%Y %H:%M:%S"
+        )
+        html = f"post_https_response failed for {host}{url}\n"
+        html += error_message
+        to = "dwbodine@gmail.com"
+        to_name = "dB"
+        send_email(to, subject, html, to_name)
     finally:
         if conn is not None:
             conn.close()
