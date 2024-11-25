@@ -3,13 +3,12 @@ Service to pull exchange rates for currency from Stripe
 """
 
 import os
-import json
-import http.client
 from datetime import datetime
 import time
 
 from common.db import db_query_one, db_insert, db_update
 from common.models.exchange_rate import ExchangeRate
+from common.utility import get_https_response
 
 
 class ExchangeRateService:
@@ -30,22 +29,16 @@ class ExchangeRateService:
             exchange_date = datetime.fromtimestamp(unix_time)
             url += "/" + exchange_date.isoformat()
 
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "x-api-key": os.getenv("STRIPE_API_KEY"),
-        }
-
-        conn = http.client.HTTPSConnection("api.striperates.com")
-        conn.request("GET", url, headers=headers)
-        response = conn.getresponse()
-
         exchange_rate_value: float = 1.0
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            json_data = json_response["data"]
-            usd_rate = json_data[0]["rates"]["usd"]
-            exchange_rate_value = float(usd_rate) * self.exchange_rate.multiplier
+        api_key = os.getenv("STRIPE_API_KEY")
+        if api_key is not None:
+            json_data = get_https_response(
+                host="api.striperates.com", url=url, api_key=api_key
+            )
+
+            if json_data is not None:
+                usd_rate = json_data[0]["rates"]["usd"]
+                exchange_rate_value = float(usd_rate) * self.exchange_rate.multiplier
 
         return round(exchange_rate_value, 5)
 
@@ -58,7 +51,7 @@ class ExchangeRateService:
 
         if self.exchange_rate is None:
             return 1
-        
+
         if unix_time is None:
             unix_time = time.time()
 

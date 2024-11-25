@@ -5,6 +5,7 @@ Utilites for Python app
 import json
 import re
 import os
+import http.client
 from datetime import datetime
 import traceback
 from types import SimpleNamespace
@@ -116,7 +117,7 @@ def send_email(
         sg = SendGridAPIClient(send_grid_key)
         sg.send(message)
         result = SendEmailResult(True, None)
-    except Exception as e: # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         result = SendEmailResult(False, str(e) + "\n" + traceback.format_exc())
 
     return result
@@ -191,3 +192,79 @@ def log_message(msg: str):
     """
     date_str = datetime.now().isoformat()
     print("[" + date_str + "] " + msg)
+
+
+def get_https_response(
+    host: str, url: str, bearer_token: str = None, api_key: str = None
+):
+    """
+    Make consistent API GET calls
+    """
+    headers: dict[str, any] = {
+        "Accept": "application/json",
+        "Content-type": "application/json;charset=UTF-8",
+    }
+    if bearer_token is not None:
+        headers["Authorization"] = f"Bearer {bearer_token}"
+    if api_key is not None:
+        headers["x-api-key"] = api_key
+
+    json_data = None
+    try:
+        conn = http.client.HTTPSConnection(
+            host=host, port=443, timeout=3000, check_hostname=False
+        )
+        conn.request("GET", url, headers=headers)
+        response = conn.getresponse()
+
+        if response.status == 200:
+            json_response = json.loads(response.read())
+            if "data" in json_response:
+                json_data = json_response["data"]
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        json_data = None
+        error_message: str = str(error) + "\n" + traceback.format_exc()
+        log_message(error_message)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return json_data
+
+
+def post_https_response(
+    host: str, url: str, payload: str, api_key: str = None, bearer_token: str = None
+):
+    """
+    Make consistent API POST calls
+    """
+    headers: dict[str, any] = {
+        "Accept": "application/json",
+        "Content-type": "application/json;charset=UTF-8",
+    }
+    if bearer_token is not None:
+        headers["Authorization"] = f"Bearer {bearer_token}"
+    if api_key is not None:
+        headers["x-api-key"] = api_key
+
+    json_data = None
+    try:
+        conn = http.client.HTTPSConnection(
+            host=host, port=443, timeout=3000, check_hostname=False
+        )
+        conn.request("POST", url, payload, headers)
+        response = conn.getresponse()
+
+        if response.status == 200:
+            json_response = json.loads(response.read())
+            if "data" in json_response:
+                json_data = json_response["data"]
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        json_data = None
+        error_message: str = str(error) + "\n" + traceback.format_exc()
+        log_message(error_message)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return json_data

@@ -9,7 +9,12 @@ import time
 from datetime import datetime
 from typing import Any
 
-from common.utility import fix_magic_quotes, format_phone
+from common.utility import (
+    fix_magic_quotes,
+    format_phone,
+    post_https_response,
+    get_https_response,
+)
 from common.db import db_query_all, db_query_one
 from common.models.ticket_socket import (
     TicketSocketCategory,
@@ -81,23 +86,14 @@ class TicketSocketService:
             "publicKeySlug": pk_slug,
         }
 
-        url = "/api/v1/tokens"
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-        }
+        url: str = "/api/v1/tokens"
+        payload: str = json.dumps(creds)
+        jwt: str = None
 
-        conn = http.client.HTTPSConnection(self.service_url)
-        conn.request("POST", url, json.dumps(creds), headers)
-        response = conn.getresponse()
-
-        jwt = ""
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            jwt = json_response["data"]["jwt"]
-
-        conn.close()
-        self.token = jwt
+        json_data = post_https_response(host=self.service_url, url=url, payload=payload)
+        if json_data is not None:
+            jwt = json_data["jwt"]
+            self.token = jwt
 
     def __initialize(self):
         self.__get_ts_account_data()
@@ -107,34 +103,25 @@ class TicketSocketService:
         """
         Fetch list of categories from TS
         """
-        url = "/api/v1/categories"
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "Authorization": "Bearer " + self.token,
-        }
-
-        conn = http.client.HTTPSConnection(self.service_url)
-        conn.request("GET", url, headers=headers)
-        response = conn.getresponse()
-
         self.categories = []
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            json_data = json_response["data"]
-            for item in json_data:
-                category_id: int = 0
-                title: str = ""
-                if "id" in item:
-                    category_id = int(item["id"])
-                if "title" in item:
-                    title = item["title"]
-                if category_id > 0 and title != "":
-                    self.categories.append(
-                        TicketSocketCategory(item["id"], item["title"])
-                    )
 
-        conn.close()
+        if self.service_url is not None and self.token is not None:
+            json_data = get_https_response(
+                host=self.service_url, url="/api/v1/categories", bearer_token=self.token
+            )
+
+            if json_data is not None:
+                for item in json_data:
+                    category_id: int = 0
+                    title: str = ""
+                    if "id" in item:
+                        category_id = int(item["id"])
+                    if "title" in item:
+                        title = item["title"]
+                    if category_id > 0 and title != "":
+                        self.categories.append(
+                            TicketSocketCategory(item["id"], item["title"])
+                        )
 
         return self.categories
 
@@ -147,9 +134,14 @@ class TicketSocketService:
         """
         Get all TS data for the specified category and time period
         """
+
+        self.events = []
+        if self.service_url is None or self.token is None:
+            return self.events
+
         url = """/api/v1/events?"""
         url += """includeEnded=true&includeOffSale=true"""
-        url += """&includeTicketTypes=true&limit=9999"""
+        url += """&includeTicketTypes=true"""
 
         if event_category_id is not None and event_category_id > 0:
             url += "&category=" + str(event_category_id)
@@ -162,20 +154,12 @@ class TicketSocketService:
             if unix_end is not None:
                 url += "&startsBefore=" + str(unix_end)
 
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "Authorization": "Bearer " + self.token,
-        }
-
-        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
-        conn.request("GET", url, headers=headers)
-        response = conn.getresponse()
+        json_data = get_https_response(
+            host=self.service_url, url=url, bearer_token=self.token
+        )
 
         self.events = []
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            json_data = json_response["data"]
+        if json_data is not None:
             for item in json_data:
                 # basic info
                 event_id: int = 0
@@ -367,29 +351,18 @@ class TicketSocketService:
         order_ids = self.get_order_ids_from_event_id(event_id)
 
         # if there are no orders, return nothing
-        if len(order_ids) <= 0:
+        if self.service_url is None or self.token is None or len(order_ids) <= 0:
             return []
-
-        # common service settings
-        base_url: str = "/api/v1/orders/"
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "Authorization": "Bearer " + self.token,
-        }
-        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
 
         # loop through and append orders
         orders: list[TicketSocketOrder] = []
         for order_id in order_ids:
-            url = base_url + str(order_id)
-            conn.request("GET", url, headers=headers)
-            response = conn.getresponse()
+            url = "/api/v1/orders/" + str(order_id)
+            json_data = get_https_response(
+                host=self.service_url, url=url, bearer_token=self.token
+            )
 
-            if response.status == 200:
-                json_response = json.loads(response.read())
-                json_data = json_response["data"]
-
+            if json_data is not None:
                 incoming_order_id: int = 0
                 if "id" in json_data:
                     incoming_order_id = int(json_data["id"])
@@ -412,31 +385,23 @@ class TicketSocketService:
         API method to only return TS data for one order
         """
         order: TicketSocketOrder = None
-        # common service settings
-        base_url: str = "/api/v1/orders/"
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "Authorization": "Bearer " + self.token,
-        }
-        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
 
-        url = base_url + str(order_id)
-        conn.request("GET", url, headers=headers)
-        response = conn.getresponse()
+        if self.service_url is not None and self.token is not None:
+            url = "/api/v1/orders/" + str(order_id)
 
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            json_data = json_response["data"]
+            json_data = get_https_response(
+                host=self.service_url, url=url, bearer_token=self.token
+            )
 
-            incoming_order_id: int = 0
-            if "id" in json_data:
-                incoming_order_id = int(json_data["id"])
+            if json_data is not None:
+                incoming_order_id: int = 0
+                if "id" in json_data:
+                    incoming_order_id = int(json_data["id"])
 
-            if incoming_order_id != 0 or incoming_order_id != order_id:
-                order = self.__parse_response_to_order_object(
-                    incoming_order_id, event_id, format_phone_numbers, json_data
-                )
+                if incoming_order_id != 0 or incoming_order_id != order_id:
+                    order = self.__parse_response_to_order_object(
+                        incoming_order_id, event_id, format_phone_numbers, json_data
+                    )
 
         return order
 
@@ -444,28 +409,22 @@ class TicketSocketService:
         """
         Fetch list of order ids from TS eventId
         """
-        url = "/api/v1/orders?limit=999&eventId=" + str(event_id)
-
-        headers = {
-            "Accept": "application/json",
-            "Content-type": "application/json;charset=UTF-8",
-            "Authorization": "Bearer " + self.token,
-        }
-
-        conn = http.client.HTTPSConnection(self.service_url, timeout=600)
-        conn.request("GET", url, headers=headers)
-        response = conn.getresponse()
-
         order_ids: list[int] = []
-        if response.status == 200:
-            json_response = json.loads(response.read())
-            json_data = json_response["data"]
-            for item in json_data:
-                order_id: int = 0
-                if "orderId" in item:
-                    order_id = int(item["orderId"])
-                if order_id != 0:
-                    order_ids.append(order_id)
+
+        if self.service_url is not None and self.token is not None:
+            url = "/api/v1/orders?eventId=" + str(event_id)
+
+            json_data = get_https_response(
+                host=self.service_url, url=url, bearer_token=self.token
+            )
+
+            if json_data is not None:
+                for item in json_data:
+                    order_id: int = 0
+                    if "orderId" in item:
+                        order_id = int(item["orderId"])
+                    if order_id != 0:
+                        order_ids.append(order_id)
 
         return order_ids
 

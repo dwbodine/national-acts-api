@@ -587,19 +587,9 @@ class DataRefreshService:
                                         ticket_socket_order_ticket_id = int(
                                             existing_ticket["Id"]
                                         )
-                                        is_checked_in = int(
-                                            existing_ticket["IsCheckedIn"]
-                                        )
-                                        if is_checked_in != 1:
-                                            is_checked_in = (
-                                                1
-                                                if ticket.scanned_timestamp != 0
-                                                else 0
-                                            )
                                         ticket_data["id"] = (
                                             ticket_socket_order_ticket_id
                                         )
-                                        ticket_data["is_checked_in"] = is_checked_in
 
                                         sql = """UPDATE TicketSocketOrderTickets
                                                 SET TicketType=%(ticket_type)s,
@@ -610,7 +600,6 @@ class DataRefreshService:
                                                 ScannedTimestamp=%(scannedTimestamp)s,
                                                 AttendeeFirstName=%(attendeeFirstName)s,
                                                 AttendeeLastName=%(attendeeLastName)s,
-                                                IsCheckedIn=%(is_checked_in)s,
                                                 ShirtSize=%(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", Price=%(price)s"
@@ -631,7 +620,7 @@ class DataRefreshService:
                                         sql = """INSERT INTO TicketSocketOrderTickets
                                             (TicketSocketOrderId, TicketId, TicketSocketTicketTypeId,
                                             TicketType, ServiceFee, BarCode, AvailableScans, PurchaseLocation,
-                                            ScannedTimestamp, IsCheckedIn,
+                                            ScannedTimestamp, 
                                             AttendeeFirstName, AttendeeLastName, ShirtSize"""
                                         if ticket_price > 0:
                                             sql += ", Price"
@@ -639,7 +628,7 @@ class DataRefreshService:
                                         sql += """VALUES (%(ticket_socket_order_id)s, %(ticketId)s,
                                             %(ticket_type_id)s, %(ticket_type)s, %(serviceFee)s, %(barcode)s,
                                             %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s,
-                                            %(is_checked_in)s, %(attendeeFirstName)s,
+                                            %(attendeeFirstName)s,
                                             %(attendeeLastName)s, %(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", %(price)s"
