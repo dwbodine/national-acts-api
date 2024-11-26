@@ -23,6 +23,7 @@ from common.models.ticket_socket import (
     TicketSocketTicket,
     TicketSocketOrder,
 )
+from common.utility import log_message
 
 
 class TicketSocketService:
@@ -104,23 +105,28 @@ class TicketSocketService:
         """
         self.categories = []
 
-        if self.service_url is not None and self.token is not None:
-            json_data = get_https_response(
-                host=self.service_url, url="/api/v1/categories", bearer_token=self.token
+        if self.service_url is None or self.token is None:
+            log_message(
+                f"service url or token not present for ticket_socket_id {self.ticket_socket_id}"
             )
+            return []
 
-            if json_data is not None:
-                for item in json_data:
-                    category_id: int = 0
-                    title: str = ""
-                    if "id" in item:
-                        category_id = int(item["id"])
-                    if "title" in item:
-                        title = item["title"]
-                    if category_id > 0 and title != "":
-                        self.categories.append(
-                            TicketSocketCategory(item["id"], item["title"])
-                        )
+        json_data = get_https_response(
+            host=self.service_url, url="/api/v1/categories", bearer_token=self.token
+        )
+
+        if json_data is not None:
+            for item in json_data:
+                category_id: int = 0
+                title: str = ""
+                if "id" in item:
+                    category_id = int(item["id"])
+                if "title" in item:
+                    title = item["title"]
+                if category_id > 0 and title != "":
+                    self.categories.append(
+                        TicketSocketCategory(item["id"], item["title"])
+                    )
 
         return self.categories
 
@@ -136,6 +142,9 @@ class TicketSocketService:
 
         self.events = []
         if self.service_url is None or self.token is None:
+            log_message(
+                f"service url or token not present for ticket_socket_id {self.ticket_socket_id}"
+            )
             return self.events
 
         url = """/api/v1/events?"""
@@ -350,7 +359,13 @@ class TicketSocketService:
         order_ids = self.get_order_ids_from_event_id(event_id)
 
         # if there are no orders, return nothing
-        if self.service_url is None or self.token is None or len(order_ids) <= 0:
+        if self.service_url is None or self.token is None:
+            log_message(
+                f"service url or token not present for ticket_socket_id {self.ticket_socket_id}"
+            )
+            return []
+
+        if len(order_ids) <= 0:
             return []
 
         # loop through and append orders
@@ -383,24 +398,29 @@ class TicketSocketService:
         """
         API method to only return TS data for one order
         """
+        if self.service_url is None or self.token is None:
+            log_message(
+                f"service url or token not present for ticket_socket_id {self.ticket_socket_id}"
+            )
+            return None
+
         order: TicketSocketOrder = None
 
-        if self.service_url is not None and self.token is not None:
-            url = "/api/v1/orders/" + str(order_id)
+        url = "/api/v1/orders/" + str(order_id)
 
-            json_data = get_https_response(
-                host=self.service_url, url=url, bearer_token=self.token
-            )
+        json_data = get_https_response(
+            host=self.service_url, url=url, bearer_token=self.token
+        )
 
-            if json_data is not None:
-                incoming_order_id: int = 0
-                if "id" in json_data:
-                    incoming_order_id = int(json_data["id"])
+        if json_data is not None:
+            incoming_order_id: int = 0
+            if "id" in json_data:
+                incoming_order_id = int(json_data["id"])
 
-                if incoming_order_id != 0 or incoming_order_id != order_id:
-                    order = self.__parse_response_to_order_object(
-                        incoming_order_id, event_id, format_phone_numbers, json_data
-                    )
+            if incoming_order_id != 0 or incoming_order_id != order_id:
+                order = self.__parse_response_to_order_object(
+                    incoming_order_id, event_id, format_phone_numbers, json_data
+                )
 
         return order
 
@@ -408,22 +428,28 @@ class TicketSocketService:
         """
         Fetch list of order ids from TS eventId
         """
+
+        if self.service_url is None or self.token is None:
+            log_message(
+                f"service url or token not present for ticket_socket_id {self.ticket_socket_id}"
+            )
+            return []
+
         order_ids: list[int] = []
 
-        if self.service_url is not None and self.token is not None:
-            url = "/api/v1/orders?eventId=" + str(event_id)
+        url = "/api/v1/orders?eventId=" + str(event_id)
 
-            json_data = get_https_response(
-                host=self.service_url, url=url, bearer_token=self.token
-            )
+        json_data = get_https_response(
+            host=self.service_url, url=url, bearer_token=self.token
+        )
 
-            if json_data is not None:
-                for item in json_data:
-                    order_id: int = 0
-                    if "orderId" in item:
-                        order_id = int(item["orderId"])
-                    if order_id != 0:
-                        order_ids.append(order_id)
+        if json_data is not None:
+            for item in json_data:
+                order_id: int = 0
+                if "orderId" in item:
+                    order_id = int(item["orderId"])
+                if order_id != 0:
+                    order_ids.append(order_id)
 
         return order_ids
 
