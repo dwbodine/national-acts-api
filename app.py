@@ -106,6 +106,22 @@ def view_log():
 
     return convert_to_json(log_data)
 
+@app.route("/cron_log")
+@jwt_required()
+def view_cron_log():
+    """
+    View cron log for admins only
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    log_data: str = None
+    with open("cron.log", "r", encoding="utf8") as f:
+        log_data = f.read()
+
+    return convert_to_json(log_data)
+
 
 if __name__ == "__main__":
     app.run()
