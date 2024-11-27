@@ -221,6 +221,13 @@ def get_https_response(
             json_response = json.loads(response.read())
             if "data" in json_response:
                 json_data = json_response["data"]
+                if json_data is not None:
+                    log_message(f"get_https_response succeeded for {host}{url}")
+        else:
+            log_message(
+                f"""post_https_response failed for {host}{url} -
+                    status: {response.status}, reason: {response.reason}"""
+            )
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
@@ -266,6 +273,11 @@ def post_https_response(
             json_response = json.loads(response.read())
             if "data" in json_response:
                 json_data = json_response["data"]
+        else:
+            log_message(
+                f"""post_https_response failed for {host}{url}
+                    - status: {response.status}, reason: {response.reason}"""
+            )
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
