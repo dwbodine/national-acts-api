@@ -41,12 +41,12 @@ class UpdateService:
                 rates.append(rate)
 
             if len(rates) > 0:
-                result_message += "Exchange rates update succeeded"
+                result_message += "Exchange rates update succeeded\r\n"
             else:
-                result_message += "Exchange rates update failed"
+                result_message += "Exchange rates update failed\r\n"
         except Exception as error:  # pylint: disable=broad-exception-caught
             error_message: str = str(error) + "\n" + traceback.format_exc()
-            result_message = f"[{now}] - {error_message}"
+            result_message = f"[{now}] - {error_message}\r\n"
 
         return result_message
 
@@ -81,15 +81,15 @@ class UpdateService:
                 )
 
             if results.succeeded:
-                result_message += "Auto events update succeeded"
+                result_message += "Auto events update succeeded\r\n"
             else:
                 result_message += (
-                    f"Auto events update failed - Message: {results.error_message}"
+                    f"Auto events update failed - Message: {results.error_message}\r\n"
                 )
 
         except Exception as error:  # pylint: disable=broad-exception-caught
             error_message: str = str(error) + "\n" + traceback.format_exc()
-            result_message = f"[{now}] - {error_message}"
+            result_message = f"[{now}] - {error_message}\r\n"
 
         return result_message
 
