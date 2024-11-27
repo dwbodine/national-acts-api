@@ -34,7 +34,15 @@ class UpdateService:
             )
             rate = service.get_exchange_rate_by_time(unix_time, force_update)
             rates.append(rate)
-        return rates
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        result_message: str = f"[{now}] - "
+        if len(rates) > 0:
+            result_message += "Exchange rates update succeeded"
+        else:
+            result_message += "Exchange rates update failed"
+
+        return result_message
 
     def update_all_events_from_ticket_socket(self):
         """
@@ -60,7 +68,16 @@ class UpdateService:
                 orders, start, end, results
             )
 
-        return results
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        result_message: str = f"[{now}] - "
+        if results.succeeded:
+            result_message += "Auto events update succeeded"
+        else:
+            result_message += (
+                f"Auto events update failed - Message: {results.error_message}"
+            )
+
+        return result_message
 
     def update_historical_events_from_ticket_socket(self, start: int, end: int):
         """
