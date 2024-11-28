@@ -80,12 +80,11 @@ class UpdateService:
                     orders, start, end, results
                 )
 
-            if results.succeeded:
-                result_message += "Auto events update succeeded\r\n"
-            else:
-                result_message += (
-                    f"Auto events update failed - Message: {results.error_message}\r\n"
-                )
+                if results.succeeded:
+                    result_message += "Auto events update succeeded\r\n"
+                else:
+                    result_message += f"""Auto events update failed
+                        - Message: {results.error_message}\r\n"""
 
         except Exception as error:  # pylint: disable=broad-exception-caught
             error_message: str = str(error) + "\n" + traceback.format_exc()

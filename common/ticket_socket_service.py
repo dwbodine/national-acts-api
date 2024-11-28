@@ -184,11 +184,6 @@ class TicketSocketService:
                 event.event_id = event_id
                 event.title = title
 
-                on_sale: str = ""
-                if "onsale" in item:
-                    on_sale = item["onsale"]
-                event.on_sale = True if on_sale == "1" else False
-
                 categories = []
                 if "categories" in item:
                     categories = item["categories"]

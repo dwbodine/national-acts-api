@@ -287,6 +287,15 @@ class VipEvent(TicketSocketEvent):
     announce_date: str = None
     num_tickets_comped: int = 0
     notes: list[EventNote] = []
+    doors_open: str = None
+    meet_and_greet_time: str = None
+    email_sent_to_vips: bool = False
+    text_sent_to_vips: bool = False
+    list_sent_to_band: bool = False
+    list_sent_time: str = None
+    list_sent_num_vips: int = 0
+    check_in_location: str = None
+    check_in_notes: str = None
 
     def get_totals(self):
         """

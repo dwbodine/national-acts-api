@@ -232,7 +232,6 @@ class EventService:
                 venue_name, address, "", city, state, zip_code, vip_country, ""
             )
             vip_event.venue = venue
-            vip_event.on_sale = True if int(row["OnSale"]) == 1 else False
             vip_event.is_active = True if int(row["IsActive"]) == 1 else False
             vip_event.is_deleted = True if int(row["IsDeleted"]) == 1 else False
             if vip_event.is_deleted is True:

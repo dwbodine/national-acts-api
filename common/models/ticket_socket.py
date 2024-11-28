@@ -116,7 +116,6 @@ class TicketSocketEvent:
     utc_time: int = 0
     event_date: str = ""
     display_date: str = ""
-    on_sale: bool = True
     thumbnail: str = ""
     ticket_socket_url: str = ""
     ticket_types: list[TicketSocketTicketType] = []

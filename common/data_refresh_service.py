@@ -201,7 +201,6 @@ class DataRefreshService:
                             if evt.venue.country is not None
                             else None
                         ),
-                        "onsale": 1 if evt.on_sale else 0,
                         "thumbnail": (
                             evt.thumbnail.strip() if evt.thumbnail is not None else None
                         ),
@@ -237,7 +236,7 @@ class DataRefreshService:
                                 EventDate=%(eventDate)s, UtcTime=%(utcTime)s, URL=%(url)s,
                                 Venue=%(venue)s, Address=%(address)s, City=%(city)s,
                                 State=%(state)s, Zip=%(zip)s, Country=%(country)s,
-                                OnSale=%(onsale)s, Thumbnail=%(thumbnail)s,
+                                Thumbnail=%(thumbnail)s,
                                 DisplayDate=%(displayDate)s, IsVip=%(isVip)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE Id=%(id)s"""
@@ -252,11 +251,11 @@ class DataRefreshService:
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
                                     EventId, Title, EventDate, UtcTime,
                                     URL, Venue, Address, City, State, Zip, Country, 
-                                    OnSale, Thumbnail, DisplayDate, IsVip) 
+                                    Thumbnail, DisplayDate, IsVip) 
                                     VALUES (%(sellerEventCategoryId)s, %(event_id)s, %(title)s,
                                     %(eventDate)s, %(utcTime)s, %(url)s, %(venue)s, %(address)s,
                                     %(city)s, %(state)s, %(zip)s, %(country)s, 
-                                    %(onsale)s, %(thumbnail)s, %(displayDate)s, %(isVip)s)"""
+                                    %(thumbnail)s, %(displayDate)s, %(isVip)s)"""
                         ticket_socket_event_id = db_insert(sql, event_data, cnx)
                         event_success = ticket_socket_event_id > 0
 
@@ -474,7 +473,8 @@ class DataRefreshService:
                                                 daily_order_data_rows_removed += 1
 
                                 # update existing order
-                                sql = """UPDATE TicketSocketOrders SET PurchaseDate=%(purchaseDate)s,
+                                sql = """UPDATE TicketSocketOrders
+                                        SET PurchaseDate=%(purchaseDate)s,
                                         PurchaseTimestamp=%(purchaseTimestamp)s,
                                         Phone=%(phone)s, EventId=%(event_id)s,
                                         UserId=%(user_id)s, PurchaserLastName=%(purchaserLastName)s,
