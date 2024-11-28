@@ -86,6 +86,66 @@ def update_event():
     return convert_to_json(success)
 
 
+@admin_api.route("/admin/notes/add", methods=["POST"])
+@jwt_required()
+def add_note():
+    """
+    API method to add a note to an event or calendar date
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    note = request.json.get("note", None)
+
+    if note is None:
+        return {"msg": "Bad Request"}, 400
+
+    event_id_str = request.json.get("eventId", None)
+    ticket_socket_event_id: int = (
+        int(event_id_str) if event_id_str is not None else None
+    )
+
+    calendar_date: str = None
+    if ticket_socket_event_id is None:
+        calendar_date_str = request.json.get("calendarDate", None)
+        calendar_date = (
+            str(calendar_date_str) if calendar_date_str is not None else None
+        )
+
+    if ticket_socket_event_id is None and calendar_date is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = EventService()
+    success = service.add_note(str(note), ticket_socket_event_id, calendar_date)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/notes/calendar")
+@jwt_required()
+def get_calendar_notes():
+    """
+    API method to fetch all calendar notes
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    start: int = None
+    end: int = None
+    if request.args.get("start") is not None:
+        start = int(request.args.get("start"))
+    if request.args.get("end") is not None:
+        end = int(request.args.get("end"))
+
+    if start is None or end is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = EventService()
+    notes = service.get_calendar_notes(start, end)
+    return convert_to_json(notes)
+
+
 @admin_api.route("/admin/orders/comp", methods=["POST"])
 @jwt_required()
 def comp_order():

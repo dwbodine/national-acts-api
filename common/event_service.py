@@ -12,7 +12,7 @@ from common.db import (
     db_update,
     db_convert_list_to_parameters,
 )
-from common.models.national_acts import VipEvent, Seller, EventNote
+from common.models.national_acts import VipEvent, Seller, Note
 from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketType
 from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
@@ -190,7 +190,17 @@ class EventService:
             vip_event.ticket_socket_event_id = ticket_socket_event_id
             vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
             vip_event.event_date = str(row["EventDate"])
-            vip_event.announce_date = str(row["AnnounceDate"])
+            vip_event.announce_date = (
+                str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
+            )
+            vip_event.doors_open = (
+                str(row["DoorsOpen"]) if row["DoorsOpen"] is not None else None
+            )
+            vip_event.meet_and_greet_time = (
+                str(row["MeetAndGreetTime"])
+                if row["MeetAndGreetTime"] is not None
+                else None
+            )
             vip_event.utc_time = int(row["UtcTime"])
             vip_event.display_date = (
                 str(row["DisplayDate"]) if row["DisplayDate"] is not None else None
@@ -201,6 +211,27 @@ class EventService:
             vip_event.ticket_socket_url = str(row["URL"])
             vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False
+            )
+            vip_event.email_sent_to_vips = (
+                True if int(row["EmailSentToVips"]) == 1 else False
+            )
+            vip_event.text_sent_to_vips = (
+                True if int(row["TextSentToVips"]) == 1 else False
+            )
+            vip_event.list_sent_to_band = (
+                True if int(row["ListSentToBand"]) == 1 else False
+            )
+            vip_event.list_sent_time = (
+                str(row["ListSentTime"]) if row["ListSentTime"] is not None else None
+            )
+            vip_event.list_sent_num_vips = int(row["ListSentNumVips"])
+            vip_event.check_in_location = (
+                str(row["CheckInLocation"])
+                if row["CheckInLocation"] is not None
+                else None
+            )
+            vip_event.check_in_notes = (
+                str(row["CheckInNotes"]) if row["CheckInNotes"] is not None else None
             )
             vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
             vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
@@ -237,6 +268,7 @@ class EventService:
             if vip_event.is_deleted is True:
                 vip_event.is_active = False
             vip_event.is_vip = True if int(row["IsVip"]) == 1 else False
+
             if (
                 row["ExternalEventId"] is not None
                 and row["ExternalEventId"] != ""
@@ -446,31 +478,6 @@ class EventService:
 
         return ticket_types
 
-    def __get_event_notes(self, ticket_socket_event_id: int):
-        """
-        Fetch only event notes from TicketSocketEventNotes based on event Id
-        """
-        notes: list[EventNote] = []
-
-        sql = """SELECT TicketSocketEventNotes.*
-                    FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventNotes.TicketSocketEventId=%(ticketSocketEventId)s
-                    AND TicketSocketOrderId IS NULL
-                    ORDER BY TicketSocketEventNotes.NoteTimestamp"""
-        data = {"ticketSocketEventId": ticket_socket_event_id}
-
-        rows = db_query_all(sql, data)
-        for row in rows:
-            note = EventNote()
-            note.note_id = int(row["TicketSocketEventNoteId"])
-            note.ticket_socket_event_id = int(row["TicketSocketEventId"])
-            note.ticket_socker_order_id = None
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
-            notes.append(note)
-
-        return notes
-
     def disable_events(self, ticket_socket_event_ids: list[int], disabled: bool):
         """
         Marks eventIds as disabled
@@ -601,6 +608,10 @@ class EventService:
                              IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
                              IsHidden=%(isHidden)s, 
                              AnnounceDate=%(announceDate)s, 
+                             DoorsOpen=%(doorsOpen)s,
+                             MeetAndGreetTime=%(meetAndGreetTime)s,
+                             CheckInLocation=%(checkInLocation)s,
+                             CheckInNotes=%(checkInNotes)s,
                              LastUpdate=CURRENT_TIMESTAMP 
                              WHERE Id=%(ticket_socket_event_id)s"""
             update_data = {
@@ -619,6 +630,26 @@ class EventService:
                 "announceDate": (
                     event_to_update.announce_date
                     if event_to_update.announce_date is not None
+                    else None
+                ),
+                "doorsOpen": (
+                    event_to_update.doors_open
+                    if event_to_update.doors_open is not None
+                    else None
+                ),
+                "meetAndGreetTime": (
+                    event_to_update.meet_and_greet_time
+                    if event_to_update.meet_and_greet_time is not None
+                    else None
+                ),
+                "checkInLocation": (
+                    event_to_update.check_in_location
+                    if event_to_update.check_in_location is not None
+                    else None
+                ),
+                "checkInNotes": (
+                    event_to_update.check_in_notes
+                    if event_to_update.check_in_notes is not None
                     else None
                 ),
             }
@@ -646,21 +677,61 @@ class EventService:
                         break
         return success
 
-    def add_event_note(
-        self, ticket_socket_event_id: int, note: str, ticket_socket_order_id: int = None
+    def add_note(
+        self, note: str, ticket_socket_event_id: int = None, calendar_date: str = None
     ):
         """
-        API method to add a note specific to an event or order
+        API method to add a note specific to an event or calendar date
         """
-        sql = """INSERT INTO TicketSocketEventNotes (TicketSocketEventId, TicketSocketOrderId, Note)
-                VALUES (%(ticketSocketEventId)s, %(ticketSocketOrderId)s, %(note)s)"""
+        sql = """INSERT INTO TicketSocketEventNotes (TicketSocketEventId, Note)
+                VALUES (%(ticketSocketEventId)s, %(note)s)"""
         data = {
             "ticketSocketEventId": ticket_socket_event_id,
-            "ticketSocketOrderId": ticket_socket_order_id,
             "note": note,
         }
         success = db_insert(sql, data)
         return success
+
+    def get_calendar_notes(self, start: int, end: int):
+        """
+        API method to fetch calendar notes
+        """
+        notes: list[Note] = []
+        sql = """SELECT * FROM TicketSocketEventNotes
+                    WHERE TicketSocketEventId IS NULL AND
+                    NoteTimestamp BETWEEN %(startDate)s and %(endDate)s 
+                    ORDER BY NoteTimestamp ASC"""
+        data = {
+            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
+            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
+        }
+        rows = db_query_all(sql, data)
+        for row in rows:
+            note = Note()
+            note.note_id = int(row["TicketSocketEventNoteId"])
+            note.note = str(row["Note"])
+            note.note_timestamp = str(row["NoteTimestamp"])
+            notes.append(note)
+        return notes
+
+    def __get_event_notes(self, ticket_socket_event_id: int):
+        """
+        API method to fetch event notes
+        """
+        notes: list[Note] = []
+        sql = """SELECT * FROM TicketSocketEventNotes
+                    WHERE TicketSocketEventId=%(ticketSocketEventId)s
+                    ORDER BY NoteTimestamp DESC"""
+        data = {"ticketSocketEventId": ticket_socket_event_id}
+        rows = db_query_all(sql, data)
+        for row in rows:
+            note = Note()
+            note.note_id = int(row["TicketSocketEventNoteId"])
+            note.ticket_socket_event_id = ticket_socket_event_id
+            note.note = str(row["Note"])
+            note.note_timestamp = str(row["NoteTimestamp"])
+            notes.append(note)
+        return notes
 
     def rebuild_daily_order_data_for_event(self, event_id: int):
         """

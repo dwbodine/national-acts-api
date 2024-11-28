@@ -118,14 +118,13 @@ class ShirtSales:
         self.total = total
 
 
-class EventNote:
+class Note:
     """
     Note system for event or order
     """
 
     note_id: int = 0
-    ticket_socket_event_id: int = 0
-    ticket_socker_order_id: int = None
+    ticket_socket_event_id: int = None
     note: str = None
     note_timestamp: str = None
 
@@ -192,7 +191,6 @@ class VipOrder(TicketSocketOrder):
     currency_symbol: str = None
     currency_abbrev: str = None
     tickets: list[VipTicket] = []
-    notes: list[EventNote] = []
 
     def get_totals(self):
         """
@@ -286,7 +284,7 @@ class VipEvent(TicketSocketEvent):
     cancelled_date: str = None
     announce_date: str = None
     num_tickets_comped: int = 0
-    notes: list[EventNote] = []
+    notes: list[Note] = []
     doors_open: str = None
     meet_and_greet_time: str = None
     email_sent_to_vips: bool = False
