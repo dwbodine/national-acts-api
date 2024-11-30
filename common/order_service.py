@@ -12,7 +12,7 @@ from common.db import (
     db_convert_list_to_parameters,
 )
 from common.daily_order_service import DailyOrderService
-from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller, EventNote
+from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller
 from common.models.ticket_socket import TicketSocketTicketType
 
 
@@ -245,11 +245,6 @@ class OrderService:
             if order.is_deleted is True:
                 order.is_active = False
 
-            notes = self.__get_order_notes(
-                order.ticket_socket_event_id, ticket_socket_order_id
-            )
-            order.notes = notes
-
             tickets = self.get_tickets_from_order_id(
                 ticket_socket_order_id, ignore_flags
             )
@@ -372,11 +367,6 @@ class OrderService:
             if order.is_deleted is True:
                 order.is_active = False
 
-            notes = self.__get_order_notes(
-                ticket_socket_event_id, ticket_socket_order_id
-            )
-            order.notes = notes
-
             tickets = self.get_tickets_from_order_id(
                 ticket_socket_order_id, ignore_flags
             )
@@ -432,36 +422,6 @@ class OrderService:
             daily_order_service.cleanup_daily_order_data_for_event(event_id)
 
             daily_order_service.update_daily_order_data(orders, start, end, None)
-
-    def __get_order_notes(
-        self, ticket_socket_event_id: int, ticket_socket_order_id: int
-    ):
-        """
-        Fetch only order notes from TicketSocketEventNotes based on event and order Id
-        """
-        notes: list[EventNote] = []
-
-        sql = """SELECT TicketSocketEventNotes.*
-                    FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventNotes.TicketSocketEventId=%(ticketSocketEventId)s
-                    AND TicketSocketEventNotes.TicketSocketOrderId=%(ticketSocketOrderId)s
-                    ORDER BY TicketSocketEventNotes.NoteTimestamp"""
-        data = {
-            "ticketSocketEventId": ticket_socket_event_id,
-            "ticketSocketOrderId": ticket_socket_order_id,
-        }
-
-        rows = db_query_all(sql, data)
-        for row in rows:
-            note = EventNote()
-            note.note_id = int(row["TicketSocketEventNoteId"])
-            note.ticket_socket_event_id = int(row["TicketSocketEventId"])
-            note.ticket_socker_order_id = int(row["TicketSocketOrderId"])
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
-            notes.append(note)
-
-        return notes
 
     def get_tickets_from_order_id(
         self, ticket_socket_order_id: int, ignore_flags: bool = False

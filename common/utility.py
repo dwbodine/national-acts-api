@@ -221,8 +221,6 @@ def get_https_response(
             json_response = json.loads(response.read())
             if "data" in json_response:
                 json_data = json_response["data"]
-                if json_data is not None:
-                    log_message(f"get_https_response succeeded for {host}{url}")
         else:
             log_message(
                 f"""post_https_response failed for {host}{url} -
