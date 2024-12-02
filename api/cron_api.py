@@ -71,10 +71,10 @@ def update_historical_exchange_rate(exchange_date_str: str):
     return convert_to_json(rates)
 
 
-@cron_api.route("/cron/updateMonthOfHistoralEventData")
+@cron_api.route("/cron/updateHistoralEventData")
 def update_historical_event_data():
     """
-    API for cron to update historical exchange rate from Stripe
+    API for cron to update historical event data from TS
     """
     # secured by internal api key
     sender_key = str(request.headers.get("x-api-key"))

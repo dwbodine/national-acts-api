@@ -432,7 +432,7 @@ class TicketSocketService:
 
         order_ids: list[int] = []
 
-        url = "/api/v1/orders?eventId=" + str(event_id)
+        url = f"/api/v1/orders?eventId={str(event_id)}&limit=9999"
 
         json_data = get_https_response(
             host=self.service_url, url=url, bearer_token=self.token
