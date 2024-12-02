@@ -149,7 +149,7 @@ class TicketSocketService:
 
         url = """/api/v1/events?"""
         url += """includeEnded=true&includeOffSale=true"""
-        url += """&includeTicketTypes=true"""
+        url += """&includeTicketTypes=true&limit=9999"""
 
         if event_category_id is not None and event_category_id > 0:
             url += "&category=" + str(event_category_id)
