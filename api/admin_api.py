@@ -68,6 +68,25 @@ def refund_event():
     success = service.refund_all_event_orders(int(event_id), refund_service_fees)
     return convert_to_json(success)
 
+@admin_api.route("/admin/events/sendListToBand", methods=["POST"])
+@jwt_required()
+def send_list_to_band():
+    """
+    API method to mark the event VIP list as sent to the band
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_id = request.json.get("eventId", None)
+
+    if event_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = EventService()
+    success = service.send_list_to_band(int(event_id))
+    return convert_to_json(success)
+
 
 @admin_api.route("/admin/events/update", methods=["POST"])
 @jwt_required()

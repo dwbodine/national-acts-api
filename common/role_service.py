@@ -78,7 +78,7 @@ class RoleService:
         if existing_role is not None:
             role_id = existing_role.role_id
             update_sql = """UPDATE Roles SET RoleName=%(roleName)s,
-                        LastUpdate=CURRENT_TIMESTAMP WHERE RoleId=%(roleId)s"""
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE RoleId=%(roleId)s"""
             update_data = {"roleName": role_to_update.role_name, "roleId": role_id}
             success = db_update(update_sql, update_data)
             if success is True:
@@ -86,7 +86,8 @@ class RoleService:
                     role_id, role_to_update.permissions
                 )
         else:
-            insert_sql = """INSERT INTO Roles (RoleName) VALUES (%(roleName)s)"""
+            insert_sql = """INSERT INTO Roles (RoleName, LastUpdate)
+                        VALUES (%(roleName)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
             insert_data = {"roleName": role_to_update.role_name}
             role_id = db_insert(insert_sql, insert_data)
             if role_id > 1:
@@ -175,8 +176,9 @@ class RoleService:
                         )
                         if new_permission is not None:
                             insert_permission_sql = """INSERT INTO RolePermissions
-                                                    (RoleId, PermissionId)
-                                                    VALUES (%(roleId)s, %(permissionId)s)"""
+                                                    (RoleId, PermissionId, LastUpdate)
+                                                    VALUES (%(roleId)s, %(permissionId)s,
+                                                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                             insert_permission_data = {
                                 "roleId": role_id,
                                 "permissionId": new_permission_id,

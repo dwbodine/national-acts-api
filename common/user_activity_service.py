@@ -21,12 +21,15 @@ class UserActivityService:
         sql = ""
         data = {"userId": user_id, "activityId": activity_id}
         if len(activity_data) > 0:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId, ActivityData)
-                         VALUES (%(userId)s, %(activityId)s, %(activityData)s)"""
+            sql = """INSERT INTO UserActivity
+                        (UserId, ActivityId, ActivityData, Timestamp)
+                         VALUES (%(userId)s, %(activityId)s, %(activityData)s,
+                         CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
             data["activityData"] = activity_data
         else:
-            sql = """INSERT INTO UserActivity (UserId, ActivityId)
-                         VALUES (%(userId)s, %(activityId)s)"""
+            sql = """INSERT INTO UserActivity (UserId, ActivityId, Timestamp)
+                         VALUES (%(userId)s, %(activityId)s,
+                         CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
         success = db_update(sql, data)
         return success

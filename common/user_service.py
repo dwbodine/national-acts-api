@@ -105,8 +105,9 @@ class UserService:
             error_message: str = None
 
             hashed_password = self.__password_hash(password)
-            sql = """INSERT INTO Users (Username, Password, FirstName, LastName)
-                        VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s)"""
+            sql = """INSERT INTO Users (Username, Password, FirstName, LastName, LastUpdate)
+                        VALUES (%(username)s, %(password)s, %(firstName)s, %(lastName)s,
+                        CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
             data = {
                 "username": username,
                 "password": hashed_password,
@@ -116,8 +117,9 @@ class UserService:
             user_id = db_insert(sql, data)
             if user_id > 0:
                 if seller_id is not None and seller_id > 0:
-                    sql = """INSERT INTO UserSeller (UserId, SellerId)
-                            VALUES (%(userId)s, %(sellerId)s)"""
+                    sql = """INSERT INTO UserSeller (UserId, SellerId, LastUpdate)
+                            VALUES (%(userId)s, %(sellerId)s,
+                            CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                     data = {"userId": user_id, "sellerId": seller_id}
                     user_seller_id = db_insert(sql, data)
                     if user_seller_id <= 0:
@@ -225,7 +227,7 @@ class UserService:
         self.__expire_all_user_tokens(username)
 
         sql = """UPDATE Users SET Password=%(password)s,
-                RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP
+                RequireResetPassword=0, LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                 WHERE Username=%(username)s"""
         data = {"username": username, "password": self.__password_hash(password)}
         success = db_update(sql, data)
@@ -251,7 +253,7 @@ class UserService:
         self.__expire_all_user_tokens(username)
 
         sql = """UPDATE Users SET Password=%(password)s,
-                RequireResetPassword=0, LastUpdate=CURRENT_TIMESTAMP
+                RequireResetPassword=0, LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                 WHERE Username=%(username)s"""
         data = {"username": username, "password": self.__password_hash(password)}
         success = db_update(sql, data)
@@ -287,8 +289,9 @@ class UserService:
 
         error_message: str = None
 
-        sql = """INSERT INTO Users (Username, FirstName, LastName, Password, Notes)
-                     VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s)"""
+        sql = """INSERT INTO Users (Username, FirstName, LastName, Password, Notes, LastUpdate)
+                     VALUES (%(username)s, %(firstName)s, %(lastName)s, %(password)s, %(notes)s,
+                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
         data = {
             "username": username,
             "firstName": first_name,
@@ -302,7 +305,9 @@ class UserService:
             user = None
             error_message = "Error occurred while registering user"
 
-        sql2 = """INSERT INTO UserSeller (UserId, SellerId) VALUES (%(userId)s, %(sellerId)s)"""
+        sql2 = """INSERT INTO UserSeller (UserId, SellerId, LastUpdate)
+                    VALUES (%(userId)s, %(sellerId)s,
+                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
         data2 = {"userId": user_id, "sellerId": seller_id}
         user_seller_id = db_insert(sql2, data2)
 
@@ -413,7 +418,7 @@ class UserService:
                            SendEmailReset=%(sendEmailReset)s,
                            SendTextReset=%(sendTextReset)s, 
                            DisableCheckIn=%(disableCheckin)s, 
-                           LastUpdate=CURRENT_TIMESTAMP 
+                           LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                            WHERE UserId=%(userId)s"""
             update_data = {
                 "isAdmin": 1 if user_to_update.is_admin else 0,
@@ -517,7 +522,7 @@ class UserService:
                         )
                         if existing_seller.role_id != new_seller.role_id:
                             update_role_sql = """UPDATE UserSeller SET RoleId=%(roleId)s,
-                                                 LastUpdate=CURRENT_TIMESTAMP
+                                                 LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                                  WHERE UserSellerId=%(userSellerId)s"""
                             update_role_data = {
                                 "roleId": new_seller.role_id,
@@ -542,8 +547,9 @@ class UserService:
                             )
                             if new_seller is not None:
                                 insert_seller_sql = """INSERT INTO UserSeller
-                                                (UserId, SellerId, RoleId)
-                                                VALUES (%(userId)s, %(sellerId)s, %(roleId)s)"""
+                                                (UserId, SellerId, RoleId, LastUpdate)
+                                                VALUES (%(userId)s, %(sellerId)s, %(roleId)s,
+                                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                                 insert_seller_data = {
                                     "userId": user_id,
                                     "sellerId": new_seller_id,
@@ -575,7 +581,7 @@ class UserService:
         Clean up all user's forgot password tokens
         """
         expire_sql = """UPDATE ForgotPasswordToken SET IsExpired=1,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE UserId IN
                         (SELECT UserId FROM Users WHERE Username=%(username)s)"""
         expire_data = {"username": username}
@@ -599,8 +605,9 @@ class UserService:
         code = random.randint(100000, 999999)
 
         sql = """INSERT INTO ForgotPasswordToken
-                (UserId, Code, CreatedOn)
-                VALUES (%(userId)s, %(code)s, %(createdOn)s)"""
+                (UserId, Code, CreatedOn, LastUpdate)
+                VALUES (%(userId)s, %(code)s, %(createdOn)s,
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
         data = {"userId": user.user_id, "code": code, "createdOn": created_on}
         token_id = db_insert(sql, data)
         if token_id > 0:

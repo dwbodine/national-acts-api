@@ -684,7 +684,7 @@ class TicketSocketRefreshHistory:
                      OrderDataUpdateDuration=%(orderDataUpdateDuration)s, TotalDuration=%(totalDuration)s, 
                     OrderDataRowsTotal=%(orderDataRowsTotal)s, OrderDataRowsInserted=%(orderDataRowsInserted)s, 
                     OrderDataRowsUpdated=%(orderDataRowsUpdated)s, OrderDataRowsRemoved=%(orderDataRowsRemoved)s, 
-                    LastUpdate=CURRENT_TIMESTAMP 
+                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
             "successVal": 1 if success is True else 0,
@@ -712,13 +712,14 @@ class TicketSocketRefreshHistory:
                  ServiceEventsSkipped,  EventsFailed, OrdersFailed, TicketsFailed,
                  TicketTypesFailed, TotalEventsFromService, EventsUpdated, EventsInserted,  
                  OrdersInserted, OrdersUpdated, OrdersDeleted, TicketsUpdated, TicketsInserted,  
-                 TicketTypesUpdated, TicketTypesInserted) VALUES (%(userId)s, %(sellerId)s, 
+                 TicketTypesUpdated, TicketTypesInserted, LastUpdate) VALUES (%(userId)s, %(sellerId)s, 
                  %(start)s, %(end)s, %(startTimer)s, %(endTimer)s, %(duration)s, %(success)s,
                  %(errorMessage)s, %(serviceEventsSkipped)s, %(eventsFailed)s, 
                  %(ordersFailed)s, %(ticketsFailed)s, %(ticketTypesFailed)s,
                  %(totalEventsFromService)s, %(eventsUpdated)s, %(eventsInserted)s, %(ordersInserted)s, 
                  %(ordersUpdated)s, %(ordersDeleted)s, %(ticketsUpdated)s, %(ticketsInserted)s,  
-                 %(ticketTypesUpdated)s, %(ticketTypesInserted)s)"""
+                 %(ticketTypesUpdated)s, %(ticketTypesInserted)s,
+                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
         data = {
             "userId": self.user_id,

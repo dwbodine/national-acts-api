@@ -501,7 +501,7 @@ class OrderService:
         for ticket_socket_order_id in ticket_socket_order_ids:
             sql = """UPDATE TicketSocketOrders
                         SET IsActive=%(is_active)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE Id=%(ticket_socket_order_id)s"""
             data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
@@ -520,7 +520,7 @@ class OrderService:
         for ticket_socket_order_id in ticket_socket_order_ids:
             sql = """UPDATE TicketSocketOrders
                         SET IsDeleted=%(isDeleted)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE Id=%(ticket_socket_order_id)s"""
             data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
@@ -542,7 +542,7 @@ class OrderService:
             sql = """UPDATE TicketSocketOrderTickets
                         SET IsCheckedIn=%(checkedIn)s,
                         CheckedInDate=%(checkedInDate)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE Id=%(ticket_socket_order_ticket_id)s"""
             data = {
                 "ticket_socket_order_ticket_id": ticket_socket_order_ticket_id,
@@ -568,14 +568,14 @@ class OrderService:
         Refunds all tickets in an order
         """
         ticket_sql = (
-            """UPDATE TicketSocketOrderTickets SET LastUpdate=CURRENT_TIMESTAMP"""
+            """UPDATE TicketSocketOrderTickets SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
         )
         if mark_chargeback is True:
             ticket_sql += """, IsChargedBack=1, IsRefunded=0,
-                            ChargebackDate=CURRENT_TIMESTAMP, RefundDate=NULL"""
+                            ChargebackDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), RefundDate=NULL"""
         else:
             ticket_sql += """, IsRefunded=1, IsChargedBack=0,
-                            RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
+                            RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), ChargebackDate=NULL"""
         if refund_service_fees is True or mark_chargeback is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
@@ -593,9 +593,9 @@ class OrderService:
         """
         Refunds a single ticket
         """
-        ticket_sql = """UPDATE TicketSocketOrderTickets SET LastUpdate=CURRENT_TIMESTAMP,
+        ticket_sql = """UPDATE TicketSocketOrderTickets SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                     IsRefunded=1, IsChargedBack=0,
-                    RefundDate=CURRENT_TIMESTAMP, ChargebackDate=NULL"""
+                    RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), ChargebackDate=NULL"""
         if refund_service_fees is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
@@ -625,7 +625,7 @@ class OrderService:
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
                              IsComped=%(isComped)s,
-                             LastUpdate=CURRENT_TIMESTAMP 
+                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                              WHERE Id=%(ticket_socket_order_id)s"""
             update_data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
@@ -668,7 +668,7 @@ class OrderService:
                         order_ticket_data["chargebackDate"] = ticket.chargeback_date
                         order_ticket_sql += """ ChargebackDate=%(chargebackDate)s,"""
 
-                    order_ticket_sql += """ LastUpdate=CURRENT_TIMESTAMP 
+                    order_ticket_sql += """ LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                                             WHERE Id=%(ticketId)s 
                                             AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
 
@@ -702,15 +702,16 @@ class OrderService:
             )
             if existing_type:
                 type_sql = """UPDATE TicketSocketTicketTypes SET IsActive=1,
-                             LastUpdate=CURRENT_TIMESTAMP
+                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                              WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                             AND TicketSocketTicketTypeId=0"""
                 success = db_update(type_sql, type_test_data)
             else:
                 type_sql = """INSERT INTO TicketSocketTicketTypes (
                             TicketSocketTicketTypeId, TicketSocketEventId,
-                            TicketTypeName, TotalAvailable)
-                             VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0)"""
+                            TicketTypeName, TotalAvailable, LastUpdate)
+                             VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0,
+                             CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                 type_id = db_insert(type_sql, type_test_data)
                 success = type_id >= 0
 
@@ -720,18 +721,20 @@ class OrderService:
             add_sql = """INSERT INTO TicketSocketOrders (
                              IsComped, EventId, OrderId, PurchaseDate,
                              UserId, PurchaserFirstName, PurchaserLastName,
-                             TicketSocketEventId
+                             TicketSocketEventId, LastUpdate
                              ) VALUES (
-                                 1, 0, 0, CURRENT_TIMESTAMP,
-                                 0, 'Comped', 'Order', %(ticket_socket_event_id)s
+                                 1, 0, 0, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                                 0, 'Comped', 'Order', %(ticket_socket_event_id)s,
+                                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                              )"""
             add_data = {"ticket_socket_event_id": ticket_socket_event_id}
             order_id = db_insert(add_sql, add_data)
             success = True if order_id > 0 else False
             if success is True:
                 ticket_sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId,
-                        TicketSocketTicketTypeId, TicketId, TicketType) VALUES (
-                            %(order_id)s, 0, %(ticketId)s, 'Comp')"""
+                        TicketSocketTicketTypeId, TicketId, TicketType, LastUpdate) VALUES (
+                            %(order_id)s, 0, %(ticketId)s, 'Comp',
+                            CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                 for x in range(0, num_tickets):
                     ticket_id = x + order_id

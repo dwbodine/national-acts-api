@@ -98,8 +98,10 @@ class ExchangeRateService:
             current_rate: float = self.__get_current_rate(unix_time)
 
             if existing_rate == 0:
-                sql2 = """INSERT INTO ExchangeRateHistory (ExchangeRateId, MidnightDate, USDRate)
-                           VALUES(%(exchangeRateId)s, %(midnightDate)s, %(currentRate)s)"""
+                sql2 = """INSERT INTO ExchangeRateHistory
+                            (ExchangeRateId, MidnightDate, USDRate, LastUpdated)
+                           VALUES (%(exchangeRateId)s, %(midnightDate)s,
+                           %(currentRate)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                 data2 = {
                     "exchangeRateId": self.exchange_rate.exchange_rate_id,
@@ -111,7 +113,7 @@ class ExchangeRateService:
                     existing_rate = current_rate
             elif current_rate != existing_rate:
                 sql2 = """UPDATE ExchangeRateHistory SET USDRate=%(currentRate)s,
-                            LastUpdated=CURRENT_TIMESTAMP 
+                            LastUpdated=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                             WHERE ExchangeRateId=%(exchangeRateId)s
                             AND MidnightDate=%(midnightDate)s"""
 

@@ -155,7 +155,7 @@ class EventService:
             if ignore_flags is not True:
                 where_clause.append(
                     """COALESCE(TicketSocketEvents.AnnounceDate,
-                                     CURRENT_TIMESTAMP) <= CURRENT_TIMESTAMP"""
+                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')) <= CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
                 )
 
             if exclude_start is not None and exclude_end is not None:
@@ -486,7 +486,7 @@ class EventService:
         for ticket_socket_event_id in ticket_socket_event_ids:
             sql = """UPDATE TicketSocketEvents
                         SET IsActive=%(is_active)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                     WHERE Id=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
@@ -505,7 +505,7 @@ class EventService:
         for ticket_socket_event_id in ticket_socket_event_ids:
             sql = """UPDATE TicketSocketEvents
                         SET IsDeleted=%(isDeleted)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE Id=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
@@ -524,7 +524,7 @@ class EventService:
         for ticket_socket_event_id in ticket_socket_event_ids:
             sql = """UPDATE TicketSocketEvents
                         SET IsHidden=%(isHidden)s,
-                        LastUpdate=CURRENT_TIMESTAMP
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE Id=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
@@ -547,8 +547,8 @@ class EventService:
         data = {"ticket_socket_event_id": ticket_socket_event_id}
         sql = """UPDATE TicketSocketEvents
                     SET IsCancelled=1,
-                    CancelledDate=CURRENT_TIMESTAMP,
-                    LastUpdate=CURRENT_TIMESTAMP
+                    CancelledDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                     WHERE Id=%(ticket_socket_event_id)s"""
         success = db_update(sql, data)
         if success is True:
@@ -612,7 +612,9 @@ class EventService:
                              MeetAndGreetTime=%(meetAndGreetTime)s,
                              CheckInLocation=%(checkInLocation)s,
                              CheckInNotes=%(checkInNotes)s,
-                             LastUpdate=CURRENT_TIMESTAMP 
+                             EmailSentToVips=%(emailSentToVips)s,
+                             TextSentToVips=%(textSentToVips)s,
+                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                              WHERE Id=%(ticket_socket_event_id)s"""
             update_data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
@@ -652,6 +654,12 @@ class EventService:
                     if event_to_update.check_in_notes is not None
                     else None
                 ),
+                "emailSentToVips": (
+                    1 if event_to_update.email_sent_to_vips is True else 0
+                ),
+                "textSentToVips": (
+                    1 if event_to_update.text_sent_to_vips is True else 0
+                ),
             }
             success = db_update(update_sql, update_data)
 
@@ -663,7 +671,7 @@ class EventService:
                     ticket_type_wql = """UPDATE TicketSocketTicketTypes
                                         SET IsActive=%(is_active)s,
                                         TicketTypeName=%(ticketTypeName)s,
-                                        LastUpdate=CURRENT_TIMESTAMP 
+                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                                         WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
                                         AND TicketSocketEventId=%(ticket_socket_event_id)s"""
                     ticket_type_data = {
@@ -683,8 +691,10 @@ class EventService:
         """
         API method to add a note specific to an event or calendar date
         """
-        sql = """INSERT INTO TicketSocketEventNotes (TicketSocketEventId, Note)
-                VALUES (%(ticketSocketEventId)s, %(note)s)"""
+        sql = """INSERT INTO TicketSocketEventNotes
+                    (TicketSocketEventId, Note, NoteTimstamp)
+                    VALUES (%(ticketSocketEventId)s, %(note)s,
+                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
         data = {
             "ticketSocketEventId": ticket_socket_event_id,
             "note": note,
@@ -765,3 +775,32 @@ class EventService:
             daily_order_service = DailyOrderService()
             daily_order_service.cleanup_daily_order_data_for_event(event_id)
             daily_order_service.update_daily_order_data(orders, start, end, None)
+
+    def send_list_to_band(self, ticket_socket_event_id: int):
+        """
+        Mark that the VIP list has been sent to the band
+        """
+        event_sql = """SELECT COUNT(TicketSocketOrderTickets.Id) AS NumVips
+                        FROM TicketSocketOrderTickets
+                        JOIN TicketSocketOrders 
+                            ON TicketSocketOrders.Id =
+                                TicketSocketOrderTickets.TicketSocketOrderId                                
+                        WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s
+                        AND TicketSocketOrders.IsDeleted <> 1
+                        AND TicketSocketOrderTickets.IsActive = 1
+                        AND TicketSocketOrderTickets.IsRefunded = 0
+                        AND TicketSocketOrderTickets.IsChargedBack = 0"""
+        event_data = {"ticketSocketEventId": ticket_socket_event_id}
+        num_vips: int = 0
+        row = db_query_one(event_sql, event_data)
+        if row:
+            num_vips = int(row["NumVips"]) if row["NumVips"] is not None else 0
+
+        sql = """UPDATE TicketSocketEvents
+                    SET ListSentToBand=1,
+                    ListSentTime=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                    ListSentNumVips=%(numVips)s
+                    WHERE Id=%(ticketSocketEventId)s"""
+        data = {"numVips": num_vips, "ticketSocketEventId": ticket_socket_event_id}
+        return db_update(sql, data)

@@ -238,7 +238,7 @@ class DataRefreshService:
                                 State=%(state)s, Zip=%(zip)s, Country=%(country)s,
                                 Thumbnail=%(thumbnail)s,
                                 DisplayDate=%(displayDate)s, IsVip=%(isVip)s,
-                                LastUpdate=CURRENT_TIMESTAMP
+                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                 WHERE Id=%(id)s"""
                         event_success = db_update(sql, event_data, cnx)
                     else:
@@ -251,11 +251,13 @@ class DataRefreshService:
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
                                     EventId, Title, EventDate, UtcTime,
                                     URL, Venue, Address, City, State, Zip, Country, 
-                                    Thumbnail, DisplayDate, IsVip) 
+                                    Thumbnail, DisplayDate, IsVip, Created, LastUpdate) 
                                     VALUES (%(sellerEventCategoryId)s, %(event_id)s, %(title)s,
                                     %(eventDate)s, %(utcTime)s, %(url)s, %(venue)s, %(address)s,
                                     %(city)s, %(state)s, %(zip)s, %(country)s, 
-                                    %(thumbnail)s, %(displayDate)s, %(isVip)s)"""
+                                    %(thumbnail)s, %(displayDate)s, %(isVip)s,
+                                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                         ticket_socket_event_id = db_insert(sql, event_data, cnx)
                         event_success = ticket_socket_event_id > 0
 
@@ -308,7 +310,7 @@ class DataRefreshService:
                                         SET TicketTypeName=%(ticketTypeName)s,
                                         TotalAvailable=%(totalAvailable)s,
                                         IsActive=%(is_active)s, 
-                                        LastUpdate=CURRENT_TIMESTAMP 
+                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                                         WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                         AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
                                 ticket_type_success = db_update(
@@ -319,10 +321,11 @@ class DataRefreshService:
                                 # insert new ticket type
                                 sql = """INSERT INTO TicketSocketTicketTypes
                                         (TicketSocketTicketTypeId, TicketSocketEventId,
-                                            TicketTypeName, TotalAvailable, IsActive)
+                                            TicketTypeName, TotalAvailable, IsActive, LastUpdate)
                                                 VALUES (%(ticketSocketTicketTypeId)s,
                                                 %(ticket_socket_event_id)s, %(ticketTypeName)s,
-                                                %(totalAvailable)s, %(is_active)s)"""
+                                                %(totalAvailable)s, %(is_active)s,
+                                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                                 ticket_socket_type_id = db_insert(
                                     sql, ticket_type_data, cnx
                                 )
@@ -482,7 +485,7 @@ class DataRefreshService:
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s,
                                         PurchaserCountry=%(purchaserCountry)s,
                                         PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
-                                        LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE Id=%(id)s"""
 
                                 order_success = db_update(sql, order_data, cnx)
                             else:
@@ -497,12 +500,12 @@ class DataRefreshService:
                                             PurchaseDate, PurchaseTimestamp, Phone, EventId, UserId,
                                             PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState,
                                             PurchaserZip, PurchaserCountry,
-                                            PurchaserIpAddress, Email) VALUES
+                                            PurchaserIpAddress, Email, LastUpdate) VALUES
                                     (%(ticket_socket_event_id)s, %(order_id)s,
                                     %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s,
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
-                                    %(purchaserIpAddress)s,  %(email)s)"""
+                                    %(purchaserIpAddress)s,  %(email)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
@@ -603,7 +606,7 @@ class DataRefreshService:
                                                 ShirtSize=%(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", Price=%(price)s"
-                                        sql += """, LastUpdate=CURRENT_TIMESTAMP WHERE Id=%(id)s"""
+                                        sql += """, LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE Id=%(id)s"""
                                         ticket_success = db_update(
                                             sql, ticket_data, cnx
                                         )
@@ -624,7 +627,7 @@ class DataRefreshService:
                                             AttendeeFirstName, AttendeeLastName, ShirtSize"""
                                         if ticket_price > 0:
                                             sql += ", Price"
-                                        sql += """) """
+                                        sql += """, LastUpdate) """
                                         sql += """VALUES (%(ticket_socket_order_id)s, %(ticketId)s,
                                             %(ticket_type_id)s, %(ticket_type)s, %(serviceFee)s, %(barcode)s,
                                             %(availableScans)s, %(purchaseLocation)s, %(scannedTimestamp)s,
@@ -632,7 +635,7 @@ class DataRefreshService:
                                             %(attendeeLastName)s, %(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", %(price)s"
-                                        sql += """)"""
+                                        sql += """, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                                         ticket_socket_order_ticket_id = db_insert(
                                             sql, ticket_data
                                         )

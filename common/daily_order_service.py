@@ -98,7 +98,7 @@ class DailyOrderService:
                                 RevenueChargedBack=%(revenueChargedBack)s,
                                 ServiceFeeRevenueChargedBack=%(serviceFeeRevenueChargedBack)s,
                                 TicketSocketOrderId=%(ticketSocketOrderId)s, 
-                                LastUpdate=CURRENT_TIMESTAMP
+                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                 WHERE DailyOrderDataId=%(dailyOrderDataId)s"""
                 update_data["dailyOrderDataId"] = daily_order_data_id
                 success = db_update(update_sql, update_data)
@@ -110,14 +110,14 @@ class DailyOrderService:
                                     TotalRevenue, IsRefunded, IsChargeback, NumTicketsRefunded,
                                     RevenueRefunded, ServiceFeeRevenueRefunded, NumTicketsChargedBack,
                                     RevenueChargedBack, ServiceFeeRevenueChargedBack,
-                                    TicketSocketOrderId) VALUES (%(purchaseDate)s,
+                                    TicketSocketOrderId, LastUpdate) VALUES (%(purchaseDate)s,
                                     %(ticketSocketEventId)s, %(orders)s, %(tickets)s,
                                     %(ticketRevenue)s, %(serviceFeeRevenue)s, %(totalRevenue)s,
                                     %(isRefunded)s, %(isChargeback)s, %(numTicketsRefunded)s,
                                     %(revenueRefunded)s, %(serviceFeeRevenueRefunded)s,
                                     %(numTicketsChargedBack)s, %(revenueChargedBack)s,
                                     %(serviceFeeRevenueChargedBack)s,
-                                    %(ticketSocketOrderId)s )"""
+                                    %(ticketSocketOrderId)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                 daily_order_data_id = db_insert(insert_sql, update_data)
                 success = daily_order_data_id > 0

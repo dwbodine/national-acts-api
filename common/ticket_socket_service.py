@@ -508,8 +508,8 @@ class TicketSocketService:
                     order.purchaser_ip_address = fix_magic_quotes(item["remoteAddr"])
                 if order.purchase_date == "" and "purchaseDate" in item:
                     # datetime is not serializable in python,
-                    # convert it to ISO-compatible string
-                    purchase_date = datetime.fromtimestamp(float(item["purchaseDate"]))
+                    # convert it to ISO-compatible string in Pacific Time (server is in Mountain)
+                    purchase_date = datetime.fromtimestamp(float(item["purchaseDate"]) - (60 * 60))
                     order.purchase_date = purchase_date.strftime("%Y-%m-%d")
                     order.purchase_timestamp = purchase_date.strftime(
                         "%Y-%m-%d %H:%M:%S"
