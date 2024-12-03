@@ -68,6 +68,7 @@ def refund_event():
     success = service.refund_all_event_orders(int(event_id), refund_service_fees)
     return convert_to_json(success)
 
+
 @admin_api.route("/admin/events/sendListToBand", methods=["POST"])
 @jwt_required()
 def send_list_to_band():
@@ -79,12 +80,14 @@ def send_list_to_band():
         return {"msg": "Unauthorized"}, 401
 
     event_id = request.json.get("eventId", None)
-
     if event_id is None:
         return {"msg": "Bad Request"}, 400
 
+    is_sent_str = request.json.get("isSent", None)
+    is_sent = True if is_sent_str == 1 else False
+
     service = EventService()
-    success = service.send_list_to_band(int(event_id))
+    success = service.send_list_to_band(int(event_id), is_sent)
     return convert_to_json(success)
 
 

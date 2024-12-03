@@ -30,6 +30,7 @@ class OrderService:
         show_deleted: bool = False,
         ignore_flags: bool = False,
         show_cancelled: bool = False,
+        ts_order_id: int = None,
     ):
         """
         Retreive order data from database
@@ -58,7 +59,9 @@ class OrderService:
 
         sql = ""
 
-        if midnight_start is not None and midnight_end is not None:
+        if ts_order_id is None and (
+            midnight_start is not None and midnight_end is not None
+        ):
             sql += """
                 WITH
                 RefundOrders AS (
@@ -76,7 +79,9 @@ class OrderService:
                                 BETWEEN %(startDate)s AND %(endDate)s
                         )
                 )"""
-        elif end is not None or start is not None or seller_id is None:
+        elif ts_order_id is None and (
+            end is not None or start is not None or seller_id is None
+        ):
             sql += """
                 WITH
                 RefundOrders AS (
@@ -120,55 +125,58 @@ class OrderService:
         data = {}
 
         where_clause: list[str] = []
+        if ts_order_id is not None:
+            where_clause.append("TicketSocketOrders.Id = %(order_id)s")
+            data["order_id"] = ts_order_id
+        else:
+            if ignore_flags is not True:
+                if show_deleted is not True:
+                    where_clause.append("TicketSocketOrders.IsDeleted = 0")
+                else:
+                    show_inactive = True
 
-        if ignore_flags is not True:
-            if show_deleted is not True:
-                where_clause.append("TicketSocketOrders.IsDeleted = 0")
-            else:
-                show_inactive = True
+                if show_inactive is True:
+                    where_clause.append("TicketSocketOrders.IsActive = 0")
+                else:
+                    where_clause.append("TicketSocketOrders.IsActive = 1")
 
-            if show_inactive is True:
-                where_clause.append("TicketSocketOrders.IsActive = 0")
-            else:
-                where_clause.append("TicketSocketOrders.IsActive = 1")
+                if show_cancelled is not True:
+                    where_clause.append("TicketSocketEvents.IsCancelled = 0")
 
-            if show_cancelled is not True:
-                where_clause.append("TicketSocketEvents.IsCancelled = 0")
+            if len(seller_event_category_ids) > 0:
+                seller_event_category_id_str = db_convert_list_to_parameters(
+                    seller_event_category_ids, data, "sellerEventCategoryId"
+                )
+                where_clause.append(
+                    "TicketSocketEvents.SellerEventCategoryId IN "
+                    + seller_event_category_id_str
+                )
 
-        if len(seller_event_category_ids) > 0:
-            seller_event_category_id_str = db_convert_list_to_parameters(
-                seller_event_category_ids, data, "sellerEventCategoryId"
-            )
-            where_clause.append(
-                "TicketSocketEvents.SellerEventCategoryId IN "
-                + seller_event_category_id_str
-            )
+            both_dates_sql = """(TicketSocketOrders.PurchaseDate
+                                BETWEEN %(startDate)s AND %(endDate)s OR
+                                TicketSocketOrders.Id in (
+                                    SELECT RefundOrderId FROM RefundOrders
+                                ))"""
 
-        both_dates_sql = """(TicketSocketOrders.PurchaseDate
-                            BETWEEN %(startDate)s AND %(endDate)s OR
-                            TicketSocketOrders.Id in (
-                                SELECT RefundOrderId FROM RefundOrders
-                            ))"""
+            start_date_sql = """(TicketSocketOrders.PurchaseDate >= %(startDate)s OR
+                                TicketSocketOrders.Id in (
+                                    SELECT RefundOrderId FROM RefundOrders
+                                ))"""
 
-        start_date_sql = """(TicketSocketOrders.PurchaseDate >= %(startDate)s OR
-                            TicketSocketOrders.Id in (
-                                SELECT RefundOrderId FROM RefundOrders
-                            ))"""
-
-        if midnight_start is not None and midnight_end is not None:
-            where_clause.append(both_dates_sql)
-            data["startDate"] = midnight_start
-            data["endDate"] = midnight_end
-        elif end is not None:
-            where_clause.append(start_date_sql)
-            data["startDate"] = datetime.now().strftime("%Y-%m-%d")
-            data["endDate"] = midnight_end
-        elif start is not None:
-            where_clause.append(start_date_sql)
-            data["startDate"] = midnight_start
-        elif seller_id is None:
-            where_clause.append(start_date_sql)
-            data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+            if midnight_start is not None and midnight_end is not None:
+                where_clause.append(both_dates_sql)
+                data["startDate"] = midnight_start
+                data["endDate"] = midnight_end
+            elif end is not None:
+                where_clause.append(start_date_sql)
+                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["endDate"] = midnight_end
+            elif start is not None:
+                where_clause.append(start_date_sql)
+                data["startDate"] = midnight_start
+            elif seller_id is None:
+                where_clause.append(start_date_sql)
+                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
 
         if len(where_clause) > 0:
             sql += " AND ".join(where_clause)
@@ -567,15 +575,16 @@ class OrderService:
         """
         Refunds all tickets in an order
         """
-        ticket_sql = (
-            """UPDATE TicketSocketOrderTickets SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
-        )
+        ticket_sql = """UPDATE TicketSocketOrderTickets
+                SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
         if mark_chargeback is True:
             ticket_sql += """, IsChargedBack=1, IsRefunded=0,
-                            ChargebackDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), RefundDate=NULL"""
+                            ChargebackDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                            RefundDate=NULL"""
         else:
             ticket_sql += """, IsRefunded=1, IsChargedBack=0,
-                            RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), ChargebackDate=NULL"""
+                            RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                            ChargebackDate=NULL"""
         if refund_service_fees is True or mark_chargeback is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
@@ -593,9 +602,11 @@ class OrderService:
         """
         Refunds a single ticket
         """
-        ticket_sql = """UPDATE TicketSocketOrderTickets SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+        ticket_sql = """UPDATE TicketSocketOrderTickets
+                    SET LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                     IsRefunded=1, IsChargedBack=0,
-                    RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), ChargebackDate=NULL"""
+                    RefundDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                    ChargebackDate=NULL"""
         if refund_service_fees is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
@@ -668,9 +679,10 @@ class OrderService:
                         order_ticket_data["chargebackDate"] = ticket.chargeback_date
                         order_ticket_sql += """ ChargebackDate=%(chargebackDate)s,"""
 
-                    order_ticket_sql += """ LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                                            WHERE Id=%(ticketId)s 
-                                            AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
+                    order_ticket_sql += """
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE Id=%(ticketId)s 
+                            AND TicketSocketOrderId=%(ticket_socket_order_id)s"""
 
                     success = db_update(order_ticket_sql, order_ticket_data)
                     if success is False:

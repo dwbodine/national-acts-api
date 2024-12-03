@@ -192,6 +192,24 @@ def orders_secured():
     return convert_to_json(results)
 
 
+@user_api.route("/user/orderById")
+@jwt_required()
+def order_by_id():
+    """
+    API method to fetch an order by id
+    """
+    service = OrderService()
+    order_id: int = None
+    if request.args.get("tsOrderId") is not None:
+        order_id = int(request.args.get("tsOrderId"))
+
+    if order_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    results = service.get_orders(ts_order_id=order_id)
+    return convert_to_json(results)
+
+
 @user_api.route("/user/profile/<int:user_id>")
 @jwt_required()
 def get_user_profile(user_id: int):

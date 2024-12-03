@@ -155,7 +155,8 @@ class EventService:
             if ignore_flags is not True:
                 where_clause.append(
                     """COALESCE(TicketSocketEvents.AnnounceDate,
-                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')) <= CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))
+                                     <= CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
                 )
 
             if exclude_start is not None and exclude_end is not None:
@@ -692,13 +693,23 @@ class EventService:
         API method to add a note specific to an event or calendar date
         """
         sql = """INSERT INTO TicketSocketEventNotes
-                    (TicketSocketEventId, Note, NoteTimstamp)
-                    VALUES (%(ticketSocketEventId)s, %(note)s,
-                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                    (TicketSocketEventId, Note, NoteTimestamp)
+                    VALUES (%(ticketSocketEventId)s, %(note)s, """
         data = {
-            "ticketSocketEventId": ticket_socket_event_id,
+            "ticketSocketEventId": (
+                ticket_socket_event_id if ticket_socket_event_id is not None else None
+            ),
             "note": note,
         }
+
+        if calendar_date is not None:
+            sql += """%(noteTimestamp)s"""
+            data["noteTimestamp"] = calendar_date
+        else:
+            sql += """CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+
+        sql += """)"""
+
         success = db_insert(sql, data)
         return success
 
@@ -776,7 +787,7 @@ class EventService:
             daily_order_service.cleanup_daily_order_data_for_event(event_id)
             daily_order_service.update_daily_order_data(orders, start, end, None)
 
-    def send_list_to_band(self, ticket_socket_event_id: int):
+    def send_list_to_band(self, ticket_socket_event_id: int, is_sent: bool):
         """
         Mark that the VIP list has been sent to the band
         """
@@ -797,10 +808,21 @@ class EventService:
             num_vips = int(row["NumVips"]) if row["NumVips"] is not None else 0
 
         sql = """UPDATE TicketSocketEvents
-                    SET ListSentToBand=1,
-                    ListSentTime=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                    SET ListSentToBand=%(listSent)s,
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
-                    ListSentNumVips=%(numVips)s
-                    WHERE Id=%(ticketSocketEventId)s"""
-        data = {"numVips": num_vips, "ticketSocketEventId": ticket_socket_event_id}
+                    ListSentNumVips=%(numVips)s, """
+
+        data = {
+            "numVips": num_vips,
+            "ticketSocketEventId": ticket_socket_event_id,
+            "listSent": 1 if is_sent is True else 0,
+        }
+
+        if is_sent is True:
+            sql += """ListSentTime=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+        else:
+            sql += """ListSentTime=NULL"""
+
+        sql += """ WHERE Id=%(ticketSocketEventId)s"""
+
         return db_update(sql, data)
