@@ -557,7 +557,7 @@ class TicketSocketService:
                     ticket_id = int(item["id"])
                 ticket_type: str = ""
                 if "ticketTypeName" in item:
-                    ticket_type = item["ticketTypeName"]
+                    ticket_type = str(item["ticketTypeName"])
                 service_fee: float = 0
                 if "fee1Amount" in item:
                     service_fee = float(item["fee1Amount"])
