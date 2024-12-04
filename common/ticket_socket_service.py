@@ -509,7 +509,9 @@ class TicketSocketService:
                 if order.purchase_date == "" and "purchaseDate" in item:
                     # datetime is not serializable in python,
                     # convert it to ISO-compatible string in Pacific Time (server is in Mountain)
-                    purchase_date = datetime.fromtimestamp(float(item["purchaseDate"]) - (60 * 60))
+                    purchase_date = datetime.fromtimestamp(
+                        float(item["purchaseDate"]) - (60 * 60)
+                    )
                     order.purchase_date = purchase_date.strftime("%Y-%m-%d")
                     order.purchase_timestamp = purchase_date.strftime(
                         "%Y-%m-%d %H:%M:%S"
@@ -578,10 +580,12 @@ class TicketSocketService:
                     scanned_timestamp = int(item["scannedTimestamp"])
                 attendee_first_name: str = ""
                 if "partyMember" in item:
-                    attendee_first_name = fix_magic_quotes(item["partyMember"])
+                    attendee_first_name = fix_magic_quotes(str(item["partyMember"]))
                 attendee_last_name: str = ""
                 if "partyMemberLastName" in item:
-                    attendee_last_name = fix_magic_quotes(item["partyMemberLastName"])
+                    attendee_last_name = fix_magic_quotes(
+                        str(item["partyMemberLastName"])
+                    )
 
                 if ticket_id == 0 or ticket_type == "":
                     continue
