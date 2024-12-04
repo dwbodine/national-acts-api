@@ -126,6 +126,7 @@ class Note:
     note_id: int = 0
     ticket_socket_event_id: int = None
     note: str = None
+    note_title: str = None
     note_timestamp: str = None
 
 

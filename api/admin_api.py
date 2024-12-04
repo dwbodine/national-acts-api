@@ -129,17 +129,22 @@ def add_note():
     )
 
     calendar_date: str = None
+    note_title: str = None
     if ticket_socket_event_id is None:
         calendar_date_str = request.json.get("calendarDate", None)
+        note_title_str = request.json.get("noteTitle", None)
         calendar_date = (
             str(calendar_date_str) if calendar_date_str is not None else None
+        )
+        note_title = (
+            str(note_title_str) if note_title_str is not None else None
         )
 
     if ticket_socket_event_id is None and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
     service = EventService()
-    success = service.add_note(str(note), ticket_socket_event_id, calendar_date)
+    success = service.add_note(str(note), ticket_socket_event_id, calendar_date, note_title)
     return convert_to_json(success)
 
 

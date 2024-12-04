@@ -687,13 +687,17 @@ class EventService:
         return success
 
     def add_note(
-        self, note: str, ticket_socket_event_id: int = None, calendar_date: str = None
+        self,
+        note: str,
+        ticket_socket_event_id: int = None,
+        calendar_date: str = None,
+        note_title: str = None,
     ):
         """
         API method to add a note specific to an event or calendar date
         """
         sql = """INSERT INTO TicketSocketEventNotes
-                    (TicketSocketEventId, Note, NoteTimestamp)
+                    (TicketSocketEventId, Note, NoteTitle, NoteTimestamp)
                     VALUES (%(ticketSocketEventId)s, %(note)s, """
         data = {
             "ticketSocketEventId": (
@@ -703,10 +707,11 @@ class EventService:
         }
 
         if calendar_date is not None:
-            sql += """%(noteTimestamp)s"""
+            sql += """%(noteTitle)s, %(noteTimestamp)s"""
+            data["noteTitle"] = note_title
             data["noteTimestamp"] = calendar_date
         else:
-            sql += """CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+            sql += """NULL, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
 
         sql += """)"""
 
@@ -732,6 +737,9 @@ class EventService:
             note.note_id = int(row["TicketSocketEventNoteId"])
             note.note = str(row["Note"])
             note.note_timestamp = str(row["NoteTimestamp"])
+            note.note_title = (
+                str(row["NoteTitle"]) if row["NoteTitle"] is not None else None
+            )
             notes.append(note)
         return notes
 
