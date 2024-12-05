@@ -136,15 +136,15 @@ def add_note():
         calendar_date = (
             str(calendar_date_str) if calendar_date_str is not None else None
         )
-        note_title = (
-            str(note_title_str) if note_title_str is not None else None
-        )
+        note_title = str(note_title_str) if note_title_str is not None else None
 
     if ticket_socket_event_id is None and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
     service = EventService()
-    success = service.add_note(str(note), ticket_socket_event_id, calendar_date, note_title)
+    success = service.add_note(
+        str(note), ticket_socket_event_id, calendar_date, note_title
+    )
     return convert_to_json(success)
 
 
@@ -171,6 +171,49 @@ def get_calendar_notes():
     service = EventService()
     notes = service.get_calendar_notes(start, end)
     return convert_to_json(notes)
+
+
+@admin_api.route("/admin/notes/delete", methods=["POST"])
+@jwt_required()
+def delete_note():
+    """
+    API method to delete note by Id
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    note_id = request.json.get("noteId", None)
+
+    if note_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = EventService()
+    success = service.delete_note(note_id)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/notes/edit", methods=["POST"])
+@jwt_required()
+def edit_note():
+    """
+    API method to edit note by Id
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    note_id = request.json.get("noteId", None)
+
+    if note_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    note = request.json.get("note", None)
+    note_title = request.json.get("noteTitle", None)
+
+    service = EventService()
+    success = service.edit_note(note_id, note, note_title)
+    return convert_to_json(success)
 
 
 @admin_api.route("/admin/orders/comp", methods=["POST"])

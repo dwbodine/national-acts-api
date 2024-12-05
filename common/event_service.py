@@ -6,6 +6,7 @@ from datetime import datetime
 import operator
 
 from common.db import (
+    db_delete,
     db_query_all,
     db_query_one,
     db_insert,
@@ -716,6 +717,38 @@ class EventService:
         sql += """)"""
 
         success = db_insert(sql, data)
+        return success
+
+    def edit_note(
+        self,
+        note_id: int,
+        note: str,
+        note_title: str = None,
+    ):
+        """
+        API method to update any note from its id
+        """
+        sql = """UPDATE TicketSocketEventNotes
+                    SET NoteTitle=%(noteTitle)s,
+                    Note=%(note)s 
+                    WHERE TicketSocketEventNoteId=%(noteId)s"""
+        data = {"note": note, "noteTitle": note_title, "noteId": note_id}
+
+        success = db_update(sql, data)
+        return success
+
+    def delete_note(
+        self,
+        note_id: int,
+    ):
+        """
+        API method to delete any note from its id
+        """
+        sql = """DELETE FROM TicketSocketEventNotes
+                    WHERE TicketSocketEventNoteId=%(noteId)s"""
+        data = {"noteId": note_id}
+
+        success = db_delete(sql, data)
         return success
 
     def get_calendar_notes(self, start: int, end: int):
