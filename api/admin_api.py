@@ -11,12 +11,13 @@ from common.common_api import is_admin_logged_in
 from common.event_service import EventService
 from common.order_service import OrderService
 from common.role_service import RoleService
+from common.tour_service import TourService
 from common.user_service import UserService
 from common.utility import (
     convert_to_json,
     convert_json_to_snake_case_object,
 )
-from common.models.national_acts import VipEvent, VipOrder
+from common.models.national_acts import Tour, VipEvent, VipOrder
 from common.models.user import User, Role
 
 admin_api = Blueprint("admin_api", __name__)
@@ -384,6 +385,75 @@ def refund_ticket():
 
     service = OrderService()
     success = service.refund_ticket(int(ticket_id), refund_service_fees)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/tours")
+@jwt_required()
+def get_all_tours():
+    """
+    API method to fetch all tours
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    service = TourService()
+    tours = service.get_all_tours()
+    return convert_to_json(tours)
+
+
+@admin_api.route("/admin/tours/add", methods=["POST"])
+@jwt_required()
+def add_tour():
+    """
+    API method to add a tour
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    tour = convert_json_to_snake_case_object(request.get_json(), Tour())
+
+    service = TourService()
+    success = service.add_tour(tour)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/tours/delete", methods=["POST"])
+@jwt_required()
+def delete_tour():
+    """
+    API method to add a tour
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    tour_id = request.json.get("tourId", None)
+
+    if tour_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = TourService()
+    success = service.delete_tour(int(tour_id))
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/tours/update", methods=["POST"])
+@jwt_required()
+def update_tour():
+    """
+    API method to update an existing tour
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    tour = convert_json_to_snake_case_object(request.get_json(), Tour())
+
+    service = TourService()
+    success = service.update_tour(tour)
     return convert_to_json(success)
 
 

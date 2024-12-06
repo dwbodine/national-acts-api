@@ -399,61 +399,86 @@ class EventService:
 
             externalevent_rows = db_query_all(external_sql, external_data)
             for row in externalevent_rows:
-                event_id = int(row["EventId"])
-                vip_event = VipEvent()
-                vip_event.event_id = event_id
-                vip_event.title = str(row["Title"])
-                vip_event.seller_name = str(row["SellerName"])
-                vip_event.is_external = True
-                vip_event.event_date = str(row["EventDate"])
-                vip_event.announce_date = str(row["AnnounceDate"])
-                vip_event.thumbnail = str(row["Thumbnail"])
-                vip_event.external_url = str(row["URL"])
-                venue = TicketSocketVenue(
-                    str(row["Venue"]),
-                    str(row["Address"]),
-                    "",
-                    str(row["City"]),
-                    str(row["State"]),
-                    str(row["Zip"]),
-                    str(row["Country"]),
-                    "",
-                )
-                vip_event.venue = venue
-                vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-                vip_event.external_event_id = int(row["EventId"])
-                vip_event.external_seller_id = int(row["SellerId"])
-                vip_event.disable_link_button = str(row["DisableLinkButton"])
-                vip_event.disable_link_reason = str(row["DisableLinkReason"])
-                vip_event.external_vip_link = str(row["ExternalVipLink"])
-                vip_event.is_vip = (
-                    True
-                    if (
-                        vip_event.external_vip_link is not None
-                        and vip_event.external_vip_link != ""
-                    )
-                    else False
-                )
-                vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
-                vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
-                vip_event.is_added_to_bands_in_town = (
-                    True if int(row["IsAddedToBandsInTown"]) == 1 else False
-                )
-                vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
-                vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
-                vip_event.cancelled_date = (
-                    str(row["CancelledDate"])
-                    if (
-                        vip_event.is_cancelled is True
-                        and row["CancelledDate"] is not None
-                    )
-                    else None
-                )
-                events.append(vip_event)
+                vip_event = self.__build_external_event_from_dict(row)
+                if vip_event is not None:
+                    events.append(vip_event)
 
         events.sort(key=operator.attrgetter("event_date", "title", "external_event_id"))
 
         return events
+
+    def get_external_event_by_id(self, external_event_id: int):
+        """
+        Fetches a single external event by Id
+        """
+        vip_event: VipEvent = None
+        external_sql = """SELECT ExternalEvents.*, Sellers.Name as SellerName
+                                FROM ExternalEvents 
+                                JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId 
+                                WHERE ExternalEvents.EventId=%(externalEventId)s"""
+        external_data = {"externalEventId": external_event_id}
+
+        row = db_query_one(external_sql, external_data)
+        vip_event = self.__build_external_event_from_dict(row)
+
+        return vip_event
+
+    def __build_external_event_from_dict(self, row: dict):
+        """
+        internal method to build out external vip event
+        """
+        vip_event: VipEvent = None
+        if row:
+            event_id = int(row["EventId"])
+            vip_event = VipEvent()
+            vip_event.event_id = event_id
+            vip_event.title = str(row["Title"])
+            vip_event.seller_name = str(row["SellerName"])
+            vip_event.is_external = True
+            vip_event.event_date = str(row["EventDate"])
+            vip_event.announce_date = str(row["AnnounceDate"])
+            vip_event.thumbnail = str(row["Thumbnail"])
+            vip_event.external_url = str(row["URL"])
+            venue = TicketSocketVenue(
+                str(row["Venue"]),
+                str(row["Address"]),
+                "",
+                str(row["City"]),
+                str(row["State"]),
+                str(row["Zip"]),
+                str(row["Country"]),
+                "",
+            )
+            vip_event.venue = venue
+            vip_event.is_active = True if int(row["IsActive"]) == 1 else False
+            vip_event.external_event_id = int(row["EventId"])
+            vip_event.external_seller_id = int(row["SellerId"])
+            vip_event.disable_link_button = str(row["DisableLinkButton"])
+            vip_event.disable_link_reason = str(row["DisableLinkReason"])
+            vip_event.external_vip_link = str(row["ExternalVipLink"])
+            vip_event.is_vip = (
+                True
+                if (
+                    vip_event.external_vip_link is not None
+                    and vip_event.external_vip_link != ""
+                )
+                else False
+            )
+            vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
+            vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
+            vip_event.is_added_to_bands_in_town = (
+                True if int(row["IsAddedToBandsInTown"]) == 1 else False
+            )
+            vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
+            vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
+            vip_event.cancelled_date = (
+                str(row["CancelledDate"])
+                if (vip_event.is_cancelled is True and row["CancelledDate"] is not None)
+                else None
+            )
+            vip_event.get_totals()
+
+        return vip_event
 
     def __get_ticket_types_from_event_id(self, ticket_socket_event_id: int):
         """

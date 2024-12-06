@@ -419,6 +419,18 @@ class VipEvent(TicketSocketEvent):
         if self.external_vip_link is not None and self.external_vip_link != "":
             self.ticket_socket_url = self.external_vip_link
 
+class Tour:
+    """
+    Respresents a tour or grouping of events
+    """
+    tour_id: int
+    seller_id: int
+    seller_name: str
+    tour_name: str
+    is_active: bool = True
+    start_date: str
+    end_date: str
+    events: list[VipEvent] = []
 
 class DailyOrderData:
     """

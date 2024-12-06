@@ -30,7 +30,7 @@ def db_query_all(sql: str, json_data=None, cnx=None):
     """
     Return multiple rows
     """
-    rows = []
+    rows: list[dict] = []
     keep_alive = True
 
     if cnx is None:
