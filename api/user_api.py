@@ -39,7 +39,6 @@ def get_events_and_orders_secured():
     show_inactive: bool = False
     show_deleted: bool = False
     show_hidden: bool = False
-    show_cancelled: bool = False
     ts_event_id: int = None
     exclude_external: bool = False
     ignore_flags: bool = False
@@ -69,8 +68,7 @@ def get_events_and_orders_secured():
         )
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
-    if request.args.get("cancelled") is not None:
-        show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
+    
     results = service.get_events_and_orders(
         True,
         seller_id,
@@ -85,7 +83,6 @@ def get_events_and_orders_secured():
         exclude_external,
         show_hidden,
         ignore_flags,
-        show_cancelled,
     )
     return convert_to_json(results)
 
@@ -163,7 +160,6 @@ def orders_secured():
     end: int = None
     show_inactive: bool = False
     show_deleted: bool = False
-    show_cancelled: bool = False
     ignore_flags: bool = False
     if request.args.get("sellerId") is not None:
         seller_id = int(request.args.get("sellerId"))
@@ -175,8 +171,6 @@ def orders_secured():
         show_inactive = True if int(request.args.get("inactive")) == 1 else False
     if request.args.get("deleted") is not None:
         show_deleted = True if int(request.args.get("deleted")) == 1 else False
-    if request.args.get("cancelled") is not None:
-        show_cancelled = True if int(request.args.get("cancelled")) == 1 else False
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
 
@@ -187,7 +181,6 @@ def orders_secured():
         show_inactive,
         show_deleted,
         ignore_flags,
-        show_cancelled,
     )
     return convert_to_json(results)
 

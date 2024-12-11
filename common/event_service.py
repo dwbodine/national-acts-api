@@ -39,7 +39,6 @@ class EventService:
         exclude_external: bool = False,
         show_hidden: bool = False,
         ignore_flags: bool = False,
-        show_cancelled: bool = False,
     ):
         """
         main method to fetch events and orders
@@ -89,7 +88,7 @@ class EventService:
             if show_inactive is True:
                 sql += " AND ExternalEvents.IsActive = 0"
             elif ignore_flags is not True:
-                sql += " AND ExternalEvents.IsActive = 1"
+                sql += " AND (ExternalEvents.IsActive = 1 OR ExternalEvents.IsCancelled = 1)"
 
         sql += " WHERE "
         data = {}
@@ -108,13 +107,13 @@ class EventService:
                 if show_inactive is True:
                     where_clause.append("TicketSocketEvents.IsActive = 0")
                 else:
-                    where_clause.append("TicketSocketEvents.IsActive = 1")
+                    where_clause.append(
+                        "(TicketSocketEvents.IsActive = 1 OR TicketSocketEvents.IsCancelled = 1)"
+                    )
 
                 if show_hidden is not True:
                     where_clause.append("TicketSocketEvents.IsHidden = 0")
 
-                if show_cancelled is not True:
-                    where_clause.append("TicketSocketEvents.IsCancelled = 0")
             if search_term is not None and len(search_term) > 0:
                 where_clause.append(
                     """MATCH (TicketSocketEvents.Title, 
@@ -239,7 +238,7 @@ class EventService:
             vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
             vip_event.cancelled_date = (
                 str(row["CancelledDate"])
-                if (vip_event.is_cancelled is True and row["CancelledDate"] is not None)
+                if (int(row["IsCancelled"]) == 1 and row["CancelledDate"] is not None)
                 else None
             )
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
@@ -341,9 +340,6 @@ class EventService:
 
             if show_hidden is not True and ignore_flags is not True:
                 externalwhere_clause.append("ExternalEvents.IsHidden = 0")
-
-            if show_cancelled is not True and ignore_flags is not True:
-                externalwhere_clause.append("ExternalEvents.IsCancelled = 0")
 
             if search_term is not None and len(search_term) > 0:
                 externalwhere_clause.append(
@@ -602,16 +598,14 @@ class EventService:
         if len(rows) > 0:
             for row in rows:
                 order_id = int(row["Id"])
-                success = self.refund_order(
+                order_service = OrderService()
+                success = order_service.refund_order(
                     order_id, refund_service_fees, mark_chargeback
                 )
                 if success is False:
                     break
             if success is True:
-                daily_order_service = DailyOrderService()
-                daily_order_service.rebuild_daily_order_data_for_event(
-                    ticket_socket_event_id
-                )
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
 
         return success
 
@@ -710,6 +704,9 @@ class EventService:
                     success = db_update(ticket_type_wql, ticket_type_data)
                     if success is False:
                         break
+
+            if success is True:
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def add_note(

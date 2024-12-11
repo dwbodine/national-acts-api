@@ -29,7 +29,6 @@ class OrderService:
         show_inactive: bool = False,
         show_deleted: bool = False,
         ignore_flags: bool = False,
-        show_cancelled: bool = False,
         ts_order_id: int = None,
     ):
         """
@@ -139,9 +138,6 @@ class OrderService:
                     where_clause.append("TicketSocketOrders.IsActive = 0")
                 else:
                     where_clause.append("TicketSocketOrders.IsActive = 1")
-
-                if show_cancelled is not True:
-                    where_clause.append("TicketSocketEvents.IsCancelled = 0")
 
             if len(seller_event_category_ids) > 0:
                 seller_event_category_id_str = db_convert_list_to_parameters(
