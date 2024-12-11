@@ -39,6 +39,7 @@ class EventService:
         exclude_external: bool = False,
         show_hidden: bool = False,
         ignore_flags: bool = False,
+        show_cancelled: bool = True,
     ):
         """
         main method to fetch events and orders
@@ -88,7 +89,10 @@ class EventService:
             if show_inactive is True:
                 sql += " AND ExternalEvents.IsActive = 0"
             elif ignore_flags is not True:
-                sql += " AND (ExternalEvents.IsActive = 1 OR ExternalEvents.IsCancelled = 1)"
+                if show_cancelled is True:
+                    sql += " AND (ExternalEvents.IsActive = 1 OR ExternalEvents.IsCancelled = 1)"
+                else:
+                    sql += " AND ExternalEvents.IsActive = 1"
 
         sql += " WHERE "
         data = {}
@@ -106,13 +110,18 @@ class EventService:
 
                 if show_inactive is True:
                     where_clause.append("TicketSocketEvents.IsActive = 0")
-                else:
+                elif show_cancelled is True:
                     where_clause.append(
                         "(TicketSocketEvents.IsActive = 1 OR TicketSocketEvents.IsCancelled = 1)"
                     )
+                else:
+                    where_clause.append("TicketSocketEvents.IsActive = 1")
 
                 if show_hidden is not True:
                     where_clause.append("TicketSocketEvents.IsHidden = 0")
+
+                if show_cancelled is not True:
+                    where_clause.append("TicketSocketEvents.IsCancelled = 0")
 
             if search_term is not None and len(search_term) > 0:
                 where_clause.append(
@@ -275,7 +284,11 @@ class EventService:
                 and row["ExternalEventId"] != ""
                 and exclude_external is not True
             ):
-                vip_event.external_event_id = int(row["ExternalEventId"])
+                vip_event.external_event_id = (
+                    int(row["ExternalEventId"])
+                    if row["ExternalEventId"] is not None
+                    else 0
+                )
                 vip_event.external_seller_id = int(row["ExternalSellerId"])
                 vip_event.external_title = str(row["ExternalTitle"])
                 vip_event.external_thumbnail = str(row["ExternalThumbnail"])
@@ -335,6 +348,10 @@ class EventService:
             externalwhere_clause: list[str] = []
             if show_inactive is True:
                 externalwhere_clause.append("ExternalEvents.IsActive = 0")
+            elif show_cancelled is True:
+                externalwhere_clause.append(
+                    "(ExternalEvents.IsActive = 1 or ExternalEvents.IsCancelled = 1)"
+                )
             elif ignore_flags is not True:
                 externalwhere_clause.append("ExternalEvents.IsActive = 1")
 
@@ -399,7 +416,7 @@ class EventService:
                 if vip_event is not None:
                     events.append(vip_event)
 
-        events.sort(key=operator.attrgetter("event_date", "title", "external_event_id"))
+        events.sort(key=operator.attrgetter("event_date", "title", "is_external"))
 
         return events
 
@@ -425,7 +442,7 @@ class EventService:
         """
         vip_event: VipEvent = None
         if row:
-            event_id = int(row["EventId"])
+            event_id = int(row["EventId"]) if row["EventId"] is not None else 0
             vip_event = VipEvent()
             vip_event.event_id = event_id
             vip_event.title = str(row["Title"])
@@ -447,7 +464,9 @@ class EventService:
             )
             vip_event.venue = venue
             vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-            vip_event.external_event_id = int(row["EventId"])
+            vip_event.external_event_id = (
+                int(row["EventId"]) if row["EventId"] is not None else 0
+            )
             vip_event.external_seller_id = int(row["SellerId"])
             vip_event.disable_link_button = str(row["DisableLinkButton"])
             vip_event.disable_link_reason = str(row["DisableLinkReason"])

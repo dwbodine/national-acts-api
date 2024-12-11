@@ -61,7 +61,7 @@ def get_events():
         False,
         False,
         False,
-        False,
+        False
     )
     return convert_to_json(results)
 
