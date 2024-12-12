@@ -234,7 +234,7 @@ class EventService:
             vip_event.list_sent_time = (
                 str(row["ListSentTime"]) if row["ListSentTime"] is not None else None
             )
-            vip_event.list_sent_num_vips = int(row["ListSentNumVips"])
+            vip_event.list_sent_num_vips = int(row["ListSentNumVips"]) if row["ListSentNumVips"] is not None else None
             vip_event.check_in_location = (
                 str(row["CheckInLocation"])
                 if row["CheckInLocation"] is not None
@@ -873,21 +873,23 @@ class EventService:
         """
         Mark that the VIP list has been sent to the band
         """
-        event_sql = """SELECT COUNT(TicketSocketOrderTickets.Id) AS NumVips
-                        FROM TicketSocketOrderTickets
-                        JOIN TicketSocketOrders 
-                            ON TicketSocketOrders.Id =
-                                TicketSocketOrderTickets.TicketSocketOrderId                                
-                        WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s
-                        AND TicketSocketOrders.IsDeleted <> 1
-                        AND TicketSocketOrderTickets.IsActive = 1
-                        AND TicketSocketOrderTickets.IsRefunded = 0
-                        AND TicketSocketOrderTickets.IsChargedBack = 0"""
-        event_data = {"ticketSocketEventId": ticket_socket_event_id}
-        num_vips: int = 0
-        row = db_query_one(event_sql, event_data)
-        if row:
-            num_vips = int(row["NumVips"]) if row["NumVips"] is not None else 0
+        updated_event: VipEvent = None
+        num_vips: int = None
+        if is_sent is True:
+            event_sql = """SELECT COUNT(TicketSocketOrderTickets.Id) AS NumVips
+                            FROM TicketSocketOrderTickets
+                            JOIN TicketSocketOrders 
+                                ON TicketSocketOrders.Id =
+                                    TicketSocketOrderTickets.TicketSocketOrderId                                
+                            WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s
+                            AND TicketSocketOrders.IsDeleted <> 1
+                            AND TicketSocketOrderTickets.IsActive = 1
+                            AND TicketSocketOrderTickets.IsRefunded = 0
+                            AND TicketSocketOrderTickets.IsChargedBack = 0"""
+            event_data = {"ticketSocketEventId": ticket_socket_event_id}
+            row = db_query_one(event_sql, event_data)
+            if row:
+                num_vips = int(row["NumVips"]) if row["NumVips"] is not None else 0
 
         sql = """UPDATE TicketSocketEvents
                     SET ListSentToBand=%(listSent)s,
@@ -907,4 +909,14 @@ class EventService:
 
         sql += """ WHERE Id=%(ticketSocketEventId)s"""
 
-        return db_update(sql, data)
+        success = db_update(sql, data)
+        if success:
+            events = self.get_events_and_orders(
+                ts_event_id=ticket_socket_event_id,
+                ignore_flags=True,
+                exclude_external=True,
+                get_orders=True
+            )
+            if events is not None and len(events) > 0:
+                updated_event = events[0]
+        return updated_event

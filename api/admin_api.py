@@ -88,8 +88,8 @@ def send_list_to_band():
     is_sent = True if is_sent_str == 1 else False
 
     service = EventService()
-    success = service.send_list_to_band(int(event_id), is_sent)
-    return convert_to_json(success)
+    updated_event = service.send_list_to_band(int(event_id), is_sent)
+    return convert_to_json(updated_event)
 
 
 @admin_api.route("/admin/events/update", methods=["POST"])

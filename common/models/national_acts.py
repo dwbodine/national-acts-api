@@ -292,7 +292,7 @@ class VipEvent(TicketSocketEvent):
     text_sent_to_vips: bool = False
     list_sent_to_band: bool = False
     list_sent_time: str = None
-    list_sent_num_vips: int = 0
+    list_sent_num_vips: int = None
     check_in_location: str = None
     check_in_notes: str = None
 
