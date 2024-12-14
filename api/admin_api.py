@@ -211,9 +211,11 @@ def edit_note():
 
     note = request.json.get("note", None)
     note_title = request.json.get("noteTitle", None)
+    is_completed_str = request.json.get("isCompleted", None)
+    is_completed = True if is_completed_str == 1 else False
 
     service = EventService()
-    success = service.edit_note(note_id, note, note_title)
+    success = service.edit_note(note_id, note, note_title, is_completed)
     return convert_to_json(success)
 
 

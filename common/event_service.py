@@ -234,7 +234,11 @@ class EventService:
             vip_event.list_sent_time = (
                 str(row["ListSentTime"]) if row["ListSentTime"] is not None else None
             )
-            vip_event.list_sent_num_vips = int(row["ListSentNumVips"]) if row["ListSentNumVips"] is not None else None
+            vip_event.list_sent_num_vips = (
+                int(row["ListSentNumVips"])
+                if row["ListSentNumVips"] is not None
+                else None
+            )
             vip_event.check_in_location = (
                 str(row["CheckInLocation"])
                 if row["CheckInLocation"] is not None
@@ -765,15 +769,22 @@ class EventService:
         note_id: int,
         note: str,
         note_title: str = None,
+        is_completed: bool = False,
     ):
         """
         API method to update any note from its id
         """
         sql = """UPDATE TicketSocketEventNotes
                     SET NoteTitle=%(noteTitle)s,
-                    Note=%(note)s 
+                    Note=%(note)s, 
+                    IsCompleted=%(isCompleted)s 
                     WHERE TicketSocketEventNoteId=%(noteId)s"""
-        data = {"note": note, "noteTitle": note_title, "noteId": note_id}
+        data = {
+            "note": note,
+            "noteTitle": note_title,
+            "noteId": note_id,
+            "isCompleted": 1 if is_completed is True else 0,
+        }
 
         success = db_update(sql, data)
         return success
@@ -814,6 +825,7 @@ class EventService:
             note.note_title = (
                 str(row["NoteTitle"]) if row["NoteTitle"] is not None else None
             )
+            note.is_completed = True if int(row["IsCompleted"]) == 1 else False
             notes.append(note)
         return notes
 
@@ -915,7 +927,7 @@ class EventService:
                 ts_event_id=ticket_socket_event_id,
                 ignore_flags=True,
                 exclude_external=True,
-                get_orders=True
+                get_orders=True,
             )
             if events is not None and len(events) > 0:
                 updated_event = events[0]

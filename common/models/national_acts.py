@@ -128,6 +128,7 @@ class Note:
     note: str = None
     note_title: str = None
     note_timestamp: str = None
+    is_completed: bool = False
 
 
 class VipTicket(TicketSocketTicket):
