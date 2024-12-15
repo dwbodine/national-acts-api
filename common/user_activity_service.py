@@ -87,8 +87,8 @@ class UserActivityService:
             LEFT JOIN UserSellerCount ON UserSellerCount.UserId = Users.UserId
                     WHERE UserActivity.Timestamp BETWEEN %(startDate)s AND %(endDate)s"""
         data = {
-            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
-            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
+            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d %H:%M:%S"),
+            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         where_clause: list[str] = []
@@ -128,7 +128,7 @@ class UserActivityService:
                 activity_name,
                 username,
                 full_name,
-                seller_name
+                seller_name,
             )
             activities.append(activity)
 
