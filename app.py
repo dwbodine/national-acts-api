@@ -6,6 +6,8 @@ import os
 import sys
 import json
 from datetime import timedelta, timezone, datetime
+import traceback
+
 from flask import Flask, request
 from flask_jwt_extended import (
     create_access_token,
@@ -14,11 +16,11 @@ from flask_jwt_extended import (
     JWTManager,
     jwt_required,
 )
-import traceback
 
 from api.admin_api import admin_api
 from api.cron_api import cron_api
 from api.dashboard_api import dashboard_api
+from api.event_api import event_api
 from api.internal_api import internal_api
 from api.public_api import public_api
 from api.user_api import user_api
@@ -41,6 +43,7 @@ application = app
 app.register_blueprint(admin_api)
 app.register_blueprint(cron_api)
 app.register_blueprint(dashboard_api)
+app.register_blueprint(event_api)
 app.register_blueprint(internal_api)
 app.register_blueprint(public_api)
 app.register_blueprint(user_api)
@@ -105,6 +108,7 @@ def view_log():
         log_data = f.read()
 
     return convert_to_json(log_data)
+
 
 @app.route("/cron_log")
 @jwt_required()
