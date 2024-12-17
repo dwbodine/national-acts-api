@@ -153,7 +153,7 @@ def get_update_history():
     return convert_to_json(logs)
 
 
-@event_api.route("/evens/refreshEventsFromService/<int:seller_id>")
+@event_api.route("/events/refreshEventsFromService/<int:seller_id>")
 @jwt_required()
 def refresh_events_from_service(seller_id: int = None):
     """
