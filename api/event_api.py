@@ -2,8 +2,6 @@
 Event API routes
 """
 
-from types import SimpleNamespace
-import json
 from datetime import datetime
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
