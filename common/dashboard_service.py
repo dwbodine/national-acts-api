@@ -36,11 +36,11 @@ class DashboardService:
             month = datetime.now().month
             day = datetime.now().day
 
-        now = datetime(current_year, month, day) + timedelta(days=1)
+        now = datetime(current_year, month, day)
         dash_totals = DashboardTotals(current_year, month, day)
 
         start = f"{current_year}-01-01 00:00:00"
-        end = now.strftime("%Y-%m-%d %H:%M:%S")
+        end = now.strftime("%Y-%m-%d 23:59:59")
 
         sql = """SELECT DailyOrderData.*,
                     TicketSocketEvents.Title AS EventTitle,
