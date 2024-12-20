@@ -2,7 +2,7 @@
 Dashboard Service
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from common.db import db_query_all
 
