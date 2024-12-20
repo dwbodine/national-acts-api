@@ -768,6 +768,7 @@ class EventService:
         self,
         note_id: int,
         note: str,
+        note_date: str,
         note_title: str = None,
         is_completed: bool = False,
     ):
@@ -777,12 +778,15 @@ class EventService:
         sql = """UPDATE TicketSocketEventNotes
                     SET NoteTitle=%(noteTitle)s,
                     Note=%(note)s, 
-                    IsCompleted=%(isCompleted)s 
+                    IsCompleted=%(isCompleted)s, 
+                    NoteTimeStamp=%(noteDate)s, 
+                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE TicketSocketEventNoteId=%(noteId)s"""
         data = {
             "note": note,
             "noteTitle": note_title,
             "noteId": note_id,
+            "noteDate": note_date,
             "isCompleted": 1 if is_completed is True else 0,
         }
 
@@ -811,7 +815,7 @@ class EventService:
         sql = """SELECT * FROM TicketSocketEventNotes
                     WHERE TicketSocketEventId IS NULL AND
                     NoteTimestamp BETWEEN %(startDate)s and %(endDate)s 
-                    ORDER BY NoteTimestamp ASC"""
+                    ORDER BY NoteTimestamp ASC, IsCompleted DESC, NoteTitle ASC"""
         data = {
             "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
             "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),

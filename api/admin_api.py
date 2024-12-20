@@ -205,8 +205,9 @@ def edit_note():
         return {"msg": "Unauthorized"}, 401
 
     note_id = request.json.get("noteId", None)
+    note_date = request.json.get("noteDate")
 
-    if note_id is None:
+    if note_id is None or note_date is None:
         return {"msg": "Bad Request"}, 400
 
     note = request.json.get("note", None)
@@ -215,7 +216,7 @@ def edit_note():
     is_completed = True if is_completed_str == 1 else False
 
     service = EventService()
-    success = service.edit_note(note_id, note, note_title, is_completed)
+    success = service.edit_note(note_id, note, note_date, note_title, is_completed)
     return convert_to_json(success)
 
 
