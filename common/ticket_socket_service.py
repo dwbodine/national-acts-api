@@ -484,6 +484,21 @@ class TicketSocketService:
                 if item_event_id != int(event_id):
                     continue
 
+                if order.purchase_date is None and "purchaseDate" in item:
+                    # datetime is not serializable in python,
+                    # convert it to ISO-compatible string in Pacific Time (server is in Mountain)
+                    purchase_date = datetime.fromtimestamp(
+                        float(item["purchaseDate"]) - (60 * 60)
+                    )
+                    order.purchase_date = purchase_date.strftime("%Y-%m-%d")
+                    order.purchase_timestamp = purchase_date.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                # must have a purchase date to continue
+                if order.purchase_date is None:
+                    continue
+
                 shirt_size: str = None
                 # set properties on order from ticket data if not present
                 if order.user_id == 0 and "userId" in item:
@@ -506,16 +521,7 @@ class TicketSocketService:
                     order.purchaser_country = fix_magic_quotes(item["billing_country"])
                 if order.purchaser_ip_address is None and "remoteAddr" in item:
                     order.purchaser_ip_address = fix_magic_quotes(item["remoteAddr"])
-                if order.purchase_date == "" and "purchaseDate" in item:
-                    # datetime is not serializable in python,
-                    # convert it to ISO-compatible string in Pacific Time (server is in Mountain)
-                    purchase_date = datetime.fromtimestamp(
-                        float(item["purchaseDate"]) - (60 * 60)
-                    )
-                    order.purchase_date = purchase_date.strftime("%Y-%m-%d")
-                    order.purchase_timestamp = purchase_date.strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
+
                 if order.email == "" and "email" in item:
                     order.email = item["email"]
 
