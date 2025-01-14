@@ -8,6 +8,7 @@ from datetime import datetime
 from flask import Blueprint, request
 
 from common.update_service import UpdateService
+from common.sender_api_service import SenderApiService
 from common.utility import convert_to_json
 
 cron_api = Blueprint("cron_api", __name__)
@@ -99,4 +100,34 @@ def update_historical_event_data():
     return convert_to_json(results)
 
 
-# END CRON JOB ROUTES
+@cron_api.route("/cron/updateSenderApiSubscribers")
+def update_subscribers():
+    """
+    API for cron to update subscriber data in Sender API
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = SenderApiService()
+    result = service.update_sender_subscribers()
+    return convert_to_json(result)
+
+@cron_api.route("/cron/getSenderApiSubscribersCsv")
+def get_subscribers_from_database():
+    """
+    API for cron to get subscriber data in Sender API in CSV form
+    """
+    # secured by internal api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("CRON_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = SenderApiService()
+    result = service.get_sender_subscribers_csv()
+    return convert_to_json(result)
