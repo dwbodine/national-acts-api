@@ -96,8 +96,8 @@ class TicketSocketOrder:
     purchaser_zip_code: str = None
     purchaser_country: str = None
     purchaser_ip_address: str = None
-    purchase_date: str = ""
-    purchase_timestamp: str = ""
+    purchase_date: str = None
+    purchase_timestamp: str = None
     email: str = ""
     cancelled: bool = False
     deleted: bool = False
