@@ -34,34 +34,39 @@ class SenderApiService:
             "Accept": "application/json",
         }
 
-        response = requests.request("GET", url, headers=headers, timeout=3000)
-        subscriber_json = response.json()
-        if subscriber_json is not None and "data" in subscriber_json:
-            data = subscriber_json["data"]
-            subscriber = Subscriber()
-            subscriber.id = data["id"]
-            subscriber.email = data["email"]
-            subscriber.first_name = data["firstname"]
-            subscriber.last_name = data["lastname"]
-            subscriber.phone = data["phone"]
-            if data["columns"] is not None:
-                for column in data["columns"]:
-                    if column["title"] == "Band":
-                        subscriber.band = column["value"]
-                    elif column["title"] == "Venue":
-                        subscriber.venue = column["value"]
-                    elif column["title"] == "Venue Address":
-                        subscriber.venue_address = column["value"]
-                    elif column["title"] == "Venue City":
-                        subscriber.venue_city = column["value"]
-                    elif column["title"] == "Venue State":
-                        subscriber.venue_state = column["value"]
-                    elif column["title"] == "Venue Zip":
-                        subscriber.venue_zip = column["value"]
-                    elif column["title"] == "Venue Country":
-                        subscriber.venue_country = column["value"]
-                    elif column["title"] == "Purchaser Zip":
-                        subscriber.purchaser_zip = column["value"]
+        try:
+            response = requests.request("GET", url, headers=headers, timeout=3000)
+            subscriber_json = response.json()
+            if subscriber_json is not None and "data" in subscriber_json:
+                data = subscriber_json["data"]
+                subscriber = Subscriber()
+                subscriber.id = data["id"]
+                subscriber.email = data["email"]
+                subscriber.first_name = data["firstname"]
+                subscriber.last_name = data["lastname"]
+                subscriber.phone = data["phone"]
+                if data["columns"] is not None:
+                    for column in data["columns"]:
+                        if column["title"] == "Band":
+                            subscriber.band = column["value"]
+                        elif column["title"] == "Venue":
+                            subscriber.venue = column["value"]
+                        elif column["title"] == "Venue Address":
+                            subscriber.venue_address = column["value"]
+                        elif column["title"] == "Venue City":
+                            subscriber.venue_city = column["value"]
+                        elif column["title"] == "Venue State":
+                            subscriber.venue_state = column["value"]
+                        elif column["title"] == "Venue Zip":
+                            subscriber.venue_zip = column["value"]
+                        elif column["title"] == "Venue Country":
+                            subscriber.venue_country = column["value"]
+                        elif column["title"] == "Purchaser Zip":
+                            subscriber.purchaser_zip = column["value"]
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            error_message: str = str(error) + "\n" + traceback.format_exc()
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_message(f"""[{now}] - {error_message}\r\n""")
 
         return subscriber
 
@@ -213,12 +218,31 @@ class SenderApiService:
 
         return results
 
+    def get_missing_subscribers_csv(self):
+        """
+        Gets all subscribers from database and converts to CSV
+        """
+        missing_subscribers: list[Subscriber] = []
+        stored_subscribers = self.get_sender_subscribers_from_db()
+        for db_subscriber in stored_subscribers:
+            existing_subscriber = self.get_subscriber_by_email(db_subscriber.email)
+            if existing_subscriber is None:
+                missing_subscribers.append(db_subscriber)
+            time.sleep(1)
+
+        return self.get_subscribers_csv(missing_subscribers)
+
     def get_sender_subscribers_csv(self):
         """
-        Convert database subscribers into CSV
+        Gets all subscribers from database and converts to CSV
         """
         stored_subscribers = self.get_sender_subscribers_from_db()
+        return self.get_subscribers_csv(stored_subscribers)
 
+    def get_subscribers_csv(self, stored_subscribers: list[Subscriber]):
+        """
+        Convert subscribers into CSV
+        """
         f = open("subscribers.csv", "w", encoding="utf-8")
 
         csv: str = (
