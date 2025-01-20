@@ -2,8 +2,9 @@
 Tour service module
 """
 
+from datetime import datetime
 from common.event_service import EventService
-from common.models.national_acts import Tour, VipEvent
+from common.models.national_acts import Seller, Tour, VipEvent
 from common.db import db_delete, db_insert, db_query_all, db_update
 
 
@@ -12,31 +13,80 @@ class TourService:
     Service to handle all tour-related activity
     """
 
-    def get_all_tours(self):
+    def get_all_tours(self, seller_id: int = None, start: int = None, end: int = None):
         """
         API method to fetch all tours
         """
         tours: list[Tour] = []
-        sql = """SELECT SellerTour.*, Sellers.Name AS SellerName
-                    FROM SellerTour
-                    JOIN Sellers on Sellers.SellerId = SellerTour.SellerId
-                    ORDER BY Sellers.Name ASC, SellerTour.StartDate ASC"""
+        sql = """SELECT Tour.*
+                    FROM Tour"""
+        data = {}
 
-        rows = db_query_all(sql)
+        if seller_id is not None or start is not None or end is not None:
+            sql += " WHERE "
+            where_clause: list[str] = []
+            if seller_id is not None:
+                where_clause.append(
+                    """EXISTS (SELECT 1 FROM TourSeller WHERE
+                        TourId=Tour.TourId and SellerId=%(seller_id)s"""
+                )
+                data["seller_id"] = seller_id
+            if start is not None and end is not None:
+                where_clause.append(
+                    "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
+                )
+                data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+                data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
+            elif end is not None:
+                where_clause.append(
+                    "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
+                )
+                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
+            elif start is not None:
+                where_clause.append("Tour.AnnounceDate >= %(startDate)s")
+                data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+            if len(where_clause) > 0:
+                sql += " AND ".join(where_clause)
+
+        sql += """ ORDER BY Tour.AnnounceDate ASC, Tour.TourName ASC"""
+
+        rows = db_query_all(sql, data)
         for row in rows:
             tour = Tour()
-            tour_id = int(row["SellerTourId"])
+            tour_id = int(row["TourId"])
             tour.tour_id = tour_id
-            tour.seller_id = int(row["SellerId"])
-            tour.seller_name = str(row["SellerName"])
             tour.tour_name = str(row["TourName"])
             tour.is_active = True if int(row["IsActive"]) == 1 else False
-            tour.start_date = str(row["StartDate"])
-            tour.end_date = str(row["EndDate"])
+            tour.announce_date = str(row["AnnounceDate"])
+
+            sellers = self.__get_sellers_by_tour_id(tour_id)
+            tour.sellers = sellers
+
             events = self.__get_events_by_tour_id(tour_id)
             tour.events = events
+
             tours.append(tour)
         return tours
+
+    def __get_sellers_by_tour_id(self, tour_id: int):
+        """
+        Fetches all sellers by tour id
+        """
+        sellers: list[Seller] = []
+
+        sql = """SELECT DISTINCT TourSeller.SellerId
+                    FROM TourSeller 
+                    WHERE TourId=%(tour_id)s"""
+        data = {"tour_id": tour_id}
+        rows = db_query_all(sql, data)
+        for row in rows:
+            seller_id = int(row["SellerId"])
+            seller: Seller = Seller(seller_id)
+
+            if seller is not None:
+                sellers.append(seller)
+        return sellers
 
     def __get_events_by_tour_id(self, tour_id: int):
         """
@@ -44,8 +94,8 @@ class TourService:
         """
         events: list[VipEvent] = []
         event_service = EventService()
-        sql = """SELECT SellerTourEvent.*
-                    FROM SellerTourEvent WHERE
+        sql = """SELECT TourEvent.*
+                    FROM TourEvent WHERE
                     SellerTourId=%(sellerTourId)s"""
         data = {"sellerTourId": tour_id}
         rows = db_query_all(sql, data)
@@ -70,17 +120,21 @@ class TourService:
         Add a new tour
         """
         success: bool = True
-        sql = """INSERT INTO SellerTour (SellerId, TourName, StartDate, EndDate)
-                VALUES(%(sellerId)s, %(tourName)s, %(startDate)s, %(endDate)s)"""
+        sql = """INSERT INTO Tour (TourName, AnnounceDate)
+                VALUES(%(tourName)s, %(announceDate)s)"""
         data = {
-            "sellerId": tour_to_add.seller_id,
             "tourName": tour_to_add.tour_name,
-            "startDate": tour_to_add.start_date,
-            "endDate": tour_to_add.end_date,
+            "announceDate": tour_to_add.announce_date,
         }
         tour_id = db_insert(sql, data)
         if tour_id > 0:
-            success = self.__add_tour_events(tour_id, tour_to_add.events)
+            success = self.__update_tour_sellers(
+                tour_to_add.tour_id, tour_to_add.sellers
+            )
+            if success is True:
+                success = self.__update_tour_events(
+                    tour_to_add.tour_id, tour_to_add.events
+                )
         else:
             success = False
         return success
@@ -90,42 +144,42 @@ class TourService:
         Update an existing tour
         """
         success: bool = True
-        sql = """UPDATE SellerTour
-                    SET SellerId=%(sellerId)s, 
-                    TourName=%(tourName)s, 
+        sql = """UPDATE Tour
+                    SET TourName=%(tourName)s, 
                     IsActive=%(isActive)s, 
-                    StartDate=%(startDate)s, 
-                    EndDate=%(endDate)s, 
+                    AnnounceDate=%(announceDate)s, 
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                    WHERE SellerTourId=%(tourId)s"""
+                    WHERE TourId=%(tourId)s"""
         data = {
-            "sellerId": tour_to_update.seller_id,
             "tourName": tour_to_update.tour_name,
             "isActive": 1 if tour_to_update.is_active is True else 0,
-            "startDate": tour_to_update.start_date,
-            "endDate": tour_to_update.end_date,
+            "announceDate": tour_to_update.announce_date,
             "tourId": tour_to_update.tour_id,
         }
         success = db_update(sql, data)
         if success is True:
-            delete_sql = """DELETE FROM SellerTourEvent 
-                WHERE SellerTourId=%(tourId)s"""
-            delete_data = {"tourId": tour_to_update.tour_id}
-            success = db_delete(delete_sql, delete_data)
-            success = self.__add_tour_events(
-                tour_to_update.tour_id, tour_to_update.events
+            success = self.__update_tour_sellers(
+                tour_to_update.tour_id, tour_to_update.sellers
             )
+            if success is True:
+                success = self.__update_tour_events(
+                    tour_to_update.tour_id, tour_to_update.events
+                )
 
         return success
 
-    def __add_tour_events(self, tour_id: int, events: list[VipEvent]):
+    def __update_tour_events(self, tour_id: int, events: list[VipEvent]):
         """
         Add/replace events for a tour
         """
         success: bool = True
+        delete_sql = """DELETE FROM TourEvent
+                 WHERE TourId=%(tourId)s"""
+        delete_data = {"tourId": tour_id}
+        db_delete(delete_sql, delete_data)
         for event in events:
-            event_sql = """INSERT INTO SellerTourEvent
-                (SellerTourId, TicketSocketEventId, ExternalEventId)
+            event_sql = """INSERT INTO TourEvent
+                (TourId, TicketSocketEventId, ExternalEventId)
                 VALUES(%(tourId)s, %(ticketSocketEventId)s, %(externalEventId)s)"""
             event_data = {
                 "tourId": tour_id,
@@ -142,17 +196,44 @@ class TourService:
                 break
         return success
 
+    def __update_tour_sellers(self, tour_id: int, sellers: list[Seller]):
+        """
+        Add/replace events for a tour
+        """
+        success: bool = True
+        delete_sql = """DELETE FROM TourSeller
+                 WHERE TourId=%(tourId)s"""
+        delete_data = {"tourId": tour_id}
+        db_delete(delete_sql, delete_data)
+        for seller in sellers:
+            seller_sql = """INSERT INTO TourSeller
+                (TourId, SellerId)
+                VALUES(%(tourId)s, %(sellerId)s)"""
+            seller_data = {
+                "tourId": tour_id,
+                "sellerId": seller.seller_id,
+            }
+            tour_seller_id = db_insert(seller_sql, seller_data)
+            success = tour_seller_id > 0
+            if success is not True:
+                break
+        return success
+
     def delete_tour(self, tour_id: int):
         """
         Delete an existing tour
         """
         success: bool = True
         data = {"tourId": tour_id}
-        delete_event_sql = """DELETE FROM SellerTourEvent
-            WHERE SellerTourId=%(tourId)s"""
+        delete_event_sql = """DELETE FROM TourEvent
+            WHERE TourId=%(tourId)s"""
         success = db_delete(delete_event_sql, data)
         if success is True:
-            delete_tour_sql = """"DELETE FROM SellerTour
-            WHERE SellerTourId=%(tourId)s"""
-            success = db_delete(delete_tour_sql, data)
+            delete_seller_sql = """DELETE FROM TourSeller
+                WHERE TourId=%(tourId)s"""
+            success = db_delete(delete_seller_sql, data)
+            if success is True:
+                delete_tour_sql = """"DELETE FROM Tour
+                    WHERE TourId=%(tourId)s"""
+                success = db_delete(delete_tour_sql, data)
         return success
