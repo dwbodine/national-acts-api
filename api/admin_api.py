@@ -391,36 +391,22 @@ def refund_ticket():
     return convert_to_json(success)
 
 
-@admin_api.route("/admin/tours")
+@admin_api.route("/admin/tours/<int:seller_id>")
 @jwt_required()
-def get_all_tours():
+def get_all_tours(seller_id: int):
     """
     API method to fetch all tours
     """
     is_admin = is_admin_logged_in()
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
+    
+    if seller_id is None or seller_id <= 0:
+        return {"msg": "Bad Request"}, 400
 
     service = TourService()
-    tours = service.get_all_tours()
+    tours = service.get_all_tours(seller_id)
     return convert_to_json(tours)
-
-
-@admin_api.route("/admin/tours/add", methods=["POST"])
-@jwt_required()
-def add_tour():
-    """
-    API method to add a tour
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    tour = convert_json_to_snake_case_object(request.get_json(), Tour())
-
-    service = TourService()
-    success = service.add_tour(tour)
-    return convert_to_json(success)
 
 
 @admin_api.route("/admin/tours/delete", methods=["POST"])
@@ -447,7 +433,7 @@ def delete_tour():
 @jwt_required()
 def update_tour():
     """
-    API method to update an existing tour
+    API method to add or update a tour
     """
     is_admin = is_admin_logged_in()
     if is_admin is False:
@@ -455,8 +441,16 @@ def update_tour():
 
     tour = convert_json_to_snake_case_object(request.get_json(), Tour())
 
+    if tour is None:
+        return {"msg": "Bad Request"}, 400
+
     service = TourService()
-    success = service.update_tour(tour)
+    success: bool = False
+    if tour.tour_id > 0:
+        success = service.update_tour(tour)
+    else:
+        success = service.add_tour(tour)
+
     return convert_to_json(success)
 
 

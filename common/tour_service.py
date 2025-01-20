@@ -13,41 +13,36 @@ class TourService:
     Service to handle all tour-related activity
     """
 
-    def get_all_tours(self, seller_id: int = None, start: int = None, end: int = None):
+    def get_all_tours(self, seller_id: int, start: int = None, end: int = None):
         """
         API method to fetch all tours
         """
         tours: list[Tour] = []
         sql = """SELECT Tour.*
-                    FROM Tour"""
-        data = {}
-
-        if seller_id is not None or start is not None or end is not None:
-            sql += " WHERE "
-            where_clause: list[str] = []
-            if seller_id is not None:
-                where_clause.append(
-                    """EXISTS (SELECT 1 FROM TourSeller WHERE
+                    FROM Tour 
+                    WHERE EXISTS (SELECT 1 FROM TourSeller WHERE
                         TourId=Tour.TourId and SellerId=%(seller_id)s"""
-                )
-                data["seller_id"] = seller_id
-            if start is not None and end is not None:
-                where_clause.append(
-                    "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
-                )
-                data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-                data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-            elif end is not None:
-                where_clause.append(
-                    "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
-                )
-                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
-                data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-            elif start is not None:
-                where_clause.append("Tour.AnnounceDate >= %(startDate)s")
-                data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-            if len(where_clause) > 0:
-                sql += " AND ".join(where_clause)
+        data = {"seller_id": seller_id}
+
+        where_clause: list[str] = []
+
+        if start is not None and end is not None:
+            where_clause.append(
+                "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
+            )
+            data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+            data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
+        elif end is not None:
+            where_clause.append(
+                "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
+            )
+            data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+            data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
+        elif start is not None:
+            where_clause.append("Tour.AnnounceDate >= %(startDate)s")
+            data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
+        if len(where_clause) > 0:
+            sql += " AND ".join(where_clause)
 
         sql += """ ORDER BY Tour.AnnounceDate ASC, Tour.TourName ASC"""
 
