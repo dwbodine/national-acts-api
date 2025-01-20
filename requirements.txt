@@ -5,3 +5,4 @@ pylint==3.0.3
 sendgrid==6.11.0
 googlemaps==4.10.0
 stringcase==1.2.0
+requests==2.32.3
