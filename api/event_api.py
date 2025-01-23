@@ -25,6 +25,7 @@ def get_events_and_orders_secured():
     """
     service = EventService()
     seller_id: int = None
+    seller_ids: list[int] = None
     start: int = None
     end: int = None
     exclude_start: int = None
@@ -38,6 +39,8 @@ def get_events_and_orders_secured():
     ignore_flags: bool = False
     if request.args.get("sellerId") is not None:
         seller_id = int(request.args.get("sellerId"))
+    if request.args.get("sellerIds") is not None:
+        seller_ids = [int(x) for x in str(request.args.get("sellerIds")).split(",")]
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
@@ -77,6 +80,8 @@ def get_events_and_orders_secured():
         exclude_external,
         show_hidden,
         ignore_flags,
+        True,
+        seller_ids,
     )
     return convert_to_json(results)
 

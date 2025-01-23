@@ -21,7 +21,7 @@ class TourService:
         sql = """SELECT Tour.*
                     FROM Tour 
                     WHERE EXISTS (SELECT 1 FROM TourSeller WHERE
-                        TourId=Tour.TourId and SellerId=%(seller_id)s"""
+                        TourId=Tour.TourId and SellerId=%(seller_id)s)"""
         data = {"seller_id": seller_id}
 
         where_clause: list[str] = []
@@ -72,8 +72,8 @@ class TourService:
 
         sql = """SELECT DISTINCT TourSeller.SellerId
                     FROM TourSeller 
-                    WHERE TourId=%(tour_id)s"""
-        data = {"tour_id": tour_id}
+                    WHERE TourId=%(tourId)s"""
+        data = {"tourId": tour_id}
         rows = db_query_all(sql, data)
         for row in rows:
             seller_id = int(row["SellerId"])
@@ -90,24 +90,32 @@ class TourService:
         events: list[VipEvent] = []
         event_service = EventService()
         sql = """SELECT TourEvent.*
-                    FROM TourEvent WHERE
-                    SellerTourId=%(sellerTourId)s"""
-        data = {"sellerTourId": tour_id}
+                    FROM TourEvent 
+                    WHERE TourId=%(tourId)s"""
+        data = {"tourId": tour_id}
         rows = db_query_all(sql, data)
         for row in rows:
-            event: VipEvent = None
-            if row["TicketSocketEventId"] is not None:
-                event = event_service.get_events_and_orders(
-                    ts_event_id=int(row["TicketSocketEventId"]),
-                    ignore_flags=True,
-                    get_orders=True,
+            evt: VipEvent = None
+            ts_event_id = (
+                int(row["TicketSocketEventId"])
+                if row["TicketSocketEventId"] is not None
+                else None
+            )
+            ex_event_id = (
+                int(row["ExternalEventId"])
+                if row["ExternalEventId"] is not None
+                else None
+            )
+            if ts_event_id is not None:
+                evts = event_service.get_events_and_orders(
+                    ts_event_id=ts_event_id, ignore_flags=True, exclude_external=True
                 )
-            elif row["ExternalEventId"] is not None:
-                event = event_service.get_external_event_by_id(
-                    int(row["ExternalEventId"])
-                )
-            if event is not None:
-                events.append(event)
+                if len(evts) > 0:
+                    evt = evts[0]
+            elif ex_event_id is not None:
+                evt = event_service.get_external_event_by_id(ex_event_id)
+            if evt is not None:
+                events.append(evt)
         return events
 
     def add_tour(self, tour_to_add: Tour):
@@ -123,13 +131,9 @@ class TourService:
         }
         tour_id = db_insert(sql, data)
         if tour_id > 0:
-            success = self.__update_tour_sellers(
-                tour_to_add.tour_id, tour_to_add.sellers
-            )
+            success = self.__update_tour_sellers(tour_id, tour_to_add.sellers)
             if success is True:
-                success = self.__update_tour_events(
-                    tour_to_add.tour_id, tour_to_add.events
-                )
+                success = self.__update_tour_events(tour_id, tour_to_add.events)
         else:
             success = False
         return success
@@ -212,23 +216,4 @@ class TourService:
             success = tour_seller_id > 0
             if success is not True:
                 break
-        return success
-
-    def delete_tour(self, tour_id: int):
-        """
-        Delete an existing tour
-        """
-        success: bool = True
-        data = {"tourId": tour_id}
-        delete_event_sql = """DELETE FROM TourEvent
-            WHERE TourId=%(tourId)s"""
-        success = db_delete(delete_event_sql, data)
-        if success is True:
-            delete_seller_sql = """DELETE FROM TourSeller
-                WHERE TourId=%(tourId)s"""
-            success = db_delete(delete_seller_sql, data)
-            if success is True:
-                delete_tour_sql = """"DELETE FROM Tour
-                    WHERE TourId=%(tourId)s"""
-                success = db_delete(delete_tour_sql, data)
         return success

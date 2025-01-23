@@ -285,6 +285,7 @@ class VipEvent(TicketSocketEvent):
     is_cancelled: bool = False
     cancelled_date: str = None
     announce_date: str = None
+    tour_announce_date: str = None
     num_tickets_comped: int = 0
     notes: list[Note] = []
     doors_open: str = None
