@@ -108,7 +108,7 @@ class TourService:
             )
             if ts_event_id is not None:
                 evts = event_service.get_events_and_orders(
-                    ts_event_id=ts_event_id, ignore_flags=True, exclude_external=True
+                    ts_event_id=ts_event_id, ignore_flags=True, exclude_external=True, get_orders=False
                 )
                 if len(evts) > 0:
                     evt = evts[0]

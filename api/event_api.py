@@ -37,6 +37,7 @@ def get_events_and_orders_secured():
     ts_event_id: int = None
     exclude_external: bool = False
     ignore_flags: bool = False
+    get_orders: bool = True
     if request.args.get("sellerId") is not None:
         seller_id = int(request.args.get("sellerId"))
     if request.args.get("sellerIds") is not None:
@@ -65,9 +66,11 @@ def get_events_and_orders_secured():
         )
     if request.args.get("ignoreFlags") is not None:
         ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
+    if request.args.get("omitOrders") is not None:
+        get_orders = False if int(request.args.get("omitOrders")) == 1 else True
 
     results = service.get_events_and_orders(
-        True,
+        get_orders,
         seller_id,
         start,
         end,

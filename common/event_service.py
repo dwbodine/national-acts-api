@@ -169,7 +169,7 @@ class EventService:
             elif start is not None:
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-            elif get_orders is False or seller_id is None:
+            elif ignore_flags is False and (get_orders is False or seller_id is None):
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
 
