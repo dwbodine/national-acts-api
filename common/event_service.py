@@ -40,6 +40,7 @@ class EventService:
         show_hidden: bool = False,
         ignore_flags: bool = False,
         show_cancelled: bool = True,
+        seller_ids: list[int] = None,
     ):
         """
         main method to fetch events and orders
@@ -47,7 +48,14 @@ class EventService:
         events: list[VipEvent] = []
 
         seller_event_category_ids: list[int] = []
-        if seller_id is not None:
+        if seller_ids is not None:
+            seller_event_category_ids = []
+            for sid in seller_ids:
+                seller = Seller(sid)
+                ids = seller.get_seller_event_category_ids()
+                if len(ids) > 0:
+                    seller_event_category_ids += ids
+        elif seller_id is not None:
             seller = Seller(seller_id)
             seller_event_category_ids = seller.get_seller_event_category_ids()
             # prevent against returning every event in the database
@@ -78,10 +86,13 @@ class EventService:
                     ExternalEvents.ExternalVipLink, 
                     ExternalEvents.DisableVipLinkButton, 
                     ExternalEvents.DisableVipLinkReason,
-                    Sellers.Name AS SellerName
+                    Sellers.Name AS SellerName,
+                    Tour.AnnounceDate AS TourAnnounceDate
                  FROM TicketSocketEvents 
                  JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
+            LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
+            LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
             LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId 
                 AND TicketSocketEvents.EventDate = ExternalEvents.EventDate """
 
@@ -161,12 +172,6 @@ class EventService:
             elif get_orders is False or seller_id is None:
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
-            if ignore_flags is not True:
-                where_clause.append(
-                    """COALESCE(TicketSocketEvents.AnnounceDate,
-                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))
-                                     <= CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
-                )
 
             if exclude_start is not None and exclude_end is not None:
                 where_clause.append(
@@ -189,20 +194,58 @@ class EventService:
         sql = sql.replace("\n", "")
 
         event_rows = db_query_all(sql, data)
+        now_ts: float = datetime.now().timestamp()
         for row in event_rows:
+            tour_announce_date_str = (
+                str(row["TourAnnounceDate"])
+                if row["TourAnnounceDate"] is not None
+                else None
+            )
+            announce_date_str = (
+                str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
+            )
+
+            tad_ts: float = None
+            if tour_announce_date_str is not None:
+                tad_ts = datetime.strptime(
+                    tour_announce_date_str, "%Y-%m-%d %H:%M:%S"
+                ).timestamp()
+            ad_ts: float = None
+            if announce_date_str is not None:
+                ad_ts = datetime.strptime(
+                    announce_date_str, "%Y-%m-%d %H:%M:%S"
+                ).timestamp()
+
+            if ignore_flags is not True:
+                if tad_ts is not None and ad_ts is not None:
+                    if tad_ts >= ad_ts:
+                        if tad_ts > now_ts:
+                            continue
+                        elif ad_ts > now_ts:
+                            continue
+                    else:
+                        if ad_ts > now_ts:
+                            continue
+                elif tad_ts is not None:
+                    if tad_ts > now_ts:
+                        continue
+                elif ad_ts is not None:
+                    if ad_ts > now_ts:
+                        continue
+
             event_id = int(row["EventId"])
             ticket_socket_event_id = int(row["Id"])
             vip_event = VipEvent()
             vip_event.event_id = event_id
+            vip_event.announce_date = announce_date_str
+            vip_event.tour_announce_date = tour_announce_date_str
             vip_event.title = str(row["Title"])
             vip_event.seller_name = str(row["SellerName"])
             vip_event.is_external = False
             vip_event.ticket_socket_event_id = ticket_socket_event_id
             vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
             vip_event.event_date = str(row["EventDate"])
-            vip_event.announce_date = (
-                str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
-            )
+
             vip_event.doors_open = (
                 str(row["DoorsOpen"]) if row["DoorsOpen"] is not None else None
             )

@@ -27,6 +27,7 @@ def get_events():
 
     service = EventService()
     seller_id: int = None
+    seller_ids: list[int] = None
     start: int = None
     end: int = None
     exclude_start: int = None
@@ -35,6 +36,8 @@ def get_events():
     ts_event_id: int = None
     if request.args.get("sellerId") is not None:
         seller_id = int(request.args.get("sellerId"))
+    if request.args.get("sellerIds") is not None:
+        seller_ids = [int(x) for x in str(request.args.get("sellerIds")).split(",")]
     if request.args.get("start") is not None:
         start = int(request.args.get("start"))
     if request.args.get("end") is not None:
@@ -61,7 +64,8 @@ def get_events():
         False,
         False,
         False,
-        False
+        False,
+        seller_ids,
     )
     return convert_to_json(results)
 
