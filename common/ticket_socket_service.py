@@ -4,6 +4,7 @@ Ticket Socket API service module
 
 import os
 import json
+import re
 import time
 from datetime import datetime
 from typing import Any
@@ -333,7 +334,14 @@ class TicketSocketService:
         ttypes: list[TicketSocketTicketType] = []
         for item in ticket_types:
             ticket_type_id = int(item["id"])
+
+            # strip out anything in the name contained in parentheses
             name = str(item["name"])
+            if len(name) > 0:
+                name = re.sub(r"\([^()]*\)", "", name)
+                name = name.replace("  ", " ")
+                name = name.strip()
+
             event_id = int(item["eventId"])
             total_available = int(item["quantity"])
             is_active: bool = True
