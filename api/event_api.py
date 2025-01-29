@@ -35,6 +35,7 @@ def get_events_and_orders_secured():
     show_deleted: bool = False
     show_hidden: bool = False
     ts_event_id: int = None
+    tour_id: int = None
     exclude_external: bool = False
     ignore_flags: bool = False
     get_orders: bool = True
@@ -60,6 +61,8 @@ def get_events_and_orders_secured():
         search_term = str(request.args.get("search"))
     if request.args.get("tsEventId") is not None:
         ts_event_id = int(request.args.get("tsEventId"))
+    if request.args.get("tourId") is not None:
+        tour_id = int(request.args.get("tourId"))
     if request.args.get("excludeExternal") is not None:
         exclude_external = (
             True if int(request.args.get("excludeExternal")) == 1 else False
@@ -70,21 +73,22 @@ def get_events_and_orders_secured():
         get_orders = False if int(request.args.get("omitOrders")) == 1 else True
 
     results = service.get_events_and_orders(
-        get_orders,
-        seller_id,
-        start,
-        end,
-        show_inactive,
-        search_term,
-        ts_event_id,
-        show_deleted,
-        exclude_start,
-        exclude_end,
-        exclude_external,
-        show_hidden,
-        ignore_flags,
-        True,
-        seller_ids,
+        get_orders=get_orders,
+        seller_id=seller_id,
+        start=start,
+        end=end,
+        show_inactive=show_inactive,
+        search_term=search_term,
+        ts_event_id=ts_event_id,
+        show_deleted=show_deleted,
+        exclude_start=exclude_start,
+        exclude_end=exclude_end,
+        exclude_external=exclude_external,
+        show_hidden=show_hidden,
+        ignore_flags=ignore_flags,
+        show_cancelled=True,
+        seller_ids=seller_ids,
+        tour_id=tour_id
     )
     return convert_to_json(results)
 

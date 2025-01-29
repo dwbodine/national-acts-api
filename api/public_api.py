@@ -51,21 +51,15 @@ def get_events():
     if request.args.get("tsEventId") is not None:
         ts_event_id = int(request.args.get("tsEventId"))
     results = service.get_events_and_orders(
-        False,
-        seller_id,
-        start,
-        end,
-        False,
-        search_term,
-        ts_event_id,
-        False,
-        exclude_start,
-        exclude_end,
-        False,
-        False,
-        False,
-        False,
-        seller_ids,
+        seller_id=seller_id,
+        start=start,
+        end=end,
+        search_term=search_term,
+        ts_event_id=ts_event_id,
+        exclude_start=exclude_start,
+        exclude_end=exclude_end,
+        show_cancelled=False,
+        seller_ids=seller_ids
     )
     return convert_to_json(results)
 

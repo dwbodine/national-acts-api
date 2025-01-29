@@ -41,6 +41,7 @@ class EventService:
         ignore_flags: bool = False,
         show_cancelled: bool = True,
         seller_ids: list[int] = None,
+        tour_id: list[int] = None,
     ):
         """
         main method to fetch events and orders
@@ -110,9 +111,30 @@ class EventService:
         data = {}
 
         where_clause: list[str] = []
-        if ts_event_id is not None:
+        if ts_event_id is not None and ts_event_id > 0:
             where_clause.append("TicketSocketEvents.Id = %(event_id)s")
             data["event_id"] = ts_event_id
+        elif tour_id is not None and tour_id > 0:
+            tour_sql = (
+                "SELECT TicketSocketEventId FROM TourEvent WHERE TourId=%(tour_id)s"
+            )
+            tour_data = {"tour_id": tour_id}
+            tour_rows = db_query_all(tour_sql, tour_data)
+            event_ids: list[int] = []
+            for tour_row in tour_rows:
+                tour_event_id = (
+                    int(tour_row["TicketSocketEventId"])
+                    if tour_row["TicketSocketEventId"] is not None
+                    else None
+                )
+                if tour_event_id is not None:
+                    event_ids.append(tour_event_id)
+
+            if len(event_ids) > 0:
+                event_ids_str = db_convert_list_to_parameters(
+                    event_ids, data, "ticketSocketEventId"
+                )
+                where_clause.append("TicketSocketEvents.Id IN " + event_ids_str)
         else:
             if ignore_flags is not True:
                 if show_deleted is not True:
