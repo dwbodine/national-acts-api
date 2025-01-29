@@ -87,7 +87,8 @@ class EventService:
                     ExternalEvents.DisableVipLinkButton, 
                     ExternalEvents.DisableVipLinkReason,
                     Sellers.Name AS SellerName,
-                    Tour.AnnounceDate AS TourAnnounceDate
+                    Tour.AnnounceDate AS TourAnnounceDate,
+                    COALESCE(Tour.IsActive, 0) AS IsTourActive
                  FROM TicketSocketEvents 
                  JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
@@ -169,7 +170,9 @@ class EventService:
             elif start is not None:
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-            elif ignore_flags is not True and (get_orders is False or seller_id is None):
+            elif ignore_flags is not True and (
+                get_orders is False or seller_id is None
+            ):
                 where_clause.append("TicketSocketEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
 
@@ -205,17 +208,23 @@ class EventService:
                 str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
             )
 
+            is_tour_active = True if int(row["IsTourActive"]) == 1 else False
+
+            # get tour announce datetime from active tours only
             tad_ts: float = None
-            if tour_announce_date_str is not None:
+            if is_tour_active and tour_announce_date_str is not None:
                 tad_ts = datetime.strptime(
                     tour_announce_date_str, "%Y-%m-%d %H:%M:%S"
                 ).timestamp()
+
+            # get event announce datetime (if available)
             ad_ts: float = None
             if announce_date_str is not None:
                 ad_ts = datetime.strptime(
                     announce_date_str, "%Y-%m-%d %H:%M:%S"
                 ).timestamp()
 
+            # skip events where the announce date has not yet passed
             if ignore_flags is not True and (get_orders is False or seller_id is None):
                 if tad_ts is not None and ad_ts is not None:
                     if tad_ts >= ad_ts:
