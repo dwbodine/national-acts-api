@@ -10,6 +10,7 @@ from common.common_api import get_user_from_jwt
 from common.daily_order_service import DailyOrderService
 from common.event_service import EventService
 from common.order_service import OrderService
+from common.tour_service import TourService
 from common.data_refresh_service import DataRefreshService
 from common.models.national_acts import VipOrder
 from common.utility import convert_to_json
@@ -352,3 +353,16 @@ def set_ticket_checkin_secured():
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convert_to_json(result)
+
+@event_api.route("/events/tours/<int:seller_id>")
+@jwt_required()
+def get_all_tours(seller_id: int):
+    """
+    API method to fetch all tours
+    """
+    if seller_id is None or seller_id <= 0:
+        return {"msg": "Bad Request"}, 400
+
+    service = TourService()
+    tours = service.get_all_tours(seller_id)
+    return convert_to_json(tours)

@@ -391,24 +391,6 @@ def refund_ticket():
     return convert_to_json(success)
 
 
-@admin_api.route("/admin/tours/<int:seller_id>")
-@jwt_required()
-def get_all_tours(seller_id: int):
-    """
-    API method to fetch all tours
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    if seller_id is None or seller_id <= 0:
-        return {"msg": "Bad Request"}, 400
-
-    service = TourService()
-    tours = service.get_all_tours(seller_id)
-    return convert_to_json(tours)
-
-
 @admin_api.route("/admin/tours/update", methods=["POST"])
 @jwt_required()
 def update_tour():
