@@ -348,7 +348,7 @@ class UserService:
         Get all users in the system
         """
         users: list[User] = []
-        sql: str = """SELECT Users.* FROM Users"""
+        sql: str = """SELECT Users.* FROM Users ORDER BY Users.FirstName, Users.LastName, Users.Username"""
         rows = db_query_all(sql)
         for row in rows:
             user = User()
