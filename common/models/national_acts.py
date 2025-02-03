@@ -1,5 +1,5 @@
 """
-Models specific to National Acts
+Models specific to event/order data and National Acts' integration with TicketSocket
 """
 
 import calendar

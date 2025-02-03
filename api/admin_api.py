@@ -7,8 +7,10 @@ import json
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
+from common.admin_service import AdminService
 from common.common_api import is_admin_logged_in
 from common.event_service import EventService
+from common.models.admin import SiteSetting
 from common.order_service import OrderService
 from common.role_service import RoleService
 from common.tour_service import TourService
@@ -23,7 +25,6 @@ from common.models.user import User, Role
 admin_api = Blueprint("admin_api", __name__)
 
 
-# BEGIN ADMIN ROUTES
 @admin_api.route("/admin/events/cancel", methods=["POST"])
 @jwt_required()
 def cancel_event():
@@ -368,6 +369,27 @@ def update_role():
     return convert_to_json(success)
 
 
+@admin_api.route("/admin/settings/update", methods=["POST"])
+@jwt_required()
+def update_setting():
+    """
+    API method to add or update a site setting
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    setting = convert_json_to_snake_case_object(request.get_json(), SiteSetting())
+
+    if setting is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = AdminService()
+    success = service.update_setting(setting)
+
+    return convert_to_json(success)
+
+
 @admin_api.route("/admin/tickets/refund", methods=["POST"])
 @jwt_required()
 def refund_ticket():
@@ -466,6 +488,3 @@ def update_user():
     service = UserService()
     success = service.update_user(user)
     return convert_to_json(success)
-
-
-# END ADMIN ROUTES
