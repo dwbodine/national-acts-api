@@ -100,17 +100,17 @@ def get_all_settings():
     settings = service.get_site_settings()
     return convert_to_json(settings)
 
-@public_api.route('/public/upload', methods=['POST'])
+@public_api.route('/public/uploadFile', methods=['POST'])
 def upload_temp_file():
     """
     Uploads a file to the /tmp folder
     """
-    if 'image' not in request.files:
+    if 'tempFile' not in request.files:
         return {"msg": "Bad Request"}, 400
 
     filename: str = None
     try:
-        file = request.files['image']
+        file = request.files['tempFile']
         filename = file.filename
         file.save(os.path.join('tmp', filename))
     except Exception as error:  # pylint: disable=broad-exception-caught

@@ -25,6 +25,7 @@ class SiteSetting:
 
     setting_id: int
     name: str
+    display_name: str
     type: SiteSettingType
     value: str
     dirty: bool
