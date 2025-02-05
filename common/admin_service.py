@@ -2,8 +2,6 @@
 Admin service module
 """
 
-import os
-
 from common.db import db_query_all, db_insert, db_update
 from common.models.admin import SiteSetting, SiteSettingType
 from common.utility import move_temp_file_to_public_folder
