@@ -6,6 +6,7 @@ import os
 
 from common.db import db_query_all, db_insert, db_update
 from common.models.admin import SiteSetting, SiteSettingType
+from common.utility import move_temp_file_to_public_folder
 
 
 class AdminService:
@@ -27,12 +28,13 @@ class AdminService:
             setting.display_name = str(row["DisplayName"])
             setting.type = str(row["Type"])
             setting.value = str(row["Value"])
+            setting.file_path = str(row["FilePath"])
             setting.dirty = False
             settings.append(setting)
 
         return settings
 
-    def update_setting(self, setting: SiteSetting, create_thumbnail: bool = False):
+    def update_setting(self, setting: SiteSetting):
         """
         Add or update site setting to database
         """
@@ -64,22 +66,6 @@ class AdminService:
 
         # move temp image to final place
         if setting.type == SiteSettingType.IMAGE:
-            current_file_path = os.path.abspath(__file__)
-            parent_dir = os.path.dirname(current_file_path)
-            temp_dir = "/tmp/"
-
-            file_dir = "/common"
-            if setting.name == "HomeBanner":
-                file_dir += "/homebanners/"
-            else:
-                file_dir += "/images/"
-
-            www_path = os.getenv("WWW_PUBLIC_FOLDER")
-            origin_file = temp_dir + setting.value
-            dest_path = parent_dir + "/" + www_path + file_dir
-
-            if os.path.exists(origin_file) and os.path.exists(dest_path):
-                dest_file = dest_path + setting.value
-                os.replace(origin_file, dest_file)
+            move_temp_file_to_public_folder(setting.value, setting.file_path)
 
         return success

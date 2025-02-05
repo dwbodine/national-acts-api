@@ -379,15 +379,19 @@ def update_setting():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    setting = convert_json_to_snake_case_object(request.get_json(), SiteSetting())
+    data = request.get_json()
 
-    if setting is None:
+    if data is None or len(data) == 0:
         return {"msg": "Bad Request"}, 400
 
+    save_success: bool = True
     service = AdminService()
-    success = service.update_setting(setting)
+    for item in data:
+        setting = convert_json_to_snake_case_object(item, SiteSetting())
+        success = service.update_setting(setting)
+        save_success = save_success and success
 
-    return convert_to_json(success)
+    return convert_to_json(save_success)
 
 
 @admin_api.route("/admin/tickets/refund", methods=["POST"])

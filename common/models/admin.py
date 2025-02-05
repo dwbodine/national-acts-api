@@ -27,5 +27,6 @@ class SiteSetting:
     name: str
     display_name: str
     type: SiteSettingType
+    file_path: str = None
     value: str
     dirty: bool
