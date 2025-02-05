@@ -73,6 +73,32 @@ def convert_json_to_snake_case_object(request_json: any, typed_object: any):
     return typed_object
 
 
+def move_temp_file_to_public_folder(temp_file_name: str, public_rel_path: str):
+    """
+    Move a file from the API /tmp directory to a location within the web app
+    Currently both are hosted on the same server so this is possible
+    without an intermediary web bucket
+    """
+    # using os.path so that this will work in both Linux and Windows
+    www_path = os.getenv("WWW_PUBLIC_FOLDER")  # absolute path to /public in www
+    api_path = os.getenv("API_FILE_PATH")  # absolute path to /tmp in api
+
+    temp_dir = os.path.join(api_path, "tmp")
+
+    # replace Linux relative path separators for Windows
+    if os.name == "nt" and len(public_rel_path) > 0:
+        public_rel_path = public_rel_path.replace("/", "\\")
+
+    origin_file = os.path.join(temp_dir, temp_file_name)
+    dest_path = os.path.join(www_path, public_rel_path)
+
+    # only attempt move if we can find the temp file and the destination path
+    if os.path.exists(origin_file) and os.path.exists(dest_path):
+        dest_file = os.path.join(dest_path, temp_file_name)
+        # using replace will overwrite destination and delete original
+        os.replace(origin_file, dest_file)
+
+
 class SendEmailResult:
     """
     Class for sending email
