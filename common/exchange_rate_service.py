@@ -40,7 +40,7 @@ class ExchangeRateService:
                 usd_rate = json_data[0]["rates"]["usd"]
                 exchange_rate_value = float(usd_rate) * self.exchange_rate.multiplier
 
-        return round(exchange_rate_value, 5)
+        return round(exchange_rate_value, 8)
 
     def get_exchange_rate_by_time(
         self, unix_time: int = None, force_update: bool = False
