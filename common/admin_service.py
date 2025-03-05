@@ -2,8 +2,8 @@
 Admin service module
 """
 
-from common.db import db_query_all, db_insert, db_update
-from common.models.admin import SiteSetting, SiteSettingType
+from common.db import db_delete, db_query_all, db_insert, db_update
+from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
 from common.utility import move_temp_file_to_public_folder
 
 
@@ -67,3 +67,64 @@ class AdminService:
             move_temp_file_to_public_folder(setting.value, setting.file_path)
 
         return success
+
+    def get_external_venues(self):
+        """
+        Fetch all external venues from database
+        """
+        venues: list[ExternalVenue] = []
+        sql = "SELECT * FROM ExternalEventVenues ORDER BY Venue ASC"
+        rows = db_query_all(sql)
+        for row in rows:
+            venue = ExternalVenue()
+            venue.venue_id = int(row["VenueID"])
+            venue.venue = str(row["Venue"])
+            venue.address = str(row["Address"])
+            venue.city = str(row["City"])
+            venue.state = str(row["State"]) if row["State"] is not None else None
+            venue.zip_code = str(row["Zip"]) if row["Zip"] is not None else None
+            venue.country = str(row["Country"]) if row["Country"] is not None else None
+            venues.append(venue)
+
+        return venues
+
+    def update_external_venue(self, venue: ExternalVenue):
+        """
+        Add a venue to the database
+        """
+
+        sql = ""
+        data = {
+            "venue": venue.venue,
+            "address": venue.address,
+            "city": venue.city,
+            "state": venue.state if venue.state is not None else None,
+            "zip": venue.zip_code if venue.zip_code is not None else None,
+            "country": venue.country if venue.country is not None else None,
+        }
+
+        if venue.venue_id is None or venue.venue_id == 0:
+            sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, Country)
+                        VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s)"""
+            venue_id = db_insert(sql, data)
+            venue.venue_id = venue_id
+        else:
+            data["venue_id"] = venue.venue_id
+            sql = """UPDATE ExternalEventVenues SET Venue=%(venue)s,
+                        Address=%(address)s,
+                        City=%(city)s, 
+                        State=%(state)s,
+                        Zip=%(zip)s,
+                        Country=%(country)s
+                        WHERE VenueID=%(venue_id)s"""
+        return venue
+
+    def delete_external_venue(self, venue_id: int):
+        """
+        Remove a venue from the database
+        """
+
+        sql = """DELETE FROM ExternalEventVenues WHERE VenueID=%(venue_id)s"""
+        data = {"venue_id": venue_id}
+        db_delete(sql, data)
+        return True

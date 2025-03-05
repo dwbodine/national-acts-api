@@ -5,15 +5,15 @@ Event Service
 from datetime import datetime
 import operator
 
+from common.calendar_service import CalendarService
 from common.db import (
-    db_delete,
     db_query_all,
     db_query_one,
-    db_insert,
     db_update,
     db_convert_list_to_parameters,
 )
-from common.models.national_acts import VipEvent, Seller, Note
+from common.external_event_service import ExternalEventService
+from common.models.national_acts import VipEvent, Seller
 from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketType
 from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
@@ -76,12 +76,13 @@ class EventService:
                     ExternalEvents.Title AS ExternalTitle, 
                     ExternalEvents.Thumbnail AS ExternalThumbnail, 
                     ExternalEvents.URL AS ExternalUrl, 
-                    ExternalEvents.Venue AS ExternalVenue, 
-                    ExternalEvents.Address AS ExternalAddress, 
-                    ExternalEvents.City AS ExternalCity, 
-                    ExternalEvents.State AS ExternalState, 
-                    ExternalEvents.Zip AS ExternalZip, 
-                    ExternalEvents.Country AS ExternalCountry, 
+                    ExternalEvents.ExternalEventVenueId,
+                    ExternalEventVenues.Venue AS ExternalVenue, 
+                    ExternalEventVenues.Address AS ExternalAddress, 
+                    ExternalEventVenues.City AS ExternalCity, 
+                    ExternalEventVenues.State AS ExternalState, 
+                    ExternalEventVenues.Zip AS ExternalZip, 
+                    ExternalEventVenues.Country AS ExternalCountry, 
                     ExternalEvents.DisableLinkButton, 
                     ExternalEvents.DisableLinkReason, 
                     ExternalEvents.ExternalVipLink, 
@@ -96,6 +97,7 @@ class EventService:
             LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
             LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId 
+            LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
                 AND TicketSocketEvents.EventDate = ExternalEvents.EventDate """
 
         if ts_event_id is None:
@@ -328,6 +330,7 @@ class EventService:
                 if (int(row["IsCancelled"]) == 1 and row["CancelledDate"] is not None)
                 else None
             )
+            vip_event.external_event_venue_id = int(row["ExternalEventVenueId"])
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
             if row["ExternalVenue"] is not None:
                 venue_name = str(row["ExternalVenue"])
@@ -348,7 +351,7 @@ class EventService:
                 vip_country = str(row["ExternalCountry"])
 
             venue = TicketSocketVenue(
-                venue_name, address, "", city, state, zip_code, vip_country, ""
+                venue_name, address, city, state, zip_code, vip_country, ""
             )
             vip_event.venue = venue
             vip_event.is_active = True if int(row["IsActive"]) == 1 else False
@@ -379,7 +382,6 @@ class EventService:
                 external_venue = TicketSocketVenue(
                     str(row["ExternalVenue"]),
                     str(row["ExternalAddress"]),
-                    "",
                     str(row["ExternalCity"]),
                     str(row["ExternalState"]),
                     str(row["ExternalZip"]),
@@ -394,13 +396,14 @@ class EventService:
                 vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
 
             if get_orders is True:
+                calendar_service = CalendarService()
                 order_service = OrderService()
                 ticket_types = self.__get_ticket_types_from_event_id(
                     ticket_socket_event_id
                 )
                 vip_event.ticket_types = ticket_types
 
-                notes = self.__get_event_notes(ticket_socket_event_id)
+                notes = calendar_service.get_event_notes(ticket_socket_event_id)
                 vip_event.notes = notes
 
                 orders = order_service.get_orders_from_event_id(
@@ -417,9 +420,13 @@ class EventService:
 
         # if not excluded, get external events without matching TicketSocketEvents
         if exclude_external is not True:
-            external_sql = """SELECT ExternalEvents.*, Sellers.Name as SellerName
+            external_event_service = ExternalEventService()
+            external_sql = """SELECT ExternalEvents.*, Sellers.Name as SellerName,
+                                ExternalEventVenues.*
                                 FROM ExternalEvents 
                                 JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId 
+                                LEFT JOIN ExternalEventVenues 
+                                    ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
                                 WHERE """
             external_data = {}
 
@@ -438,9 +445,9 @@ class EventService:
 
             if search_term is not None and len(search_term) > 0:
                 externalwhere_clause.append(
-                    """MATCH (ExternalEvents.Title, ExternalEvents.Venue,
-                              ExternalEvents.Address, ExternalEvents.City,
-                              ExternalEvents.State, ExternalEvents.Country)
+                    """MATCH (ExternalEvents.Title, ExternalEventVenues.Venue,
+                              ExternalEventVenues.Address, ExternalEventVenues.City,
+                              ExternalEventVenues.State, ExternalEventVenues.Country)
                               AGAINST (%(search_term)s IN BOOLEAN MODE)"""
                 )
                 external_data["search_term"] = "*" + search_term + "*"
@@ -490,88 +497,13 @@ class EventService:
 
             externalevent_rows = db_query_all(external_sql, external_data)
             for row in externalevent_rows:
-                vip_event = self.__build_external_event_from_dict(row)
+                vip_event = external_event_service.build_external_event_from_dict(row)
                 if vip_event is not None:
                     events.append(vip_event)
 
         events.sort(key=operator.attrgetter("event_date", "title", "is_external"))
 
         return events
-
-    def get_external_event_by_id(self, external_event_id: int):
-        """
-        Fetches a single external event by Id
-        """
-        vip_event: VipEvent = None
-        external_sql = """SELECT ExternalEvents.*, Sellers.Name as SellerName
-                                FROM ExternalEvents 
-                                JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId 
-                                WHERE ExternalEvents.EventId=%(externalEventId)s"""
-        external_data = {"externalEventId": external_event_id}
-
-        row = db_query_one(external_sql, external_data)
-        vip_event = self.__build_external_event_from_dict(row)
-
-        return vip_event
-
-    def __build_external_event_from_dict(self, row: dict):
-        """
-        internal method to build out external vip event
-        """
-        vip_event: VipEvent = None
-        if row:
-            event_id = int(row["EventId"]) if row["EventId"] is not None else 0
-            vip_event = VipEvent()
-            vip_event.event_id = event_id
-            vip_event.title = str(row["Title"])
-            vip_event.seller_name = str(row["SellerName"])
-            vip_event.is_external = True
-            vip_event.event_date = str(row["EventDate"])
-            vip_event.announce_date = str(row["AnnounceDate"])
-            vip_event.thumbnail = str(row["Thumbnail"])
-            vip_event.external_url = str(row["URL"])
-            venue = TicketSocketVenue(
-                str(row["Venue"]),
-                str(row["Address"]),
-                "",
-                str(row["City"]),
-                str(row["State"]),
-                str(row["Zip"]),
-                str(row["Country"]),
-                "",
-            )
-            vip_event.venue = venue
-            vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-            vip_event.external_event_id = (
-                int(row["EventId"]) if row["EventId"] is not None else 0
-            )
-            vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.disable_link_button = str(row["DisableLinkButton"])
-            vip_event.disable_link_reason = str(row["DisableLinkReason"])
-            vip_event.external_vip_link = str(row["ExternalVipLink"])
-            vip_event.is_vip = (
-                True
-                if (
-                    vip_event.external_vip_link is not None
-                    and vip_event.external_vip_link != ""
-                )
-                else False
-            )
-            vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
-            vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
-            vip_event.is_added_to_bands_in_town = (
-                True if int(row["IsAddedToBandsInTown"]) == 1 else False
-            )
-            vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
-            vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
-            vip_event.cancelled_date = (
-                str(row["CancelledDate"])
-                if (vip_event.is_cancelled is True and row["CancelledDate"] is not None)
-                else None
-            )
-            vip_event.get_totals()
-
-        return vip_event
 
     def __get_ticket_types_from_event_id(self, ticket_socket_event_id: int):
         """
@@ -805,126 +737,6 @@ class EventService:
             if success is True:
                 self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
-
-    def add_note(
-        self,
-        note: str,
-        ticket_socket_event_id: int = None,
-        calendar_date: str = None,
-        note_title: str = None,
-    ):
-        """
-        API method to add a note specific to an event or calendar date
-        """
-        sql = """INSERT INTO TicketSocketEventNotes
-                    (TicketSocketEventId, Note, NoteTitle, NoteTimestamp)
-                    VALUES (%(ticketSocketEventId)s, %(note)s, """
-        data = {
-            "ticketSocketEventId": (
-                ticket_socket_event_id if ticket_socket_event_id is not None else None
-            ),
-            "note": note,
-        }
-
-        if calendar_date is not None:
-            sql += """%(noteTitle)s, %(noteTimestamp)s"""
-            data["noteTitle"] = note_title
-            data["noteTimestamp"] = calendar_date
-        else:
-            sql += """NULL, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
-
-        sql += """)"""
-
-        success = db_insert(sql, data)
-        return success
-
-    def edit_note(
-        self,
-        note_id: int,
-        note: str,
-        note_date: str,
-        note_title: str = None,
-        is_completed: bool = False,
-    ):
-        """
-        API method to update any note from its id
-        """
-        sql = """UPDATE TicketSocketEventNotes
-                    SET NoteTitle=%(noteTitle)s,
-                    Note=%(note)s, 
-                    IsCompleted=%(isCompleted)s, 
-                    NoteTimeStamp=%(noteDate)s, 
-                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                    WHERE TicketSocketEventNoteId=%(noteId)s"""
-        data = {
-            "note": note,
-            "noteTitle": note_title,
-            "noteId": note_id,
-            "noteDate": note_date,
-            "isCompleted": 1 if is_completed is True else 0,
-        }
-
-        success = db_update(sql, data)
-        return success
-
-    def delete_note(
-        self,
-        note_id: int,
-    ):
-        """
-        API method to delete any note from its id
-        """
-        sql = """DELETE FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventNoteId=%(noteId)s"""
-        data = {"noteId": note_id}
-
-        success = db_delete(sql, data)
-        return success
-
-    def get_calendar_notes(self, start: int, end: int):
-        """
-        API method to fetch calendar notes
-        """
-        notes: list[Note] = []
-        sql = """SELECT * FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventId IS NULL AND
-                    NoteTimestamp BETWEEN %(startDate)s and %(endDate)s 
-                    ORDER BY NoteTimestamp ASC, IsCompleted DESC, NoteTitle ASC"""
-        data = {
-            "startDate": datetime.fromtimestamp(start).strftime("%Y-%m-%d"),
-            "endDate": datetime.fromtimestamp(end).strftime("%Y-%m-%d"),
-        }
-        rows = db_query_all(sql, data)
-        for row in rows:
-            note = Note()
-            note.note_id = int(row["TicketSocketEventNoteId"])
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
-            note.note_title = (
-                str(row["NoteTitle"]) if row["NoteTitle"] is not None else None
-            )
-            note.is_completed = True if int(row["IsCompleted"]) == 1 else False
-            notes.append(note)
-        return notes
-
-    def __get_event_notes(self, ticket_socket_event_id: int):
-        """
-        API method to fetch event notes
-        """
-        notes: list[Note] = []
-        sql = """SELECT * FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventId=%(ticketSocketEventId)s
-                    ORDER BY NoteTimestamp DESC"""
-        data = {"ticketSocketEventId": ticket_socket_event_id}
-        rows = db_query_all(sql, data)
-        for row in rows:
-            note = Note()
-            note.note_id = int(row["TicketSocketEventNoteId"])
-            note.ticket_socket_event_id = ticket_socket_event_id
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
-            notes.append(note)
-        return notes
 
     def rebuild_daily_order_data_for_event(self, event_id: int):
         """

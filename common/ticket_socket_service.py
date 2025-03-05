@@ -231,11 +231,14 @@ class TicketSocketService:
                 elif custom_fields != {} and "venueAddress1" in custom_fields:
                     address1 = fix_magic_quotes(custom_fields["venueAddress1"])
 
-                address2 = ""
+                address2 = None
                 if "venueAddress2" in item and item["venueAddress2"] != "":
                     address2 = fix_magic_quotes(item["venueAddress2"])
                 elif custom_fields != {} and "venueAddress2" in custom_fields:
                     address2 = fix_magic_quotes(custom_fields["venueAddress2"])
+                    
+                if address2 is not None:
+                    address1 += ", " + address2
 
                 city = ""
                 if "venueCity" in item and item["venueCity"] != "":
@@ -270,7 +273,7 @@ class TicketSocketService:
                     timezone = custom_fields["timezone"]
 
                 event_venue = TicketSocketVenue(
-                    venue, address1, address2, city, state, zip_code, country, timezone
+                    venue, address1, city, state, zip_code, country, timezone
                 )
                 event.venue = event_venue
 

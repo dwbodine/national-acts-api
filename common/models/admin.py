@@ -30,3 +30,17 @@ class SiteSetting:
     file_path: str = None
     value: str
     dirty: bool
+
+
+class ExternalVenue:
+    """
+    setting for "external event venues"
+    """
+
+    venue_id: int
+    venue: str
+    address: str
+    city: str
+    state: str
+    zip_code: str
+    country: str

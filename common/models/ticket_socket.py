@@ -23,7 +23,6 @@ class TicketSocketVenue:
         self,
         name: str,
         address1: str,
-        address2: str,
         city: str,
         state: str,
         postal_code: str,
@@ -32,7 +31,6 @@ class TicketSocketVenue:
     ):
         self.name = name
         self.address1 = address1
-        self.address2 = address2
         self.city = city
         self.state = state
         self.postal_code = postal_code

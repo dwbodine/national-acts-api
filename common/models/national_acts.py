@@ -257,6 +257,7 @@ class VipEvent(TicketSocketEvent):
     external_title: str = None
     external_thumbnail: str = None
     external_url: str = None
+    external_event_venue_id: int = None
     external_venue: TicketSocketVenue = None
     disable_link_button: bool = False
     disable_link_reason: bool = False
@@ -397,11 +398,6 @@ class VipEvent(TicketSocketEvent):
                 and self.external_venue.address1 != ""
             ):
                 self.venue.address1 = self.external_venue.address1
-            if (
-                self.external_venue.address2 is not None
-                and self.external_venue.address2 != ""
-            ):
-                self.venue.address2 = self.external_venue.address2
             if self.external_venue.city is not None and self.external_venue.city != "":
                 self.venue.city = self.external_venue.city
             if (
