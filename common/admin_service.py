@@ -73,7 +73,11 @@ class AdminService:
         Fetch all external venues from database
         """
         venues: list[ExternalVenue] = []
-        sql = "SELECT * FROM ExternalEventVenues ORDER BY Venue ASC"
+        sql = """SELECT ExternalEventVenues.*,
+            (SELECT 1 FROM ExternalEvents
+                WHERE ExternalEvents.ExternalEventVenueId = 
+                ExternalEventVenues.VenueID Limit 0, 1) as HasEvents
+            FROM ExternalEventVenues ORDER BY Venue ASC"""
         rows = db_query_all(sql)
         for row in rows:
             venue = ExternalVenue()
@@ -84,6 +88,7 @@ class AdminService:
             venue.state = str(row["State"]) if row["State"] is not None else None
             venue.zip_code = str(row["Zip"]) if row["Zip"] is not None else None
             venue.country = str(row["Country"]) if row["Country"] is not None else None
+            venue.has_events = True if row["HasEvents"] is not None else False
             venues.append(venue)
 
         return venues
@@ -93,6 +98,7 @@ class AdminService:
         Add a venue to the database
         """
 
+        success = False
         sql = ""
         data = {
             "venue": venue.venue,
@@ -107,6 +113,7 @@ class AdminService:
             sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, Country)
                         VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s)"""
             venue_id = db_insert(sql, data)
+            success = venue_id > 0
             venue.venue_id = venue_id
         else:
             data["venue_id"] = venue.venue_id
@@ -117,7 +124,8 @@ class AdminService:
                         Zip=%(zip)s,
                         Country=%(country)s
                         WHERE VenueID=%(venue_id)s"""
-        return venue
+            success = db_update(sql, data)
+        return venue if success is True else None
 
     def delete_external_venue(self, venue_id: int):
         """

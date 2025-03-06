@@ -41,6 +41,7 @@ class ExternalVenue:
     venue: str
     address: str
     city: str
-    state: str
-    zip_code: str
-    country: str
+    state: str = None
+    zip_code: str = None
+    country: str = None
+    has_events: bool = False

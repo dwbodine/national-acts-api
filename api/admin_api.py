@@ -134,7 +134,7 @@ def get_external_events(seller_id: int):
 @jwt_required()
 def update_external_event(seller_id: int):
     """
-    API method to delete note by Id
+    API method to add/update external event
     """
     is_admin = is_admin_logged_in()
     if is_admin is False:
