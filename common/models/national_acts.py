@@ -498,6 +498,7 @@ class Seller:
     is_active: bool = True
     name: str = None
     seller_type: int = 1
+    num_external_events: int = 0
 
     seller_event_categories: list[SellerEventCategory] = []
 
@@ -509,8 +510,14 @@ class Seller:
         """
         Initialize seller from database
         """
-        sql = """SELECT * FROM Sellers
-                 WHERE SellerId=%(sellerId)s"""
+        sql = """SELECT Sellers.*,
+            (SELECT COUNT(EventId) FROM ExternalEvents 
+                WHERE ExternalEvents.SellerId = Sellers.SellerId
+                AND ExternalEvents.EventDate >= 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))
+                AS NumExternalEvents
+            FROM Sellers
+            WHERE Sellers.SellerId=%(sellerId)s"""
         data = {"sellerId": self.seller_id}
 
         row = db_query_one(sql, data)
@@ -519,6 +526,7 @@ class Seller:
             self.seller_type = int(row["SellerTypeId"])
             self.hide_in_list = int(row["HideInList"]) == 1
             self.is_active = int(row["Inactive"]) != 1
+            self.num_external_events = int(row["NumExternalEvents"])
             self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):

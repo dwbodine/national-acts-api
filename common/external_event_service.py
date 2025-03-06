@@ -3,6 +3,7 @@ External Event Service
 """
 
 from common.db import (
+    db_delete,
     db_query_all,
     db_query_one,
     db_insert,
@@ -154,6 +155,76 @@ class ExternalEventService:
             success = event_id > 0
         return success
 
+    def disable_external_events(self, event_ids: list[int], disabled: bool):
+        """
+        Marks eventIds as disabled
+        """
+        success: bool = True
+        for event_id in event_ids:
+            sql = """UPDATE ExternalEvents
+                        SET IsActive=%(is_active)s,
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                    WHERE EventId=%(event_id)s"""
+            data = {
+                "event_id": event_id,
+                "is_active": 0 if disabled is True else 1,
+            }
+            success = db_update(sql, data)
+            if success is False:
+                break
+        return success
+
+    def delete_external_events(self, event_ids: list[int]):
+        """
+        Marks eventIds as deleted
+        """
+        success: bool = True
+        for event_id in event_ids:
+            sql = """DELETE FROM ExternalEvents WHERE EventId=%(event_id)s"""
+            data = {"event_id": event_id}
+            success = db_delete(sql, data)
+            if success is False:
+                break
+        return success
+
+    def hide_external_events(self, event_ids: list[int], hidden: bool):
+        """
+        Marks events as hidden
+        """
+        success: bool = True
+        for event_id in event_ids:
+            sql = """UPDATE ExternalEvents
+                        SET IsHidden=%(isHidden)s,
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                        WHERE EventId=%(event_id)s"""
+            data = {
+                "event_id": event_id,
+                "isHidden": 1 if hidden is True else 0,
+            }
+            success = db_update(sql, data)
+            if success is False:
+                break
+        return success
+
+    def cancel_external_events(self, event_ids: list[int], hidden: bool):
+        """
+        Marks events as cancelled
+        """
+        success: bool = True
+        for event_id in event_ids:
+            sql = """UPDATE ExternalEvents
+                        SET IsCancelled=%(isCancelled)s,
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                        WHERE EventId=%(event_id)s"""
+            data = {
+                "event_id": event_id,
+                "isCancelled": 1 if hidden is True else 0,
+            }
+            success = db_update(sql, data)
+            if success is False:
+                break
+        return success
+
     def build_external_event_from_dict(self, row: dict):
         """
         internal method to build out external vip event
@@ -206,7 +277,11 @@ class ExternalEventService:
             vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
             vip_event.cancelled_date = (
                 str(row["CancelledDate"])
-                if (vip_event.is_cancelled is True and row["CancelledDate"] is not None)
+                if (
+                    "CancelledDate" in row
+                    and row["CancelledDate"] is not None
+                    and vip_event.is_cancelled is True
+                )
                 else None
             )
             vip_event.get_totals()
