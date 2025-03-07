@@ -251,7 +251,7 @@ class ExternalEventService:
                 str(row["Country"]),
                 "",
             )
-            vip_event.venue = venue
+            vip_event.external_venue = venue
             vip_event.is_active = True if int(row["IsActive"]) == 1 else False
             vip_event.external_event_id = (
                 int(row["EventId"]) if row["EventId"] is not None else 0
