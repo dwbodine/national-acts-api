@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
+from PIL import Image
 
 
 class CamelCaseJsonEncoder(json.JSONEncoder):
@@ -78,6 +79,7 @@ def move_temp_file_to_public_folder(temp_file_name: str, public_rel_path: str):
     Move a file from the API /tmp directory to a location within the web app
     Currently both are hosted on the same server so this is possible
     without an intermediary web bucket
+
     """
     # using os.path so that this will work in both Linux and Windows
     www_path = os.getenv("WWW_PUBLIC_FOLDER")  # absolute path to /public in www
@@ -97,6 +99,41 @@ def move_temp_file_to_public_folder(temp_file_name: str, public_rel_path: str):
         dest_file = os.path.join(dest_path, temp_file_name)
         # using replace will overwrite destination and delete original
         os.replace(origin_file, dest_file)
+
+
+def create_thumbnail(image_name):
+    """
+    Resizes an image using Pillow
+    """
+
+    api_path = os.getenv("API_FILE_PATH")  # absolute path to /tmp in api
+    temp_dir = os.path.join(api_path, "tmp")
+
+    image_path = os.path.join(temp_dir, image_name)
+    thumbfile_name: str = None
+
+    if os.path.exists(image_path):
+        try:
+            image = Image.open(image_path)
+            filename = image.filename
+            last_index = filename.rfind(".")
+            if last_index < 0:
+                return None
+            thumbfile_path = f"{filename[0:last_index]}_thumb{filename[last_index:]}"
+            thumbnail_size = int(os.getenv("THUMBNAIL_SIZE"))
+            size = thumbnail_size, thumbnail_size
+            image.thumbnail(size, Image.Resampling.LANCZOS)
+            image.save(thumbfile_path, image.format)
+            if not os.path.exists(thumbfile_path):
+                thumbfile_name = None
+            else:
+                os.remove(image_path)
+                thumbfile_name = os.path.basename(thumbfile_path)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            thumbfile_name = None
+            log_message(f"Unexpected {e=}, {type(e)=}")
+
+    return thumbfile_name
 
 
 class SendEmailResult:

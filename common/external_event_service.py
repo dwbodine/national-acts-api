@@ -11,6 +11,7 @@ from common.db import (
 )
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import TicketSocketVenue
+from common.utility import create_thumbnail, move_temp_file_to_public_folder
 
 
 class ExternalEventService:
@@ -74,7 +75,7 @@ class ExternalEventService:
                 and event_to_update.is_deleted is False
                 else 0
             ),
-            "title": event_to_update.external_title,
+            "title": event_to_update.title,
             "is_cancelled": 1 if event_to_update.is_cancelled is True else 0,
             "isAddedToBandsInTown": (
                 1 if event_to_update.is_added_to_bands_in_town is True else 0
@@ -86,11 +87,6 @@ class ExternalEventService:
                 else None
             ),
             "event_date": event_to_update.event_date,
-            "thumbnail": (
-                event_to_update.external_thumbnail
-                if event_to_update.external_thumbnail is not None
-                else None
-            ),
             "url": event_to_update.external_url,
             "external_event_venue_id": event_to_update.external_event_venue_id,
             "disable_link_button": (
@@ -116,13 +112,18 @@ class ExternalEventService:
             ),
         }
 
+        if event_to_update.external_thumbnail is not None:
+            thumb_file = create_thumbnail(event_to_update.external_thumbnail)
+            if thumb_file is not None:
+                update_data["thumbnail"] = thumb_file
+                move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
+
         if event_to_update.event_id > 0:
             update_data["event_id"] = event_to_update.external_event_id
             update_sql = """UPDATE ExternalEvents
                              SET IsActive=%(is_active)s, 
                              Title=%(title)s,
                              EventDate=%(event_date)s,
-                             Thumbnail=%(thumbnail)s,
                              URL=%(url)s,
                              ExternalEventVenueId=%(external_event_venue_id)s,
                              DisableLinkButton=%(disable_link_button)s,
@@ -133,9 +134,13 @@ class ExternalEventService:
                              IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
                              IsHidden=%(isHidden)s, 
                              AnnounceDate=%(announceDate)s, 
-                             IsCancelled=%(is_cancelled)s,
-                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                             WHERE EventId=%(event_id)s"""
+                             IsCancelled=%(is_cancelled)s, """
+                             
+            if "thumbnail" in update_data:
+                update_sql += """Thumbnail=%(thumbnail)s, """
+                
+            update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+                WHERE EventId=%(event_id)s"""
 
             success = db_update(update_sql, update_data)
         else:
@@ -153,6 +158,7 @@ class ExternalEventService:
 
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0
+
         return success
 
     def disable_external_events(self, event_ids: list[int], disabled: bool):

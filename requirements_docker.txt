@@ -7,3 +7,4 @@ sendgrid==6.11.0
 googlemaps==4.10.0
 stringcase==1.2.0
 requests==2.32.3
+pillow==11.1.0
