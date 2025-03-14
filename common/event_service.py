@@ -47,8 +47,9 @@ class EventService:
         main method to fetch events and orders
         """
         events: list[VipEvent] = []
-
+        now_ts: float = datetime.now().timestamp()
         seller_event_category_ids: list[int] = []
+
         if seller_ids is not None:
             seller_event_category_ids = []
             for sid in seller_ids:
@@ -221,7 +222,7 @@ class EventService:
         sql = sql.replace("\n", "")
 
         event_rows = db_query_all(sql, data)
-        now_ts: float = datetime.now().timestamp()
+
         for row in event_rows:
             tour_announce_date_str = (
                 str(row["TourAnnounceDate"])
@@ -497,6 +498,24 @@ class EventService:
 
             externalevent_rows = db_query_all(external_sql, external_data)
             for row in externalevent_rows:
+                external_announce_date_str = (
+                    str(row["AnnounceDate"])
+                    if row["AnnounceDate"] is not None
+                    else None
+                )
+
+                # get event announce datetime (if available)
+                external_ad_ts: float = None
+                if external_announce_date_str is not None:
+                    external_ad_ts = datetime.strptime(
+                        external_announce_date_str, "%Y-%m-%d %H:%M:%S"
+                    ).timestamp()
+
+                    # skip events where the announce date has not yet passed
+                if ignore_flags is not True and external_ad_ts is not None:
+                    if external_ad_ts > now_ts:
+                        continue
+
                 vip_event = external_event_service.build_external_event_from_dict(row)
                 if vip_event is not None:
                     events.append(vip_event)

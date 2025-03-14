@@ -75,7 +75,7 @@ class ExternalEventService:
                 and event_to_update.is_deleted is False
                 else 0
             ),
-            "title": event_to_update.title,
+            "title": event_to_update.external_title,
             "is_cancelled": 1 if event_to_update.is_cancelled is True else 0,
             "isAddedToBandsInTown": (
                 1 if event_to_update.is_added_to_bands_in_town is True else 0
@@ -147,14 +147,14 @@ class ExternalEventService:
             update_data["seller_id"] = event_to_update.external_seller_id
             update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
                 Thumbnail, URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
-                ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, Created, 
-                LastUpdate, IsActive, IsAddedToBandsInTown, IsHidden, IsCancelled, 
-                AnnounceDate) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
+                ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, IsHidden, IsCancelled, 
+                AnnounceDate, Created, 
+                LastUpdate) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
                 %(thumbnail)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
-                %(disable_vip_link_reason)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
-                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), %(is_active)s, 
-                %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s)"""
+                %(disable_vip_link_reason)s, %(is_active)s, 
+                %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0
@@ -239,13 +239,17 @@ class ExternalEventService:
         if row:
             event_id = int(row["EventId"]) if row["EventId"] is not None else 0
             vip_event = VipEvent()
-            vip_event.event_id = event_id
-            vip_event.title = str(row["Title"])
-            vip_event.seller_name = str(row["SellerName"])
             vip_event.is_external = True
+            vip_event.event_id = event_id
+            vip_event.external_event_id = event_id
+            vip_event.title = str(row["Title"])
+            vip_event.external_title = str(row["Title"])
+            vip_event.seller_name = str(row["SellerName"])
+            vip_event.external_seller_id = int(row["SellerId"])
             vip_event.event_date = str(row["EventDate"])
             vip_event.announce_date = str(row["AnnounceDate"])
             vip_event.thumbnail = str(row["Thumbnail"])
+            vip_event.external_thumbnail = str(row["Thumbnail"])
             vip_event.external_url = str(row["URL"])
             vip_event.external_event_venue_id = int(row["ExternalEventVenueId"])
             venue = TicketSocketVenue(
@@ -263,7 +267,7 @@ class ExternalEventService:
                 int(row["EventId"]) if row["EventId"] is not None else 0
             )
             vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.disable_link_button = str(row["DisableLinkButton"])
+            vip_event.disable_link_button = True if int(row["DisableLinkButton"]) == 1 else False
             vip_event.disable_link_reason = str(row["DisableLinkReason"])
             vip_event.external_vip_link = str(row["ExternalVipLink"])
             vip_event.is_vip = (
@@ -274,7 +278,7 @@ class ExternalEventService:
                 )
                 else False
             )
-            vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
+            vip_event.disable_vip_link_button = True if int(row["DisableVipLinkButton"]) == 1 else False
             vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
             vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False

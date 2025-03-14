@@ -260,10 +260,10 @@ class VipEvent(TicketSocketEvent):
     external_event_venue_id: int = None
     external_venue: TicketSocketVenue = None
     disable_link_button: bool = False
-    disable_link_reason: bool = False
+    disable_link_reason: str = None
     external_vip_link: str = None
     disable_vip_link_button: bool = False
-    disable_vip_link_reason: bool = False
+    disable_vip_link_reason: str = None
     seller_event_category_id: int = None
     is_vip: bool = True
     is_deleted: bool = False
