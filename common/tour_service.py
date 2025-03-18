@@ -4,6 +4,7 @@ Tour service module
 
 from datetime import datetime
 from common.event_service import EventService
+from common.external_event_service import ExternalEventService
 from common.models.national_acts import Seller, Tour, VipEvent
 from common.db import db_delete, db_insert, db_query_all, db_update
 
@@ -89,6 +90,7 @@ class TourService:
         """
         events: list[VipEvent] = []
         event_service = EventService()
+        external_event_service = ExternalEventService()
         sql = """SELECT TourEvent.*
                     FROM TourEvent 
                     WHERE TourId=%(tourId)s"""
@@ -108,12 +110,15 @@ class TourService:
             )
             if ts_event_id is not None:
                 evts = event_service.get_events_and_orders(
-                    ts_event_id=ts_event_id, ignore_flags=True, exclude_external=True, get_orders=False
+                    ts_event_id=ts_event_id,
+                    ignore_flags=True,
+                    exclude_external=True,
+                    get_orders=False,
                 )
                 if len(evts) > 0:
                     evt = evts[0]
             elif ex_event_id is not None:
-                evt = event_service.get_external_event_by_id(ex_event_id)
+                evt = external_event_service.get_external_event_by_id(ex_event_id)
             if evt is not None:
                 events.append(evt)
         return events

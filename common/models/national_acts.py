@@ -257,12 +257,13 @@ class VipEvent(TicketSocketEvent):
     external_title: str = None
     external_thumbnail: str = None
     external_url: str = None
+    external_event_venue_id: int = None
     external_venue: TicketSocketVenue = None
     disable_link_button: bool = False
-    disable_link_reason: bool = False
+    disable_link_reason: str = None
     external_vip_link: str = None
     disable_vip_link_button: bool = False
-    disable_vip_link_reason: bool = False
+    disable_vip_link_reason: str = None
     seller_event_category_id: int = None
     is_vip: bool = True
     is_deleted: bool = False
@@ -390,30 +391,28 @@ class VipEvent(TicketSocketEvent):
             self.title = self.external_title
 
         if self.external_venue is not None:
-            if self.external_venue.name is not None and self.external_venue.name != "":
-                self.venue.name = self.external_venue.name
-            if (
-                self.external_venue.address1 is not None
-                and self.external_venue.address1 != ""
-            ):
-                self.venue.address1 = self.external_venue.address1
-            if (
-                self.external_venue.address2 is not None
-                and self.external_venue.address2 != ""
-            ):
-                self.venue.address2 = self.external_venue.address2
-            if self.external_venue.city is not None and self.external_venue.city != "":
-                self.venue.city = self.external_venue.city
-            if (
-                self.external_venue.state is not None
-                and self.external_venue.state != ""
-            ):
-                self.venue.state = self.external_venue.state
-            if (
-                self.external_venue.postal_code is not None
-                and self.external_venue.postal_code != ""
-            ):
-                self.venue.postal_code = self.external_venue.postal_code
+            if self.venue is None:
+                self.venue = self.external_venue
+            else:
+                if self.external_venue.name is not None and self.external_venue.name != "":
+                    self.venue.name = self.external_venue.name
+                if (
+                    self.external_venue.address1 is not None
+                    and self.external_venue.address1 != ""
+                ):
+                    self.venue.address1 = self.external_venue.address1
+                if self.external_venue.city is not None and self.external_venue.city != "":
+                    self.venue.city = self.external_venue.city
+                if (
+                    self.external_venue.state is not None
+                    and self.external_venue.state != ""
+                ):
+                    self.venue.state = self.external_venue.state
+                if (
+                    self.external_venue.postal_code is not None
+                    and self.external_venue.postal_code != ""
+                ):
+                    self.venue.postal_code = self.external_venue.postal_code
 
         if self.external_thumbnail is not None and self.external_thumbnail != "":
             self.thumbnail = self.external_thumbnail
@@ -502,6 +501,7 @@ class Seller:
     is_active: bool = True
     name: str = None
     seller_type: int = 1
+    num_external_events: int = 0
 
     seller_event_categories: list[SellerEventCategory] = []
 
@@ -513,8 +513,14 @@ class Seller:
         """
         Initialize seller from database
         """
-        sql = """SELECT * FROM Sellers
-                 WHERE SellerId=%(sellerId)s"""
+        sql = """SELECT Sellers.*,
+            (SELECT COUNT(EventId) FROM ExternalEvents 
+                WHERE ExternalEvents.SellerId = Sellers.SellerId
+                AND ExternalEvents.EventDate >= 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))
+                AS NumExternalEvents
+            FROM Sellers
+            WHERE Sellers.SellerId=%(sellerId)s"""
         data = {"sellerId": self.seller_id}
 
         row = db_query_one(sql, data)
@@ -523,6 +529,7 @@ class Seller:
             self.seller_type = int(row["SellerTypeId"])
             self.hide_in_list = int(row["HideInList"]) == 1
             self.is_active = int(row["Inactive"]) != 1
+            self.num_external_events = int(row["NumExternalEvents"])
             self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):

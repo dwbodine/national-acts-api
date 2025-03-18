@@ -8,9 +8,11 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from common.admin_service import AdminService
+from common.calendar_service import CalendarService
 from common.common_api import is_admin_logged_in
 from common.event_service import EventService
-from common.models.admin import SiteSetting
+from common.external_event_service import ExternalEventService
+from common.models.admin import ExternalVenue, SiteSetting
 from common.order_service import OrderService
 from common.role_service import RoleService
 from common.tour_service import TourService
@@ -110,6 +112,142 @@ def update_event():
     return convert_to_json(success)
 
 
+@admin_api.route("/admin/external_events/<int:seller_id>")
+@jwt_required()
+def get_external_events(seller_id: int):
+    """
+    API method to fetch all external events for seller_id
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    if seller_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = ExternalEventService()
+    events = service.get_external_events_by_seller(seller_id)
+    return convert_to_json(events)
+
+
+@admin_api.route("/admin/external_events/update/<int:seller_id>", methods=["POST"])
+@jwt_required()
+def update_external_event(seller_id: int):
+    """
+    API method to add/update external event
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    if seller_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    event = convert_json_to_snake_case_object(request.get_json(), VipEvent())
+
+    service = ExternalEventService()
+    success = service.update_external_event(event)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/external_events/setEventsCancelled", methods=["POST"])
+@jwt_required()
+def set_event_cancelled_secured():
+    """
+    API method to mark event(s) as cancelled
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_ids: list[int] = request.json.get("eventIdList", None)
+    is_cancelled = request.json.get("isCancelled", None)
+
+    if event_ids is None or len(event_ids) == 0 or is_cancelled is None:
+        return {"msg": "Bad Request"}, 400
+
+    cancelled: bool = True if int(is_cancelled) == 1 else False
+    service = ExternalEventService()
+    if len(event_ids) > 0:
+        result = service.cancel_external_events(event_ids, cancelled)
+        if result is False:
+            return {"msg": "Internal Server Error"}, 500
+    return convert_to_json(result)
+
+
+@admin_api.route("/admin/external_events/setEventsDeleted", methods=["POST"])
+@jwt_required()
+def set_event_deleted_secured():
+    """
+    API method to mark event(s) as deleted
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_ids: list[int] = request.json.get("eventIdList", None)
+
+    if event_ids is None or len(event_ids) == 0:
+        return {"msg": "Bad Request"}, 400
+
+    service = ExternalEventService()
+    if len(event_ids) > 0:
+        result = service.delete_external_events(event_ids)
+        if result is False:
+            return {"msg": "Internal Server Error"}, 500
+    return convert_to_json(result)
+
+
+@admin_api.route("/admin/external_events/setEventsHidden", methods=["POST"])
+@jwt_required()
+def set_event_hidden_secured():
+    """
+    API method to mark event(s) as hidden
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_ids: list[int] = request.json.get("eventIdList", None)
+    is_hidden = request.json.get("isHidden", None)
+
+    if event_ids is None or len(event_ids) == 0 or is_hidden is None:
+        return {"msg": "Bad Request"}, 400
+
+    hidden: bool = True if int(is_hidden) == 1 else False
+    service = ExternalEventService()
+    if len(event_ids) > 0:
+        result = service.hide_external_events(event_ids, hidden)
+        if result is False:
+            return {"msg": "Internal Server Error"}, 500
+    return convert_to_json(result)
+
+
+@admin_api.route("/admin/external_events/setEventsInactive", methods=["POST"])
+@jwt_required()
+def set_event_inactive_secured():
+    """
+    API method to mark event(s) as inactive
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    event_ids: list[int] = request.json.get("eventIdList", None)
+    is_active = request.json.get("isActive", None)
+
+    if event_ids is None or len(event_ids) == 0 or is_active is None:
+        return {"msg": "Bad Request"}, 400
+
+    disabled: bool = True if int(is_active) == 0 else False
+    service = ExternalEventService()
+    if len(event_ids) > 0:
+        result = service.disable_external_events(event_ids, disabled)
+        if result is False:
+            return {"msg": "Internal Server Error"}, 500
+    return convert_to_json(result)
+
+
 @admin_api.route("/admin/notes/add", methods=["POST"])
 @jwt_required()
 def add_note():
@@ -143,7 +281,7 @@ def add_note():
     if ticket_socket_event_id is None and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
-    service = EventService()
+    service = CalendarService()
     success = service.add_note(
         str(note), ticket_socket_event_id, calendar_date, note_title
     )
@@ -170,7 +308,7 @@ def get_calendar_notes():
     if start is None or end is None:
         return {"msg": "Bad Request"}, 400
 
-    service = EventService()
+    service = CalendarService()
     notes = service.get_calendar_notes(start, end)
     return convert_to_json(notes)
 
@@ -190,7 +328,7 @@ def delete_note():
     if note_id is None:
         return {"msg": "Bad Request"}, 400
 
-    service = EventService()
+    service = CalendarService()
     success = service.delete_note(note_id)
     return convert_to_json(success)
 
@@ -216,7 +354,7 @@ def edit_note():
     is_completed_str = request.json.get("isCompleted", None)
     is_completed = True if is_completed_str == 1 else False
 
-    service = EventService()
+    service = CalendarService()
     success = service.edit_note(note_id, note, note_date, note_title, is_completed)
     return convert_to_json(success)
 
@@ -491,4 +629,56 @@ def update_user():
 
     service = UserService()
     success = service.update_user(user)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/venues")
+@jwt_required()
+def get_all_venues():
+    """
+    API method to fetch all external event venues
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    service = AdminService()
+    venues = service.get_external_venues()
+    return convert_to_json(venues)
+
+
+@admin_api.route("/admin/venues/edit", methods=["POST"])
+@jwt_required()
+def update_venue():
+    """
+    API method to add/edit single venue
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    venue = convert_json_to_snake_case_object(request.get_json(), ExternalVenue())
+
+    service = AdminService()
+    venue = service.update_external_venue(venue)
+    return convert_to_json(venue)
+
+
+@admin_api.route("/admin/venues/delete", methods=["POST"])
+@jwt_required()
+def delete_venue():
+    """
+    API method to add/edit single venue
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    venue_id = request.json.get("venueId", None)
+
+    if venue_id is None:
+        return {"msg": "Bad Request"}, 400
+
+    service = AdminService()
+    success = service.delete_external_venue(int(venue_id))
     return convert_to_json(success)

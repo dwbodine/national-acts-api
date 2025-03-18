@@ -183,8 +183,6 @@ class DataRefreshService:
                     service_events.append(evt.event_id)
                     # compile event data for update
                     address = evt.venue.address1
-                    if evt.venue and evt.venue.address2:
-                        address += " " + evt.venue.address2
 
                     event_data = {
                         "title": evt.title.strip(),
