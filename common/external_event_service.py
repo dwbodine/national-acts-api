@@ -135,10 +135,10 @@ class ExternalEventService:
                              IsHidden=%(isHidden)s, 
                              AnnounceDate=%(announceDate)s, 
                              IsCancelled=%(is_cancelled)s, """
-                             
+
             if "thumbnail" in update_data:
                 update_sql += """Thumbnail=%(thumbnail)s, """
-                
+
             update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                 WHERE EventId=%(event_id)s"""
 
@@ -146,15 +146,26 @@ class ExternalEventService:
         else:
             update_data["seller_id"] = event_to_update.external_seller_id
             update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
-                Thumbnail, URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
-                ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, IsHidden, IsCancelled, 
-                AnnounceDate, Created, 
-                LastUpdate) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
-                %(thumbnail)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
+                URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
+                ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, IsActive, 
+                IsAddedToBandsInTown, IsHidden, IsCancelled, 
+                AnnounceDate, Created, LastUpdate"""
+
+            if "thumbnail" in update_data:
+                update_sql += """, Thumbnail"""
+
+            update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
+                %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
                 %(disable_vip_link_reason)s, %(is_active)s, 
-                %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
-                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s, 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+
+            if "thumbnail" in update_data:
+                update_sql += """, %(thumbnail)s"""
+
+            update_sql += """)"""
 
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0
@@ -267,7 +278,9 @@ class ExternalEventService:
                 int(row["EventId"]) if row["EventId"] is not None else 0
             )
             vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.disable_link_button = True if int(row["DisableLinkButton"]) == 1 else False
+            vip_event.disable_link_button = (
+                True if int(row["DisableLinkButton"]) == 1 else False
+            )
             vip_event.disable_link_reason = str(row["DisableLinkReason"])
             vip_event.external_vip_link = str(row["ExternalVipLink"])
             vip_event.is_vip = (
@@ -278,7 +291,9 @@ class ExternalEventService:
                 )
                 else False
             )
-            vip_event.disable_vip_link_button = True if int(row["DisableVipLinkButton"]) == 1 else False
+            vip_event.disable_vip_link_button = (
+                True if int(row["DisableVipLinkButton"]) == 1 else False
+            )
             vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
             vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False
