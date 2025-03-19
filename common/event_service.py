@@ -97,20 +97,25 @@ class EventService:
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
             LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
-            LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId 
-            LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
-                AND TicketSocketEvents.EventDate = ExternalEvents.EventDate """
+            LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND ExternalEvents.EventDate = TicketSocketEvents.EventDate
+                        
+            """
 
         if ts_event_id is None:
             if show_inactive is True:
                 sql += " AND ExternalEvents.IsActive = 0"
+            elif show_inactive is not True:
+                sql += " AND ExternalEvents.IsActive = 1"
             elif ignore_flags is not True:
                 if show_cancelled is True:
                     sql += " AND (ExternalEvents.IsActive = 1 OR ExternalEvents.IsCancelled = 1)"
                 else:
                     sql += " AND ExternalEvents.IsActive = 1"
 
-        sql += " WHERE "
+        sql += """
+                LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId 
+                WHERE 
+                """
         data = {}
 
         where_clause: list[str] = []
@@ -162,15 +167,20 @@ class EventService:
 
             if search_term is not None and len(search_term) > 0:
                 where_clause.append(
-                    """MATCH (TicketSocketEvents.Title, 
+                    """CONCAT_WS (' ', Sellers.Name, 
+                                TicketSocketEvents.Title, 
+                                ExternalEventVenues.Venue,
+                                ExternalEventVenues.Address, 
+                                ExternalEventVenues.City,
+                                ExternalEventVenues.State,
+                                ExternalEventVenues.Country,
                                 TicketSocketEvents.Venue, 
                                 TicketSocketEvents.Address, 
                                 TicketSocketEvents.City, 
                                 TicketSocketEvents.State,
                                 TicketSocketEvents.Country) 
-                                AGAINST (%(search_term)s IN BOOLEAN MODE)"""
+                                LIKE ('%""" + search_term + """%')"""
                 )
-                data["search_term"] = "*" + search_term + "*"
             if len(seller_event_category_ids) > 0:
                 seller_event_category_id_str = db_convert_list_to_parameters(
                     seller_event_category_ids, data, "sellerEventCategoryId"
@@ -331,7 +341,11 @@ class EventService:
                 if (int(row["IsCancelled"]) == 1 and row["CancelledDate"] is not None)
                 else None
             )
-            vip_event.external_event_venue_id = int(row["ExternalEventVenueId"])
+            vip_event.external_event_venue_id = (
+                int(row["ExternalEventVenueId"])
+                if row["ExternalEventVenueId"] is not None
+                else 0
+            )
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
             if row["ExternalVenue"] is not None:
                 venue_name = str(row["ExternalVenue"])
@@ -446,10 +460,10 @@ class EventService:
 
             if search_term is not None and len(search_term) > 0:
                 externalwhere_clause.append(
-                    """MATCH (ExternalEvents.Title, ExternalEventVenues.Venue,
+                    """CONCAT_WS (' ', Sellers.Name, ExternalEvents.Title, ExternalEventVenues.Venue,
                               ExternalEventVenues.Address, ExternalEventVenues.City,
                               ExternalEventVenues.State, ExternalEventVenues.Country)
-                              AGAINST (%(search_term)s IN BOOLEAN MODE)"""
+                              LIKE ('%""" + search_term + """"%')"""
                 )
                 external_data["search_term"] = "*" + search_term + "*"
             if seller_id is not None:
