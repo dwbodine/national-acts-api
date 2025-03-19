@@ -98,24 +98,8 @@ class EventService:
             LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
             LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND ExternalEvents.EventDate = TicketSocketEvents.EventDate
-                        
-            """
-
-        if ts_event_id is None:
-            if show_inactive is True:
-                sql += " AND ExternalEvents.IsActive = 0"
-            elif show_inactive is not True:
-                sql += " AND ExternalEvents.IsActive = 1"
-            elif ignore_flags is not True:
-                if show_cancelled is True:
-                    sql += " AND (ExternalEvents.IsActive = 1 OR ExternalEvents.IsCancelled = 1)"
-                else:
-                    sql += " AND ExternalEvents.IsActive = 1"
-
-        sql += """
-                LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId 
-                WHERE 
-                """
+            LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId 
+            WHERE """
         data = {}
 
         where_clause: list[str] = []
@@ -179,7 +163,9 @@ class EventService:
                                 TicketSocketEvents.City, 
                                 TicketSocketEvents.State,
                                 TicketSocketEvents.Country) 
-                                LIKE ('%""" + search_term + """%')"""
+                                LIKE ('%"""
+                    + search_term
+                    + """%')"""
                 )
             if len(seller_event_category_ids) > 0:
                 seller_event_category_id_str = db_convert_list_to_parameters(
@@ -446,24 +432,24 @@ class EventService:
             external_data = {}
 
             externalwhere_clause: list[str] = []
-            if show_inactive is True:
-                externalwhere_clause.append("ExternalEvents.IsActive = 0")
-            elif show_cancelled is True:
-                externalwhere_clause.append(
-                    "(ExternalEvents.IsActive = 1 or ExternalEvents.IsCancelled = 1)"
-                )
-            elif ignore_flags is not True:
+            if ignore_flags is not True and show_cancelled is not True:
+                externalwhere_clause.append("ExternalEvents.IsCancelled = 0")
+
+            if ignore_flags is not True and show_inactive is not True:
                 externalwhere_clause.append("ExternalEvents.IsActive = 1")
 
-            if show_hidden is not True and ignore_flags is not True:
+            if ignore_flags is not True and show_hidden is not True:
                 externalwhere_clause.append("ExternalEvents.IsHidden = 0")
 
             if search_term is not None and len(search_term) > 0:
                 externalwhere_clause.append(
-                    """CONCAT_WS (' ', Sellers.Name, ExternalEvents.Title, ExternalEventVenues.Venue,
+                    """CONCAT_WS (' ', Sellers.Name, ExternalEvents.Title, 
+                              ExternalEventVenues.Venue,
                               ExternalEventVenues.Address, ExternalEventVenues.City,
                               ExternalEventVenues.State, ExternalEventVenues.Country)
-                              LIKE ('%""" + search_term + """"%')"""
+                              LIKE ('%"""
+                    + search_term
+                    + """"%')"""
                 )
                 external_data["search_term"] = "*" + search_term + "*"
             if seller_id is not None:
