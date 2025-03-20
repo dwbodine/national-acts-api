@@ -269,12 +269,16 @@ class EventService:
             vip_event.event_id = event_id
             vip_event.announce_date = announce_date_str
             vip_event.tour_announce_date = tour_announce_date_str
-            vip_event.title = str(row["Title"])
-            vip_event.seller_name = str(row["SellerName"])
+            vip_event.title = str(row["Title"]) if row["Title"] is not None else None
+            vip_event.seller_name = (
+                str(row["SellerName"]) if row["SellerName"] is not None else None
+            )
             vip_event.is_external = False
             vip_event.ticket_socket_event_id = ticket_socket_event_id
             vip_event.seller_event_category_id = int(row["SellerEventCategoryId"])
-            vip_event.event_date = str(row["EventDate"])
+            vip_event.event_date = (
+                str(row["EventDate"]) if row["EventDate"] is not None else None
+            )
 
             vip_event.doors_open = (
                 str(row["DoorsOpen"]) if row["DoorsOpen"] is not None else None
@@ -291,7 +295,9 @@ class EventService:
             vip_event.thumbnail = (
                 str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
             )
-            vip_event.ticket_socket_url = str(row["URL"])
+            vip_event.ticket_socket_url = (
+                str(row["URL"]) if row["URL"] is not None else None
+            )
             vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False
             )
@@ -372,29 +378,71 @@ class EventService:
                     else 0
                 )
                 vip_event.external_seller_id = int(row["ExternalSellerId"])
-                vip_event.external_title = str(row["ExternalTitle"])
-                vip_event.external_thumbnail = str(row["ExternalThumbnail"])
-                vip_event.external_url = str(row["ExternalUrl"])
+                vip_event.external_title = (
+                    str(row["ExternalTitle"])
+                    if row["ExternalTitle"] is not None
+                    else None
+                )
+                vip_event.external_thumbnail = (
+                    str(row["ExternalThumbnail"])
+                    if row["ExternalThumbnail"] is not None
+                    else None
+                )
+                vip_event.external_url = (
+                    str(row["ExternalUrl"]) if row["ExternalUrl"] is not None else None
+                )
                 external_country = (
                     str(row["ExternalCountry"])
                     if row["ExternalCountry"] is not None
                     else None
                 )
                 external_venue = TicketSocketVenue(
-                    str(row["ExternalVenue"]),
-                    str(row["ExternalAddress"]),
-                    str(row["ExternalCity"]),
-                    str(row["ExternalState"]),
-                    str(row["ExternalZip"]),
+                    (
+                        str(row["ExternalVenue"])
+                        if row["ExternalVenue"] is not None
+                        else None
+                    ),
+                    (
+                        str(row["ExternalAddress"])
+                        if row["ExternalAddress"] is not None
+                        else None
+                    ),
+                    (
+                        str(row["ExternalCity"])
+                        if row["ExternalCity"] is not None
+                        else None
+                    ),
+                    (
+                        str(row["ExternalState"])
+                        if row["ExternalState"] is not None
+                        else None
+                    ),
+                    str(row["ExternalZip"]) if row["ExternalZip"] is not None else None,
                     external_country,
                     "",
                 )
                 vip_event.external_venue = external_venue
-                vip_event.disable_link_button = str(row["DisableLinkButton"])
-                vip_event.disable_link_reason = str(row["DisableLinkReason"])
-                vip_event.external_vip_link = str(row["ExternalVipLink"])
-                vip_event.disable_vip_link_button = str(row["DisableVipLinkButton"])
-                vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
+                vip_event.disable_link_button = (
+                    True if int(row["DisableLinkButton"]) == 1 else False
+                )
+                vip_event.disable_link_reason = (
+                    str(row["DisableLinkReason"])
+                    if row["DisableLinkReason"] is not None
+                    else None
+                )
+                vip_event.external_vip_link = (
+                    str(row["ExternalVipLink"])
+                    if row["ExternalVipLink"] is not None
+                    else None
+                )
+                vip_event.disable_vip_link_button = (
+                    True if int(row["DisableVipLinkButton"]) == 1 else False
+                )
+                vip_event.disable_vip_link_reason = (
+                    str(row["DisableVipLinkReason"])
+                    if row["DisableVipLinkReason"] is not None
+                    else None
+                )
 
             if get_orders is True:
                 calendar_service = CalendarService()
@@ -539,7 +587,11 @@ class EventService:
         rows = db_query_all(sql, data)
         for row in rows:
             ticket_type_id = int(row["TicketSocketTicketTypeId"])
-            name = str(row["TicketTypeName"])
+            name = (
+                str(row["TicketTypeName"])
+                if row["TicketTypeName"] is not None
+                else None
+            )
             total = int(row["TotalAvailable"])
             is_active: bool = int(row["IsActive"]) == 1
             ticket_type = TicketSocketTicketType(

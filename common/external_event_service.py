@@ -253,23 +253,29 @@ class ExternalEventService:
             vip_event.is_external = True
             vip_event.event_id = event_id
             vip_event.external_event_id = event_id
-            vip_event.title = str(row["Title"])
-            vip_event.external_title = str(row["Title"])
-            vip_event.seller_name = str(row["SellerName"])
+            vip_event.title = str(row["Title"]) if row["Title"] is not None else None
+            vip_event.external_title = str(row["Title"]) if row["Title"] is not None else None
+            vip_event.seller_name = str(row["SellerName"]) if row["SellerName"] is not None else None
             vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.event_date = str(row["EventDate"])
-            vip_event.announce_date = str(row["AnnounceDate"])
-            vip_event.thumbnail = str(row["Thumbnail"])
-            vip_event.external_thumbnail = str(row["Thumbnail"])
-            vip_event.external_url = str(row["URL"])
+            vip_event.event_date = str(row["EventDate"]) if row["EventDate"] is not None else None
+            vip_event.announce_date = (
+                str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
+            )
+            vip_event.thumbnail = (
+                str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
+            )
+            vip_event.external_thumbnail = (
+                str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
+            )
+            vip_event.external_url = str(row["URL"]) if row["URL"] is not None else None
             vip_event.external_event_venue_id = int(row["ExternalEventVenueId"])
             venue = TicketSocketVenue(
-                str(row["Venue"]),
-                str(row["Address"]),
-                str(row["City"]),
-                str(row["State"]),
-                str(row["Zip"]),
-                str(row["Country"]),
+                str(row["Venue"]) if row["Venue"] is not None else None,
+                str(row["Address"]) if row["Address"] is not None else None,
+                str(row["City"]) if row["City"] is not None else None,
+                str(row["State"]) if row["State"] is not None else None,
+                str(row["Zip"]) if row["Zip"] is not None else None,
+                str(row["Country"]) if row["Country"] is not None else None,
                 "",
             )
             vip_event.external_venue = venue
@@ -281,8 +287,16 @@ class ExternalEventService:
             vip_event.disable_link_button = (
                 True if int(row["DisableLinkButton"]) == 1 else False
             )
-            vip_event.disable_link_reason = str(row["DisableLinkReason"])
-            vip_event.external_vip_link = str(row["ExternalVipLink"])
+            vip_event.disable_link_reason = (
+                str(row["DisableLinkReason"])
+                if row["DisableLinkReason"] is not None
+                else None
+            )
+            vip_event.external_vip_link = (
+                str(row["ExternalVipLink"])
+                if row["ExternalVipLink"] is not None
+                else None
+            )
             vip_event.is_vip = (
                 True
                 if (
@@ -294,7 +308,11 @@ class ExternalEventService:
             vip_event.disable_vip_link_button = (
                 True if int(row["DisableVipLinkButton"]) == 1 else False
             )
-            vip_event.disable_vip_link_reason = str(row["DisableVipLinkReason"])
+            vip_event.disable_vip_link_reason = (
+                str(row["DisableVipLinkReason"])
+                if row["DisableVipLinkReason"] is not None
+                else None
+            )
             vip_event.is_added_to_bands_in_town = (
                 True if int(row["IsAddedToBandsInTown"]) == 1 else False
             )

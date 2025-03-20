@@ -191,20 +191,42 @@ class OrderService:
             order = VipOrder()
             order.order_id = order_id
             order.event_id = event_id
-            order.event_title = str(row["EventTitle"])
-            order.venue = str(row["Venue"])
-            order.event_address = str(row["EventAddress"])
-            order.event_city = str(row["EventCity"])
-            order.event_state = str(row["EventState"])
-            order.event_zip = str(row["EventZip"])
-            order.event_country = str(row["EventCountry"])
-            order.event_date = str(row["EventDate"])
-            order.seller_name = str(row["SellerName"])
+            order.event_title = (
+                str(row["EventTitle"]) if row["EventTitle"] is not None else None
+            )
+            order.venue = str(row["Venue"]) if row["Venue"] is not None else None
+            order.event_address = (
+                str(row["EventAddress"]) if row["EventAddress"] is not None else None
+            )
+            order.event_city = (
+                str(row["EventCity"]) if row["EventCity"] is not None else None
+            )
+            order.event_state = (
+                str(row["EventState"]) if row["EventState"] is not None else None
+            )
+            order.event_zip = (
+                str(row["EventZip"]) if row["EventZip"] is not None else None
+            )
+            order.event_country = (
+                str(row["EventCountry"]) if row["EventCountry"] is not None else None
+            )
+            order.event_date = (
+                str(row["EventDate"]) if row["EventDate"] is not None else None
+            )
+            order.seller_name = (
+                str(row["SellerName"]) if row["SellerName"] is not None else None
+            )
             order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = int(row["TicketSocketEventId"])
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.purchase_date = str(row["PurchaseDate"])
-            order.purchase_timestamp = str(row["PurchaseTimestamp"])
+            order.purchase_date = (
+                str(row["PurchaseDate"]) if row["PurchaseDate"] is not None else None
+            )
+            order.purchase_timestamp = (
+                str(row["PurchaseTimestamp"])
+                if row["PurchaseTimestamp"] is not None
+                else None
+            )
             order.user_id = int(row["UserId"])
             order.phone = str(row["Phone"]) if row["Phone"] is not None else None
             order.email = str(row["Email"]) if row["Email"] is not None else None
@@ -240,8 +262,14 @@ class OrderService:
                 else None
             )
             order.exchange_rate = float(row["ExchangeRate"])
-            order.currency_abbrev = str(row["CurrencyAbbrev"])
-            order.currency_symbol = str(row["Symbol"])
+            order.currency_abbrev = (
+                str(row["CurrencyAbbrev"])
+                if row["CurrencyAbbrev"] is not None
+                else None
+            )
+            order.currency_symbol = (
+                str(row["Symbol"]) if row["Symbol"] is not None else None
+            )
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
             order.is_comped = True if int(row["IsComped"]) == 1 else False
@@ -312,20 +340,42 @@ class OrderService:
             order = VipOrder()
             order.order_id = order_id
             order.event_id = event_id
-            order.venue = str(row["Venue"])
-            order.event_title = str(row["EventTitle"])
-            order.event_address = str(row["EventAddress"])
-            order.event_city = str(row["EventCity"])
-            order.event_state = str(row["EventState"])
-            order.event_zip = str(row["EventZip"])
-            order.event_country = str(row["EventCountry"])
-            order.event_date = str(row["EventDate"])
-            order.seller_name = str(row["SellerName"])
+            order.venue = str(row["Venue"]) if row["Venue"] is not None else None
+            order.event_title = (
+                str(row["EventTitle"]) if row["EventTitle"] is not None else None
+            )
+            order.event_address = (
+                str(row["EventAddress"]) if row["EventAddress"] is not None else None
+            )
+            order.event_city = (
+                str(row["EventCity"]) if row["EventCity"] is not None else None
+            )
+            order.event_state = (
+                str(row["EventState"]) if row["EventState"] is not None else None
+            )
+            order.event_zip = (
+                str(row["EventZip"]) if row["EventZip"] is not None else None
+            )
+            order.event_country = (
+                str(row["EventCountry"]) if row["EventCountry"] is not None else None
+            )
+            order.event_date = (
+                str(row["EventDate"]) if row["EventDate"] is not None else None
+            )
+            order.seller_name = (
+                str(row["SellerName"]) if row["SellerName"] is not None else None
+            )
             order.seller_id = int(row["SellerId"])
             order.ticket_socket_event_id = ticket_socket_event_id
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.purchase_date = str(row["PurchaseDate"])
-            order.purchase_timestamp = str(row["PurchaseTimestamp"])
+            order.purchase_date = (
+                str(row["PurchaseDate"]) if row["PurchaseDate"] is not None else None
+            )
+            order.purchase_timestamp = (
+                str(row["PurchaseTimestamp"])
+                if row["PurchaseTimestamp"] is not None
+                else None
+            )
             order.user_id = int(row["UserId"])
             order.phone = str(row["Phone"]) if row["Phone"] is not None else None
             order.email = str(row["Email"]) if row["Email"] is not None else None
@@ -362,8 +412,14 @@ class OrderService:
             )
 
             order.exchange_rate = float(row["ExchangeRate"])
-            order.currency_abbrev = str(row["CurrencyAbbrev"])
-            order.currency_symbol = str(row["Symbol"])
+            order.currency_abbrev = (
+                str(row["CurrencyAbbrev"])
+                if row["CurrencyAbbrev"] is not None
+                else None
+            )
+            order.currency_symbol = (
+                str(row["Symbol"]) if row["Symbol"] is not None else None
+            )
             order.is_active = True if int(row["IsActive"]) == 1 else False
             order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
             order.is_comped = True if int(row["IsComped"]) == 1 else False
@@ -448,17 +504,33 @@ class OrderService:
             ticket = VipTicket()
             ticket.ticket_id = ticket_id
             ticket.is_active = True if int(row["IsActive"]) == 1 else False
-            ticket.ticket_type = str(row["TicketType"])
+            ticket.ticket_type = (
+                str(row["TicketType"]) if row["TicketType"] is not None else None
+            )
             ticket.price = float(row["Price"])
             ticket.service_fee = float(row["ServiceFee"])
             ticket.ticket_type_id = int(row["TicketSocketTicketTypeId"])
-            ticket.barcode = str(row["BarCode"])
+            ticket.barcode = str(row["BarCode"]) if row["BarCode"] is not None else None
             ticket.available_scans = int(row["AvailableScans"])
-            ticket.purchase_location = str(row["PurchaseLocation"])
+            ticket.purchase_location = (
+                str(row["PurchaseLocation"])
+                if row["PurchaseLocation"] is not None
+                else None
+            )
             ticket.scanned_timestamp = int(row["ScannedTimestamp"])
-            ticket.attendee_first_name = str(row["AttendeeFirstName"])
-            ticket.attendee_last_name = str(row["AttendeeLastName"])
-            ticket.last_update = str(row["LastUpdate"])
+            ticket.attendee_first_name = (
+                str(row["AttendeeFirstName"])
+                if row["AttendeeFirstName"] is not None
+                else None
+            )
+            ticket.attendee_last_name = (
+                str(row["AttendeeLastName"])
+                if row["AttendeeLastName"] is not None
+                else None
+            )
+            ticket.last_update = (
+                str(row["LastUpdate"]) if row["LastUpdate"] is not None else None
+            )
             ticket.attendee_phone = (
                 str(row["AttendeePhone"]) if row["AttendeePhone"] is not None else None
             )
