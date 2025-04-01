@@ -205,8 +205,6 @@ class VipOrder(TicketSocketOrder):
 
         for ticket in self.tickets:
             total_tickets += 1
-            total_revenue += ticket.price
-            total_service_fees += ticket.service_fee
             if ticket.shirt_size is not None:
                 total_shirts += 1
             if ticket.is_refunded is True:
@@ -215,11 +213,16 @@ class VipOrder(TicketSocketOrder):
                 self.revenue_refunded += ticket.price
                 if ticket.is_service_fee_refunded is True:
                     self.service_fee_revenue_refunded += ticket.service_fee
+                else:
+                    total_service_fees += ticket.service_fee
             elif ticket.is_charged_back is True:
                 self.has_chargebacks = True
                 self.num_tickets_charged_back += 1
                 self.revenue_charged_back += ticket.price
                 self.service_fee_revenue_charged_back += ticket.service_fee
+            else:
+                total_revenue += ticket.price
+                total_service_fees += ticket.service_fee
 
         self.num_tickets = total_tickets
         self.revenue = total_revenue
