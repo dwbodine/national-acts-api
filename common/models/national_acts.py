@@ -25,6 +25,14 @@ class SellerEventCategory:
     ticket_socket_id: int = 0
     event_category_id: int = 0
     seller_event_category_id: int = 0
+    has_events: bool = False
+
+    def __eq__(self, other):
+        return (
+            self.seller_event_category_id == other.seller_event_category_id
+            and self.seller_id == other.seller_id
+            and self.ticket_socket_id == other.ticket_socket_id
+        )
 
     def __init__(
         self,
@@ -65,6 +73,7 @@ class SellerEventCategory:
             self.seller_event_category_id = seller_event_category_id
         else:
             raise RuntimeError("Invalid input data for SellerEventCategory")
+        self.__find_events()
 
     def __populate_from_seller_id_and_ticket_socket_id(
         self, seller_id: int, ticket_socket_id: int
@@ -106,6 +115,15 @@ class SellerEventCategory:
             self.seller_id = sec["SellerId"]
             self.ticket_socket_id = sec["TicketSocketId"]
             self.event_category_id = sec["EventCategoryId"]
+
+    def __find_events(self):
+        sql = """SELECT COUNT(TicketSocketEvents.Id) AS NumEvents
+                FROM TicketSocketEvents 
+                WHERE TicketSocketEvents.SellerEventCategoryId = 
+                %(sellerEventCategoryId)s"""
+        data = {"sellerEventCategoryId": self.seller_event_category_id}
+        row = db_query_one(sql, data)
+        self.has_events = True if int(row["NumEvents"]) > 0 else False
 
 
 class ShirtSales:
@@ -397,14 +415,20 @@ class VipEvent(TicketSocketEvent):
             if self.venue is None:
                 self.venue = self.external_venue
             else:
-                if self.external_venue.name is not None and self.external_venue.name != "":
+                if (
+                    self.external_venue.name is not None
+                    and self.external_venue.name != ""
+                ):
                     self.venue.name = self.external_venue.name
                 if (
                     self.external_venue.address1 is not None
                     and self.external_venue.address1 != ""
                 ):
                     self.venue.address1 = self.external_venue.address1
-                if self.external_venue.city is not None and self.external_venue.city != "":
+                if (
+                    self.external_venue.city is not None
+                    and self.external_venue.city != ""
+                ):
                     self.venue.city = self.external_venue.city
                 if (
                     self.external_venue.state is not None
@@ -508,9 +532,10 @@ class Seller:
 
     seller_event_categories: list[SellerEventCategory] = []
 
-    def __init__(self, seller_id: int):
-        self.seller_id = seller_id
-        self.__initialize()
+    def __init__(self, seller_id: int = None):
+        if seller_id is not None:
+            self.seller_id = seller_id
+            self.__initialize()
 
     def __initialize(self):
         """

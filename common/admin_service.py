@@ -4,6 +4,8 @@ Admin service module
 
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
+from common.models.ticket_socket import TicketSocketAccount
+from common.ticket_socket_service import TicketSocketService
 from common.utility import move_temp_file_to_public_folder
 
 
@@ -67,6 +69,29 @@ class AdminService:
             move_temp_file_to_public_folder(setting.value, setting.file_path)
 
         return success
+
+    def get_ticket_socket_accounts(self):
+        """
+        Fetch current ticket socket account data
+        """
+        accounts: list[TicketSocketAccount] = []
+        sql = "SELECT TicketSocketId FROM TicketSocket"
+        rows = db_query_all(sql)
+        for row in rows:
+            ticket_socket_id = int(row["TicketSocketId"])
+            service = TicketSocketService(ticket_socket_id)
+            account = TicketSocketAccount()
+            account.ticket_socket_id = ticket_socket_id
+            account.name = service.name
+            account.currency_symbol = service.currency_symbol
+            account.exchange_rate_id = service.exchange_rate_id
+            account.exchange_rate_slug = service.exchange_rate_slug
+            account.mulitiplier = service.mulitiplier
+            account.service_url = service.service_url
+            account.utc_offset_hours = service.utc_offset_hours
+            account.categories = service.get_categories()
+            accounts.append(account)
+        return accounts
 
     def get_external_venues(self):
         """

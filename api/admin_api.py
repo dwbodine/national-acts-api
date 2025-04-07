@@ -15,13 +15,19 @@ from common.external_event_service import ExternalEventService
 from common.models.admin import ExternalVenue, SiteSetting
 from common.order_service import OrderService
 from common.role_service import RoleService
+from common.seller_service import SellerService
 from common.tour_service import TourService
 from common.user_service import UserService
 from common.utility import (
     convert_to_json,
     convert_json_to_snake_case_object,
 )
-from common.models.national_acts import Tour, VipEvent, VipOrder
+from common.models.national_acts import (
+    Seller,
+    Tour,
+    VipEvent,
+    VipOrder,
+)
 from common.models.user import User, Role
 
 admin_api = Blueprint("admin_api", __name__)
@@ -507,6 +513,23 @@ def update_role():
     return convert_to_json(success)
 
 
+@admin_api.route("/admin/seller/update", methods=["POST"])
+@jwt_required()
+def update_seller():
+    """
+    API method to update seller data
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    seller = convert_json_to_snake_case_object(request.get_json(), Seller())
+
+    service = SellerService()
+    updated_seller = service.update_seller(seller)
+    return convert_to_json(updated_seller)
+
+
 @admin_api.route("/admin/settings/update", methods=["POST"])
 @jwt_required()
 def update_setting():
@@ -553,6 +576,21 @@ def refund_ticket():
     service = OrderService()
     success = service.refund_ticket(int(ticket_id), refund_service_fees)
     return convert_to_json(success)
+
+
+@admin_api.route("/admin/ticketSocketAccounts")
+@jwt_required()
+def get_ticket_socket_accounts():
+    """
+    API method to fetch current TS account data
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    service = AdminService()
+    accounts = service.get_ticket_socket_accounts()
+    return convert_to_json(accounts)
 
 
 @admin_api.route("/admin/tours/update", methods=["POST"])
