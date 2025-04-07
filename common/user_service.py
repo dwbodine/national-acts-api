@@ -42,7 +42,7 @@ class UserService:
 
             if is_valid_input:
                 # check to see if they exist first and pull data
-                sql = "SELECT Password, RequireResetPassword FROM Users WHERE Username=%(username)s"
+                sql = "SELECT Password, RequireResetPassword, IsActive FROM Users WHERE Username=%(username)s"
                 data = {"username": username}
                 row = db_query_one(sql, data)
 
@@ -50,9 +50,14 @@ class UserService:
                     require_reset = (
                         True if int(row["RequireResetPassword"]) == 1 else False
                     )
+                    is_active = (
+                        True if int(row["IsActive"]) == 1 else False
+                    )
                     if require_reset:
                         error_message = """Password reset required -
                          please click on "Forgot Password?" to proceed"""
+                    elif is_active is not True:
+                        error_message = """Incorrect username or password"""
                     else:
                         hashed_password = str(row["Password"])
                         authenticated = self.__password_verify(
