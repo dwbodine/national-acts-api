@@ -49,13 +49,19 @@ class SellerService:
                 sellers.append(seller)
         return sellers
 
-    def get_all_sellers(self):
+    def get_all_sellers(self, show_inactive=False):
         """
         Return a list of all active sellers in the database
         """
         sellers: list[Seller] = []
 
-        sql = """SELECT SellerId, Name FROM Sellers WHERE Inactive <> 1 ORDER BY Name"""
+        sql = """SELECT SellerId, Name FROM Sellers """
+
+        if show_inactive is False:
+            sql += """WHERE Inactive <> 1 """
+
+        sql += """ORDER BY Name"""
+
         data = None
 
         rows = db_query_all(sql, data)
@@ -120,8 +126,14 @@ class SellerService:
                     (cat for cat in existing_categories if cat == category), None
                 )
                 if found_category is not None:
-                    if found_category.event_category_id != category.event_category_id:
-                        if category.event_category_id is not None:
+                    if (
+                        found_category.event_category_id != category.event_category_id
+                        or category.event_category_id == 0
+                    ):
+                        if (
+                            category.event_category_id is not None
+                            and category.event_category_id > 0
+                        ):
                             update_sql = """UPDATE SellerEventCategory SET
                                 EventCategoryId=%(eventCategoryId)s, 
                                 LastUpdated=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
@@ -138,14 +150,18 @@ class SellerService:
                                 "sellerEventCategoryId": found_category.seller_event_category_id
                             }
                             success = db_delete(delete_sql, delete_data)
-                else:
+                elif (
+                    category.event_category_id > 0
+                    and category.seller_id > 0
+                    and category.ticket_socket_id > 0
+                ):
                     insert_sql = """INSERT INTO SellerEventCategory
                         (SellerId, TicketSocketId, EventCategoryId, Created, LastUpdated)
                          VALUES (%(sellerId)s, %(ticketSocketId)s, %(eventCategoryId)s,
                          CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
                          CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                     insert_data = {
-                        "sellerId": category.seller_id,
+                        "sellerId": seller_id,
                         "ticketSocketId": category.ticket_socket_id,
                         "eventCategoryId": category.event_category_id,
                     }

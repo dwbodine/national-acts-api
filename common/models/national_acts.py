@@ -29,8 +29,7 @@ class SellerEventCategory:
 
     def __eq__(self, other):
         return (
-            self.seller_event_category_id == other.seller_event_category_id
-            and self.seller_id == other.seller_id
+            self.seller_id == other.seller_id
             and self.ticket_socket_id == other.ticket_socket_id
         )
 

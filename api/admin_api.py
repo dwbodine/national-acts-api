@@ -512,6 +512,19 @@ def update_role():
     success = service.update_role(role)
     return convert_to_json(success)
 
+@admin_api.route("/admin/sellers")
+@jwt_required()
+def get_admin_sellers():
+    """
+    API method to fetch all sellers for admin site
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    service = SellerService()
+    results = service.get_all_sellers(show_inactive=True)
+    return convert_to_json(results)
 
 @admin_api.route("/admin/seller/update", methods=["POST"])
 @jwt_required()
