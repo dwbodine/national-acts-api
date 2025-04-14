@@ -170,8 +170,7 @@ class SenderApiService:
         """
         Update SenderAPI with subscribers from database
         """
-        start_time: int = int(datetime.now().timestamp()) - (3 * 24 * 60 * 60)
-        stored_subscribers = self.get_sender_subscribers_from_db(start_time)
+        stored_subscribers = self.get_sender_subscribers_from_db(500)
 
         subscribers_processed: int = 0
         subscribers_updated: int = 0
@@ -204,9 +203,6 @@ class SenderApiService:
                     if success is True and db_subscriber.order_id > 0:
                         success = self.update_subscriber_order(db_subscriber.order_id)
 
-                    if success is not True:
-                        break
-
                     time.sleep(1.5)
 
             except Exception as error:  # pylint: disable=broad-exception-caught
@@ -215,6 +211,7 @@ class SenderApiService:
                 log_message(f"""[{now}] - {error_message}\r\n""")
 
         results = {
+            "total_subscribers_fetched": len(stored_subscribers),
             "subscribers_processed": subscribers_processed,
             "subscribers_added": subscribers_added,
             "subscribers_updated": subscribers_updated,
@@ -292,7 +289,7 @@ class SenderApiService:
 
         return True
 
-    def get_sender_subscribers_from_db(self, start_time: int = None):
+    def get_sender_subscribers_from_db(self, limit: int = 0):
         """
         Build list of subscribers from TicketSocketOrders
         """
@@ -333,11 +330,9 @@ class SenderApiService:
                     AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
                     """
 
-            if start_time is not None:
-                sql += " AND TicketSocketOrders.LastUpdate >= %(startDate)s"
-                data["startDate"] = datetime.fromtimestamp(start_time).strftime(
-                    "%Y-%m-%d"
-                )
+            if limit > 0:
+                sql += """ LIMIT 0, %(limit)s"""
+                data["limit"] = limit
 
             rows = db.db_query_all(sql, data)
             for row in rows:
