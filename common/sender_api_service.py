@@ -291,17 +291,17 @@ class SenderApiService:
                         TicketSocketOrders.Email,
                         TicketSocketOrders.Phone,
                         TicketSocketOrders.PurchaserZip,
-                        TicketSocketEvents.Venue,
+                        COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) as Venue,
                         TicketSocketEvents.Address AS VenueAddress,
                         TicketSocketEvents.City AS VenueCity,
                         TicketSocketEvents.State AS VenueState,
                         TicketSocketEvents.Zip AS VenueZip,
                         TicketSocketEvents.Country AS VenueCountry,
-                        ExternalEvents.Address AS ExternalAddress, 
-                        ExternalEvents.City AS ExternalCity, 
-                        ExternalEvents.State AS ExternalState, 
-                        ExternalEvents.Zip AS ExternalZip, 
-                        ExternalEvents.Country AS ExternalCountry, 
+                        ExternalEventVenues.Address AS ExternalAddress, 
+                        ExternalEventVenues.City AS ExternalCity, 
+                        ExternalEventVenues.State AS ExternalState, 
+                        ExternalEventVenues.Zip AS ExternalZip, 
+                        ExternalEventVenues.Country AS ExternalCountry, 
                         Sellers.Name as Band
                     FROM TicketSocketOrders 
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
@@ -309,6 +309,7 @@ class SenderApiService:
                     JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
                     LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId 
                         AND TicketSocketEvents.EventDate = ExternalEvents.EventDate
+                    LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
                     WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
                     AND TicketSocketOrders.IsDeleted <> 1
                     AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
