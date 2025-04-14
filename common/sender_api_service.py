@@ -201,6 +201,12 @@ class SenderApiService:
                         else:
                             new_subscribers_with_error.append(db_subscriber.email)
 
+                    if success is True and db_subscriber.order_id > 0:
+                        success = self.update_subscriber_order(db_subscriber.order_id)
+
+                    if success is not True:
+                        break
+
                     time.sleep(1.5)
 
             except Exception as error:  # pylint: disable=broad-exception-caught
@@ -217,6 +223,16 @@ class SenderApiService:
         }
 
         return results
+
+    def update_subscriber_order(self, order_id: int):
+        """
+        Sets the order as already updated with Sender
+        """
+        sql = """UPDATE TicketSocketOrders SET IsSenderUpdated=1,
+            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+            WHERE Id=%(orderId)s"""
+        data = {"orderId": order_id}
+        return db.db_update(sql, data)
 
     def get_missing_subscribers_csv(self):
         """
@@ -302,7 +318,8 @@ class SenderApiService:
                         ExternalEventVenues.State AS ExternalState, 
                         ExternalEventVenues.Zip AS ExternalZip, 
                         ExternalEventVenues.Country AS ExternalCountry, 
-                        Sellers.Name as Band
+                        Sellers.Name as Band,
+                        TicketSocketOrders.Id as OrderId 
                     FROM TicketSocketOrders 
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
                     JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
@@ -312,6 +329,7 @@ class SenderApiService:
                     LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
                     WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
                     AND TicketSocketOrders.IsDeleted <> 1
+                    AND TicketSocketOrders.IsSenderUpdated <> 1 
                     AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
                     """
 
@@ -403,6 +421,9 @@ class SenderApiService:
                     new_sub.phone = None
 
                 new_sub.band = str(row["Band"]) if row["Band"] is not None else ""
+                new_sub.order_id = (
+                    int(row["OrderId"]) if row["OrderId"] is not None else 0
+                )
 
                 stored_subscribers.append(new_sub)
 
