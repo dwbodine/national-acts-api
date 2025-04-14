@@ -170,7 +170,7 @@ class SenderApiService:
         """
         Update SenderAPI with subscribers from database
         """
-        stored_subscribers = self.get_sender_subscribers_from_db()
+        stored_subscribers = self.get_sender_subscribers_from_db(500)
 
         subscribers_processed: int = 0
         subscribers_updated: int = 0
@@ -289,7 +289,7 @@ class SenderApiService:
 
         return True
 
-    def get_sender_subscribers_from_db(self):
+    def get_sender_subscribers_from_db(self, limit: int = 0):
         """
         Build list of subscribers from TicketSocketOrders
         """
@@ -329,6 +329,10 @@ class SenderApiService:
                     AND TicketSocketOrders.IsSenderUpdated <> 1 
                     AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
                     """
+
+            if limit > 0:
+                sql += """ LIMIT 0, %(limit)s"""
+                data["limit"] = limit
 
             rows = db.db_query_all(sql, data)
             for row in rows:
