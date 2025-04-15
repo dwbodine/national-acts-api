@@ -528,8 +528,6 @@ class Seller:
     name: str = None
     seller_type: int = 1
     num_external_events: int = 0
-    display_name: str = None
-    show_display_name: bool = False
     address: str = None
     city: str = None
     state: str = None
@@ -573,6 +571,28 @@ class Seller:
             self.hide_in_list = int(row["HideInList"]) == 1
             self.is_active = int(row["Inactive"]) != 1
             self.num_external_events = int(row["NumExternalEvents"])
+            self.address = str(row["Address"]) if row["Address"] is not None else None
+            self.city = str(row["City"]) if row["City"] is not None else None
+            self.state = str(row["State"]) if row["State"] is not None else None
+            self.zip = str(row["Zip"]) if row["Zip"] is not None else None
+            self.country = str(row["Country"]) if row["Country"] is not None else None
+            self.phone = str(row["Phone"]) if row["Phone"] is not None else None
+            self.email = str(row["Email"]) if row["Email"] is not None else None
+            self.twitter = str(row["Twitter"]) if row["Twitter"] is not None else None
+            self.facebook = (
+                str(row["Facebook"]) if row["Facebook"] is not None else None
+            )
+            self.instagram = (
+                str(row["Instagram"]) if row["Instagram"] is not None else None
+            )
+            self.youtube = str(row["YouTube"]) if row["YouTube"] is not None else None
+            self.spotify = str(row["Spotify"]) if row["Spotify"] is not None else None
+            self.website = str(row["Website"]) if row["Website"] is not None else None
+            self.website_display_text = (
+                str(row["WebsiteDisplayText"])
+                if row["WebsiteDisplayText"] is not None
+                else None
+            )
             self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):

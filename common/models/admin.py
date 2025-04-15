@@ -64,7 +64,7 @@ class PageSeller:
     """
 
     page_seller_id: int = 0
-    page_id: int
+    page: int
     seller_id: int
     display_name: str = None
     show_display_name: bool = False
