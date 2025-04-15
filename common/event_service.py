@@ -618,6 +618,8 @@ class EventService:
             success = db_update(sql, data)
             if success is False:
                 break
+            else:
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)                
         return success
 
     def delete_events(self, ticket_socket_event_ids: list[int], deleted: bool):
@@ -637,6 +639,8 @@ class EventService:
             success = db_update(sql, data)
             if success is False:
                 break
+            else:
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def hide_events(self, ticket_socket_event_ids: list[int], hidden: bool):
