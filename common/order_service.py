@@ -586,6 +586,8 @@ class OrderService:
             success = db_update(sql, data)
             if success is False:
                 break
+            else:
+                self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
         return success
 
     def delete_orders(self, ticket_socket_order_ids: list[int], deleted: bool):
@@ -605,6 +607,8 @@ class OrderService:
             success = db_update(sql, data)
             if success is False:
                 break
+            else:
+                self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
         return success
 
     def check_in_tickets(
