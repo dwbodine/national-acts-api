@@ -528,6 +528,22 @@ class Seller:
     name: str = None
     seller_type: int = 1
     num_external_events: int = 0
+    display_name: str = None
+    show_display_name: bool = False
+    address: str = None
+    city: str = None
+    state: str = None
+    zip: str = None
+    country: str = None
+    phone: str = None
+    email: str = None
+    twitter: str = None
+    facebook: str = None
+    instagram: str = None
+    youtube: str = None
+    spotify: str = None
+    website: str = None
+    website_display_text: str = None
 
     seller_event_categories: list[SellerEventCategory] = []
 
