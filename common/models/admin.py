@@ -64,10 +64,10 @@ class PageSeller:
     """
 
     page_seller_id: int = 0
-    page: int
+    page_id: int
     seller_id: int
     display_name: str = None
-    show_display_name: bool = False
+    show_display_name: bool = None
     address: str = None
     city: str = None
     state: str = None
