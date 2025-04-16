@@ -85,6 +85,64 @@ class SellerService:
             "sellerTypeId": seller_to_udpdate.seller_type,
             "hideInList": 1 if seller_to_udpdate.hide_in_list is True else 0,
             "inactive": 1 if seller_to_udpdate.is_active is False else 0,
+            "address": (
+                seller_to_udpdate.address
+                if seller_to_udpdate.address is not None
+                else None
+            ),
+            "city": (
+                seller_to_udpdate.city if seller_to_udpdate.city is not None else None
+            ),
+            "state": (
+                seller_to_udpdate.state if seller_to_udpdate.state is not None else None
+            ),
+            "zip": seller_to_udpdate.zip if seller_to_udpdate.zip is not None else None,
+            "country": (
+                seller_to_udpdate.country
+                if seller_to_udpdate.country is not None
+                else None
+            ),
+            "phone": (
+                seller_to_udpdate.phone if seller_to_udpdate.phone is not None else None
+            ),
+            "email": (
+                seller_to_udpdate.email if seller_to_udpdate.email is not None else None
+            ),
+            "twitter": (
+                seller_to_udpdate.twitter
+                if seller_to_udpdate.twitter is not None
+                else None
+            ),
+            "facebook": (
+                seller_to_udpdate.facebook
+                if seller_to_udpdate.facebook is not None
+                else None
+            ),
+            "instagram": (
+                seller_to_udpdate.instagram
+                if seller_to_udpdate.instagram is not None
+                else None
+            ),
+            "youtube": (
+                seller_to_udpdate.youtube
+                if seller_to_udpdate.youtube is not None
+                else None
+            ),
+            "spotify": (
+                seller_to_udpdate.spotify
+                if seller_to_udpdate.spotify is not None
+                else None
+            ),
+            "website": (
+                seller_to_udpdate.website
+                if seller_to_udpdate.website is not None
+                else None
+            ),
+            "websiteDisplayText": (
+                seller_to_udpdate.country
+                if seller_to_udpdate.website_display_text is not None
+                else None
+            ),
         }
 
         if seller_to_udpdate.seller_id > 0:
@@ -94,13 +152,33 @@ class SellerService:
                         SellerTypeId=%(sellerTypeId)s, 
                         HideInList=%(hideInList)s, 
                         Inactive=%(inactive)s, 
+                        Address=%(address)s,
+                        City=%(city)s,
+                        State=%(state)s,
+                        Zip=%(zip)s,
+                        Country=%(country)s,
+                        Phone=%(phone)s,
+                        Email=%(email)s,
+                        Twitter=%(twitter)s,
+                        Facebook=%(facebook)s,
+                        Instagram=%(instagram)s,
+                        YouTube=%(youtube)s,
+                        Spotify=%(spotify)s,
+                        Website=%(website)s,
+                        WebsiteDisplayText=%(websiteDisplayText)s,
                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE SellerId=%(sellerId)s"""
             success = db_update(sql, data)
             seller_id = seller_to_udpdate.seller_id if success else 0
         else:
-            sql = """INSERT INTO Sellers (Name, SellerTypeId, HideInList, Inactive, Created)
+            sql = """INSERT INTO Sellers (Name, SellerTypeId, HideInList, Inactive,
+                    Address, City, State, Zip, Country, Phone, Email, Twitter, Facebook, 
+                    Instagram, YouTube, Spotify, Website, WebsiteDisplayText, Created, LastUpdate)
                     VALUES (%(name)s, %(sellerTypeId)s, %(hideInList)s, %(inactive)s, 
+                    %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s, %(phone)s, 
+                    %(email)s, %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, 
+                    %(spotify)s, %(website)s, %(websiteDisplayText)s, 
+                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
             seller_id = db_insert(sql, data)
             success = seller_id > 0
