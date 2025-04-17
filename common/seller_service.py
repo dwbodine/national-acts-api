@@ -199,6 +199,7 @@ class SellerService:
                 else []
             )
 
+            categories_updated: bool = False
             for category in new_categories:
                 found_category = next(
                     (cat for cat in existing_categories if cat == category), None
@@ -221,6 +222,7 @@ class SellerService:
                                 "sellerEventCategoryId": found_category.seller_event_category_id,
                             }
                             success = db_update(update_sql, update_data)
+                            categories_updated = success
                         else:
                             delete_sql = """DELETE FROM SellerEventCategory
                                 WHERE SellerEventCategoryId=%(sellerEventCategoryId)s"""
@@ -228,11 +230,8 @@ class SellerService:
                                 "sellerEventCategoryId": found_category.seller_event_category_id
                             }
                             success = db_delete(delete_sql, delete_data)
-                elif (
-                    category.event_category_id > 0
-                    and category.seller_id > 0
-                    and category.ticket_socket_id > 0
-                ):
+                            categories_updated = success
+                elif category.event_category_id > 0 and category.ticket_socket_id > 0:
                     insert_sql = """INSERT INTO SellerEventCategory
                         (SellerId, TicketSocketId, EventCategoryId, Created, LastUpdated)
                          VALUES (%(sellerId)s, %(ticketSocketId)s, %(eventCategoryId)s,
@@ -245,9 +244,15 @@ class SellerService:
                     }
                     sec_id = db_insert(insert_sql, insert_data)
                     success = sec_id > 0
+                    categories_updated = success
+                    if categories_updated is True:
+                        category.seller_event_category_id = sec_id
 
                 if success is not True:
                     break
+
+            if categories_updated is True:
+                seller_to_udpdate.seller_event_categories = new_categories
 
         if success is True:
             seller_to_udpdate.seller_id = seller_id
