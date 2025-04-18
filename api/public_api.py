@@ -9,6 +9,7 @@ from flask import Blueprint, request
 
 from common.admin_service import AdminService
 from common.event_service import EventService
+from common.page_service import PageService
 from common.seller_service import SellerService
 from common.utility import convert_to_json, log_message
 
@@ -67,6 +68,23 @@ def get_events():
     return convert_to_json(results)
 
 
+@public_api.route("/public/page/<str: route>")
+def get_page(route: str):
+    """
+    API method to fetch a page by route
+    """
+    # secured by public api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = PageService()
+    results = service.get_page_by_route(route)
+    return convert_to_json(results)
+
+
 @public_api.route("/public/sellers")
 def get_sellers():
     """
@@ -100,19 +118,20 @@ def get_all_settings():
     settings = service.get_site_settings()
     return convert_to_json(settings)
 
-@public_api.route('/public/uploadFile', methods=['POST'])
+
+@public_api.route("/public/uploadFile", methods=["POST"])
 def upload_temp_file():
     """
     Uploads a file to the /tmp folder
     """
-    if 'tempFile' not in request.files:
+    if "tempFile" not in request.files:
         return {"msg": "Bad Request"}, 400
 
     filename: str = None
     try:
-        file = request.files['tempFile']
+        file = request.files["tempFile"]
         filename = file.filename
-        file.save(os.path.join('tmp', filename))
+        file.save(os.path.join("tmp", filename))
     except Exception as error:  # pylint: disable=broad-exception-caught
         filename = None
         error_message: str = str(error) + "\n" + traceback.format_exc()

@@ -355,3 +355,14 @@ def post_https_response(
             conn.close()
 
     return json_data
+
+def get_override_string_value_or_default(override: any, default: any):
+    """
+    Get string value from override vs. default
+    """
+    if override is not None:
+        return str(override)
+    elif default is not None:
+        return str(default)
+    else:
+        return None
