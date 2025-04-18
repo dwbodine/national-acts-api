@@ -254,10 +254,16 @@ class ExternalEventService:
             vip_event.event_id = event_id
             vip_event.external_event_id = event_id
             vip_event.title = str(row["Title"]) if row["Title"] is not None else None
-            vip_event.external_title = str(row["Title"]) if row["Title"] is not None else None
-            vip_event.seller_name = str(row["SellerName"]) if row["SellerName"] is not None else None
+            vip_event.external_title = (
+                str(row["Title"]) if row["Title"] is not None else None
+            )
+            vip_event.seller_name = (
+                str(row["SellerName"]) if row["SellerName"] is not None else None
+            )
             vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.event_date = str(row["EventDate"]) if row["EventDate"] is not None else None
+            vip_event.event_date = (
+                str(row["EventDate"]) if row["EventDate"] is not None else None
+            )
             vip_event.announce_date = (
                 str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
             )
@@ -268,7 +274,11 @@ class ExternalEventService:
                 str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
             )
             vip_event.external_url = str(row["URL"]) if row["URL"] is not None else None
-            vip_event.external_event_venue_id = int(row["ExternalEventVenueId"])
+            vip_event.external_event_venue_id = (
+                int(row["ExternalEventVenueId"])
+                if row["ExternalEventVenueId"] is not None
+                else None
+            )
             venue = TicketSocketVenue(
                 str(row["Venue"]) if row["Venue"] is not None else None,
                 str(row["Address"]) if row["Address"] is not None else None,
