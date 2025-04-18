@@ -68,7 +68,7 @@ def get_events():
     return convert_to_json(results)
 
 
-@public_api.route("/public/page/<str: route>")
+@public_api.route("/public/page/<string:route>")
 def get_page(route: str):
     """
     API method to fetch a page by route

@@ -356,13 +356,42 @@ def post_https_response(
 
     return json_data
 
-def get_override_string_value_or_default(override: any, default: any):
+
+def get_override_string_value_or_default(
+    override: any = None, default: any = None
+) -> str:
     """
     Get string value from override vs. default
     """
-    if override is not None:
+    if override is not None and len(str(override)) > 0:
         return str(override)
-    elif default is not None:
+    elif default is not None and len(str(default)) > 0:
         return str(default)
     else:
         return None
+
+
+def get_override_int_value_or_default(override: any = None, default: any = None) -> int:
+    """
+    Get integer value from override vs. default
+    """
+    if override is not None:
+        return int(override)
+    elif default is not None:
+        return int(default)
+    else:
+        return 0
+
+
+def get_override_bool_value_or_default(
+    override: any = None, default: any = None
+) -> bool:
+    """
+    Get integer value from override vs. default
+    """
+    if override is not None:
+        return int(override) == 1
+    elif default is not None:
+        return int(default) == 1
+    else:
+        return False
