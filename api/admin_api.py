@@ -12,8 +12,9 @@ from common.calendar_service import CalendarService
 from common.common_api import is_admin_logged_in
 from common.event_service import EventService
 from common.external_event_service import ExternalEventService
-from common.models.admin import ExternalVenue, SiteSetting
+from common.models.admin import ExternalVenue, Page, SiteSetting
 from common.order_service import OrderService
+from common.page_service import PageService
 from common.role_service import RoleService
 from common.seller_service import SellerService
 from common.tour_service import TourService
@@ -443,6 +444,35 @@ def get_all_permissions():
     permissions = service.get_all_permissions()
     return convert_to_json(permissions)
 
+@admin_api.route("/admin/pages")
+@jwt_required()
+def get_all_pages():
+    """
+    API method to fetch all pages
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    service = PageService()
+    pages = service.get_all_pages()
+    return convert_to_json(pages)
+
+@admin_api.route("/admin/pages/update", methods=["POST"])
+@jwt_required()
+def update_page():
+    """
+    API method to update page
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    page = convert_json_to_snake_case_object(request.get_json(), Page())
+
+    service = PageService()
+    success = service.update_page(page)
+    return convert_to_json(success)
 
 @admin_api.route("/admin/roles")
 @jwt_required()

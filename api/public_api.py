@@ -69,7 +69,7 @@ def get_events():
 
 
 @public_api.route("/public/page/<string:route>")
-def get_page(route: str):
+def get_page_by_route(route: str):
     """
     API method to fetch a page by route
     """

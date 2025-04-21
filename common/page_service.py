@@ -34,7 +34,9 @@ class PageService:
 
         sql = """SELECT Pages.*, PageType.PageType AS PageTypeName,
                     PageType.Template, PageType.Component
-                    FROM Pages ORDER BY Pages.Title ASC, Pages.Inactive DESC"""
+                    FROM Pages 
+                    JOIN PageType ON Pages.PageTypeID = PageType.PageTypeID 
+                    ORDER BY Pages.Title ASC, Pages.Inactive DESC"""
         rows = db_query_all(sql)
         for row in rows:
             page = self.__get_page_from_row_object(row)
@@ -390,46 +392,26 @@ class PageService:
                         "showDisplayName": (
                             1 if seller.show_display_name is True else 0
                         ),
-                        "address": get_override_string_value_or_default(
-                            seller.address
-                        ),
-                        "city": get_override_string_value_or_default(
-                            seller.city
-                        ),
-                        "state": get_override_string_value_or_default(
-                            seller.state
-                        ),
+                        "address": get_override_string_value_or_default(seller.address),
+                        "city": get_override_string_value_or_default(seller.city),
+                        "state": get_override_string_value_or_default(seller.state),
                         "zip": get_override_string_value_or_default(seller.zip),
-                        "country": get_override_string_value_or_default(
-                            seller.country
-                        ),
-                        "phone": get_override_string_value_or_default(
-                            seller.phone
-                        ),
-                        "email": get_override_string_value_or_default(
-                            seller.email
-                        ),
-                        "twitter": get_override_string_value_or_default(
-                            seller.twitter
-                        ),
+                        "country": get_override_string_value_or_default(seller.country),
+                        "phone": get_override_string_value_or_default(seller.phone),
+                        "email": get_override_string_value_or_default(seller.email),
+                        "twitter": get_override_string_value_or_default(seller.twitter),
                         "facebook": get_override_string_value_or_default(
                             seller.facebook
                         ),
                         "instagram": get_override_string_value_or_default(
                             seller.instagram
                         ),
-                        "youtube": get_override_string_value_or_default(
-                            seller.youtube
-                        ),
-                        "spotify": get_override_string_value_or_default(
-                            seller.spotify
-                        ),
-                        "website": get_override_string_value_or_default(
-                            seller.website
-                        ),
+                        "youtube": get_override_string_value_or_default(seller.youtube),
+                        "spotify": get_override_string_value_or_default(seller.spotify),
+                        "website": get_override_string_value_or_default(seller.website),
                         "websiteDisplayText": get_override_string_value_or_default(
                             seller.website_display_text
-                        )
+                        ),
                     }
                     ps_id = db_insert(insert_sql, insert_data)
                     success = ps_id > 0
