@@ -478,3 +478,23 @@ class PageService:
                 page.page_type = page_type
 
         return page
+
+    def get_all_page_types(self):
+        """
+        Gets all page types
+        """
+        sql = "SELECT * FROM PageType ORDER BY PageType ASC"
+        rows = db_query_all(sql)
+        
+        page_types: list[PageType] = []
+        
+        for row in rows:
+            page_type = PageType()
+            page_type.page_type_id = get_override_int_value_or_default(row["PageTypeID"])
+            page_type.page_type_name = get_override_string_value_or_default(row["PageType"])
+            page_type.page_type_template = get_override_string_value_or_default(row["Template"])
+            page_type.page_type_component = get_override_string_value_or_default(row["Component"])
+            page_types.append(page_type)
+            
+        return page_types
+            

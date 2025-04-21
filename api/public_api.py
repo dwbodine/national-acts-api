@@ -84,6 +84,21 @@ def get_page_by_route(route: str):
     results = service.get_page_by_route(route)
     return convert_to_json(results)
 
+@public_api.route("/public/page_types")
+def get_page_types():
+    """
+    API method to fetch all page types
+    """
+    # secured by public api key
+    sender_key = str(request.headers.get("x-api-key"))
+    api_key = str(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = PageService()
+    results = service.get_all_page_types()
+    return convert_to_json(results)
 
 @public_api.route("/public/sellers")
 def get_sellers():
