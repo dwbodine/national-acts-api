@@ -110,6 +110,11 @@ class ExternalEventService:
                 if event_to_update.disable_vip_link_reason is not None
                 else None
             ),
+            "event_time": (
+                event_to_update.external_event_time
+                if event_to_update.external_event_time is not None
+                else None
+            ),
         }
 
         if event_to_update.external_thumbnail is not None:
@@ -124,6 +129,7 @@ class ExternalEventService:
                              SET IsActive=%(is_active)s, 
                              Title=%(title)s,
                              EventDate=%(event_date)s,
+                             EventTime=%(event_time)s,
                              URL=%(url)s,
                              ExternalEventVenueId=%(external_event_venue_id)s,
                              DisableLinkButton=%(disable_link_button)s,
@@ -145,8 +151,8 @@ class ExternalEventService:
             success = db_update(update_sql, update_data)
         else:
             update_data["seller_id"] = event_to_update.external_seller_id
-            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
-                URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
+            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate, 
+                EventTime, URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
                 ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, IsActive, 
                 IsAddedToBandsInTown, IsHidden, IsCancelled, 
                 AnnounceDate, Created, LastUpdate"""
@@ -155,7 +161,7 @@ class ExternalEventService:
                 update_sql += """, Thumbnail"""
 
             update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
-                %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
+                %(event_time)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
                 %(disable_vip_link_reason)s, %(is_active)s, 
                 %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s, 
@@ -252,6 +258,9 @@ class ExternalEventService:
             vip_event = VipEvent()
             vip_event.is_external = True
             vip_event.event_id = event_id
+            vip_event.external_event_time = (
+                str(row["EventTime"]) if row["EventTime"] is not None else None
+            )
             vip_event.external_event_id = event_id
             vip_event.title = str(row["Title"]) if row["Title"] is not None else None
             vip_event.external_title = (

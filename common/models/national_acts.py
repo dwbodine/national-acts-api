@@ -256,6 +256,7 @@ class VipEvent(TicketSocketEvent):
     is_active: bool = True
     orders: list[VipOrder] = []
     external_event_id: int = None
+    external_event_time: str = None
     external_seller_id: int = None
     external_title: str = None
     external_thumbnail: str = None

@@ -89,6 +89,7 @@ class EventService:
                     ExternalEvents.ExternalVipLink, 
                     ExternalEvents.DisableVipLinkButton, 
                     ExternalEvents.DisableVipLinkReason,
+                    ExternalEvents.EventTime AS ExternalEventTime,
                     Sellers.Name AS SellerName,
                     Tour.AnnounceDate AS TourAnnounceDate,
                     COALESCE(Tour.IsActive, 0) AS IsTourActive
@@ -338,6 +339,11 @@ class EventService:
                 if row["ExternalEventVenueId"] is not None
                 else 0
             )
+            vip_event.external_event_time = (
+                str(row["ExternalEventTime"])
+                if row["ExternalEventTime"] is not None
+                else None
+            )
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
             if row["ExternalVenue"] is not None:
                 venue_name = str(row["ExternalVenue"])
@@ -376,6 +382,11 @@ class EventService:
                     int(row["ExternalEventId"])
                     if row["ExternalEventId"] is not None
                     else 0
+                )
+                vip_event.external_event_time = (
+                    str(row["ExternalEventTime"])
+                    if row["ExternalEventTime"] is not None
+                    else None
                 )
                 vip_event.external_seller_id = int(row["ExternalSellerId"])
                 vip_event.external_title = (
@@ -619,7 +630,7 @@ class EventService:
             if success is False:
                 break
             else:
-                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)                
+                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
         return success
 
     def delete_events(self, ticket_socket_event_ids: list[int], deleted: bool):
