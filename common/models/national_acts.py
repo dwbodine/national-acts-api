@@ -256,15 +256,11 @@ class VipEvent(TicketSocketEvent):
     is_active: bool = True
     orders: list[VipOrder] = []
     external_event_id: int = None
-    external_event_time: str = None
     external_seller_id: int = None
-    external_title: str = None
-    external_thumbnail: str = None
-    external_url: str = None
     external_event_venue_id: int = None
-    external_venue: TicketSocketVenue = None
     disable_link_button: bool = False
     disable_link_reason: str = None
+    external_url: str = None
     external_vip_link: str = None
     disable_vip_link_button: bool = False
     disable_vip_link_reason: str = None
@@ -295,6 +291,7 @@ class VipEvent(TicketSocketEvent):
     notes: list[Note] = []
     doors_open: str = None
     meet_and_greet_time: str = None
+    event_time: str = None
     email_sent_to_vips: bool = False
     text_sent_to_vips: bool = False
     list_sent_to_band: bool = False
@@ -389,37 +386,6 @@ class VipEvent(TicketSocketEvent):
             shirt_sale = ShirtSales(str(size), int(total))
             shirt_sales.append(shirt_sale)
         self.shirt_sales = shirt_sales
-
-        # roll up external event data, if any
-        if self.external_title is not None and self.external_title != "":
-            self.title = self.external_title
-
-        if self.external_venue is not None:
-            if self.venue is None:
-                self.venue = self.external_venue
-            else:
-                if self.external_venue.name is not None and self.external_venue.name != "":
-                    self.venue.name = self.external_venue.name
-                if (
-                    self.external_venue.address1 is not None
-                    and self.external_venue.address1 != ""
-                ):
-                    self.venue.address1 = self.external_venue.address1
-                if self.external_venue.city is not None and self.external_venue.city != "":
-                    self.venue.city = self.external_venue.city
-                if (
-                    self.external_venue.state is not None
-                    and self.external_venue.state != ""
-                ):
-                    self.venue.state = self.external_venue.state
-                if (
-                    self.external_venue.postal_code is not None
-                    and self.external_venue.postal_code != ""
-                ):
-                    self.venue.postal_code = self.external_venue.postal_code
-
-        if self.external_thumbnail is not None and self.external_thumbnail != "":
-            self.thumbnail = self.external_thumbnail
 
         if self.external_vip_link is not None and self.external_vip_link != "":
             self.ticket_socket_url = self.external_vip_link

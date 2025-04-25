@@ -111,8 +111,24 @@ class ExternalEventService:
                 else None
             ),
             "event_time": (
-                event_to_update.external_event_time
-                if event_to_update.external_event_time is not None
+                event_to_update.event_time
+                if event_to_update.event_time is not None
+                else None
+            ),
+            "meet_and_greet_time": (
+                event_to_update.meet_and_greet_time
+                if event_to_update.meet_and_greet_time is not None
+                else None
+            ),
+            "doors_open_time": (
+                event_to_update.doors_open
+                if event_to_update.doors_open is not None
+                else None
+            ),
+            "ticket_socket_event_id": (
+                event_to_update.ticket_socket_event_id
+                if event_to_update.ticket_socket_event_id is not None
+                and event_to_update.ticket_socket_event_id > 0
                 else None
             ),
         }
@@ -127,9 +143,12 @@ class ExternalEventService:
             update_data["event_id"] = event_to_update.external_event_id
             update_sql = """UPDATE ExternalEvents
                              SET IsActive=%(is_active)s, 
+                             TicketSocketEventId=%(ticket_socket_event_id)s,
                              Title=%(title)s,
                              EventDate=%(event_date)s,
                              EventTime=%(event_time)s,
+                             MeetAndGreetTime=%(meet_and_greet_time)s,
+                             DoorsOpenTime=%(doors_open_time)s,
                              URL=%(url)s,
                              ExternalEventVenueId=%(external_event_venue_id)s,
                              DisableLinkButton=%(disable_link_button)s,
@@ -145,26 +164,27 @@ class ExternalEventService:
             if "thumbnail" in update_data:
                 update_sql += """Thumbnail=%(thumbnail)s, """
 
-            update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+            update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                 WHERE EventId=%(event_id)s"""
 
             success = db_update(update_sql, update_data)
         else:
             update_data["seller_id"] = event_to_update.external_seller_id
-            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate, 
-                EventTime, URL, ExternalEventVenueId, DisableLinkButton, DisableLinkReason,
-                ExternalVipLink, DisableVipLinkButton, DisableVipLinkReason, IsActive, 
-                IsAddedToBandsInTown, IsHidden, IsCancelled, 
-                AnnounceDate, Created, LastUpdate"""
+            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
+                TicketSocketEventId, EventTime, MeetAndGreetTime, DoorsOpenTime, URL, 
+                ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
+                DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, 
+                IsHidden, IsCancelled, AnnounceDate, Created, LastUpdate"""
 
             if "thumbnail" in update_data:
                 update_sql += """, Thumbnail"""
 
-            update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s, 
-                %(event_time)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s, 
+            update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s,
+                %(ticket_socket_event_id)s, %(event_time)s, %(meet_and_greet_time)s,
+                %(doors_open_time)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s,
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
-                %(disable_vip_link_reason)s, %(is_active)s, 
-                %(isAddedToBandsInTown)s, %(isHidden)s, %(is_cancelled)s, %(announceDate)s, 
+                %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isHidden)s,
+                %(is_cancelled)s, %(announceDate)s, 
                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
 
@@ -258,8 +278,21 @@ class ExternalEventService:
             vip_event = VipEvent()
             vip_event.is_external = True
             vip_event.event_id = event_id
-            vip_event.external_event_time = (
+            vip_event.ticket_socket_event_id = (
+                int(row["TicketSocketEventId"])
+                if row["TicketSocketEventId"] is not None
+                else 0
+            )
+            vip_event.event_time = (
                 str(row["EventTime"]) if row["EventTime"] is not None else None
+            )
+            vip_event.doors_open = (
+                str(row["DoorsOpenTime"]) if row["DoorsOpenTime"] is not None else None
+            )
+            vip_event.meet_and_greet_time = (
+                str(row["MeetAndGreetTime"])
+                if row["MeetAndGreetTime"] is not None
+                else None
             )
             vip_event.external_event_id = event_id
             vip_event.title = str(row["Title"]) if row["Title"] is not None else None

@@ -71,25 +71,48 @@ class EventService:
         else:
             search_term = None
 
-        sql = """SELECT TicketSocketEvents.*,
+        sql = """SELECT TicketSocketEvents.Id AS Id,
+                    TicketSocketEvents.EventId AS EventId,
+                    TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
+                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
+                    TicketSocketEvents.EventDate AS EventDate,
+                    TicketSocketEvents.UtcTime AS UtcTime,
+                    TicketSocketEvents.DisplayDate AS DisplayDate,
+                    COALESCE(ExternalEvents.Thumbnail, TicketSocketEvents.Thumbnail) AS Thumbnail,
+                    TicketSocketEvents.URL AS URL,
+                    ExternalEvents.URL AS ExternalUrl,
+                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
+                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS Address,
+                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
+                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
+                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip,
+                    COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS Country,
+                    TicketSocketEvents.IsActive AS IsActive,
+                    TicketSocketEvents.IsDeleted AS IsDeleted,
+                    TicketSocketEvents.IsVip AS IsVip,
+                    TicketSocketEvents.IsAddedToBandsInTown AS IsAddedToBandsInTown,
+                    TicketSocketEvents.IsHidden AS IsHidden,
+                    TicketSocketEvents.IsCancelled AS IsCancelled,
+                    TicketSocketEvents.CancelledDate AS CancelledDate,
+                    TicketSocketEvents.EmailSentToVips AS EmailSentToVips,
+                    TicketSocketEvents.TextSentToVips AS TextSentToVips,
+                    TicketSocketEvents.ListSentToBand AS ListSentToBand,
+                    TicketSocketEvents.ListSentTime AS ListSentTime,
+                    TicketSocketEvents.ListSentNumVips AS ListSentNumVips,
+                    TicketSocketEvents.CheckInLocation AS CheckInLocation,
+                    TicketSocketEvents.CheckInNotes AS CheckInNotes,
                     ExternalEvents.EventId AS ExternalEventId, 
                     ExternalEvents.SellerId AS ExternalSellerId, 
-                    ExternalEvents.Title AS ExternalTitle, 
-                    ExternalEvents.Thumbnail AS ExternalThumbnail, 
-                    ExternalEvents.URL AS ExternalUrl, 
-                    ExternalEvents.ExternalEventVenueId,
-                    ExternalEventVenues.Venue AS ExternalVenue, 
-                    ExternalEventVenues.Address AS ExternalAddress, 
-                    ExternalEventVenues.City AS ExternalCity, 
-                    ExternalEventVenues.State AS ExternalState, 
-                    ExternalEventVenues.Zip AS ExternalZip, 
-                    ExternalEventVenues.Country AS ExternalCountry, 
-                    ExternalEvents.DisableLinkButton, 
-                    ExternalEvents.DisableLinkReason, 
-                    ExternalEvents.ExternalVipLink, 
-                    ExternalEvents.DisableVipLinkButton, 
-                    ExternalEvents.DisableVipLinkReason,
-                    ExternalEvents.EventTime AS ExternalEventTime,
+                    ExternalEvents.ExternalEventVenueId AS ExternalEventVenueId,
+                    ExternalEvents.DisableLinkButton AS DisableLinkButton,
+                    ExternalEvents.DisableLinkReason AS DisableLinkReason, 
+                    ExternalEvents.ExternalVipLink AS ExternalVipLink, 
+                    ExternalEvents.DisableVipLinkButton AS DisableVipLinkButton, 
+                    ExternalEvents.DisableVipLinkReason AS DisableVipLinkReason,
+                    ExternalEvents.EventTime AS EventTime,
+                    COALESCE(ExternalEvents.MeetAndGreetTime, TicketSocketEvents.MeetAndGreetTime) AS MeetAndGreetTime,
+                    COALESCE(ExternalEvents.DoorsOpenTime, TicketSocketEvents.DoorsOpen) AS DoorsOpenTime,
+                    COALESCE(ExternalEvents.AnnounceDate, TicketSocketEvents.AnnounceDate) AS AnnounceDate,
                     Sellers.Name AS SellerName,
                     Tour.AnnounceDate AS TourAnnounceDate,
                     COALESCE(Tour.IsActive, 0) AS IsTourActive
@@ -99,6 +122,7 @@ class EventService:
             LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
             LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND ExternalEvents.EventDate = TicketSocketEvents.EventDate
+                 AND (ExternalEvents.TicketSocketEventId IS NULL OR ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id)
             LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId 
             WHERE """
         data = {}
@@ -154,16 +178,16 @@ class EventService:
                 where_clause.append(
                     """CONCAT_WS (' ', Sellers.Name, 
                                 TicketSocketEvents.Title, 
-                                ExternalEventVenues.Venue,
-                                ExternalEventVenues.Address, 
-                                ExternalEventVenues.City,
-                                ExternalEventVenues.State,
-                                ExternalEventVenues.Country,
-                                TicketSocketEvents.Venue, 
-                                TicketSocketEvents.Address, 
-                                TicketSocketEvents.City, 
-                                TicketSocketEvents.State,
-                                TicketSocketEvents.Country) 
+                                COALESCE(ExternalEventVenues.Venue, ''),
+                                COALESCE(ExternalEventVenues.Address, ''),
+                                COALESCE(ExternalEventVenues.City, ''),
+                                COALESCE(ExternalEventVenues.State, ''),
+                                COALESCE(ExternalEventVenues.Country, ''),
+                                COALESCE(TicketSocketEvents.Venue, ''),
+                                COALESCE(TicketSocketEvents.Address, ''),
+                                COALESCE(TicketSocketEvents.City, ''),
+                                COALESCE(TicketSocketEvents.State, ''),
+                                COALESCE(TicketSocketEvents.Country, '')) 
                                 LIKE ('%"""
                     + search_term
                     + """%')"""
@@ -212,9 +236,10 @@ class EventService:
         if len(where_clause) > 0:
             sql += " AND ".join(where_clause)
 
-        sql += (
-            " ORDER BY TicketSocketEvents.EventDate ASC, TicketSocketEvents.Title ASC"
-        )
+        sql += """ ORDER BY TicketSocketEvents.EventDate, 
+                 ExternalEvents.EventTime,
+                 COALESCE(ExternalEvents.MeetAndGreetTime, TicketSocketEvents.MeetAndGreetTime), 
+                 COALESCE(ExternalEvents.Title, TicketSocketEvents.Title)"""
 
         sql = sql.replace("\n", "")
 
@@ -281,14 +306,36 @@ class EventService:
                 str(row["EventDate"]) if row["EventDate"] is not None else None
             )
 
-            vip_event.doors_open = (
-                str(row["DoorsOpen"]) if row["DoorsOpen"] is not None else None
-            )
-            vip_event.meet_and_greet_time = (
-                str(row["MeetAndGreetTime"])
-                if row["MeetAndGreetTime"] is not None
+            doors_open: str = (
+                str(row["ExternalDoorsOpenTime"])
+                if row["ExternalDoorsOpenTime"] is not None
                 else None
             )
+            if doors_open is None:
+                doors_open = (
+                    str(row["DoorsOpen"]) if row["DoorsOpen"] is not None else None
+                )
+            vip_event.doors_open = doors_open
+
+            meet_and_greet_time: str = (
+                str(row["ExternalMeetAndGreetTime"])
+                if row["ExternalMeetAndGreetTime"] is not None
+                else None
+            )
+            if meet_and_greet_time is None:
+                meet_and_greet_time = (
+                    str(row["MeetAndGreetTime"])
+                    if row["MeetAndGreetTime"] is not None
+                    else None
+                )
+            vip_event.meet_and_greet_time = meet_and_greet_time
+
+            vip_event.event_time = (
+                str(row["ExternalEventTime"])
+                if row["ExternalEventTime"] is not None
+                else None
+            )
+
             vip_event.utc_time = int(row["UtcTime"])
             vip_event.display_date = (
                 str(row["DisplayDate"]) if row["DisplayDate"] is not None else None
@@ -339,11 +386,7 @@ class EventService:
                 if row["ExternalEventVenueId"] is not None
                 else 0
             )
-            vip_event.external_event_time = (
-                str(row["ExternalEventTime"])
-                if row["ExternalEventTime"] is not None
-                else None
-            )
+
             venue_name = str(row["Venue"]) if row["Venue"] is not None else None
             if row["ExternalVenue"] is not None:
                 venue_name = str(row["ExternalVenue"])
@@ -383,56 +426,15 @@ class EventService:
                     if row["ExternalEventId"] is not None
                     else 0
                 )
-                vip_event.external_event_time = (
-                    str(row["ExternalEventTime"])
-                    if row["ExternalEventTime"] is not None
-                    else None
-                )
                 vip_event.external_seller_id = int(row["ExternalSellerId"])
                 vip_event.external_title = (
                     str(row["ExternalTitle"])
                     if row["ExternalTitle"] is not None
                     else None
                 )
-                vip_event.external_thumbnail = (
-                    str(row["ExternalThumbnail"])
-                    if row["ExternalThumbnail"] is not None
-                    else None
-                )
                 vip_event.external_url = (
                     str(row["ExternalUrl"]) if row["ExternalUrl"] is not None else None
                 )
-                external_country = (
-                    str(row["ExternalCountry"])
-                    if row["ExternalCountry"] is not None
-                    else None
-                )
-                external_venue = TicketSocketVenue(
-                    (
-                        str(row["ExternalVenue"])
-                        if row["ExternalVenue"] is not None
-                        else None
-                    ),
-                    (
-                        str(row["ExternalAddress"])
-                        if row["ExternalAddress"] is not None
-                        else None
-                    ),
-                    (
-                        str(row["ExternalCity"])
-                        if row["ExternalCity"] is not None
-                        else None
-                    ),
-                    (
-                        str(row["ExternalState"])
-                        if row["ExternalState"] is not None
-                        else None
-                    ),
-                    str(row["ExternalZip"]) if row["ExternalZip"] is not None else None,
-                    external_country,
-                    "",
-                )
-                vip_event.external_venue = external_venue
                 vip_event.disable_link_button = (
                     True if int(row["DisableLinkButton"]) == 1 else False
                 )
@@ -579,7 +581,15 @@ class EventService:
                 if vip_event is not None:
                     events.append(vip_event)
 
-        events.sort(key=operator.attrgetter("event_date", "title", "is_external"))
+        events.sort(
+            key=operator.attrgetter(
+                "event_date",
+                "event_time",
+                "meet_and_greet_time",
+                "title",
+                "is_external",
+            )
+        )
 
         return events
 
@@ -744,8 +754,6 @@ class EventService:
                              IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
                              IsHidden=%(isHidden)s, 
                              AnnounceDate=%(announceDate)s, 
-                             DoorsOpen=%(doorsOpen)s,
-                             MeetAndGreetTime=%(meetAndGreetTime)s,
                              CheckInLocation=%(checkInLocation)s,
                              CheckInNotes=%(checkInNotes)s,
                              EmailSentToVips=%(emailSentToVips)s,
@@ -768,16 +776,6 @@ class EventService:
                 "announceDate": (
                     event_to_update.announce_date
                     if event_to_update.announce_date is not None
-                    else None
-                ),
-                "doorsOpen": (
-                    event_to_update.doors_open
-                    if event_to_update.doors_open is not None
-                    else None
-                ),
-                "meetAndGreetTime": (
-                    event_to_update.meet_and_greet_time
-                    if event_to_update.meet_and_greet_time is not None
                     else None
                 ),
                 "checkInLocation": (
