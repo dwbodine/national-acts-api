@@ -11,7 +11,13 @@ from common.db import (
 )
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import TicketSocketVenue
-from common.utility import create_thumbnail, move_temp_file_to_public_folder
+from common.utility import (
+    create_thumbnail,
+    get_override_bool_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    move_temp_file_to_public_folder,
+)
 
 
 class ExternalEventService:
@@ -75,7 +81,7 @@ class ExternalEventService:
                 and event_to_update.is_deleted is False
                 else 0
             ),
-            "title": event_to_update.external_title,
+            "title": event_to_update.title,
             "is_cancelled": 1 if event_to_update.is_cancelled is True else 0,
             "isAddedToBandsInTown": (
                 1 if event_to_update.is_added_to_bands_in_town is True else 0
@@ -133,8 +139,8 @@ class ExternalEventService:
             ),
         }
 
-        if event_to_update.external_thumbnail is not None:
-            thumb_file = create_thumbnail(event_to_update.external_thumbnail)
+        if event_to_update.thumbnail is not None:
+            thumb_file = create_thumbnail(event_to_update.thumbnail)
             if thumb_file is not None:
                 update_data["thumbnail"] = thumb_file
                 move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
@@ -169,7 +175,7 @@ class ExternalEventService:
 
             success = db_update(update_sql, update_data)
         else:
-            update_data["seller_id"] = event_to_update.external_seller_id
+            update_data["seller_id"] = event_to_update.seller_id
             update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
                 TicketSocketEventId, EventTime, MeetAndGreetTime, DoorsOpenTime, URL, 
                 ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
@@ -274,111 +280,113 @@ class ExternalEventService:
         """
         vip_event: VipEvent = None
         if row:
-            event_id = int(row["EventId"]) if row["EventId"] is not None else 0
+            event_id = get_override_int_value_or_default(row["EventId"])
             vip_event = VipEvent()
             vip_event.is_external = True
-            vip_event.event_id = event_id
-            vip_event.ticket_socket_event_id = (
-                int(row["TicketSocketEventId"])
-                if row["TicketSocketEventId"] is not None
-                else 0
-            )
-            vip_event.event_time = (
-                str(row["EventTime"]) if row["EventTime"] is not None else None
-            )
-            vip_event.doors_open = (
-                str(row["DoorsOpenTime"]) if row["DoorsOpenTime"] is not None else None
-            )
-            vip_event.meet_and_greet_time = (
-                str(row["MeetAndGreetTime"])
-                if row["MeetAndGreetTime"] is not None
-                else None
-            )
             vip_event.external_event_id = event_id
-            vip_event.title = str(row["Title"]) if row["Title"] is not None else None
-            vip_event.external_title = (
-                str(row["Title"]) if row["Title"] is not None else None
+            vip_event.event_id = event_id
+            ticket_socket_event_id = get_override_int_value_or_default(row["EventId"])
+            vip_event.ticket_socket_event_id = (
+                ticket_socket_event_id if ticket_socket_event_id > 0 else None
             )
-            vip_event.seller_name = (
-                str(row["SellerName"]) if row["SellerName"] is not None else None
+            vip_event.event_time = get_override_string_value_or_default(
+                row["EventTime"]
             )
-            vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.event_date = (
-                str(row["EventDate"]) if row["EventDate"] is not None else None
+            vip_event.doors_open = get_override_string_value_or_default(
+                row["DoorsOpenTime"]
             )
-            vip_event.announce_date = (
-                str(row["AnnounceDate"]) if row["AnnounceDate"] is not None else None
+            vip_event.meet_and_greet_time = get_override_string_value_or_default(
+                row["MeetAndGreetTime"]
             )
-            vip_event.thumbnail = (
-                str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
+            vip_event.title = get_override_string_value_or_default(row["Title"])
+            vip_event.seller_name = get_override_string_value_or_default(
+                row["SellerName"]
             )
-            vip_event.external_thumbnail = (
-                str(row["Thumbnail"]) if row["Thumbnail"] is not None else None
+            vip_event.seller_id = get_override_int_value_or_default(row["SellerId"])
+            vip_event.event_date = get_override_string_value_or_default(
+                row["EventDate"]
             )
-            vip_event.external_url = str(row["URL"]) if row["URL"] is not None else None
-            vip_event.external_event_venue_id = (
-                int(row["ExternalEventVenueId"])
-                if row["ExternalEventVenueId"] is not None
-                else None
+            vip_event.announce_date = get_override_string_value_or_default(
+                row["AnnounceDate"]
             )
+            vip_event.thumbnail = get_override_string_value_or_default(row["Thumbnail"])
+            vip_event.external_url = get_override_string_value_or_default(row["URL"])
+            vip_event.external_event_venue_id = get_override_int_value_or_default(
+                row["ExternalEventVenueId"]
+            )
+
+            if vip_event.event_time is None:
+                vip_event.event_time = ""
+            if vip_event.meet_and_greet_time is None:
+                vip_event.meet_and_greet_time = ""
+
             venue = TicketSocketVenue(
-                str(row["Venue"]) if row["Venue"] is not None else None,
-                str(row["Address"]) if row["Address"] is not None else None,
-                str(row["City"]) if row["City"] is not None else None,
-                str(row["State"]) if row["State"] is not None else None,
-                str(row["Zip"]) if row["Zip"] is not None else None,
-                str(row["Country"]) if row["Country"] is not None else None,
+                get_override_string_value_or_default(row["Venue"]),
+                get_override_string_value_or_default(row["Address"]),
+                get_override_string_value_or_default(row["City"]),
+                get_override_string_value_or_default(row["State"]),
+                get_override_string_value_or_default(row["Zip"]),
+                get_override_string_value_or_default(row["Country"]),
                 "",
             )
-            vip_event.external_venue = venue
-            vip_event.is_active = True if int(row["IsActive"]) == 1 else False
-            vip_event.external_event_id = (
-                int(row["EventId"]) if row["EventId"] is not None else 0
+            vip_event.venue = venue
+
+            vip_event.is_active = get_override_bool_value_or_default(row["IsActive"])
+
+            vip_event.disable_link_button = get_override_bool_value_or_default(
+                row["DisableLinkButton"]
             )
-            vip_event.external_seller_id = int(row["SellerId"])
-            vip_event.disable_link_button = (
-                True if int(row["DisableLinkButton"]) == 1 else False
+            vip_event.disable_link_reason = get_override_string_value_or_default(
+                row["DisableLinkReason"]
             )
-            vip_event.disable_link_reason = (
-                str(row["DisableLinkReason"])
-                if row["DisableLinkReason"] is not None
-                else None
+            vip_event.external_vip_link = get_override_string_value_or_default(
+                row["ExternalVipLink"]
             )
-            vip_event.external_vip_link = (
-                str(row["ExternalVipLink"])
-                if row["ExternalVipLink"] is not None
-                else None
+
+            vip_event.disable_vip_link_button = get_override_bool_value_or_default(
+                row["DisableVipLinkButton"]
+            )
+            vip_event.disable_vip_link_reason = get_override_string_value_or_default(
+                row["DisableVipLinkReason"]
             )
             vip_event.is_vip = (
-                True
-                if (
-                    vip_event.external_vip_link is not None
-                    and vip_event.external_vip_link != ""
-                )
-                else False
+                True if vip_event.external_vip_link is not None else False
             )
-            vip_event.disable_vip_link_button = (
-                True if int(row["DisableVipLinkButton"]) == 1 else False
+
+            vip_event.is_added_to_bands_in_town = get_override_bool_value_or_default(
+                row["IsAddedToBandsInTown"]
             )
-            vip_event.disable_vip_link_reason = (
-                str(row["DisableVipLinkReason"])
-                if row["DisableVipLinkReason"] is not None
-                else None
+
+            vip_event.is_hidden = get_override_bool_value_or_default(row["IsHidden"])
+            vip_event.is_cancelled = get_override_bool_value_or_default(
+                row["IsCancelled"]
             )
-            vip_event.is_added_to_bands_in_town = (
-                True if int(row["IsAddedToBandsInTown"]) == 1 else False
+            vip_event.cancelled_date = get_override_string_value_or_default(
+                row["CancelledDate"]
             )
-            vip_event.is_hidden = True if int(row["IsHidden"]) == 1 else False
-            vip_event.is_cancelled = True if int(row["IsCancelled"]) == 1 else False
-            vip_event.cancelled_date = (
-                str(row["CancelledDate"])
-                if (
-                    "CancelledDate" in row
-                    and row["CancelledDate"] is not None
-                    and vip_event.is_cancelled is True
-                )
-                else None
+            vip_event.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
+            vip_event.email_sent_to_vips = get_override_bool_value_or_default(
+                row["EmailSentToVips"]
             )
+            vip_event.text_sent_to_vips = get_override_bool_value_or_default(
+                row["TextSentToVips"]
+            )
+            vip_event.list_sent_to_band = get_override_bool_value_or_default(
+                row["ListSentToBand"]
+            )
+            vip_event.list_sent_time = get_override_string_value_or_default(
+                row["ListSentTime"]
+            )
+            vip_event.list_sent_num_vips = get_override_int_value_or_default(
+                row["ListSentNumVips"]
+            )
+            vip_event.check_in_location = get_override_string_value_or_default(
+                row["CheckInLocation"]
+            )
+            vip_event.check_in_notes = get_override_string_value_or_default(
+                row["CheckInNotes"]
+            )
+
             vip_event.get_totals()
 
         return vip_event

@@ -246,52 +246,31 @@ class VipEvent(TicketSocketEvent):
     National acts specific version of TS events
     """
 
+    # TicketSocketEvent properties
     ticket_socket_event_id: int = 0
-    total_revenue: float = 0
-    total_service_fees: float = 0
-    total_tickets: int = 0
-    total_checked_in: int = 0
-    total_shirts: int = 0
-    shirt_sales: list[ShirtSales] = []
-    is_active: bool = True
-    orders: list[VipOrder] = []
+    seller_event_category_id: int = None
+    is_vip: bool = True
+
+    # ExternalEvent properties
     external_event_id: int = None
-    external_seller_id: int = None
+    seller_id: int = None
+    meet_and_greet_time: str = None
+    doors_open: str = None
+    event_time: str = None
+    external_url: str = None
     external_event_venue_id: int = None
     disable_link_button: bool = False
     disable_link_reason: str = None
-    external_url: str = None
     external_vip_link: str = None
     disable_vip_link_button: bool = False
     disable_vip_link_reason: str = None
-    seller_event_category_id: int = None
-    is_vip: bool = True
-    is_deleted: bool = False
-    is_external: bool = False
-    has_shirt_data: bool = False
-    has_phone_data: bool = False
-    has_non_usa_orders: bool = False
-    non_usa_currency_symbol: str = None
-    non_usa_currency_abbrev: str = None
-    num_tickets_refunded: int = 0
-    revenue_refunded: float = 0
-    service_fee_revenue_refunded: float = 0
-    num_tickets_charged_back: int = 0
-    revenue_charged_back: float = 0
-    service_fee_revenue_charged_back: float = 0
-    has_ticket_type_data: bool = False
+    is_active: bool = True
     is_added_to_bands_in_town: bool = False
-    seller_name: str = ""
     is_hidden: bool = False
     is_cancelled: bool = False
-    cancelled_date: str = None
     announce_date: str = None
-    tour_announce_date: str = None
-    num_tickets_comped: int = 0
-    notes: list[Note] = []
-    doors_open: str = None
-    meet_and_greet_time: str = None
-    event_time: str = None
+    cancelled_date: str = None
+    is_deleted: bool = False
     email_sent_to_vips: bool = False
     text_sent_to_vips: bool = False
     list_sent_to_band: bool = False
@@ -299,6 +278,36 @@ class VipEvent(TicketSocketEvent):
     list_sent_num_vips: int = None
     check_in_location: str = None
     check_in_notes: str = None
+
+    # collections
+    notes: list[Note] = []
+    orders: list[VipOrder] = []
+
+    # other database properties
+    seller_name: str = ""
+    non_usa_currency_symbol: str = None
+    non_usa_currency_abbrev: str = None
+    tour_announce_date: str = None
+
+    # computed properties
+    is_external: bool = False
+    total_revenue: float = 0
+    total_service_fees: float = 0
+    total_tickets: int = 0
+    total_checked_in: int = 0
+    total_shirts: int = 0
+    shirt_sales: list[ShirtSales] = []
+    has_shirt_data: bool = False
+    has_phone_data: bool = False
+    has_non_usa_orders: bool = False
+    num_tickets_refunded: int = 0
+    revenue_refunded: float = 0
+    service_fee_revenue_refunded: float = 0
+    num_tickets_charged_back: int = 0
+    revenue_charged_back: float = 0
+    service_fee_revenue_charged_back: float = 0
+    has_ticket_type_data: bool = False
+    num_tickets_comped: int = 0
 
     def get_totals(self):
         """
@@ -386,9 +395,6 @@ class VipEvent(TicketSocketEvent):
             shirt_sale = ShirtSales(str(size), int(total))
             shirt_sales.append(shirt_sale)
         self.shirt_sales = shirt_sales
-
-        if self.external_vip_link is not None and self.external_vip_link != "":
-            self.ticket_socket_url = self.external_vip_link
 
 
 class DailyOrderData:
