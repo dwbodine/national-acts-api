@@ -84,9 +84,9 @@ class EventService:
                     TicketSocketEvents.UtcTime AS UtcTime,
                     TicketSocketEvents.DisplayDate AS DisplayDate,
                     TicketSocketEvents.IsVip AS IsVip,
+                    TicketSocketEvents.URL AS URL,
                     COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
-                    COALESCE(ExternalEvents.Thumbnail, TicketSocketEvents.Thumbnail) AS Thumbnail,
-                    COALESCE(ExternalEvents.ExternalVipLink, TicketSocketEvents.URL) AS URL,                    
+                    COALESCE(ExternalEvents.Thumbnail, TicketSocketEvents.Thumbnail) AS Thumbnail,                    
                     COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
                     COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS Address,
                     COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
@@ -362,7 +362,6 @@ class EventService:
             vip_event.event_time = get_override_string_value_or_default(
                 row["EventTime"]
             )
-
             vip_event.external_event_venue_id = get_override_int_value_or_default(
                 row["ExternalEventVenueId"]
             )
@@ -385,6 +384,8 @@ class EventService:
             vip_event.seller_name = get_override_string_value_or_default(
                 row["SellerName"]
             )
+            if vip_event.external_vip_link is not None:
+                vip_event.ticket_socket_url = vip_event.external_vip_link
 
             # venue data
             venue_name = get_override_string_value_or_default(row["Venue"])
