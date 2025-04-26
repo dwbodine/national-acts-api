@@ -85,8 +85,8 @@ class EventService:
                     TicketSocketEvents.DisplayDate AS DisplayDate,
                     TicketSocketEvents.IsVip AS IsVip,
                     TicketSocketEvents.URL AS URL,
+                    TicketSocketEvents.Thumbnail,
                     COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
-                    COALESCE(ExternalEvents.Thumbnail, TicketSocketEvents.Thumbnail) AS Thumbnail,                    
                     COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
                     COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS Address,
                     COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
@@ -110,6 +110,7 @@ class EventService:
                     COALESCE(ExternalEvents.IsCancelled, TicketSocketEvents.IsCancelled) AS IsCancelled,
                     ExternalEvents.EventId AS ExternalEventId, 
                     ExternalEvents.URL AS ExternalUrl,
+                    ExternalEvents.Thumbnail AS ExternalThumbnail,
                     ExternalEvents.EventTime AS EventTime,
                     ExternalEvents.ExternalEventVenueId AS ExternalEventVenueId,
                     ExternalEvents.DisableLinkButton AS DisableLinkButton,
@@ -319,7 +320,12 @@ class EventService:
                 row["DisplayDate"]
             )
             vip_event.title = get_override_string_value_or_default(row["Title"])
-            vip_event.thumbnail = get_override_string_value_or_default(row["Thumbnail"])
+            thumbnail = get_override_string_value_or_default(row["Thumbnail"])
+            external_thumbnail = get_override_string_value_or_default(row["ExternalThumbnail"])
+            if external_thumbnail is not None:
+                vip_event.thumbnail = external_thumbnail
+            else:
+                vip_event.thumbnail = thumbnail
             vip_event.ticket_socket_url = get_override_string_value_or_default(
                 row["URL"]
             )
