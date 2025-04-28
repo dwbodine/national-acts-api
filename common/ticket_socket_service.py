@@ -296,7 +296,7 @@ class TicketSocketService:
                 # it's a timezone that isn't convertible using Python or well...anything)
                 # So what we do instead is define a "default offset" in the database
                 # that roughly gets us the right date since we're not displaying times
-                # in the front end.  With any luck the "displayStartDate" comes back
+                # from TS in the front end.  With any luck the "displayStartDate" comes back
                 # with a valid value and we use that for our date instead
 
                 try:
