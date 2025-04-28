@@ -561,6 +561,53 @@ class EventService:
 
         return events
 
+    def get_ticket_socket_events_only(self, seller_id: int = None):
+        """
+        Fetch only TS events for association with External Events
+        """
+        events: list[VipEvent] = []
+        sql = """SELECT SellerEventCategory.SellerId, TicketSocketEvents.*
+            FROM TicketSocketEvents
+            JOIN SellerEventCategory 
+                ON SellerEventCategory.SellerEventCategoryId =
+                TicketSocketEvents.SellerEventCategoryId"""
+
+        data = {}
+
+        if seller_id is not None:
+            sql += """ WHERE SellerEventCategory.SellerId=%(seller_id)s"""
+            data["seller_id"] = seller_id
+
+        sql += " ORDER BY TicketSocketEvents.EventDate, TicketSocketEvents.Title"
+
+        rows = db_query_all(sql, data)
+        for row in rows:
+            vip_event = VipEvent()
+            vip_event.ticket_socket_event_id = get_override_int_value_or_default(
+                row["Id"]
+            )
+            vip_event.event_id = get_override_int_value_or_default(row["EventId"])
+            vip_event.title = get_override_string_value_or_default(row["Title"])
+            vip_event.event_date = get_override_string_value_or_default(
+                row["EventDate"]
+            )
+            vip_event.thumbnail = get_override_string_value_or_default(row["Thumbnail"])
+            vip_event.ticket_socket_url = get_override_string_value_or_default(
+                row["URL"]
+            )
+            vip_event.venue = TicketSocketVenue(
+                get_override_string_value_or_default(row["Venue"]),
+                get_override_string_value_or_default(row["Address"]),
+                get_override_string_value_or_default(row["City"]),
+                get_override_string_value_or_default(row["State"]),
+                get_override_string_value_or_default(row["Zip"]),
+                get_override_string_value_or_default(row["Country"]),
+                "",
+            )
+            vip_event.is_vip = get_override_bool_value_or_default(row["IsVip"])
+            events.append(vip_event)
+        return events
+
     def __get_ticket_types_from_event_id(self, ticket_socket_event_id: int):
         """
         Fetch from TicketSocketTicketTypes based on event Id

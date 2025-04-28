@@ -95,6 +95,25 @@ def send_list_to_band():
     return convert_to_json(updated_event)
 
 
+@admin_api.route("/admin/events/ticketSocketOnly")
+@jwt_required()
+def get_only_ts_events():
+    """
+    API method to fetch only TS events
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    seller_id: int = None
+    if request.args.get("sellerId") is not None:
+        seller_id = int(request.args.get("sellerId"))
+
+    service = EventService()
+    events = service.get_ticket_socket_events_only(seller_id)
+    return convert_to_json(events)
+
+
 @admin_api.route("/admin/events/update", methods=["POST"])
 @jwt_required()
 def update_event():
