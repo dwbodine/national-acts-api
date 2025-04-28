@@ -166,7 +166,7 @@ class EventService:
                     where_clause.append("ExternalEvents.IsActive = 0")
                 elif show_cancelled is True:
                     where_clause.append(
-                        """(COALESCE(ExternalEvents.IsActive, 1) = 1)
+                        """(COALESCE(ExternalEvents.IsActive, 1) = 1
                             OR ExternalEvents.IsCancelled = 1)"""
                     )
                 else:
@@ -570,7 +570,7 @@ class EventService:
             FROM TicketSocketEvents
             JOIN SellerEventCategory 
                 ON SellerEventCategory.SellerEventCategoryId =
-                TicketSocketEvents.SellerEventCategoryId"""
+                TicketSocketEvents.SellerEventCategoryId """
 
         data = {}
 
