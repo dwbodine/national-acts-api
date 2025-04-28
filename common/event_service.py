@@ -79,7 +79,6 @@ class EventService:
         sql = """SELECT TicketSocketEvents.Id AS Id,
                     TicketSocketEvents.EventId AS EventId,
                     TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
-                    TicketSocketEvents.IsActive AS IsActive,                    
                     TicketSocketEvents.EventDate AS EventDate,
                     TicketSocketEvents.IsVip AS IsVip,
                     TicketSocketEvents.URL AS URL,
@@ -91,32 +90,32 @@ class EventService:
                     COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
                     COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip,
                     COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS Country,
-                    COALESCE(ExternalEvents.IsDeleted, TicketSocketEvents.IsDeleted) AS IsDeleted,
-                    COALESCE(ExternalEvents.CancelledDate, TicketSocketEvents.CancelledDate) AS CancelledDate,                    
-                    COALESCE(ExternalEvents.EmailSentToVips, TicketSocketEvents.EmailSentToVips) AS EmailSentToVips,
-                    COALESCE(ExternalEvents.TextSentToVips, TicketSocketEvents.TextSentToVips) AS TextSentToVips,
-                    COALESCE(ExternalEvents.ListSentToBand, TicketSocketEvents.ListSentToBand) AS ListSentToBand,
-                    COALESCE(ExternalEvents.ListSentTime, TicketSocketEvents.ListSentTime) AS ListSentTime,
-                    COALESCE(ExternalEvents.ListSentNumVips, TicketSocketEvents.ListSentNumVips) AS ListSentNumVips,
-                    COALESCE(ExternalEvents.CheckInLocation, TicketSocketEvents.CheckInLocation) AS CheckInLocation,
-                    COALESCE(ExternalEvents.CheckInNotes, TicketSocketEvents.CheckInNotes) AS CheckInNotes,
-                    ExternalEvents.MeetAndGreetTime AS MeetAndGreetTime,
-                    ExternalEvents.DoorsOpenTime AS DoorsOpenTime,
-                    COALESCE(ExternalEvents.AnnounceDate, TicketSocketEvents.AnnounceDate) AS AnnounceDate,
-                    COALESCE(ExternalEvents.IsAddedToBandsInTown, TicketSocketEvents.IsAddedToBandsInTown) AS IsAddedToBandsInTown,
-                    COALESCE(ExternalEvents.IsHidden, TicketSocketEvents.IsHidden) AS IsHidden,
-                    COALESCE(ExternalEvents.IsCancelled, TicketSocketEvents.IsCancelled) AS IsCancelled,
+                    COALESCE(ExternalEvents.EmailSentToVips, 0) AS EmailSentToVips,
+                    COALESCE(ExternalEvents.TextSentToVips, 0) AS TextSentToVips,
+                    COALESCE(ExternalEvents.ListSentToBand, 0) AS ListSentToBand,
+                    ExternalEvents.ListSentTime AS ListSentTime,
+                    COALESCE(ExternalEvents.ListSentNumVips, 0) AS ListSentNumVips,
+                    ExternalEvents.CheckInLocation AS CheckInLocation,
+                    ExternalEvents.CheckInNotes AS CheckInNotes,                    
+                    ExternalEvents.AnnounceDate AS AnnounceDate,
+                    ExternalEvents.IsAddedToBandsInTown AS IsAddedToBandsInTown,
                     ExternalEvents.EventId AS ExternalEventId, 
                     ExternalEvents.URL AS ExternalUrl,
                     ExternalEvents.Thumbnail AS ExternalThumbnail,
                     ExternalEvents.EventTime AS EventTime,
+                    ExternalEvents.MeetAndGreetTime AS MeetAndGreetTime,
+                    ExternalEvents.DoorsOpenTime AS DoorsOpenTime,
                     ExternalEvents.ExternalEventVenueId AS ExternalEventVenueId,
                     ExternalEvents.DisableLinkButton AS DisableLinkButton,
                     ExternalEvents.DisableLinkReason AS DisableLinkReason, 
                     ExternalEvents.ExternalVipLink AS ExternalVipLink,
                     ExternalEvents.DisableVipLinkButton AS DisableVipLinkButton, 
                     ExternalEvents.DisableVipLinkReason AS DisableVipLinkReason,
-                    ExternalEvents.IsActive AS ExternalIsActive,             
+                    ExternalEvents.IsActive AS IsActive,    
+                    ExternalEvents.IsDeleted AS IsDeleted,     
+                    ExternalEvents.IsHidden AS IsHidden,    
+                    ExternalEvents.IsCancelled AS IsCancelled,
+                    ExternalEvents.CancelledDate AS CancelledDate,                    
                     Sellers.SellerId AS SellerId, 
                     Sellers.Name AS SellerName,
                     Tour.AnnounceDate AS TourAnnounceDate,
@@ -126,8 +125,7 @@ class EventService:
                  JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
             LEFT JOIN TourEvent ON TourEvent.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
-            LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId AND ExternalEvents.EventDate = TicketSocketEvents.EventDate
-                 AND (ExternalEvents.TicketSocketEventId IS NULL OR ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id)
+            LEFT JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
             LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId 
             WHERE """
         data = {}
@@ -160,24 +158,25 @@ class EventService:
         else:
             if ignore_flags is not True:
                 if show_deleted is not True:
-                    where_clause.append("TicketSocketEvents.IsDeleted = 0")
+                    where_clause.append("COALESCE(ExternalEvents.IsDeleted, 0) = 0")
                 else:
                     show_inactive = True
 
                 if show_inactive is True:
-                    where_clause.append("TicketSocketEvents.IsActive = 0")
+                    where_clause.append("ExternalEvents.IsActive = 0")
                 elif show_cancelled is True:
                     where_clause.append(
-                        "(TicketSocketEvents.IsActive = 1 OR TicketSocketEvents.IsCancelled = 1)"
+                        """(COALESCE(ExternalEvents.IsActive, 1) = 1)
+                            OR ExternalEvents.IsCancelled = 1)"""
                     )
                 else:
-                    where_clause.append("TicketSocketEvents.IsActive = 1")
+                    where_clause.append("COALESCE(ExternalEvents.IsActive, 1) = 1")
 
                 if show_hidden is not True:
-                    where_clause.append("TicketSocketEvents.IsHidden = 0")
+                    where_clause.append("COALESCE(ExternalEvents.IsHidden, 0) = 0")
 
                 if show_cancelled is not True:
-                    where_clause.append("TicketSocketEvents.IsCancelled = 0")
+                    where_clause.append("COALESCE(ExternalEvents.IsCancelled, 0) = 0")
 
             if search_term is not None and len(search_term) > 0:
                 where_clause.append(
@@ -315,7 +314,9 @@ class EventService:
             )
             vip_event.title = get_override_string_value_or_default(row["Title"])
             thumbnail = get_override_string_value_or_default(row["Thumbnail"])
-            external_thumbnail = get_override_string_value_or_default(row["ExternalThumbnail"])
+            external_thumbnail = get_override_string_value_or_default(
+                row["ExternalThumbnail"]
+            )
             if external_thumbnail is not None:
                 vip_event.thumbnail = external_thumbnail
             else:
@@ -410,10 +411,7 @@ class EventService:
                 row["IsCancelled"]
             )
 
-            is_active = get_override_bool_value_or_default(row["IsActive"])
-            if row["ExternalIsActive"] is not None and is_active is not False:
-                is_active = get_override_bool_value_or_default(row["ExternalIsActive"])
-            vip_event.is_active = is_active
+            vip_event.is_active = get_override_bool_value_or_default(row["IsActive"])
 
             vip_event.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
             if vip_event.is_deleted is True:
@@ -598,10 +596,10 @@ class EventService:
         """
         success: bool = True
         for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE TicketSocketEvents
+            sql = """UPDATE ExternalEvents
                         SET IsActive=%(is_active)s,
                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                    WHERE Id=%(ticket_socket_event_id)s"""
+                    WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "is_active": 0 if disabled is True else 1,
@@ -619,10 +617,10 @@ class EventService:
         """
         success: bool = True
         for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE TicketSocketEvents
+            sql = """UPDATE ExternalEvents
                         SET IsDeleted=%(isDeleted)s,
                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                        WHERE Id=%(ticket_socket_event_id)s"""
+                        WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "isDeleted": 1 if deleted is True else 0,
@@ -640,10 +638,10 @@ class EventService:
         """
         success: bool = True
         for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE TicketSocketEvents
+            sql = """UPDATE ExternalEvents
                         SET IsHidden=%(isHidden)s,
                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                        WHERE Id=%(ticket_socket_event_id)s"""
+                        WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
             data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "isHidden": 1 if hidden is True else 0,
@@ -663,11 +661,11 @@ class EventService:
         """
         success: bool = True
         data = {"ticket_socket_event_id": ticket_socket_event_id}
-        sql = """UPDATE TicketSocketEvents
+        sql = """UPDATE ExternalEvents
                     SET IsCancelled=1,
                     CancelledDate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                    WHERE Id=%(ticket_socket_event_id)s"""
+                    WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
         success = db_update(sql, data)
         if success is True:
             success = self.refund_all_event_orders(
@@ -713,12 +711,12 @@ class EventService:
             return False
 
         ticket_socket_event_id: int = event_to_update.ticket_socket_event_id
-        sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticket_socket_event_id)s"""
+        sql = """SELECT * FROM ExternalEvents WHERE TicketSocketId=%(ticket_socket_event_id)s"""
         data = {"ticket_socket_event_id": ticket_socket_event_id}
         existing_event: VipEvent = db_query_one(sql, data)
 
         if existing_event is not None:
-            update_sql = """UPDATE TicketSocketEvents
+            update_sql = """UPDATE ExternalEvents
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
                              IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
@@ -729,7 +727,7 @@ class EventService:
                              EmailSentToVips=%(emailSentToVips)s,
                              TextSentToVips=%(textSentToVips)s,
                              LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                             WHERE Id=%(ticket_socket_event_id)s"""
+                             WHERE TicketSocketId=%(ticket_socket_event_id)s"""
             update_data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "is_active": (
@@ -847,7 +845,7 @@ class EventService:
             if row:
                 num_vips = int(row["NumVips"]) if row["NumVips"] is not None else 0
 
-        sql = """UPDATE TicketSocketEvents
+        sql = """UPDATE ExternalEvents
                     SET ListSentToBand=%(listSent)s,
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                     ListSentNumVips=%(numVips)s, """
@@ -863,7 +861,7 @@ class EventService:
         else:
             sql += """ListSentTime=NULL"""
 
-        sql += """ WHERE Id=%(ticketSocketEventId)s"""
+        sql += """ WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
 
         success = db_update(sql, data)
         if success:
