@@ -81,7 +81,6 @@ class EventService:
                     TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
                     TicketSocketEvents.IsActive AS IsActive,                    
                     TicketSocketEvents.EventDate AS EventDate,
-                    TicketSocketEvents.DisplayDate AS DisplayDate,
                     TicketSocketEvents.IsVip AS IsVip,
                     TicketSocketEvents.URL AS URL,
                     TicketSocketEvents.Thumbnail,
@@ -313,9 +312,6 @@ class EventService:
             )
             vip_event.event_date = get_override_string_value_or_default(
                 row["EventDate"]
-            )
-            vip_event.display_date = get_override_string_value_or_default(
-                row["DisplayDate"]
             )
             vip_event.title = get_override_string_value_or_default(row["Title"])
             thumbnail = get_override_string_value_or_default(row["Thumbnail"])

@@ -203,11 +203,6 @@ class DataRefreshService:
                         "thumbnail": (
                             evt.thumbnail.strip() if evt.thumbnail is not None else None
                         ),
-                        "displayDate": (
-                            evt.display_date.strip()
-                            if evt.display_date is not None
-                            else None
-                        ),
                         "isVip": 1 if evt.is_vip else 0,
                     }
 
@@ -235,8 +230,7 @@ class DataRefreshService:
                                 EventDate=%(eventDate)s, URL=%(url)s,
                                 Venue=%(venue)s, Address=%(address)s, City=%(city)s,
                                 State=%(state)s, Zip=%(zip)s, Country=%(country)s,
-                                Thumbnail=%(thumbnail)s,
-                                DisplayDate=%(displayDate)s, IsVip=%(isVip)s,
+                                Thumbnail=%(thumbnail)s, IsVip=%(isVip)s,
                                 LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                 WHERE Id=%(id)s"""
                         event_success = db_update(sql, event_data, cnx)
@@ -250,11 +244,11 @@ class DataRefreshService:
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
                                     EventId, Title, EventDate, URL, Venue, Address,
                                     City, State, Zip, Country, 
-                                    Thumbnail, DisplayDate, IsVip, Created, LastUpdate) 
+                                    Thumbnail, IsVip, Created, LastUpdate) 
                                     VALUES (%(sellerEventCategoryId)s, %(event_id)s, %(title)s,
                                     %(eventDate)s, %(url)s, %(venue)s, %(address)s,
                                     %(city)s, %(state)s, %(zip)s, %(country)s, 
-                                    %(thumbnail)s, %(displayDate)s, %(isVip)s,
+                                    %(thumbnail)s, %(isVip)s,
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                         ticket_socket_event_id = db_insert(sql, event_data, cnx)
