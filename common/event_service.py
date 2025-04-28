@@ -100,7 +100,7 @@ class EventService:
                     COALESCE(ExternalEvents.ListSentNumVips, TicketSocketEvents.ListSentNumVips) AS ListSentNumVips,
                     COALESCE(ExternalEvents.CheckInLocation, TicketSocketEvents.CheckInLocation) AS CheckInLocation,
                     COALESCE(ExternalEvents.CheckInNotes, TicketSocketEvents.CheckInNotes) AS CheckInNotes,
-                    COALESCE(ExternalEvents.MeetAndGreetTime, TicketSocketEvents.MeetAndGreetTime) AS MeetAndGreetTime,
+                    ExternalEvents.MeetAndGreetTime AS MeetAndGreetTime,
                     ExternalEvents.DoorsOpenTime AS DoorsOpenTime,
                     COALESCE(ExternalEvents.AnnounceDate, TicketSocketEvents.AnnounceDate) AS AnnounceDate,
                     COALESCE(ExternalEvents.IsAddedToBandsInTown, TicketSocketEvents.IsAddedToBandsInTown) AS IsAddedToBandsInTown,
@@ -243,7 +243,7 @@ class EventService:
 
         sql += """ ORDER BY TicketSocketEvents.EventDate,
                  ExternalEvents.EventTime,
-                 COALESCE(ExternalEvents.MeetAndGreetTime, TicketSocketEvents.MeetAndGreetTime), 
+                 ExternalEvents.MeetAndGreetTime, 
                  COALESCE(ExternalEvents.Title, TicketSocketEvents.Title)"""
 
         sql = sql.replace("\n", "")
