@@ -109,7 +109,6 @@ class TicketSocketEvent:
     event_id: int = 0
     title: str = ""
     event_date: str = ""
-    display_date: str = ""
     thumbnail: str = ""
     ticket_socket_url: str = ""
 
