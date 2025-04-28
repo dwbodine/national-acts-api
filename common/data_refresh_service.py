@@ -189,7 +189,6 @@ class DataRefreshService:
                     event_data = {
                         "title": evt.title.strip(),
                         "eventDate": evt.event_date.strip(),
-                        "utcTime": evt.utc_time,
                         "url": evt.ticket_socket_url.strip(),
                         "venue": evt.venue.name.strip(),
                         "address": address.strip(),
@@ -233,7 +232,7 @@ class DataRefreshService:
                         ticket_socket_event_id = int(existing_event["Id"])
                         event_data["id"] = ticket_socket_event_id
                         sql = """UPDATE TicketSocketEvents SET Title=%(title)s,
-                                EventDate=%(eventDate)s, UtcTime=%(utcTime)s, URL=%(url)s,
+                                EventDate=%(eventDate)s, URL=%(url)s,
                                 Venue=%(venue)s, Address=%(address)s, City=%(city)s,
                                 State=%(state)s, Zip=%(zip)s, Country=%(country)s,
                                 Thumbnail=%(thumbnail)s,
@@ -249,11 +248,11 @@ class DataRefreshService:
                             evt.seller_event_category_id
                         )
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
-                                    EventId, Title, EventDate, UtcTime,
-                                    URL, Venue, Address, City, State, Zip, Country, 
+                                    EventId, Title, EventDate, URL, Venue, Address,
+                                    City, State, Zip, Country, 
                                     Thumbnail, DisplayDate, IsVip, Created, LastUpdate) 
                                     VALUES (%(sellerEventCategoryId)s, %(event_id)s, %(title)s,
-                                    %(eventDate)s, %(utcTime)s, %(url)s, %(venue)s, %(address)s,
+                                    %(eventDate)s, %(url)s, %(venue)s, %(address)s,
                                     %(city)s, %(state)s, %(zip)s, %(country)s, 
                                     %(thumbnail)s, %(displayDate)s, %(isVip)s,
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),

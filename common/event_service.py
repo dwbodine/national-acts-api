@@ -81,7 +81,6 @@ class EventService:
                     TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
                     TicketSocketEvents.IsActive AS IsActive,                    
                     TicketSocketEvents.EventDate AS EventDate,
-                    TicketSocketEvents.UtcTime AS UtcTime,
                     TicketSocketEvents.DisplayDate AS DisplayDate,
                     TicketSocketEvents.IsVip AS IsVip,
                     TicketSocketEvents.URL AS URL,
@@ -315,7 +314,6 @@ class EventService:
             vip_event.event_date = get_override_string_value_or_default(
                 row["EventDate"]
             )
-            vip_event.utc_time = get_override_int_value_or_default(row["UtcTime"])
             vip_event.display_date = get_override_string_value_or_default(
                 row["DisplayDate"]
             )
