@@ -81,6 +81,7 @@ class DataRefreshService:
 
                     # populate sellerEventCategoryId, which is required on our end
                     if seller_event_category is not None:
+                        vip_event.seller_id = seller_event_category.seller_id
                         vip_event.seller_event_category_id = (
                             seller_event_category.seller_event_category_id
                         )
@@ -88,6 +89,7 @@ class DataRefreshService:
                         seller_ec_temp = SellerEventCategory(
                             None, ticket_socket_id, vip_event.event_category_id
                         )
+                        vip_event.seller_id = seller_ec_temp.seller_id
                         vip_event.seller_event_category_id = (
                             seller_ec_temp.seller_event_category_id
                         )
@@ -258,6 +260,29 @@ class DataRefreshService:
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                         ticket_socket_event_id = db_insert(sql, event_data, cnx)
                         event_success = ticket_socket_event_id > 0
+
+                        # automatically add new events to external events table
+                        if event_success is True:
+                            event_data["seller_id"] = int(evt.seller_id)
+                            event_data["id"] = ticket_socket_event_id
+
+                            if evt.is_vip is True:
+                                event_data["url"] = None
+                                event_data["external_vip_link"] = (
+                                    evt.ticket_socket_url.strip()
+                                )
+                            else:
+                                event_data["url"] = evt.ticket_socket_url.strip()
+                                event_data["external_vip_link"] = None
+
+                            sql = """INSERT INTO ExternalEvents(TicketSocketEventId, SellerId,
+                                Title, EventDate, Thumbnail, URL, ExternalVipLink, Created,
+                                LastUpdate) VALUES (%(id)s, %(seller_id)s, %(title)s,
+                                %(eventDate)s, %(thumbnail)s, %(url)s, %(external_vip_link)s,
+                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                            external_event_id = db_insert(sql, event_data, cnx)
+                            event_success = external_event_id > 0
 
                     # if the update succeeded, update counters
                     if event_success:
@@ -483,7 +508,8 @@ class DataRefreshService:
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s,
                                         PurchaserCountry=%(purchaserCountry)s,
                                         PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
-                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE Id=%(id)s"""
+                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                                        WHERE Id=%(id)s"""
 
                                 order_success = db_update(sql, order_data, cnx)
                             else:
@@ -503,7 +529,8 @@ class DataRefreshService:
                                     %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s,
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
-                                    %(purchaserIpAddress)s,  %(email)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                                    %(purchaserIpAddress)s,  %(email)s,
+                                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
@@ -604,7 +631,9 @@ class DataRefreshService:
                                                 ShirtSize=%(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", Price=%(price)s"
-                                        sql += """, LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE Id=%(id)s"""
+                                        sql += """,
+                                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                                                WHERE Id=%(id)s"""
                                         ticket_success = db_update(
                                             sql, ticket_data, cnx
                                         )
@@ -633,7 +662,8 @@ class DataRefreshService:
                                             %(attendeeLastName)s, %(shirtSize)s"""
                                         if ticket_price > 0:
                                             sql += ", %(price)s"
-                                        sql += """, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                                        sql += """,
+                                            CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                                         ticket_socket_order_ticket_id = db_insert(
                                             sql, ticket_data
                                         )
