@@ -101,7 +101,7 @@ class EventService:
                     COALESCE(ExternalEvents.CheckInLocation, TicketSocketEvents.CheckInLocation) AS CheckInLocation,
                     COALESCE(ExternalEvents.CheckInNotes, TicketSocketEvents.CheckInNotes) AS CheckInNotes,
                     COALESCE(ExternalEvents.MeetAndGreetTime, TicketSocketEvents.MeetAndGreetTime) AS MeetAndGreetTime,
-                    COALESCE(ExternalEvents.DoorsOpenTime, TicketSocketEvents.DoorsOpen) AS DoorsOpenTime,
+                    ExternalEvents.DoorsOpenTime AS DoorsOpenTime,
                     COALESCE(ExternalEvents.AnnounceDate, TicketSocketEvents.AnnounceDate) AS AnnounceDate,
                     COALESCE(ExternalEvents.IsAddedToBandsInTown, TicketSocketEvents.IsAddedToBandsInTown) AS IsAddedToBandsInTown,
                     COALESCE(ExternalEvents.IsHidden, TicketSocketEvents.IsHidden) AS IsHidden,
