@@ -16,6 +16,7 @@ from common.utility import (
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
     move_temp_file_to_public_folder,
 )
 
@@ -81,57 +82,51 @@ class ExternalEventService:
                 and event_to_update.is_deleted is False
                 else 0
             ),
-            "title": event_to_update.title,
-            "is_cancelled": 1 if event_to_update.is_cancelled is True else 0,
-            "isAddedToBandsInTown": (
-                1 if event_to_update.is_added_to_bands_in_town is True else 0
+            "title": get_override_string_value_or_default(event_to_update.title),
+            "is_cancelled": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_cancelled
             ),
-            "isHidden": 1 if event_to_update.is_hidden is True else 0,
-            "announceDate": (
+            "isAddedToBandsInTown": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_added_to_bands_in_town
+            ),
+            "isHidden": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_hidden
+            ),
+            "announceDate": get_override_string_value_or_default(
                 event_to_update.announce_date
-                if event_to_update.announce_date is not None
-                else None
             ),
-            "event_date": event_to_update.event_date,
-            "url": event_to_update.external_url,
-            "external_event_venue_id": event_to_update.external_event_venue_id,
-            "disable_link_button": (
-                1 if event_to_update.disable_link_button is True else 0
+            "event_date": get_override_string_value_or_default(
+                event_to_update.event_date
             ),
-            "disable_link_reason": (
+            "url": get_override_string_value_or_default(event_to_update.external_url),
+            "external_event_venue_id": get_override_int_value_or_default(
+                event_to_update.external_event_venue_id
+            ),
+            "disable_link_button": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.disable_link_button
+            ),
+            "disable_link_reason": get_override_string_value_or_default(
                 event_to_update.disable_link_reason
-                if event_to_update.disable_link_reason is not None
-                else None
             ),
-            "external_vip_link": (
+            "external_vip_link": get_override_string_value_or_default(
                 event_to_update.external_vip_link
-                if event_to_update.external_vip_link is not None
-                else None
             ),
-            "disable_vip_link_button": (
-                1 if event_to_update.disable_vip_link_button is True else 0
+            "disable_vip_link_button": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.disable_vip_link_button
             ),
-            "disable_vip_link_reason": (
+            "disable_vip_link_reason": get_override_string_value_or_default(
                 event_to_update.disable_vip_link_reason
-                if event_to_update.disable_vip_link_reason is not None
-                else None
             ),
-            "event_time": (
+            "event_time": get_override_string_value_or_default(
                 event_to_update.event_time
-                if event_to_update.event_time is not None
-                else None
             ),
-            "meet_and_greet_time": (
+            "meet_and_greet_time": get_override_string_value_or_default(
                 event_to_update.meet_and_greet_time
-                if event_to_update.meet_and_greet_time is not None
-                else None
             ),
-            "doors_open_time": (
+            "doors_open_time": get_override_string_value_or_default(
                 event_to_update.doors_open
-                if event_to_update.doors_open is not None
-                else None
             ),
-            "ticket_socket_event_id": (
+            "ticket_socket_event_id": get_override_int_value_or_default(
                 event_to_update.ticket_socket_event_id
                 if event_to_update.ticket_socket_event_id is not None
                 and event_to_update.ticket_socket_event_id > 0
@@ -142,7 +137,9 @@ class ExternalEventService:
         if event_to_update.thumbnail is not None:
             thumb_file = create_thumbnail(event_to_update.thumbnail)
             if thumb_file is not None:
-                update_data["thumbnail"] = thumb_file
+                update_data["thumbnail"] = get_override_string_value_or_default(
+                    thumb_file
+                )
                 move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
 
         if event_to_update.event_id > 0:
@@ -172,6 +169,8 @@ class ExternalEventService:
 
             update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                 WHERE EventId=%(event_id)s"""
+
+            update_sql = update_sql.replace("\n", "")
 
             success = db_update(update_sql, update_data)
         else:
@@ -229,9 +228,9 @@ class ExternalEventService:
         """
         success: bool = True
         for event_id in event_ids:
-            sql = """DELETE FROM ExternalEvents WHERE EventId=%(event_id)s"""
+            sql = """UPDATE ExternalEvents SET IsDeleted=1 WHERE EventId=%(event_id)s"""
             data = {"event_id": event_id}
-            success = db_delete(sql, data)
+            success = db_update(sql, data)
             if success is False:
                 break
         return success
@@ -285,7 +284,9 @@ class ExternalEventService:
             vip_event.is_external = True
             vip_event.external_event_id = event_id
             vip_event.event_id = event_id
-            ticket_socket_event_id = get_override_int_value_or_default(row["EventId"])
+            ticket_socket_event_id = get_override_int_value_or_default(
+                row["TicketSocketEventId"]
+            )
             vip_event.ticket_socket_event_id = (
                 ticket_socket_event_id if ticket_socket_event_id > 0 else None
             )

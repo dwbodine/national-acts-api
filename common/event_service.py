@@ -758,7 +758,7 @@ class EventService:
             return False
 
         ticket_socket_event_id: int = event_to_update.ticket_socket_event_id
-        sql = """SELECT * FROM ExternalEvents WHERE TicketSocketId=%(ticket_socket_event_id)s"""
+        sql = """SELECT * FROM ExternalEvents WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
         data = {"ticket_socket_event_id": ticket_socket_event_id}
         existing_event: VipEvent = db_query_one(sql, data)
 
@@ -774,7 +774,7 @@ class EventService:
                              EmailSentToVips=%(emailSentToVips)s,
                              TextSentToVips=%(textSentToVips)s,
                              LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                             WHERE TicketSocketId=%(ticket_socket_event_id)s"""
+                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
             update_data = {
                 "ticket_socket_event_id": ticket_socket_event_id,
                 "is_active": (
