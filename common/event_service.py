@@ -7,6 +7,7 @@ import operator
 
 from common.calendar_service import CalendarService
 from common.db import (
+    db_insert,
     db_query_all,
     db_query_one,
     db_update,
@@ -18,9 +19,12 @@ from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketTyp
 from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
 from common.utility import (
+    create_thumbnail,
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
+    move_temp_file_to_public_folder,
 )
 
 
@@ -754,84 +758,171 @@ class EventService:
         Update single event from admin
         """
         success: bool = True
-        if event_to_update is None or event_to_update.ticket_socket_event_id <= 0:
+        if event_to_update is None:
             return False
 
-        ticket_socket_event_id: int = event_to_update.ticket_socket_event_id
-        sql = """SELECT * FROM ExternalEvents WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
-        data = {"ticket_socket_event_id": ticket_socket_event_id}
-        existing_event: VipEvent = db_query_one(sql, data)
+        ticket_socket_event_id: int = (
+            event_to_update.ticket_socket_event_id
+            if event_to_update.ticket_socket_event_id is not None
+            and event_to_update.ticket_socket_event_id > 0
+            else None
+        )
 
-        if existing_event is not None:
+        update_data = {
+            "ticket_socket_event_id": ticket_socket_event_id,
+            "title": get_override_string_value_or_default(event_to_update.title),
+            "event_date": get_override_string_value_or_default(
+                event_to_update.event_date
+            ),
+            "meet_and_greet_time": get_override_string_value_or_default(
+                event_to_update.meet_and_greet_time
+            ),
+            "doors_open_time": get_override_string_value_or_default(
+                event_to_update.doors_open
+            ),
+            "event_time": get_override_string_value_or_default(
+                event_to_update.event_time
+            ),
+            "is_active": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_active
+            ),
+            "isDeleted": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_deleted
+            ),
+            "isAddedToBandsInTown": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_added_to_bands_in_town
+            ),
+            "isHidden": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.is_hidden
+            ),
+            "announceDate": get_override_string_value_or_default(
+                event_to_update.announce_date
+            ),
+            "checkInLocation": get_override_string_value_or_default(
+                event_to_update.check_in_location
+            ),
+            "checkInNotes": get_override_string_value_or_default(
+                event_to_update.check_in_notes
+            ),
+            "emailSentToVips": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.email_sent_to_vips
+            ),
+            "textSentToVips": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.text_sent_to_vips
+            ),
+            "url": get_override_string_value_or_default(event_to_update.external_url),
+            "external_event_venue_id": get_override_int_value_or_default(
+                event_to_update.external_event_venue_id
+            ),
+            "disable_link_button": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.disable_link_button
+            ),
+            "disable_link_reason": get_override_string_value_or_default(
+                event_to_update.disable_link_reason
+            ),
+            "external_vip_link": get_override_string_value_or_default(
+                event_to_update.external_vip_link
+            ),
+            "disable_vip_link_button": get_override_tinyint_value_or_default_from_bool(
+                event_to_update.disable_vip_link_button
+            ),
+            "disable_vip_link_reason": get_override_string_value_or_default(
+                event_to_update.disable_vip_link_reason
+            ),
+        }
+
+        if event_to_update.thumbnail is not None:
+            thumb_file = create_thumbnail(event_to_update.thumbnail)
+            if thumb_file is not None:
+                update_data["thumbnail"] = get_override_string_value_or_default(
+                    thumb_file
+                )
+                move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
+
+        if event_to_update.event_id > 0:
+            update_data["event_id"] = event_to_update.external_event_id
             update_sql = """UPDATE ExternalEvents
-                             SET IsActive=%(is_active)s, 
-                             IsDeleted=%(isDeleted)s, 
-                             IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
-                             IsHidden=%(isHidden)s, 
-                             AnnounceDate=%(announceDate)s, 
-                             CheckInLocation=%(checkInLocation)s,
-                             CheckInNotes=%(checkInNotes)s,
-                             EmailSentToVips=%(emailSentToVips)s,
-                             TextSentToVips=%(textSentToVips)s,
-                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
-            update_data = {
-                "ticket_socket_event_id": ticket_socket_event_id,
-                "is_active": (
-                    1
-                    if event_to_update.is_active is True
-                    and event_to_update.is_deleted is False
-                    else 0
-                ),
-                "isDeleted": 1 if event_to_update.is_deleted is True else 0,
-                "isAddedToBandsInTown": (
-                    1 if event_to_update.is_added_to_bands_in_town is True else 0
-                ),
-                "isHidden": 1 if event_to_update.is_hidden is True else 0,
-                "announceDate": (
-                    event_to_update.announce_date
-                    if event_to_update.announce_date is not None
-                    else None
-                ),
-                "checkInLocation": (
-                    event_to_update.check_in_location
-                    if event_to_update.check_in_location is not None
-                    else None
-                ),
-                "checkInNotes": (
-                    event_to_update.check_in_notes
-                    if event_to_update.check_in_notes is not None
-                    else None
-                ),
-                "emailSentToVips": (
-                    1 if event_to_update.email_sent_to_vips is True else 0
-                ),
-                "textSentToVips": (
-                    1 if event_to_update.text_sent_to_vips is True else 0
-                ),
-            }
-            success = db_update(update_sql, update_data)
+                            SET TicketSocketEventId=%(ticket_socket_event_id)s, 
+                                Title=%(title)s,
+                                EventDate=%(event_date)s,
+                                MeetAndGreetTime=%(meet_and_greet_time)s,
+                                DoorsOpenTime=%(doors_open_time)s,
+                                EventTime=%(event_time)s,
+                                URL=%(url)s,
+                                ExternalEventVenueId=%(external_event_venue_id)s,
+                                DisableLinkButton=%(disable_link_button)s,
+                                DisableLinkReason=%(disable_link_reason)s,
+                                ExternalVipLink=%(external_vip_link)s,
+                                DisableVipLinkButton=%(disable_vip_link_button)s,
+                                DisableVipLinkReason=%(disable_vip_link_reason)s,
+                                IsActive=%(is_active)s, 
+                                IsDeleted=%(isDeleted)s, 
+                                IsAddedToBandsInTown=%(isAddedToBandsInTown)s, 
+                                IsHidden=%(isHidden)s, 
+                                AnnounceDate=%(announceDate)s, 
+                                CheckInLocation=%(checkInLocation)s,
+                                CheckInNotes=%(checkInNotes)s,
+                                EmailSentToVips=%(emailSentToVips)s,
+                                TextSentToVips=%(textSentToVips)s, """
 
-            if (
-                event_to_update.is_deleted is False
-                and len(event_to_update.ticket_types) > 0
-            ):
-                for ticket_type in event_to_update.ticket_types:
-                    ticket_type_wql = """UPDATE TicketSocketTicketTypes
-                                        SET IsActive=%(is_active)s,
-                                        TicketTypeName=%(ticketTypeName)s,
-                                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                                        WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
-                                        AND TicketSocketEventId=%(ticket_socket_event_id)s"""
-                    ticket_type_data = {
-                        "ticket_type_id": ticket_type.ticket_type_id,
-                        "ticket_socket_event_id": ticket_socket_event_id,
-                        "is_active": 1 if ticket_type.is_active is True else 0,
-                        "ticketTypeName": ticket_type.ticket_type_name,
-                    }
-                    success = db_update(ticket_type_wql, ticket_type_data)
-                    if success is False:
-                        break
+            if "thumbnail" in update_data:
+                update_sql += """Thumbnail=%(thumbnail)s, """
+
+            update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                WHERE EventId=%(event_id)s"""
+
+            success = db_update(update_sql, update_data)
+        else:
+            update_data["seller_id"] = event_to_update.seller_id
+            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
+                TicketSocketEventId, EventTime, MeetAndGreetTime, DoorsOpenTime, URL, 
+                ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
+                DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, 
+                IsDeleted, IsHidden, AnnounceDate, CheckInLocation, CheckInNotes, 
+                EmailSentToVips, TextSentToVips, Created, LastUpdate"""
+
+            if "thumbnail" in update_data:
+                update_sql += """, Thumbnail"""
+
+            update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s,
+                %(ticket_socket_event_id)s, %(event_time)s, %(meet_and_greet_time)s,
+                %(doors_open_time)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s,
+                %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
+                %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isDeleted)s, 
+                %(isHidden)s, %(announceDate)s, %(checkInLocation)s, %(checkInNotes)s,
+                %(emailSentToVips)s, %(textSentToVips)s, 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
+
+            if "thumbnail" in update_data:
+                update_sql += """, %(thumbnail)s"""
+
+            update_sql += """)"""
+
+            event_id = db_insert(update_sql, update_data)
+            success = event_id > 0
+
+        if (
+            ticket_socket_event_id is not None
+            and event_to_update.is_deleted is False
+            and len(event_to_update.ticket_types) > 0
+        ):
+            for ticket_type in event_to_update.ticket_types:
+                ticket_type_wql = """UPDATE TicketSocketTicketTypes
+                                    SET IsActive=%(is_active)s,
+                                    TicketTypeName=%(ticketTypeName)s,
+                                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+                                    WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
+                                    AND TicketSocketEventId=%(ticket_socket_event_id)s"""
+                ticket_type_data = {
+                    "ticket_type_id": ticket_type.ticket_type_id,
+                    "ticket_socket_event_id": ticket_socket_event_id,
+                    "is_active": 1 if ticket_type.is_active is True else 0,
+                    "ticketTypeName": ticket_type.ticket_type_name,
+                }
+                success = db_update(ticket_type_wql, ticket_type_data)
+                if success is False:
+                    break
 
             if success is True:
                 self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
