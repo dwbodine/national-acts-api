@@ -82,15 +82,15 @@ def send_list_to_band():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_id = request.json.get("eventId", None)
-    if event_id is None:
+    ticket_socket_event_id = request.json.get("eventId", None)
+    if ticket_socket_event_id is None:
         return {"msg": "Bad Request"}, 400
 
     is_sent_str = request.json.get("isSent", None)
     is_sent = True if is_sent_str == 1 else False
 
     service = EventService()
-    updated_event = service.send_list_to_band(int(event_id), is_sent)
+    updated_event = service.send_list_to_band(int(ticket_socket_event_id), is_sent)
     return convert_to_json(updated_event)
 
 

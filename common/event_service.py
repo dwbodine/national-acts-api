@@ -508,7 +508,7 @@ class EventService:
                 external_data["startDate"] = datetime.fromtimestamp(start).strftime(
                     "%Y-%m-%d"
                 )
-            else:
+            elif ignore_flags is not True:
                 externalwhere_clause.append("ExternalEvents.EventDate >= %(startDate)s")
                 external_data["startDate"] = datetime.now().strftime("%Y-%m-%d")
 
@@ -966,7 +966,7 @@ class EventService:
         Mark that the VIP list has been sent to the band
         """
         updated_event: VipEvent = None
-        num_vips: int = None
+        num_vips: int = 0
         if is_sent is True:
             event_sql = """SELECT COUNT(TicketSocketOrderTickets.Id) AS NumVips
                             FROM TicketSocketOrderTickets
@@ -990,7 +990,7 @@ class EventService:
 
         data = {
             "numVips": num_vips,
-            "ticketSocketEventId": ticket_socket_event_id,
+            "ticket_socket_event_id": ticket_socket_event_id,
             "listSent": 1 if is_sent is True else 0,
         }
 
@@ -999,7 +999,7 @@ class EventService:
         else:
             sql += """ListSentTime=NULL"""
 
-        sql += """ WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
+        sql += """ WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
 
         success = db_update(sql, data)
         if success:
