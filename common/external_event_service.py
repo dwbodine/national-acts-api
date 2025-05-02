@@ -2,22 +2,13 @@
 External Event Service
 """
 
-from common.db import (
-    db_delete,
-    db_query_all,
-    db_query_one,
-    db_insert,
-    db_update,
-)
+from common.db import db_query_one
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import TicketSocketVenue
 from common.utility import (
-    create_thumbnail,
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
-    get_override_tinyint_value_or_default_from_bool,
-    move_temp_file_to_public_folder,
 )
 
 

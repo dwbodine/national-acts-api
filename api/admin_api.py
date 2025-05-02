@@ -11,7 +11,6 @@ from common.admin_service import AdminService
 from common.calendar_service import CalendarService
 from common.common_api import is_admin_logged_in
 from common.event_service import EventService
-from common.external_event_service import ExternalEventService
 from common.models.admin import ExternalVenue, SiteSetting
 from common.order_service import OrderService
 from common.role_service import RoleService
@@ -129,6 +128,7 @@ def update_event():
     service = EventService()
     success = service.update_event(event)
     return convert_to_json(success)
+
 
 @admin_api.route("/admin/notes/add", methods=["POST"])
 @jwt_required()
