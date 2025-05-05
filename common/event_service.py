@@ -641,65 +641,105 @@ class EventService:
 
         return ticket_types
 
-    def disable_events(self, ticket_socket_event_ids: list[int], disabled: bool):
+    def disable_events(self, event_ids: list[int], ticket_socket_event_ids: list[int], disabled: bool):
         """
         Marks eventIds as disabled
         """
         success: bool = True
-        for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE ExternalEvents
-                        SET IsActive=%(is_active)s,
-                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                    WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
-            data = {
-                "ticket_socket_event_id": ticket_socket_event_id,
-                "is_active": 0 if disabled is True else 1,
-            }
-            success = db_update(sql, data)
-            if success is False:
-                break
-            else:
-                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+        if len(ticket_socket_event_ids) > 0:
+            for ticket_socket_event_id in ticket_socket_event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsActive=%(is_active)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                        WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
+                data = {
+                    "ticket_socket_event_id": ticket_socket_event_id,
+                    "is_active": 0 if disabled is True else 1,
+                }
+                success = db_update(sql, data)
+                if success is False:
+                    break
+                else:   
+                    self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+        if len(event_ids) > 0:
+            for event_id in event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsActive=%(is_active)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                        WHERE EventId=%(event_id)s"""
+                data = {
+                    "event_id": event_id,
+                    "is_active": 0 if disabled is True else 1,
+                }
+                success = db_update(sql, data)
+
         return success
 
-    def delete_events(self, ticket_socket_event_ids: list[int], deleted: bool):
+    def delete_events(self, event_ids: list[int], ticket_socket_event_ids: list[int], deleted: bool):
         """
         Marks eventIds as deleted
         """
         success: bool = True
-        for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE ExternalEvents
-                        SET IsDeleted=%(isDeleted)s,
-                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                        WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
-            data = {
-                "ticket_socket_event_id": ticket_socket_event_id,
-                "isDeleted": 1 if deleted is True else 0,
-            }
-            success = db_update(sql, data)
-            if success is False:
-                break
-            else:
-                self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+        if len(ticket_socket_event_ids) > 0:
+            for ticket_socket_event_id in ticket_socket_event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsDeleted=%(isDeleted)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
+                data = {
+                    "ticket_socket_event_id": ticket_socket_event_id,
+                    "isDeleted": 1 if deleted is True else 0,
+                }
+                success = db_update(sql, data)
+                if success is False:
+                    break
+                else:
+                    self.rebuild_daily_order_data_for_event(ticket_socket_event_id)
+        if len(event_ids) > 0:
+            for event_id in event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsDeleted=%(isDeleted)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE EventId=%(event_id)s"""
+                data = {
+                    "event_id": event_id,
+                    "isDeleted": 1 if deleted is True else 0,
+                }
+                success = db_update(sql, data)
+
         return success
 
-    def hide_events(self, ticket_socket_event_ids: list[int], hidden: bool):
+    def hide_events(self, event_ids: list[int], ticket_socket_event_ids: list[int], hidden: bool):
         """
         Marks events as hidden
         """
         success: bool = True
-        for ticket_socket_event_id in ticket_socket_event_ids:
-            sql = """UPDATE ExternalEvents
-                        SET IsHidden=%(isHidden)s,
-                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                        WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
-            data = {
-                "ticket_socket_event_id": ticket_socket_event_id,
-                "isHidden": 1 if hidden is True else 0,
-            }
-            success = db_update(sql, data)
-            if success is False:
-                break
+        if len(ticket_socket_event_ids) > 0:
+            for ticket_socket_event_id in ticket_socket_event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsHidden=%(isHidden)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE TicketSocketEventId=%(ticket_socket_event_id)s"""
+                data = {
+                    "ticket_socket_event_id": ticket_socket_event_id,
+                    "isHidden": 1 if hidden is True else 0,
+                }
+                success = db_update(sql, data)
+                if success is False:
+                    break
+        if len(event_ids) > 0:
+            for event_id in event_ids:
+                sql = """UPDATE ExternalEvents
+                            SET IsHidden=%(isHidden)s,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE EventId=%(event_id)s"""
+                data = {
+                    "event_id": event_id,
+                    "isHidden": 1 if hidden is True else 0,
+                }
+                success = db_update(sql, data)
+                if success is False:
+                    break
         return success
 
     def cancel_event(
