@@ -41,11 +41,11 @@ def cancel_event():
     if event_id is None:
         return {"msg": "Bad Request"}, 400
 
-    refund_service_fees_str = request.json.get("refundServiceFees", None)
-    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+    cancelled_str = request.json.get("cancelled", None)
+    cancelled: bool = True if cancelled_str == 1 else False
 
     service = EventService()
-    success = service.cancel_event(int(event_id), refund_service_fees)
+    success = service.cancel_event(int(event_id), cancelled)
     return convert_to_json(success)
 
 
@@ -65,10 +65,12 @@ def refund_event():
         return {"msg": "Bad Request"}, 400
 
     refund_service_fees_str = request.json.get("refundServiceFees", None)
+    mark_cancelled_str = request.json.get("markCancelled", None)
     refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+    mark_cancelled: bool = True if mark_cancelled_str == 1 else False
 
     service = EventService()
-    success = service.refund_all_event_orders(int(event_id), refund_service_fees)
+    success = service.refund_all_event_orders(int(event_id), refund_service_fees, mark_cancelled)
     return convert_to_json(success)
 
 
@@ -82,15 +84,15 @@ def send_list_to_band():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    ticket_socket_event_id = request.json.get("eventId", None)
-    if ticket_socket_event_id is None:
+    event_id = request.json.get("eventId", None)
+    if event_id is None:
         return {"msg": "Bad Request"}, 400
 
     is_sent_str = request.json.get("isSent", None)
     is_sent = True if is_sent_str == 1 else False
 
     service = EventService()
-    updated_event = service.send_list_to_band(int(ticket_socket_event_id), is_sent)
+    updated_event = service.send_list_to_band(int(event_id), is_sent)
     return convert_to_json(updated_event)
 
 
@@ -146,13 +148,13 @@ def add_note():
         return {"msg": "Bad Request"}, 400
 
     event_id_str = request.json.get("eventId", None)
-    ticket_socket_event_id: int = (
+    event_id: int = (
         int(event_id_str) if event_id_str is not None else None
     )
 
     calendar_date: str = None
     note_title: str = None
-    if ticket_socket_event_id is None:
+    if event_id is None:
         calendar_date_str = request.json.get("calendarDate", None)
         note_title_str = request.json.get("noteTitle", None)
         calendar_date = (
@@ -160,12 +162,12 @@ def add_note():
         )
         note_title = str(note_title_str) if note_title_str is not None else None
 
-    if ticket_socket_event_id is None and calendar_date is None:
+    if event_id is None and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
     service = CalendarService()
     success = service.add_note(
-        str(note), ticket_socket_event_id, calendar_date, note_title
+        str(note), event_id, calendar_date, note_title
     )
     return convert_to_json(success)
 

@@ -385,6 +385,20 @@ def get_override_int_value_or_default(override: any = None, default: any = None)
         return 0
 
 
+def get_override_float_value_or_default(
+    override: any = None, default: any = None
+) -> float:
+    """
+    Get float value from override vs. default
+    """
+    if override is not None:
+        return float(override)
+    elif default is not None:
+        return float(default)
+    else:
+        return 0
+
+
 def get_override_tinyint_value_or_default_from_bool(
     override: bool = None, default: bool = None
 ) -> int:

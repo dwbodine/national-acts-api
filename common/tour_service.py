@@ -4,9 +4,14 @@ Tour service module
 
 from datetime import datetime
 from common.event_service import EventService
-from common.external_event_service import ExternalEventService
 from common.models.national_acts import Seller, Tour, VipEvent
 from common.db import db_delete, db_insert, db_query_all, db_update
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
+)
 
 
 class TourService:
@@ -50,11 +55,13 @@ class TourService:
         rows = db_query_all(sql, data)
         for row in rows:
             tour = Tour()
-            tour_id = int(row["TourId"])
+            tour_id = get_override_int_value_or_default(row["TourId"])
             tour.tour_id = tour_id
-            tour.tour_name = str(row["TourName"])
-            tour.is_active = True if int(row["IsActive"]) == 1 else False
-            tour.announce_date = str(row["AnnounceDate"])
+            tour.tour_name = get_override_string_value_or_default(row["TourName"])
+            tour.is_active = get_override_bool_value_or_default(row["IsActive"])
+            tour.announce_date = get_override_string_value_or_default(
+                row["AnnounceDate"]
+            )
 
             sellers = self.__get_sellers_by_tour_id(tour_id)
             tour.sellers = sellers
@@ -77,7 +84,7 @@ class TourService:
         data = {"tourId": tour_id}
         rows = db_query_all(sql, data)
         for row in rows:
-            seller_id = int(row["SellerId"])
+            seller_id = get_override_int_value_or_default(row["SellerId"])
             seller: Seller = Seller(seller_id)
 
             if seller is not None:
@@ -90,7 +97,6 @@ class TourService:
         """
         events: list[VipEvent] = []
         event_service = EventService()
-        external_event_service = ExternalEventService()
         sql = """SELECT TourEvent.*
                     FROM TourEvent 
                     WHERE TourId=%(tourId)s"""
@@ -98,27 +104,16 @@ class TourService:
         rows = db_query_all(sql, data)
         for row in rows:
             evt: VipEvent = None
-            ts_event_id = (
-                int(row["TicketSocketEventId"])
-                if row["TicketSocketEventId"] is not None
-                else None
-            )
-            ex_event_id = (
-                int(row["ExternalEventId"])
-                if row["ExternalEventId"] is not None
-                else None
-            )
-            if ts_event_id is not None:
+            event_id = get_override_int_value_or_default(row["ExternalEventId"])
+            if event_id is not None and event_id > 0:
                 evts = event_service.get_events_and_orders(
-                    ts_event_id=ts_event_id,
+                    event_id=event_id,
                     ignore_flags=True,
                     exclude_external=True,
                     get_orders=False,
                 )
                 if len(evts) > 0:
                     evt = evts[0]
-            elif ex_event_id is not None:
-                evt = external_event_service.get_external_event_by_id(ex_event_id)
             if evt is not None:
                 events.append(evt)
         return events
@@ -131,8 +126,10 @@ class TourService:
         sql = """INSERT INTO Tour (TourName, AnnounceDate)
                 VALUES(%(tourName)s, %(announceDate)s)"""
         data = {
-            "tourName": tour_to_add.tour_name,
-            "announceDate": tour_to_add.announce_date,
+            "tourName": get_override_string_value_or_default(tour_to_add.tour_name),
+            "announceDate": get_override_string_value_or_default(
+                tour_to_add.announce_date
+            ),
         }
         tour_id = db_insert(sql, data)
         if tour_id > 0:
@@ -155,10 +152,14 @@ class TourService:
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE TourId=%(tourId)s"""
         data = {
-            "tourName": tour_to_update.tour_name,
-            "isActive": 1 if tour_to_update.is_active is True else 0,
-            "announceDate": tour_to_update.announce_date,
-            "tourId": tour_to_update.tour_id,
+            "tourName": get_override_string_value_or_default(tour_to_update.tour_name),
+            "isActive": get_override_tinyint_value_or_default_from_bool(
+                tour_to_update.is_active
+            ),
+            "announceDate": get_override_string_value_or_default(
+                tour_to_update.announce_date
+            ),
+            "tourId": get_override_int_value_or_default(tour_to_update.tour_id),
         }
         success = db_update(sql, data)
         if success is True:
@@ -183,15 +184,12 @@ class TourService:
         db_delete(delete_sql, delete_data)
         for event in events:
             event_sql = """INSERT INTO TourEvent
-                (TourId, TicketSocketEventId, ExternalEventId)
-                VALUES(%(tourId)s, %(ticketSocketEventId)s, %(externalEventId)s)"""
+                (TourId, ExternalEventId)
+                VALUES(%(tourId)s, %(externalEventId)s)"""
             event_data = {
-                "tourId": tour_id,
-                "ticketSocketEventId": (
-                    event.ticket_socket_event_id if event.is_external is False else None
-                ),
-                "externalEventId": (
-                    event.event_id if event.is_external is True else None
+                "tourId": get_override_int_value_or_default(tour_id),
+                "externalEventId": get_override_int_value_or_default(
+                    event.external_event_id
                 ),
             }
             tour_event_id = db_insert(event_sql, event_data)
@@ -214,8 +212,8 @@ class TourService:
                 (TourId, SellerId)
                 VALUES(%(tourId)s, %(sellerId)s)"""
             seller_data = {
-                "tourId": tour_id,
-                "sellerId": seller.seller_id,
+                "tourId": get_override_int_value_or_default(tour_id),
+                "sellerId": get_override_int_value_or_default(seller.seller_id),
             }
             tour_seller_id = db_insert(seller_sql, seller_data)
             success = tour_seller_id > 0

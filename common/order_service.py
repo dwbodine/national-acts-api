@@ -14,6 +14,7 @@ from common.db import (
 from common.daily_order_service import DailyOrderService
 from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller
 from common.models.ticket_socket import TicketSocketTicketType
+from common.utility import get_override_int_value_or_default
 
 
 class OrderService:
@@ -764,19 +765,25 @@ class OrderService:
 
         return success
 
-    def add_comped_order(self, ticket_socket_event_id: int, num_tickets: int):
+    def add_comped_order(self, event_id: int, num_tickets: int):
         """
         Add a comped order from admin
         """
         success: bool = True
-        if ticket_socket_event_id <= 0 or num_tickets <= 0:
+        ticket_socket_event_id: int = 0
+
+        if event_id <= 0 or num_tickets <= 0:
             return False
 
-        sql = """SELECT * FROM TicketSocketEvents WHERE Id=%(ticket_socket_event_id)s"""
-        data = {"ticket_socket_event_id": ticket_socket_event_id}
+        sql = """SELECT TicketSocketEventId FROM ExternalEvents WHERE EventId=%(event_id)s"""
+        data = {"event_id": event_id}
         existing_event: VipEvent = db_query_one(sql, data)
-
         if existing_event:
+            ticket_socket_event_id = get_override_int_value_or_default(
+                existing_event["TicketSocketEventId"]
+            )
+
+        if ticket_socket_event_id > 0:
             type_test = """SELECT * FROM TicketSocketTicketTypes
                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                             AND TicketSocketTicketTypeId=0"""

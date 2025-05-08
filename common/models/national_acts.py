@@ -5,7 +5,7 @@ Models specific to event/order data and National Acts' integration with TicketSo
 import calendar
 import datetime
 import traceback
-from common.utility import log_message
+from common.utility import get_override_bool_value_or_default, get_override_float_value_or_default, get_override_int_value_or_default, get_override_string_value_or_default, log_message
 from common.models.ticket_socket import (
     TicketSocketTicket,
     TicketSocketOrder,
@@ -124,7 +124,7 @@ class Note:
     """
 
     note_id: int = 0
-    ticket_socket_event_id: int = None
+    external_event_id: int = None
     note: str = None
     note_title: str = None
     note_timestamp: str = None
@@ -462,10 +462,10 @@ class DashboardTotals:
         sql = "SELECT * FROM Settings WHERE Name=%(name)s"
         data = {"name": "YearlyRevenueGoal"}
         row = db_query_one(sql, data)
-        self.yearly_revenue_goal = float(row["Value"])
+        self.yearly_revenue_goal = get_override_float_value_or_default(row["Value"])
         data = {"name": "MonthlyRevenueGoal"}
         row = db_query_one(sql, data)
-        self.monthly_revenue_goal = float(row["Value"])
+        self.monthly_revenue_goal = get_override_float_value_or_default(row["Value"])
 
 
 class Seller:
@@ -501,11 +501,11 @@ class Seller:
 
         row = db_query_one(sql, data)
         if row:
-            self.name = str(row["Name"])
-            self.seller_type = int(row["SellerTypeId"])
-            self.hide_in_list = int(row["HideInList"]) == 1
-            self.is_active = int(row["Inactive"]) != 1
-            self.num_external_events = int(row["NumExternalEvents"])
+            self.name = get_override_string_value_or_default(row["Name"])
+            self.seller_type = get_override_int_value_or_default(row["SellerTypeId"])
+            self.hide_in_list = get_override_bool_value_or_default(row["HideInList"])
+            self.is_active = (get_override_int_value_or_default(row["Inactive"]) != 1)
+            self.num_external_events = get_override_int_value_or_default(row["NumExternalEvents"])
             self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):
@@ -522,9 +522,9 @@ class Seller:
         for row in rows:
             sec = SellerEventCategory(
                 self.seller_id,
-                int(row["TicketSocketId"]),
-                int(row["EventCategoryId"]),
-                int(row["SellerEventCategoryId"]),
+                get_override_int_value_or_default(row["TicketSocketId"]),
+                get_override_int_value_or_default(row["EventCategoryId"]),
+                get_override_int_value_or_default(row["SellerEventCategoryId"]),
             )
             seller_event_categories.append(sec)
         self.seller_event_categories = seller_event_categories
