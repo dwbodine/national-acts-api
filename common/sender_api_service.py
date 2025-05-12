@@ -321,8 +321,7 @@ class SenderApiService:
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
                     JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
                     JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
-                    LEFT JOIN ExternalEvents ON ExternalEvents.SellerId = Sellers.SellerId 
-                        AND TicketSocketEvents.EventDate = ExternalEvents.EventDate
+                    LEFT JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
                     LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
                     WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
                     AND TicketSocketOrders.IsDeleted <> 1

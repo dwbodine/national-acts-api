@@ -11,7 +11,6 @@ from common.admin_service import AdminService
 from common.calendar_service import CalendarService
 from common.common_api import is_admin_logged_in
 from common.event_service import EventService
-from common.external_event_service import ExternalEventService
 from common.models.admin import ExternalVenue, Page, SiteSetting
 from common.order_service import OrderService
 from common.page_service import PageService
@@ -49,11 +48,11 @@ def cancel_event():
     if event_id is None:
         return {"msg": "Bad Request"}, 400
 
-    refund_service_fees_str = request.json.get("refundServiceFees", None)
-    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+    cancelled_str = request.json.get("cancelled", None)
+    cancelled: bool = True if cancelled_str == 1 else False
 
     service = EventService()
-    success = service.cancel_event(int(event_id), refund_service_fees)
+    success = service.cancel_event(int(event_id), cancelled)
     return convert_to_json(success)
 
 
@@ -73,10 +72,14 @@ def refund_event():
         return {"msg": "Bad Request"}, 400
 
     refund_service_fees_str = request.json.get("refundServiceFees", None)
+    mark_cancelled_str = request.json.get("markCancelled", None)
     refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+    mark_cancelled: bool = True if mark_cancelled_str == 1 else False
 
     service = EventService()
-    success = service.refund_all_event_orders(int(event_id), refund_service_fees)
+    success = service.refund_all_event_orders(
+        int(event_id), refund_service_fees, mark_cancelled
+    )
     return convert_to_json(success)
 
 
@@ -102,6 +105,25 @@ def send_list_to_band():
     return convert_to_json(updated_event)
 
 
+@admin_api.route("/admin/events/ticketSocketOnly")
+@jwt_required()
+def get_only_ts_events():
+    """
+    API method to fetch only TS events
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    seller_id: int = None
+    if request.args.get("sellerId") is not None:
+        seller_id = int(request.args.get("sellerId"))
+
+    service = EventService()
+    events = service.get_ticket_socket_events_only(seller_id)
+    return convert_to_json(events)
+
+
 @admin_api.route("/admin/events/update", methods=["POST"])
 @jwt_required()
 def update_event():
@@ -117,142 +139,6 @@ def update_event():
     service = EventService()
     success = service.update_event(event)
     return convert_to_json(success)
-
-
-@admin_api.route("/admin/external_events/<int:seller_id>")
-@jwt_required()
-def get_external_events(seller_id: int):
-    """
-    API method to fetch all external events for seller_id
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    if seller_id is None:
-        return {"msg": "Bad Request"}, 400
-
-    service = ExternalEventService()
-    events = service.get_external_events_by_seller(seller_id)
-    return convert_to_json(events)
-
-
-@admin_api.route("/admin/external_events/update/<int:seller_id>", methods=["POST"])
-@jwt_required()
-def update_external_event(seller_id: int):
-    """
-    API method to add/update external event
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    if seller_id is None:
-        return {"msg": "Bad Request"}, 400
-
-    event = convert_json_to_snake_case_object(request.get_json(), VipEvent())
-
-    service = ExternalEventService()
-    success = service.update_external_event(event)
-    return convert_to_json(success)
-
-
-@admin_api.route("/admin/external_events/setEventsCancelled", methods=["POST"])
-@jwt_required()
-def set_event_cancelled_secured():
-    """
-    API method to mark event(s) as cancelled
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    event_ids: list[int] = request.json.get("eventIdList", None)
-    is_cancelled = request.json.get("isCancelled", None)
-
-    if event_ids is None or len(event_ids) == 0 or is_cancelled is None:
-        return {"msg": "Bad Request"}, 400
-
-    cancelled: bool = True if int(is_cancelled) == 1 else False
-    service = ExternalEventService()
-    if len(event_ids) > 0:
-        result = service.cancel_external_events(event_ids, cancelled)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
-    return convert_to_json(result)
-
-
-@admin_api.route("/admin/external_events/setEventsDeleted", methods=["POST"])
-@jwt_required()
-def set_event_deleted_secured():
-    """
-    API method to mark event(s) as deleted
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    event_ids: list[int] = request.json.get("eventIdList", None)
-
-    if event_ids is None or len(event_ids) == 0:
-        return {"msg": "Bad Request"}, 400
-
-    service = ExternalEventService()
-    if len(event_ids) > 0:
-        result = service.delete_external_events(event_ids)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
-    return convert_to_json(result)
-
-
-@admin_api.route("/admin/external_events/setEventsHidden", methods=["POST"])
-@jwt_required()
-def set_event_hidden_secured():
-    """
-    API method to mark event(s) as hidden
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    event_ids: list[int] = request.json.get("eventIdList", None)
-    is_hidden = request.json.get("isHidden", None)
-
-    if event_ids is None or len(event_ids) == 0 or is_hidden is None:
-        return {"msg": "Bad Request"}, 400
-
-    hidden: bool = True if int(is_hidden) == 1 else False
-    service = ExternalEventService()
-    if len(event_ids) > 0:
-        result = service.hide_external_events(event_ids, hidden)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
-    return convert_to_json(result)
-
-
-@admin_api.route("/admin/external_events/setEventsInactive", methods=["POST"])
-@jwt_required()
-def set_event_inactive_secured():
-    """
-    API method to mark event(s) as inactive
-    """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    event_ids: list[int] = request.json.get("eventIdList", None)
-    is_active = request.json.get("isActive", None)
-
-    if event_ids is None or len(event_ids) == 0 or is_active is None:
-        return {"msg": "Bad Request"}, 400
-
-    disabled: bool = True if int(is_active) == 0 else False
-    service = ExternalEventService()
-    if len(event_ids) > 0:
-        result = service.disable_external_events(event_ids, disabled)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
-    return convert_to_json(result)
 
 
 @admin_api.route("/admin/notes/add", methods=["POST"])
@@ -271,13 +157,11 @@ def add_note():
         return {"msg": "Bad Request"}, 400
 
     event_id_str = request.json.get("eventId", None)
-    ticket_socket_event_id: int = (
-        int(event_id_str) if event_id_str is not None else None
-    )
+    event_id: int = int(event_id_str) if event_id_str is not None else None
 
     calendar_date: str = None
     note_title: str = None
-    if ticket_socket_event_id is None:
+    if event_id is None:
         calendar_date_str = request.json.get("calendarDate", None)
         note_title_str = request.json.get("noteTitle", None)
         calendar_date = (
@@ -285,13 +169,11 @@ def add_note():
         )
         note_title = str(note_title_str) if note_title_str is not None else None
 
-    if ticket_socket_event_id is None and calendar_date is None:
+    if event_id is None and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
     service = CalendarService()
-    success = service.add_note(
-        str(note), ticket_socket_event_id, calendar_date, note_title
-    )
+    success = service.add_note(str(note), event_id, calendar_date, note_title)
     return convert_to_json(success)
 
 
@@ -444,6 +326,7 @@ def get_all_permissions():
     permissions = service.get_all_permissions()
     return convert_to_json(permissions)
 
+
 @admin_api.route("/admin/pages")
 @jwt_required()
 def get_all_pages():
@@ -457,6 +340,7 @@ def get_all_pages():
     service = PageService()
     pages = service.get_all_pages()
     return convert_to_json(pages)
+
 
 @admin_api.route("/admin/pages/update", methods=["POST"])
 @jwt_required()
@@ -473,6 +357,7 @@ def update_page():
     service = PageService()
     success = service.update_page(page)
     return convert_to_json(success)
+
 
 @admin_api.route("/admin/roles")
 @jwt_required()
@@ -542,6 +427,7 @@ def update_role():
     success = service.update_role(role)
     return convert_to_json(success)
 
+
 @admin_api.route("/admin/sellers")
 @jwt_required()
 def get_admin_sellers():
@@ -555,6 +441,7 @@ def get_admin_sellers():
     service = SellerService()
     results = service.get_all_sellers(show_inactive=True)
     return convert_to_json(results)
+
 
 @admin_api.route("/admin/seller/update", methods=["POST"])
 @jwt_required()

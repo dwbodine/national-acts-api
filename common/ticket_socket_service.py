@@ -236,7 +236,7 @@ class TicketSocketService:
                     address2 = fix_magic_quotes(item["venueAddress2"])
                 elif custom_fields != {} and "venueAddress2" in custom_fields:
                     address2 = fix_magic_quotes(custom_fields["venueAddress2"])
-                    
+
                 if address2 is not None:
                     address1 += ", " + address2
 
@@ -282,13 +282,9 @@ class TicketSocketService:
                 if "displayStartDate" in item:
                     display_date = item["displayStartDate"]
 
-                event.display_date = display_date
-
                 event_utc: int = 0
                 if "start" in item:
                     event_utc = int(item["start"])
-
-                event.utc_time = event_utc
 
                 # need at least one of them to be non-zero
                 if display_date == "" and event_utc == 0:
@@ -300,14 +296,14 @@ class TicketSocketService:
                 # it's a timezone that isn't convertible using Python or well...anything)
                 # So what we do instead is define a "default offset" in the database
                 # that roughly gets us the right date since we're not displaying times
-                # in the front end.  With any luck the "displayStartDate" comes back
+                # from TS in the front end.  With any luck the "displayStartDate" comes back
                 # with a valid value and we use that for our date instead
 
                 try:
-                    event_date = datetime.strptime(event.display_date, "%m/%d/%Y")
+                    event_date = datetime.strptime(display_date, "%m/%d/%Y")
                     event.event_date = event_date.strftime("%Y-%m-%d")
                 except Exception:  # pylint: disable=broad-exception-caught
-                    event_time: int = event.utc_time + (self.utc_offset_hours * 60 * 60)
+                    event_time: int = event_utc + (self.utc_offset_hours * 60 * 60)
                     event.event_date = datetime.fromtimestamp(event_time).strftime(
                         "%Y-%m-%d"
                     )

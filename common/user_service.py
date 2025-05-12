@@ -480,14 +480,11 @@ class UserService:
 
         user = self.__retrieve_user_from_database(user_id=user_id, fetch_sellers=True)
 
-        sql = """SELECT SellerEventCategory.SellerId
-                 FROM TicketSocketEvents 
-                JOIN SellerEventCategory
-                    ON SellerEventCategory.SellerEventCategoryId
-                        = TicketSocketEvents.SellerEventCategoryId 
-                WHERE TicketSocketEvents.Id=%(ticketSocketEventId)s"""
+        sql = """SELECT SellerId
+                 FROM ExternalEvents 
+                 WHERE ExternalEvents.EventId=%(event_id)s"""
 
-        data = {"ticketSocketEventId": event_id}
+        data = {"event_id": event_id}
 
         row = db_query_one(sql, data)
         event_seller_id = 0

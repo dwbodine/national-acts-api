@@ -35,7 +35,7 @@ def get_events_and_orders_secured():
     show_inactive: bool = False
     show_deleted: bool = False
     show_hidden: bool = False
-    ts_event_id: int = None
+    event_id: int = None
     tour_id: int = None
     exclude_external: bool = False
     ignore_flags: bool = False
@@ -60,8 +60,8 @@ def get_events_and_orders_secured():
         show_hidden = True if int(request.args.get("hidden")) == 1 else False
     if request.args.get("search") is not None:
         search_term = str(request.args.get("search"))
-    if request.args.get("tsEventId") is not None:
-        ts_event_id = int(request.args.get("tsEventId"))
+    if request.args.get("eventId") is not None:
+        event_id = int(request.args.get("eventId"))
     if request.args.get("tourId") is not None:
         tour_id = int(request.args.get("tourId"))
     if request.args.get("excludeExternal") is not None:
@@ -80,7 +80,7 @@ def get_events_and_orders_secured():
         end=end,
         show_inactive=show_inactive,
         search_term=search_term,
-        ts_event_id=ts_event_id,
+        event_id=event_id,
         show_deleted=show_deleted,
         exclude_start=exclude_start,
         exclude_end=exclude_end,
@@ -89,7 +89,7 @@ def get_events_and_orders_secured():
         ignore_flags=ignore_flags,
         show_cancelled=True,
         seller_ids=seller_ids,
-        tour_id=tour_id
+        tour_id=tour_id,
     )
     return convert_to_json(results)
 
@@ -234,19 +234,19 @@ def set_event_deleted_secured():
     """
     API method to mark event(s) as deleted
     """
-    event_ids: list[int] = request.json.get("eventIdList", None)
+    event_ids: list[int] = request.json.get("eventIdList", [])
     is_deleted = request.json.get("isDeleted", None)
 
-    if event_ids is None or len(event_ids) == 0 or is_deleted is None:
+    if (event_ids is None or len(event_ids) == 0) or is_deleted is None:
         return {"msg": "Bad Request"}, 400
 
     deleted: bool = True if int(is_deleted) == 1 else False
 
     service = EventService()
-    if len(event_ids) > 0:
-        result = service.delete_events(event_ids, deleted)
-        if result is False:
-            return {"msg": "Internal Server Error"}, 500
+
+    result = service.delete_events(event_ids, deleted)
+    if result is False:
+        return {"msg": "Internal Server Error"}, 500
     return convert_to_json(result)
 
 
@@ -256,10 +256,10 @@ def set_event_hidden_secured():
     """
     API method to mark event(s) as hidden
     """
-    event_ids: list[int] = request.json.get("eventIdList", None)
+    event_ids: list[int] = request.json.get("eventIdList", [])
     is_hidden = request.json.get("isHidden", None)
 
-    if event_ids is None or len(event_ids) == 0 or is_hidden is None:
+    if (event_ids is None or len(event_ids) == 0) or is_hidden is None:
         return {"msg": "Bad Request"}, 400
 
     hidden: bool = True if int(is_hidden) == 1 else False
@@ -277,10 +277,10 @@ def set_event_inactive_secured():
     """
     API method to mark event(s) as inactive
     """
-    event_ids: list[int] = request.json.get("eventIdList", None)
+    event_ids: list[int] = request.json.get("eventIdList", [])
     is_active = request.json.get("isActive", None)
 
-    if event_ids is None or len(event_ids) == 0 or is_active is None:
+    if (event_ids is None or len(event_ids) == 0) or is_active is None:
         return {"msg": "Bad Request"}, 400
 
     disabled: bool = True if int(is_active) == 0 else False
@@ -353,6 +353,7 @@ def set_ticket_checkin_secured():
         if result is False:
             return {"msg": "Internal Server Error"}, 500
     return convert_to_json(result)
+
 
 @event_api.route("/events/tours/<int:seller_id>")
 @jwt_required()

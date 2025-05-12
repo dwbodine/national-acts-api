@@ -5,7 +5,13 @@ Models specific to event/order data and National Acts' integration with TicketSo
 import calendar
 import datetime
 import traceback
-from common.utility import log_message
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    log_message,
+)
 from common.models.ticket_socket import (
     TicketSocketTicket,
     TicketSocketOrder,
@@ -141,7 +147,7 @@ class Note:
     """
 
     note_id: int = 0
-    ticket_socket_event_id: int = None
+    external_event_id: int = None
     note: str = None
     note_title: str = None
     note_timestamp: str = None
@@ -263,54 +269,31 @@ class VipEvent(TicketSocketEvent):
     National acts specific version of TS events
     """
 
+    # TicketSocketEvent properties
     ticket_socket_event_id: int = 0
-    total_revenue: float = 0
-    total_service_fees: float = 0
-    total_tickets: int = 0
-    total_checked_in: int = 0
-    total_shirts: int = 0
-    shirt_sales: list[ShirtSales] = []
-    is_active: bool = True
-    orders: list[VipOrder] = []
+    seller_event_category_id: int = None
+    is_vip: bool = True
+
+    # ExternalEvent properties
     external_event_id: int = None
-    external_seller_id: int = None
-    external_title: str = None
-    external_thumbnail: str = None
+    seller_id: int = None
+    meet_and_greet_time: str = None
+    doors_open: str = None
+    event_time: str = None
     external_url: str = None
     external_event_venue_id: int = None
-    external_venue: TicketSocketVenue = None
     disable_link_button: bool = False
     disable_link_reason: str = None
     external_vip_link: str = None
     disable_vip_link_button: bool = False
     disable_vip_link_reason: str = None
-    seller_event_category_id: int = None
-    is_vip: bool = True
-    is_deleted: bool = False
-    is_external: bool = False
-    has_shirt_data: bool = False
-    has_phone_data: bool = False
-    has_non_usa_orders: bool = False
-    non_usa_currency_symbol: str = None
-    non_usa_currency_abbrev: str = None
-    num_tickets_refunded: int = 0
-    revenue_refunded: float = 0
-    service_fee_revenue_refunded: float = 0
-    num_tickets_charged_back: int = 0
-    revenue_charged_back: float = 0
-    service_fee_revenue_charged_back: float = 0
-    has_ticket_type_data: bool = False
+    is_active: bool = True
     is_added_to_bands_in_town: bool = False
-    seller_name: str = ""
     is_hidden: bool = False
     is_cancelled: bool = False
-    cancelled_date: str = None
     announce_date: str = None
-    tour_announce_date: str = None
-    num_tickets_comped: int = 0
-    notes: list[Note] = []
-    doors_open: str = None
-    meet_and_greet_time: str = None
+    cancelled_date: str = None
+    is_deleted: bool = False
     email_sent_to_vips: bool = False
     text_sent_to_vips: bool = False
     list_sent_to_band: bool = False
@@ -318,6 +301,36 @@ class VipEvent(TicketSocketEvent):
     list_sent_num_vips: int = None
     check_in_location: str = None
     check_in_notes: str = None
+
+    # collections
+    notes: list[Note] = []
+    orders: list[VipOrder] = []
+
+    # other database properties
+    seller_name: str = ""
+    non_usa_currency_symbol: str = None
+    non_usa_currency_abbrev: str = None
+    tour_announce_date: str = None
+
+    # computed properties
+    is_external: bool = False
+    total_revenue: float = 0
+    total_service_fees: float = 0
+    total_tickets: int = 0
+    total_checked_in: int = 0
+    total_shirts: int = 0
+    shirt_sales: list[ShirtSales] = []
+    has_shirt_data: bool = False
+    has_phone_data: bool = False
+    has_non_usa_orders: bool = False
+    num_tickets_refunded: int = 0
+    revenue_refunded: float = 0
+    service_fee_revenue_refunded: float = 0
+    num_tickets_charged_back: int = 0
+    revenue_charged_back: float = 0
+    service_fee_revenue_charged_back: float = 0
+    has_ticket_type_data: bool = False
+    num_tickets_comped: int = 0
 
     def get_totals(self):
         """
@@ -406,46 +419,6 @@ class VipEvent(TicketSocketEvent):
             shirt_sales.append(shirt_sale)
         self.shirt_sales = shirt_sales
 
-        # roll up external event data, if any
-        if self.external_title is not None and self.external_title != "":
-            self.title = self.external_title
-
-        if self.external_venue is not None:
-            if self.venue is None:
-                self.venue = self.external_venue
-            else:
-                if (
-                    self.external_venue.name is not None
-                    and self.external_venue.name != ""
-                ):
-                    self.venue.name = self.external_venue.name
-                if (
-                    self.external_venue.address1 is not None
-                    and self.external_venue.address1 != ""
-                ):
-                    self.venue.address1 = self.external_venue.address1
-                if (
-                    self.external_venue.city is not None
-                    and self.external_venue.city != ""
-                ):
-                    self.venue.city = self.external_venue.city
-                if (
-                    self.external_venue.state is not None
-                    and self.external_venue.state != ""
-                ):
-                    self.venue.state = self.external_venue.state
-                if (
-                    self.external_venue.postal_code is not None
-                    and self.external_venue.postal_code != ""
-                ):
-                    self.venue.postal_code = self.external_venue.postal_code
-
-        if self.external_thumbnail is not None and self.external_thumbnail != "":
-            self.thumbnail = self.external_thumbnail
-
-        if self.external_vip_link is not None and self.external_vip_link != "":
-            self.ticket_socket_url = self.external_vip_link
-
 
 class DailyOrderData:
     """
@@ -512,10 +485,10 @@ class DashboardTotals:
         sql = "SELECT * FROM Settings WHERE Name=%(name)s"
         data = {"name": "YearlyRevenueGoal"}
         row = db_query_one(sql, data)
-        self.yearly_revenue_goal = float(row["Value"])
+        self.yearly_revenue_goal = get_override_float_value_or_default(row["Value"])
         data = {"name": "MonthlyRevenueGoal"}
         row = db_query_one(sql, data)
-        self.monthly_revenue_goal = float(row["Value"])
+        self.monthly_revenue_goal = get_override_float_value_or_default(row["Value"])
 
 
 class Seller:
@@ -566,32 +539,12 @@ class Seller:
 
         row = db_query_one(sql, data)
         if row:
-            self.name = str(row["Name"])
-            self.seller_type = int(row["SellerTypeId"])
-            self.hide_in_list = int(row["HideInList"]) == 1
-            self.is_active = int(row["Inactive"]) != 1
-            self.num_external_events = int(row["NumExternalEvents"])
-            self.address = str(row["Address"]) if row["Address"] is not None else None
-            self.city = str(row["City"]) if row["City"] is not None else None
-            self.state = str(row["State"]) if row["State"] is not None else None
-            self.zip = str(row["Zip"]) if row["Zip"] is not None else None
-            self.country = str(row["Country"]) if row["Country"] is not None else None
-            self.phone = str(row["Phone"]) if row["Phone"] is not None else None
-            self.email = str(row["Email"]) if row["Email"] is not None else None
-            self.twitter = str(row["Twitter"]) if row["Twitter"] is not None else None
-            self.facebook = (
-                str(row["Facebook"]) if row["Facebook"] is not None else None
-            )
-            self.instagram = (
-                str(row["Instagram"]) if row["Instagram"] is not None else None
-            )
-            self.youtube = str(row["YouTube"]) if row["YouTube"] is not None else None
-            self.spotify = str(row["Spotify"]) if row["Spotify"] is not None else None
-            self.website = str(row["Website"]) if row["Website"] is not None else None
-            self.website_display_text = (
-                str(row["WebsiteDisplayText"])
-                if row["WebsiteDisplayText"] is not None
-                else None
+            self.name = get_override_string_value_or_default(row["Name"])
+            self.seller_type = get_override_int_value_or_default(row["SellerTypeId"])
+            self.hide_in_list = get_override_bool_value_or_default(row["HideInList"])
+            self.is_active = get_override_int_value_or_default(row["Inactive"]) != 1
+            self.num_external_events = get_override_int_value_or_default(
+                row["NumExternalEvents"]
             )
             self.__get_seller_event_categories()
 
@@ -609,9 +562,9 @@ class Seller:
         for row in rows:
             sec = SellerEventCategory(
                 self.seller_id,
-                int(row["TicketSocketId"]),
-                int(row["EventCategoryId"]),
-                int(row["SellerEventCategoryId"]),
+                get_override_int_value_or_default(row["TicketSocketId"]),
+                get_override_int_value_or_default(row["EventCategoryId"]),
+                get_override_int_value_or_default(row["SellerEventCategoryId"]),
             )
             seller_event_categories.append(sec)
         self.seller_event_categories = seller_event_categories

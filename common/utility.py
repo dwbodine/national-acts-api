@@ -363,10 +363,12 @@ def get_override_string_value_or_default(
     """
     Get string value from override vs. default
     """
-    if override is not None and len(str(override)) > 0:
-        return str(override)
-    elif default is not None and len(str(default)) > 0:
-        return str(default)
+    if override is not None:
+        override_val = str(override).strip()
+        return override_val if len(override_val) > 0 else None
+    elif default is not None:
+        default_val = str(default).strip()
+        return default_val if len(default_val) > 0 else None
     else:
         return None
 
@@ -379,6 +381,34 @@ def get_override_int_value_or_default(override: any = None, default: any = None)
         return int(override)
     elif default is not None:
         return int(default)
+    else:
+        return 0
+
+
+def get_override_float_value_or_default(
+    override: any = None, default: any = None
+) -> float:
+    """
+    Get float value from override vs. default
+    """
+    if override is not None:
+        return float(override)
+    elif default is not None:
+        return float(default)
+    else:
+        return 0
+
+
+def get_override_tinyint_value_or_default_from_bool(
+    override: bool = None, default: bool = None
+) -> int:
+    """
+    Get database tinyint value from override vs. default
+    """
+    if override is not None:
+        return 1 if override is True else 0
+    elif default is not None:
+        return 1 if default is True else 0
     else:
         return 0
 

@@ -37,7 +37,7 @@ def get_events():
     exclude_start: int = None
     exclude_end: int = None
     search_term: str = None
-    ts_event_id: int = None
+    event_id: int = None
     if request.args.get("sellerId") is not None:
         seller_id = int(request.args.get("sellerId"))
     if request.args.get("sellerIds") is not None:
@@ -52,14 +52,14 @@ def get_events():
         exclude_end = int(request.args.get("excludeEnd"))
     if request.args.get("search") is not None:
         search_term = str(request.args.get("search"))
-    if request.args.get("tsEventId") is not None:
-        ts_event_id = int(request.args.get("tsEventId"))
+    if request.args.get("eventId") is not None:
+        event_id = int(request.args.get("eventId"))
     results = service.get_events_and_orders(
         seller_id=seller_id,
         start=start,
         end=end,
         search_term=search_term,
-        ts_event_id=ts_event_id,
+        event_id=event_id,
         exclude_start=exclude_start,
         exclude_end=exclude_end,
         show_cancelled=False,

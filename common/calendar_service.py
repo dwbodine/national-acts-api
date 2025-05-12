@@ -7,7 +7,6 @@ from datetime import datetime
 from common.db import (
     db_delete,
     db_query_all,
-    db_query_one,
     db_insert,
     db_update,
 )
@@ -22,19 +21,19 @@ class CalendarService:
     def add_note(
         self,
         note: str,
-        ticket_socket_event_id: int = None,
+        external_event_id: int = None,
         calendar_date: str = None,
         note_title: str = None,
     ):
         """
         API method to add a note specific to an event or calendar date
         """
-        sql = """INSERT INTO TicketSocketEventNotes
-                    (TicketSocketEventId, Note, NoteTitle, NoteTimestamp)
-                    VALUES (%(ticketSocketEventId)s, %(note)s, """
+        sql = """INSERT INTO EventNotes
+                    (ExternalEventId, Note, NoteTitle, NoteTimestamp)
+                    VALUES (%(externalEventId)s, %(note)s, """
         data = {
-            "ticketSocketEventId": (
-                ticket_socket_event_id if ticket_socket_event_id is not None else None
+            "externalEventId": (
+                external_event_id if external_event_id is not None else None
             ),
             "note": note,
         }
@@ -62,13 +61,13 @@ class CalendarService:
         """
         API method to update any note from its id
         """
-        sql = """UPDATE TicketSocketEventNotes
+        sql = """UPDATE EventNotes
                     SET NoteTitle=%(noteTitle)s,
                     Note=%(note)s, 
                     IsCompleted=%(isCompleted)s, 
                     NoteTimeStamp=%(noteDate)s, 
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
-                    WHERE TicketSocketEventNoteId=%(noteId)s"""
+                    WHERE EventNoteId=%(noteId)s"""
         data = {
             "note": note,
             "noteTitle": note_title,
@@ -87,8 +86,8 @@ class CalendarService:
         """
         API method to delete any note from its id
         """
-        sql = """DELETE FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventNoteId=%(noteId)s"""
+        sql = """DELETE FROM EventNotes
+                    WHERE EventNoteId=%(noteId)s"""
         data = {"noteId": note_id}
 
         success = db_delete(sql, data)
@@ -99,8 +98,8 @@ class CalendarService:
         API method to fetch calendar notes
         """
         notes: list[Note] = []
-        sql = """SELECT * FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventId IS NULL AND
+        sql = """SELECT * FROM EventNotes
+                    WHERE ExternalEventId IS NULL AND
                     NoteTimestamp BETWEEN %(startDate)s and %(endDate)s 
                     ORDER BY NoteTimestamp ASC, IsCompleted DESC, NoteTitle ASC"""
         data = {
@@ -110,7 +109,7 @@ class CalendarService:
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
-            note.note_id = int(row["TicketSocketEventNoteId"])
+            note.note_id = int(row["EventNoteId"])
             note.note = str(row["Note"])
             note.note_timestamp = str(row["NoteTimestamp"])
             note.note_title = (
@@ -120,20 +119,20 @@ class CalendarService:
             notes.append(note)
         return notes
 
-    def get_event_notes(self, ticket_socket_event_id: int):
+    def get_event_notes(self, external_event_id: int):
         """
         API method to fetch event notes
         """
         notes: list[Note] = []
-        sql = """SELECT * FROM TicketSocketEventNotes
-                    WHERE TicketSocketEventId=%(ticketSocketEventId)s
+        sql = """SELECT * FROM EventNotes
+                    WHERE ExternalEventId=%(externalEventId)s
                     ORDER BY NoteTimestamp DESC"""
-        data = {"ticketSocketEventId": ticket_socket_event_id}
+        data = {"externalEventId": external_event_id}
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
-            note.note_id = int(row["TicketSocketEventNoteId"])
-            note.ticket_socket_event_id = ticket_socket_event_id
+            note.note_id = int(row["EventNoteId"])
+            note.external_event_id = external_event_id
             note.note = str(row["Note"])
             note.note_timestamp = str(row["NoteTimestamp"])
             notes.append(note)

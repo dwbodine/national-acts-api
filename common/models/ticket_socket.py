@@ -124,12 +124,12 @@ class TicketSocketEvent:
 
     event_id: int = 0
     title: str = ""
-    venue: TicketSocketVenue = None
-    orders: list[TicketSocketOrder] = []
-    event_category_id: int = 0
-    utc_time: int = 0
     event_date: str = ""
-    display_date: str = ""
     thumbnail: str = ""
     ticket_socket_url: str = ""
+
+    event_category_id: int = 0
+
+    orders: list[TicketSocketOrder] = []
     ticket_types: list[TicketSocketTicketType] = []
+    venue: TicketSocketVenue = None
