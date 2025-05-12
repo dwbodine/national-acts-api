@@ -161,11 +161,6 @@ class EventService:
 
                 if show_inactive is True:
                     where_clause.append("COALESCE(ExternalEvents.IsActive, 1) = 0")
-                elif show_cancelled is True:
-                    where_clause.append(
-                        """(COALESCE(ExternalEvents.IsActive, 1) = 1
-                            OR COALESCE(ExternalEvents.IsCancelled, 0) = 1)"""
-                    )
                 else:
                     where_clause.append("COALESCE(ExternalEvents.IsActive, 1) = 1")
 
