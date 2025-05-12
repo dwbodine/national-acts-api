@@ -15,7 +15,6 @@ from common.utility import (
 from common.models.ticket_socket import (
     TicketSocketTicket,
     TicketSocketOrder,
-    TicketSocketVenue,
     TicketSocketEvent,
 )
 from common.db import db_query_all, db_query_one, db_insert, db_update, db_delete
