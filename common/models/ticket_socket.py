@@ -14,6 +14,22 @@ class TicketSocketCategory:
         self.name = title
 
 
+class TicketSocketAccount:
+    """
+    Model representation of data for a TS account
+    """
+
+    ticket_socket_id: int = 0
+    name: str = ""
+    service_url: str = ""
+    utc_offset_hours: int = 0
+    exchange_rate_id: int = 1
+    exchange_rate_slug: str = ""
+    mulitiplier: float = 1
+    currency_symbol: str = ""
+    categories: list[TicketSocketCategory] = []
+
+
 class TicketSocketVenue:
     """
     Venue in TicketSocket API

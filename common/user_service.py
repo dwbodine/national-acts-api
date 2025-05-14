@@ -14,6 +14,11 @@ from common.models.user import (
 from common.db import db_query_all, db_query_one, db_update, db_insert, db_delete
 from common.role_service import RoleService
 from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
     log_message,
     send_email,
     validate_email_address,
@@ -47,19 +52,20 @@ class UserService:
                 row = db_query_one(sql, data)
 
                 if row:
-                    require_reset = (
-                        True if int(row["RequireResetPassword"]) == 1 else False
+                    require_reset = get_override_bool_value_or_default(
+                        row["RequireResetPassword"]
                     )
-                    is_active = (
-                        True if int(row["IsActive"]) == 1 else False
-                    )
+                    is_active = get_override_bool_value_or_default(row["IsActive"])
+
                     if require_reset:
                         error_message = """Password reset required -
                          please click on "Forgot Password?" to proceed"""
                     elif is_active is not True:
                         error_message = """Incorrect username or password"""
                     else:
-                        hashed_password = str(row["Password"])
+                        hashed_password = get_override_string_value_or_default(
+                            row["Password"]
+                        )
                         authenticated = self.__password_verify(
                             password, hashed_password
                         )
@@ -71,7 +77,7 @@ class UserService:
                 else:
                     error_message = "Incorrect username or password"
 
-        except Exception as err: # pylint: disable=broad-exception-caught
+        except Exception as err:  # pylint: disable=broad-exception-caught
             user = None
             error_message: str = "Error occurred during login"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -133,7 +139,7 @@ class UserService:
             else:
                 error_message = """Error occurred during user registration,
                             please contact your administrator"""
-        except Exception as err: # pylint: disable=broad-exception-caught
+        except Exception as err:  # pylint: disable=broad-exception-caught
             user = None
             error_message = """Error occurred during user registration,
                             please contact your administrator"""
@@ -170,7 +176,7 @@ class UserService:
                     error_message = "Error occurred during password reset"
             else:
                 error_message = "User not found"
-        except Exception as err: # pylint: disable=broad-exception-caught
+        except Exception as err:  # pylint: disable=broad-exception-caught
             user = None
             error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -204,7 +210,7 @@ class UserService:
             if not row:
                 user = None
                 error_message = "Invalid code"
-        except Exception as err: # pylint: disable=broad-exception-caught
+        except Exception as err:  # pylint: disable=broad-exception-caught
             user = None
             error_message = "Error occurred during password reset"
             log_message(f"Unexpected {err=}, {type(err)=}")
@@ -353,26 +359,38 @@ class UserService:
         Get all users in the system
         """
         users: list[User] = []
-        sql: str = """SELECT Users.* FROM Users ORDER BY Users.FirstName, Users.LastName, Users.Username"""
+        sql: str = (
+            """SELECT Users.* FROM Users ORDER BY Users.FirstName, Users.LastName, Users.Username"""
+        )
         rows = db_query_all(sql)
         for row in rows:
             user = User()
-            user.user_id = int(row["UserId"])
-            user.is_admin = True if int(row["IsAdmin"]) == 1 else False
-            user.username = str(row["Username"])
-            user.first_name = str(row["FirstName"])
-            user.last_name = str(row["LastName"])
-            user.is_active = True if int(row["IsActive"]) == 1 else False
-            user.notes = str(row["Notes"])
-            user.mobile = str(row["Mobile"])
-            user.require_reset_password = (
-                True if int(row["RequireResetPassword"]) == 1 else False
+            user.user_id = get_override_int_value_or_default(row["UserId"])
+            user.is_admin = get_override_bool_value_or_default(row["IsAdmin"])
+            user.username = get_override_string_value_or_default(row["Username"])
+            user.first_name = get_override_string_value_or_default(row["FirstName"])
+            user.last_name = get_override_string_value_or_default(row["LastName"])
+            user.is_active = get_override_bool_value_or_default(row["IsActive"])
+            user.notes = get_override_string_value_or_default(row["Notes"])
+            user.mobile = get_override_string_value_or_default(row["Mobile"])
+            user.require_reset_password = get_override_bool_value_or_default(
+                row["RequireResetPassword"]
             )
-            user.send_email_reset = True if int(row["SendEmailReset"]) == 1 else False
-            user.send_text_reset = True if int(row["SendTextReset"]) == 1 else False
-            user.disable_check_in = True if int(row["DisableCheckIn"]) == 1 else False
-            created_at = datetime.fromisoformat(str(row["CreatedAt"]))
-            last_update = datetime.fromisoformat(str(row["LastUpdate"]))
+            user.send_email_reset = get_override_bool_value_or_default(
+                row["SendEmailReset"]
+            )
+            user.send_text_reset = get_override_bool_value_or_default(
+                row["SendTextReset"]
+            )
+            user.disable_check_in = get_override_bool_value_or_default(
+                row["DisableCheckIn"]
+            )
+            created_at = datetime.fromisoformat(
+                get_override_string_value_or_default(row["CreatedAt"])
+            )
+            last_update = datetime.fromisoformat(
+                get_override_string_value_or_default(row["LastUpdate"])
+            )
             user.created_at = created_at.strftime("%m/%d/%Y")
             user.last_update = last_update.strftime("%m/%d/%Y")
 
@@ -426,20 +444,34 @@ class UserService:
                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                            WHERE UserId=%(userId)s"""
             update_data = {
-                "isAdmin": 1 if user_to_update.is_admin else 0,
-                "username": username,
-                "firstName": user_to_update.first_name,
-                "lastName": user_to_update.last_name,
-                "mobile": user_to_update.mobile,
-                "notes": user_to_update.notes,
-                "isActive": 1 if user_to_update.is_active else 0,
-                "requireResetPassword": (
-                    1 if user_to_update.require_reset_password else 0
+                "isAdmin": get_override_tinyint_value_or_default_from_bool(
+                    user_to_update.is_admin
                 ),
-                "sendEmailReset": 1 if user_to_update.send_email_reset else 0,
-                "disableCheckin": 1 if user_to_update.disable_check_in else 0,
-                "sendTextReset": 1 if send_text_reset else 0,
-                "userId": user_id,
+                "username": get_override_string_value_or_default(username),
+                "firstName": get_override_string_value_or_default(
+                    user_to_update.first_name
+                ),
+                "lastName": get_override_string_value_or_default(
+                    user_to_update.last_name
+                ),
+                "mobile": get_override_string_value_or_default(user_to_update.mobile),
+                "notes": get_override_string_value_or_default(user_to_update.notes),
+                "isActive": get_override_tinyint_value_or_default_from_bool(
+                    user_to_update.is_active
+                ),
+                "requireResetPassword": get_override_tinyint_value_or_default_from_bool(
+                    user_to_update.require_reset_password
+                ),
+                "sendEmailReset": get_override_tinyint_value_or_default_from_bool(
+                    user_to_update.send_email_reset
+                ),
+                "disableCheckin": get_override_tinyint_value_or_default_from_bool(
+                    user_to_update.disable_check_in
+                ),
+                "sendTextReset": get_override_tinyint_value_or_default_from_bool(
+                    send_text_reset
+                ),
+                "userId": get_override_string_value_or_default(user_id),
             }
             success = db_update(update_sql, update_data)
             if success is True:
@@ -466,7 +498,7 @@ class UserService:
 
             user_sql = """DELETE FROM Users WHERE UserId=%(userId)s"""
             success = db_delete(user_sql, data)
-        except Exception as err: # pylint: disable=broad-exception-caught
+        except Exception as err:  # pylint: disable=broad-exception-caught
             success = False
             log_message(f"Unexpected {err=}, {type(err)=}")
 
@@ -489,7 +521,7 @@ class UserService:
         row = db_query_one(sql, data)
         event_seller_id = 0
         if row:
-            event_seller_id = int(row["SellerId"])
+            event_seller_id = get_override_int_value_or_default(row["SellerId"])
 
         if event_seller_id > 0:
             for seller in user.sellers:
@@ -527,8 +559,12 @@ class UserService:
                                                  LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                                  WHERE UserSellerId=%(userSellerId)s"""
                             update_role_data = {
-                                "roleId": new_seller.role_id,
-                                "userSellerId": existing_seller.user_seller_id,
+                                "roleId": get_override_int_value_or_default(
+                                    new_seller.role_id
+                                ),
+                                "userSellerId": get_override_int_value_or_default(
+                                    existing_seller.user_seller_id
+                                ),
                             }
                             success = db_update(update_role_sql, update_role_data)
                         new_seller_ids.remove(existing_seller_id)
@@ -553,9 +589,15 @@ class UserService:
                                                 VALUES (%(userId)s, %(sellerId)s, %(roleId)s,
                                                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                                 insert_seller_data = {
-                                    "userId": user_id,
-                                    "sellerId": new_seller_id,
-                                    "roleId": new_seller.role_id,
+                                    "userId": get_override_int_value_or_default(
+                                        user_id
+                                    ),
+                                    "sellerId": get_override_int_value_or_default(
+                                        new_seller_id
+                                    ),
+                                    "roleId": get_override_int_value_or_default(
+                                        new_seller.role_id
+                                    ),
                                 }
                                 user_seller_id = db_insert(
                                     insert_seller_sql, insert_seller_data
@@ -610,7 +652,11 @@ class UserService:
                 (UserId, Code, CreatedOn, LastUpdate)
                 VALUES (%(userId)s, %(code)s, %(createdOn)s,
                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
-        data = {"userId": user.user_id, "code": code, "createdOn": created_on}
+        data = {
+            "userId": get_override_int_value_or_default(user.user_id),
+            "code": get_override_int_value_or_default(code),
+            "createdOn": get_override_float_value_or_default(created_on),
+        }
         token_id = db_insert(sql, data)
         if token_id > 0:
             return code
@@ -657,22 +703,32 @@ class UserService:
             row = db_query_one(sql, data)
             if row:
                 user = User()
-                user.user_id = int(row["UserId"])
-                user.is_admin = True if int(row["IsAdmin"]) == 1 else False
-                user.username = str(row["Username"])
-                user.first_name = str(row["FirstName"])
-                user.last_name = str(row["LastName"])
-                user.is_active = True if int(row["IsActive"]) == 1 else False
-                user.notes = str(row["Notes"])
-                user.mobile = str(row["Mobile"])
-                user.require_reset_password = (
-                    True if int(row["RequireResetPassword"]) else False
+                user.user_id = get_override_int_value_or_default(row["UserId"])
+                user.is_admin = get_override_bool_value_or_default(row["IsAdmin"])
+                user.username = get_override_string_value_or_default(row["Username"])
+                user.first_name = get_override_string_value_or_default(row["FirstName"])
+                user.last_name = get_override_string_value_or_default(row["LastName"])
+                user.is_active = get_override_bool_value_or_default(row["IsActive"])
+                user.notes = get_override_string_value_or_default(row["Notes"])
+                user.mobile = get_override_string_value_or_default(row["Mobile"])
+                user.require_reset_password = get_override_bool_value_or_default(
+                    row["RequireResetPassword"]
                 )
-                user.send_email_reset = True if int(row["SendEmailReset"]) else False
-                user.send_text_reset = True if int(row["SendTextReset"]) else False
-                user.disable_check_in = True if int(row["DisableCheckIn"]) else False
-                created_at = datetime.fromisoformat(str(row["CreatedAt"]))
-                last_update = datetime.fromisoformat(str(row["LastUpdate"]))
+                user.send_email_reset = get_override_bool_value_or_default(
+                    row["SendEmailReset"]
+                )
+                user.send_text_reset = get_override_bool_value_or_default(
+                    row["SendTextReset"]
+                )
+                user.disable_check_in = get_override_bool_value_or_default(
+                    row["DisableCheckIn"]
+                )
+                created_at = datetime.fromisoformat(
+                    get_override_string_value_or_default(row["CreatedAt"])
+                )
+                last_update = datetime.fromisoformat(
+                    get_override_string_value_or_default(row["LastUpdate"])
+                )
                 user.created_at = created_at.strftime("%m/%d/%Y")
                 user.last_update = last_update.strftime("%m/%d/%Y")
 
@@ -714,11 +770,11 @@ class UserService:
         rows = db_query_all(sql, data)
 
         for row in rows:
-            user_seller_id = int(row["UserSellerId"])
-            seller_id = int(row["SellerId"])
-            seller_name = str(row["Name"])
-            seller_type = int(row["SellerTypeId"])
-            role_id = int(row["RoleId"])
+            user_seller_id = get_override_int_value_or_default(row["UserSellerId"])
+            seller_id = get_override_int_value_or_default(row["SellerId"])
+            seller_name = get_override_string_value_or_default(row["Name"])
+            seller_type = get_override_int_value_or_default(row["SellerTypeId"])
+            role_id = get_override_int_value_or_default(row["RoleId"])
             us = UserSeller(
                 user_seller_id, seller_id, seller_name, seller_type, role_id
             )

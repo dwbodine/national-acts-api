@@ -7,6 +7,10 @@ from common.models.user import (
     Permission,
 )
 from common.db import db_query_all, db_query_one, db_update, db_insert, db_delete
+from common.utility import (
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 
 
 class RoleService:
@@ -23,8 +27,8 @@ class RoleService:
         sql = """SELECT * FROM Permissions ORDER BY PermissionName"""
         rows = db_query_all(sql)
         for row in rows:
-            permission_id = int(row["PermissionId"])
-            name = str(row["PermissionName"])
+            permission_id = get_override_int_value_or_default(row["PermissionId"])
+            name = get_override_string_value_or_default(row["PermissionName"])
             permission = Permission(permission_id, name)
             permissions.append(permission)
         return permissions
@@ -37,8 +41,8 @@ class RoleService:
         sql = """SELECT * FROM Roles ORDER BY RoleId"""
         rows = db_query_all(sql)
         for row in rows:
-            role_id = int(row["RoleId"])
-            role_name = str(row["RoleName"])
+            role_id = get_override_int_value_or_default(row["RoleId"])
+            role_name = get_override_string_value_or_default(row["RoleName"])
             role = Role()
             role.role_id = role_id
             role.role_name = role_name
@@ -56,8 +60,8 @@ class RoleService:
         data = {"roleId": role_id}
         row = db_query_one(sql, data)
         if row:
-            role_id = int(row["RoleId"])
-            role_name = str(row["RoleName"])
+            role_id = get_override_int_value_or_default(row["RoleId"])
+            role_name = get_override_string_value_or_default(row["RoleName"])
             role = Role()
             role.role_id = role_id
             role.role_name = role_name
@@ -73,22 +77,32 @@ class RoleService:
         if role_to_update is None:
             return False
         existing_role: Role = None
-        if role_to_update.role_id > 0:
-            existing_role = self.get_role_by_id(role_to_update.role_id)
+        new_role_id: int = get_override_int_value_or_default(role_to_update.role_id)
+        if new_role_id > 0:
+            existing_role = self.get_role_by_id(new_role_id)
         if existing_role is not None:
-            role_id = existing_role.role_id
+            existing_role_id = get_override_int_value_or_default(existing_role.role_id)
             update_sql = """UPDATE Roles SET RoleName=%(roleName)s,
                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') WHERE RoleId=%(roleId)s"""
-            update_data = {"roleName": role_to_update.role_name, "roleId": role_id}
+            update_data = {
+                "roleName": get_override_string_value_or_default(
+                    role_to_update.role_name
+                ),
+                "roleId": existing_role_id,
+            }
             success = db_update(update_sql, update_data)
             if success is True:
                 success = self.assign_permissions_to_role_id(
-                    role_id, role_to_update.permissions
+                    existing_role_id, role_to_update.permissions
                 )
         else:
             insert_sql = """INSERT INTO Roles (RoleName, LastUpdate)
                         VALUES (%(roleName)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
-            insert_data = {"roleName": role_to_update.role_name}
+            insert_data = {
+                "roleName": get_override_string_value_or_default(
+                    role_to_update.role_name
+                )
+            }
             role_id = db_insert(insert_sql, insert_data)
             if role_id > 1:
                 success = self.assign_permissions_to_role_id(
@@ -135,8 +149,8 @@ class RoleService:
         data = {"roleId": role_id}
         rows = db_query_all(sql, data)
         for row in rows:
-            permission_id = int(row["PermissionId"])
-            permission_name = str(row["PermissionName"])
+            permission_id = get_override_int_value_or_default(row["PermissionId"])
+            permission_name = get_override_string_value_or_default(row["PermissionName"])
             permission = Permission(permission_id, permission_name)
             permissions.append(permission)
         return permissions
@@ -147,6 +161,8 @@ class RoleService:
         """
         Update permissions for selected role
         """
+        if role_id is None or role_id <= 0:
+            return False
         existing_role = self.get_role_by_id(role_id)
         success: bool = True
         if existing_role is not None:
@@ -180,8 +196,8 @@ class RoleService:
                                                     VALUES (%(roleId)s, %(permissionId)s,
                                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                             insert_permission_data = {
-                                "roleId": role_id,
-                                "permissionId": new_permission_id,
+                                "roleId": get_override_int_value_or_default(role_id),
+                                "permissionId": get_override_int_value_or_default(new_permission_id),
                             }
                             role_permission_id = db_insert(
                                 insert_permission_sql, insert_permission_data
@@ -220,7 +236,7 @@ class RoleService:
         rows = db_query_all(sql, data)
 
         for row in rows:
-            permission_id = int(row["PermissionId"])
+            permission_id = get_override_int_value_or_default(row["PermissionId"])
             permissions.append(permission_id)
 
         return permissions

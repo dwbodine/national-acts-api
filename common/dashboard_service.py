@@ -10,6 +10,12 @@ from common.models.national_acts import (
     DailyOrderData,
     DashboardTotals,
 )
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 
 
 class DashboardService:
@@ -73,45 +79,73 @@ class DashboardService:
 
         rows = db_query_all(sql, data)
         for row in rows:
-            purchase_date = str(row["PurchaseDate"])
-            ticket_socket_event_id = int(row["TicketSocketEventId"])
-            order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
-            order_data.event_title = str(row["EventTitle"])
-            order_data.event_date = str(row["EventDate"])
-            order_data.seller_id = int(row["SellerId"])
-            order_data.seller_name = str(row["SellerName"])
-            order_data.venue = str(row["Venue"])
-            order_data.city = str(row["City"])
-            order_data.state = str(row["State"])
-            order_data.country = str(row["Country"])
-            order_data.zip = str(row["Zip"])
-            order_data.tickets = int(row["Tickets"])
-            order_data.orders = int(row["Orders"])
-            order_data.ticket_revenue_usd = float(row["TicketRevenue"])
-            order_data.service_fees_revenue_usd = float(row["ServiceFeeRevenue"])
-            order_data.total_revenue_usd = float(row["TotalRevenue"])
-            order_data.ticket_socket_id = int(row["TicketSocketId"])
-            order_data.ticket_socket_order_id = (
-                int(row["TicketSocketOrderId"])
-                if row["TicketSocketOrderId"] is not None
-                else None
+            purchase_date = get_override_string_value_or_default(row["PurchaseDate"])
+            ticket_socket_event_id = get_override_int_value_or_default(
+                row["TicketSocketEventId"]
             )
-            order_data.is_refunded = True if int(row["IsRefunded"]) == 1 else False
+            order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
+            order_data.event_title = get_override_string_value_or_default(
+                row["EventTitle"]
+            )
+            order_data.event_date = get_override_string_value_or_default(
+                row["EventDate"]
+            )
+            order_data.seller_id = get_override_int_value_or_default(row["SellerId"])
+            order_data.seller_name = get_override_string_value_or_default(
+                row["SellerName"]
+            )
+            order_data.venue = get_override_string_value_or_default(row["Venue"])
+            order_data.city = get_override_string_value_or_default(row["City"])
+            order_data.state = get_override_string_value_or_default(row["State"])
+            order_data.country = get_override_string_value_or_default(row["Country"])
+            order_data.zip = get_override_string_value_or_default(row["Zip"])
+            order_data.tickets = get_override_int_value_or_default(row["Tickets"])
+            order_data.orders = get_override_int_value_or_default(row["Orders"])
+            order_data.ticket_revenue_usd = get_override_float_value_or_default(
+                row["TicketRevenue"]
+            )
+            order_data.service_fees_revenue_usd = get_override_float_value_or_default(
+                row["ServiceFeeRevenue"]
+            )
+            order_data.total_revenue_usd = get_override_float_value_or_default(
+                row["TotalRevenue"]
+            )
+            order_data.ticket_socket_id = get_override_int_value_or_default(
+                row["TicketSocketId"]
+            )
+            order_data.ticket_socket_order_id = get_override_int_value_or_default(
+                row["TicketSocketOrderId"], default=None
+            )
+            order_data.is_refunded = get_override_bool_value_or_default(
+                row["IsRefunded"]
+            )
             if order_data.is_refunded is True:
-                order_data.num_tickets_refunded = int(row["NumTicketsRefunded"])
-                order_data.revenue_refunded = float(row["RevenueRefunded"])
-                order_data.service_fee_revenue_refunded = float(
-                    row["ServiceFeeRevenueRefunded"]
+                order_data.num_tickets_refunded = get_override_int_value_or_default(
+                    row["NumTicketsRefunded"]
+                )
+                order_data.revenue_refunded = get_override_float_value_or_default(
+                    row["RevenueRefunded"]
+                )
+                order_data.service_fee_revenue_refunded = (
+                    get_override_float_value_or_default(
+                        row["ServiceFeeRevenueRefunded"]
+                    )
                 )
 
-            order_data.is_charged_back = (
-                True if int(row["IsChargeback"]) == 1 else False
+            order_data.is_charged_back = get_override_bool_value_or_default(
+                row["IsChargeback"]
             )
             if order_data.is_charged_back is True:
-                order_data.num_tickets_charged_back = int(row["NumTicketsChargedBack"])
-                order_data.revenue_charged_back = float(row["RevenueChargedBack"])
-                order_data.service_fee_revenue_charged_back = float(
-                    row["ServiceFeeRevenueChargedBack"]
+                order_data.num_tickets_charged_back = get_override_int_value_or_default(
+                    row["NumTicketsChargedBack"]
+                )
+                order_data.revenue_charged_back = get_override_float_value_or_default(
+                    row["RevenueChargedBack"]
+                )
+                order_data.service_fee_revenue_charged_back = (
+                    get_override_float_value_or_default(
+                        row["ServiceFeeRevenueChargedBack"]
+                    )
                 )
 
             dash_totals.tickets += order_data.tickets

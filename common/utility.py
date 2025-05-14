@@ -373,7 +373,7 @@ def get_override_string_value_or_default(
         return None
 
 
-def get_override_int_value_or_default(override: any = None, default: any = None) -> int:
+def get_override_int_value_or_default(override: any = None, default: int = 0) -> int:
     """
     Get integer value from override vs. default
     """
@@ -382,7 +382,7 @@ def get_override_int_value_or_default(override: any = None, default: any = None)
     elif default is not None:
         return int(default)
     else:
-        return 0
+        return None
 
 
 def get_override_float_value_or_default(
@@ -420,8 +420,8 @@ def get_override_bool_value_or_default(
     Get integer value from override vs. default
     """
     if override is not None:
-        return int(override) == 1
+        return int(override) >= 1
     elif default is not None:
-        return int(default) == 1
+        return int(default) >= 1
     else:
         return False
