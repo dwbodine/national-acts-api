@@ -115,7 +115,7 @@ class SellerService:
             "spotify": get_override_string_value_or_default(seller_to_udpdate.spotify),
             "website": get_override_string_value_or_default(seller_to_udpdate.website),
             "websiteDisplayText": get_override_string_value_or_default(
-                seller_to_udpdate.country
+                seller_to_udpdate.website_display_text
             ),
         }
 

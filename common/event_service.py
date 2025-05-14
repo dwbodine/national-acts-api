@@ -645,7 +645,7 @@ class EventService:
 
         if success is True:
             sql = """SELECT TicketSocketOrders.Id AS OrderId,
-                        TicketSocketEvents.Id AS EventId,
+                        TicketSocketEvents.Id AS EventId
                         FROM TicketSocketOrders
                         JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId
                         JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
@@ -756,7 +756,7 @@ class EventService:
                 )
                 move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
 
-        if event_to_update.event_id > 0:
+        if event_to_update.external_event_id > 0:
             update_data["event_id"] = get_override_int_value_or_default(
                 event_to_update.external_event_id
             )

@@ -109,7 +109,7 @@ class TourService:
                 evts = event_service.get_events_and_orders(
                     event_id=event_id,
                     ignore_flags=True,
-                    exclude_external=True,
+                    exclude_external=False,
                     get_orders=False,
                 )
                 if len(evts) > 0:

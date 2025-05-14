@@ -510,7 +510,6 @@ class Seller:
     is_active: bool = True
     name: str = None
     seller_type: int = 1
-    num_external_events: int = 0
     address: str = None
     city: str = None
     state: str = None
@@ -537,12 +536,7 @@ class Seller:
         """
         Initialize seller from database
         """
-        sql = """SELECT Sellers.*,
-            (SELECT COUNT(EventId) FROM ExternalEvents 
-                WHERE ExternalEvents.SellerId = Sellers.SellerId
-                AND ExternalEvents.EventDate >= 
-                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))
-                AS NumExternalEvents
+        sql = """SELECT Sellers.*
             FROM Sellers
             WHERE Sellers.SellerId=%(sellerId)s"""
         data = {"sellerId": self.seller_id}
@@ -551,11 +545,25 @@ class Seller:
         if row:
             self.name = get_override_string_value_or_default(row["Name"])
             self.seller_type = get_override_int_value_or_default(row["SellerTypeId"])
-            self.hide_in_list = get_override_bool_value_or_default(row["HideInList"])
-            self.is_active = get_override_int_value_or_default(row["Inactive"]) != 1
-            self.num_external_events = get_override_int_value_or_default(
-                row["NumExternalEvents"]
+            self.address = get_override_string_value_or_default(row["Address"])
+            self.city = get_override_string_value_or_default(row["City"])
+            self.state = get_override_string_value_or_default(row["State"])
+            self.zip = get_override_string_value_or_default(row["Zip"])
+            self.country = get_override_string_value_or_default(row["Country"])
+            self.phone = get_override_string_value_or_default(row["Phone"])
+            self.email = get_override_string_value_or_default(row["Email"])
+            self.twitter = get_override_string_value_or_default(row["Twitter"])
+            self.facebook = get_override_string_value_or_default(row["Facebook"])
+            self.instagram = get_override_string_value_or_default(row["Instagram"])
+            self.youtube = get_override_string_value_or_default(row["YouTube"])
+            self.spotify = get_override_string_value_or_default(row["Spotify"])
+            self.website = get_override_string_value_or_default(row["Website"])
+            self.website_display_text = get_override_string_value_or_default(
+                row["WebsiteDisplayText"]
             )
+            self.hide_in_list = get_override_bool_value_or_default(row["HideInList"])
+            self.is_active = not get_override_bool_value_or_default(row["Inactive"])
+
             self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):
