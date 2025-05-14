@@ -10,6 +10,11 @@ from common.data_refresh_service import DataRefreshService
 from common.daily_order_service import DailyOrderService
 from common.models.national_acts import TicketSocketRefreshHistory
 from common.order_service import OrderService
+from common.utility import (
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 
 
 class UpdateService:
@@ -32,9 +37,9 @@ class UpdateService:
             for row in rows:
                 service = ExchangeRateService(
                     ExchangeRate(
-                        int(row["ExchangeRateId"]),
-                        row["ServiceTokenId"],
-                        float(row["Multiplier"]),
+                        get_override_int_value_or_default(row["ExchangeRateId"]),
+                        get_override_string_value_or_default(row["ServiceTokenId"]),
+                        get_override_float_value_or_default(row["Multiplier"]),
                     )
                 )
                 rate = service.get_exchange_rate_by_time(unix_time, force_update)

@@ -12,6 +12,10 @@ from typing import Any
 from common.utility import (
     fix_magic_quotes,
     format_phone,
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
     post_https_response,
     get_https_response,
 )
@@ -62,23 +66,30 @@ class TicketSocketService:
 
         row = db_query_one(sql, data)
         if row:
-            self.name = row["AccountName"]
-            self.service_url = row["ServiceUrl"]
+            self.name = get_override_string_value_or_default(row["AccountName"])
+            self.service_url = get_override_string_value_or_default(row["ServiceUrl"])
             self.service_url = self.service_url.replace("https://", "")
-            self.utc_offset_hours = int(row["DefaultUtcOffsetHours"])
-            self.currency_symbol = row["Symbol"]
-            self.exchange_rate_id = int(row["ExchangeRateId"])
-            self.exchange_rate_slug = row["ServiceTokenId"]
-            self.mulitiplier = float(row["Multiplier"])
+            self.utc_offset_hours = get_override_int_value_or_default(
+                row["DefaultUtcOffsetHours"]
+            )
+            self.currency_symbol = get_override_string_value_or_default(row["Symbol"])
+            self.exchange_rate_id = get_override_int_value_or_default(
+                row["ExchangeRateId"]
+            )
+            self.exchange_rate_slug = get_override_string_value_or_default(
+                row["ServiceTokenId"]
+            )
+            self.mulitiplier = get_override_float_value_or_default(row["Multiplier"])
 
     def __get_jwt_token(self):
         """
         Gets JWT bearer token from TicketSocket for this account
         """
-        uid = os.getenv("API_UID_" + str(self.ticket_socket_id))
-        pwd = os.getenv("API_PWD_" + str(self.ticket_socket_id))
-        pk = os.getenv("API_PK_" + str(self.ticket_socket_id))
-        pk_slug = os.getenv("API_PK_SLUG_" + str(self.ticket_socket_id))
+        ticket_id_str: str = get_override_string_value_or_default(self.ticket_socket_id)
+        uid = os.getenv("API_UID_" + ticket_id_str)
+        pwd = os.getenv("API_PWD_" + ticket_id_str)
+        pk = os.getenv("API_PK_" + ticket_id_str)
+        pk_slug = os.getenv("API_PK_SLUG_" + ticket_id_str)
 
         creds = {
             "userName": uid,
@@ -121,9 +132,9 @@ class TicketSocketService:
                 category_id: int = 0
                 title: str = ""
                 if "id" in item:
-                    category_id = int(item["id"])
+                    category_id = get_override_int_value_or_default(item["id"])
                 if "title" in item:
-                    title = item["title"]
+                    title = get_override_string_value_or_default(item["title"])
                 if category_id > 0 and title != "":
                     self.categories.append(
                         TicketSocketCategory(item["id"], item["title"])
@@ -174,11 +185,11 @@ class TicketSocketService:
                 event_id: int = 0
                 title: str = ""
                 if "id" in item:
-                    event_id = int(item["id"])
+                    event_id = get_override_int_value_or_default(item["id"])
                 if "title" in item:
-                    title = item["title"]
+                    title = get_override_string_value_or_default(item["title"])
 
-                if event_id == 0 or title == "":
+                if event_id == 0 or title is None or title == "":
                     continue
 
                 event = TicketSocketEvent()
@@ -196,7 +207,7 @@ class TicketSocketService:
 
                 category_id: int = 0
                 if "id" in category:
-                    category_id = int(category["id"])
+                    category_id = get_override_int_value_or_default(category["id"])
 
                 if category_id <= 0:
                     continue
@@ -205,64 +216,116 @@ class TicketSocketService:
 
                 thumbnail: str = ""
                 if "smallPic" in item:
-                    thumbnail = item["smallPic"]
+                    thumbnail = get_override_string_value_or_default(item["smallPic"])
                 event.thumbnail = thumbnail
 
                 sef_url: str = ""
                 if "sefUrl" in item:
-                    sef_url = item["sefUrl"]
+                    sef_url = get_override_string_value_or_default(item["sefUrl"])
 
                 event.ticket_socket_url = (
                     "https://" + self.service_url + "/event/" + sef_url
                 )
 
                 # venue info
-                venue = ""
+                venue = None
                 if "venue" in item:
-                    venue = fix_magic_quotes(item["venue"])
+                    venue = get_override_string_value_or_default(item["venue"])
+
+                if venue is not None:
+                    venue = fix_magic_quotes(venue)
+                else:
+                    venue = ""
 
                 custom_fields = {}
                 if "custom_fields" in item:
                     custom_fields = item["custom_fields"]
 
-                address1 = ""
-                if "venueAddress1" in item and item["venueAddress1"] != "":
-                    address1 = fix_magic_quotes(item["venueAddress1"])
+                address1 = None
+                if "venueAddress1" in item:
+                    address1 = get_override_string_value_or_default(
+                        item["venueAddress1"]
+                    )
                 elif custom_fields != {} and "venueAddress1" in custom_fields:
-                    address1 = fix_magic_quotes(custom_fields["venueAddress1"])
+                    address1 = get_override_string_value_or_default(
+                        custom_fields["venueAddress1"]
+                    )
+
+                if address1 is not None:
+                    address1 = fix_magic_quotes(address1)
+                else:
+                    address1 = ""
 
                 address2 = None
                 if "venueAddress2" in item and item["venueAddress2"] != "":
-                    address2 = fix_magic_quotes(item["venueAddress2"])
+                    address2 = get_override_string_value_or_default(
+                        item["venueAddress2"]
+                    )
                 elif custom_fields != {} and "venueAddress2" in custom_fields:
-                    address2 = fix_magic_quotes(custom_fields["venueAddress2"])
+                    address2 = get_override_string_value_or_default(
+                        custom_fields["venueAddress2"]
+                    )
 
                 if address2 is not None:
-                    address1 += ", " + address2
+                    address2 = fix_magic_quotes(address2)
+                    if address1 != "":
+                        address1 += ", " + address2
+                    else:
+                        address1 = address2
 
-                city = ""
+                city = None
                 if "venueCity" in item and item["venueCity"] != "":
-                    city = fix_magic_quotes(item["venueCity"])
+                    city = get_override_string_value_or_default(item["venueCity"])
                 elif custom_fields != {} and "venueCity" in custom_fields:
-                    city = fix_magic_quotes(custom_fields["venueCity"])
+                    city = get_override_string_value_or_default(
+                        custom_fields["venueCity"]
+                    )
 
-                state = ""
+                if city is not None:
+                    city = fix_magic_quotes(city)
+                else:
+                    city = ""
+
+                state = None
                 if "venueState" in item and item["venueState"] != "":
-                    state = fix_magic_quotes(item["venueState"])
+                    state = get_override_string_value_or_default(item["venueState"])
                 elif custom_fields != {} and "venueState" in custom_fields:
-                    state = fix_magic_quotes(custom_fields["venueState"])
+                    state = get_override_string_value_or_default(
+                        custom_fields["venueState"]
+                    )
 
-                zip_code = ""
+                if state is not None:
+                    state = fix_magic_quotes(state)
+                else:
+                    state = ""
+
+                zip_code = None
                 if "venuePostalCode" in item and item["venuePostalCode"] != "":
-                    zip_code = fix_magic_quotes(item["venuePostalCode"])
+                    zip_code = get_override_string_value_or_default(
+                        item["venuePostalCode"]
+                    )
                 elif custom_fields != {} and "venuePostalCode" in custom_fields:
-                    zip_code = fix_magic_quotes(custom_fields["venuePostalCode"])
+                    zip_code = get_override_string_value_or_default(
+                        custom_fields["venuePostalCode"]
+                    )
 
-                country = ""
+                if zip_code is not None:
+                    zip_code = fix_magic_quotes(zip_code)
+                else:
+                    zip_code = ""
+
+                country = None
                 if "venueCountry" in item and item["venueCountry"] != "":
-                    country = fix_magic_quotes(item["venueCountry"])
+                    country = get_override_string_value_or_default(item["venueCountry"])
                 elif custom_fields != {} and "venueCountry" in custom_fields:
-                    country = fix_magic_quotes(custom_fields["venueCountry"])
+                    country = get_override_string_value_or_default(
+                        custom_fields["venueCountry"]
+                    )
+
+                if country is not None:
+                    country = fix_magic_quotes(country)
+                else:
+                    country = ""
 
                 format_phones: bool = True
                 if country != "" and country != "USA" and country != "United States":
@@ -270,7 +333,9 @@ class TicketSocketService:
 
                 timezone = ""
                 if custom_fields != {} and "timezone" in custom_fields:
-                    timezone = custom_fields["timezone"]
+                    timezone = get_override_string_value_or_default(
+                        custom_fields["timezone"], default=""
+                    )
 
                 event_venue = TicketSocketVenue(
                     venue, address1, city, state, zip_code, country, timezone
@@ -278,16 +343,18 @@ class TicketSocketService:
                 event.venue = event_venue
 
                 # date/time info
-                display_date: str = ""
+                display_date: str = None
                 if "displayStartDate" in item:
-                    display_date = item["displayStartDate"]
+                    display_date = get_override_string_value_or_default(
+                        item["displayStartDate"]
+                    )
 
                 event_utc: int = 0
                 if "start" in item:
-                    event_utc = int(item["start"])
+                    event_utc = get_override_int_value_or_default(item["start"])
 
                 # need at least one of them to be non-zero
-                if display_date == "" and event_utc == 0:
+                if display_date is None and event_utc == 0:
                     continue
 
                 # note: this is a total hack since TicketSocket returns in UTC
@@ -332,20 +399,20 @@ class TicketSocketService:
 
         ttypes: list[TicketSocketTicketType] = []
         for item in ticket_types:
-            ticket_type_id = int(item["id"])
+            ticket_type_id = get_override_int_value_or_default(item["id"])
 
             # strip out anything in the name contained in parentheses
-            name = str(item["name"])
+            name = get_override_string_value_or_default(item["name"])
             if len(name) > 0:
                 name = re.sub(r"\([^()]*\)", "", name)
                 name = name.replace("  ", " ")
                 name = name.strip()
 
-            event_id = int(item["eventId"])
-            total_available = int(item["quantity"])
+            event_id = get_override_int_value_or_default(item["eventId"])
+            total_available = get_override_int_value_or_default(item["quantity"])
             is_active: bool = True
             if "deleted" in item:
-                is_active = int(item["deleted"]) == 0
+                is_active = get_override_bool_value_or_default(item["deleted"])
             ttype = TicketSocketTicketType(
                 event_id, ticket_type_id, name, total_available, is_active
             )
@@ -381,9 +448,11 @@ class TicketSocketService:
             if json_data is not None:
                 incoming_order_id: int = 0
                 if "id" in json_data:
-                    incoming_order_id = int(json_data["id"])
+                    incoming_order_id = get_override_int_value_or_default(
+                        json_data["id"]
+                    )
 
-                if incoming_order_id == 0 or incoming_order_id != order_id:
+                if incoming_order_id == 0 or incoming_order_id != int(order_id):
                     continue
 
                 order: TicketSocketOrder = self.__parse_response_to_order_object(
@@ -417,9 +486,9 @@ class TicketSocketService:
         if json_data is not None:
             incoming_order_id: int = 0
             if "id" in json_data:
-                incoming_order_id = int(json_data["id"])
+                incoming_order_id = get_override_int_value_or_default(json_data["id"])
 
-            if incoming_order_id != 0 or incoming_order_id != order_id:
+            if incoming_order_id > 0 or incoming_order_id != order_id:
                 order = self.__parse_response_to_order_object(
                     incoming_order_id, event_id, format_phone_numbers, json_data
                 )
@@ -449,7 +518,7 @@ class TicketSocketService:
             for item in json_data:
                 order_id: int = 0
                 if "orderId" in item:
-                    order_id = int(item["orderId"])
+                    order_id = get_override_int_value_or_default(item["orderId"])
                 if order_id != 0:
                     order_ids.append(order_id)
 
@@ -467,7 +536,7 @@ class TicketSocketService:
             order.cancelled = bool(json_data["cancelled"])
 
         if "deleted" in json_data:
-            order.deleted = True if int(json_data["deleted"]) == 1 else False
+            order.deleted = get_override_bool_value_or_default(json_data["deleted"])
 
         tickets = None
         if "tickets" in json_data:
@@ -476,7 +545,7 @@ class TicketSocketService:
         total_count: int = 0
         if tickets is not None:
             if "totalCount" in tickets:
-                total_count = int(tickets["totalCount"])
+                total_count = get_override_int_value_or_default(tickets["totalCount"])
 
         order_tickets = []
         if total_count > 0:
@@ -486,16 +555,17 @@ class TicketSocketService:
                 # and yes that happens that an order can contain tickets to multiple events
                 item_event_id: int = 0
                 if "eventId" in item:
-                    item_event_id = int(item["eventId"])
+                    item_event_id = get_override_int_value_or_default(item["eventId"])
 
-                if item_event_id != int(event_id):
+                if item_event_id <= 0 or item_event_id != int(event_id):
                     continue
 
                 if order.purchase_date is None and "purchaseDate" in item:
                     # datetime is not serializable in python,
                     # convert it to ISO-compatible string in Pacific Time (server is in Mountain)
                     purchase_date = datetime.fromtimestamp(
-                        float(item["purchaseDate"]) - (60 * 60)
+                        get_override_float_value_or_default(item["purchaseDate"])
+                        - (60 * 60)
                     )
                     order.purchase_date = purchase_date.strftime("%Y-%m-%d")
                     order.purchase_timestamp = purchase_date.strftime(
@@ -509,28 +579,64 @@ class TicketSocketService:
                 shirt_size: str = None
                 # set properties on order from ticket data if not present
                 if order.user_id == 0 and "userId" in item:
-                    order.user_id = int(item["userId"])
+                    order.user_id = get_override_int_value_or_default(item["userId"])
                 if order.purchaser_first_name == "" and "billing_firstName" in item:
-                    order.purchaser_first_name = fix_magic_quotes(
-                        item["billing_firstName"]
+                    order.purchaser_first_name = get_override_string_value_or_default(
+                        item["billing_firstName"], default=""
                     )
+                    if order.purchaser_first_name != "":
+                        order.purchaser_first_name = fix_magic_quotes(
+                            order.purchaser_first_name
+                        )
                 if order.purchaser_last_name == "" and "billing_lastName" in item:
-                    order.purchaser_last_name = fix_magic_quotes(
-                        item["billing_lastName"]
+                    order.purchaser_last_name = get_override_string_value_or_default(
+                        item["billing_lastName"], default=""
                     )
+                    if order.purchaser_last_name != "":
+                        order.purchaser_last_name = fix_magic_quotes(
+                            order.purchaser_last_name
+                        )
                 if order.purchaser_city is None and "billing_city" in item:
-                    order.purchaser_city = fix_magic_quotes(item["billing_city"])
+                    order.purchaser_city = get_override_string_value_or_default(
+                        item["billing_city"]
+                    )
+                    if order.purchaser_city is not None:
+                        order.purchaser_city = fix_magic_quotes(order.purchaser_city)
                 if order.purchaser_state is None and "billing_state" in item:
-                    order.purchaser_state = fix_magic_quotes(item["billing_state"])
+                    order.purchaser_state = get_override_string_value_or_default(
+                        item["billing_state"]
+                    )
+                    if order.purchaser_state is not None:
+                        order.purchaser_state = fix_magic_quotes(order.purchaser_state)
                 if order.purchaser_zip_code is None and "billing_zip" in item:
-                    order.purchaser_zip_code = fix_magic_quotes(item["billing_zip"])
+                    order.purchaser_zip_code = get_override_string_value_or_default(
+                        item["billing_zip"]
+                    )
+                    if order.purchaser_zip_code is not None:
+                        order.purchaser_zip_code = fix_magic_quotes(
+                            order.purchaser_zip_code
+                        )
                 if order.purchaser_country is None and "billing_country" in item:
-                    order.purchaser_country = fix_magic_quotes(item["billing_country"])
+                    order.purchaser_country = get_override_string_value_or_default(
+                        item["billing_country"]
+                    )
+                    if order.purchaser_country is not None:
+                        order.purchaser_country = fix_magic_quotes(
+                            order.purchaser_country
+                        )
                 if order.purchaser_ip_address is None and "remoteAddr" in item:
-                    order.purchaser_ip_address = fix_magic_quotes(item["remoteAddr"])
+                    order.purchaser_ip_address = get_override_string_value_or_default(
+                        item["remoteAddr"]
+                    )
+                    if order.purchaser_ip_address is not None:
+                        order.purchaser_ip_address = fix_magic_quotes(
+                            order.purchaser_ip_address
+                        )
 
                 if order.email == "" and "email" in item:
-                    order.email = item["email"]
+                    order.email = get_override_string_value_or_default(
+                        item["email"], default=""
+                    )
 
                 # get shirt and phone data from questions
                 purchaser_questions: list = []
@@ -544,14 +650,20 @@ class TicketSocketService:
                     for question_item in questions:
                         question: str = ""
                         if "question" in question_item:
-                            question = str(question_item["question"]).lower()
+                            question = get_override_string_value_or_default(
+                                question_item["question"], default=""
+                            )
+                            if question != "":
+                                question = question.lower()
 
                         if question == "":
                             continue
 
                         answer: str = ""
                         if "answerText" in question_item:
-                            answer = str(question_item["answerText"])
+                            answer = get_override_string_value_or_default(
+                                question_item["answerText"], default=""
+                            )
 
                         if answer != "":
                             if question.find("phone") >= 0 and order.phone == "":
@@ -565,40 +677,58 @@ class TicketSocketService:
                 # create the ticket object
                 price: float = 0
                 if "price" in item:
-                    price = float(item["price"])
+                    price = get_override_float_value_or_default(item["price"])
 
                 ticket_id: int = 0
                 if "id" in item:
-                    ticket_id = int(item["id"])
+                    ticket_id = get_override_int_value_or_default(item["id"])
                 ticket_type: str = ""
                 if "ticketTypeName" in item:
-                    ticket_type = str(item["ticketTypeName"])
+                    ticket_type = get_override_string_value_or_default(
+                        item["ticketTypeName"], default=""
+                    )
                 service_fee: float = 0
                 if "fee1Amount" in item:
-                    service_fee = float(item["fee1Amount"])
+                    service_fee = get_override_float_value_or_default(
+                        item["fee1Amount"]
+                    )
                 ticket_type_id: int = 0
                 if "typeId" in item:
-                    ticket_type_id = int(item["typeId"])
+                    ticket_type_id = get_override_int_value_or_default(item["typeId"])
                 barcode: str = ""
                 if "barcode" in item:
-                    barcode = str(item["barcode"])
+                    barcode = get_override_string_value_or_default(
+                        item["barcode"], default=""
+                    )
                 available_scans: int = 0
                 if "availableScans" in item:
-                    available_scans = int(item["availableScans"])
+                    available_scans = get_override_int_value_or_default(
+                        item["availableScans"]
+                    )
                 purchase_location: str = ""
                 if "purchaseLocation" in item:
-                    purchase_location = str(item["purchaseLocation"])
+                    purchase_location = get_override_string_value_or_default(
+                        item["purchaseLocation"], default=""
+                    )
                 scanned_timestamp: int = 0
                 if "scannedTimestamp" in item:
-                    scanned_timestamp = int(item["scannedTimestamp"])
+                    scanned_timestamp = get_override_int_value_or_default(
+                        item["scannedTimestamp"]
+                    )
                 attendee_first_name: str = ""
                 if "partyMember" in item:
-                    attendee_first_name = fix_magic_quotes(str(item["partyMember"]))
+                    attendee_first_name = get_override_string_value_or_default(
+                        str(item["partyMember"]), default=""
+                    )
+                    if attendee_first_name != "":
+                        attendee_first_name = fix_magic_quotes(attendee_first_name)
                 attendee_last_name: str = ""
                 if "partyMemberLastName" in item:
-                    attendee_last_name = fix_magic_quotes(
-                        str(item["partyMemberLastName"])
+                    attendee_last_name = get_override_string_value_or_default(
+                        str(item["partyMemberLastName"]), default=""
                     )
+                    if attendee_last_name != "":
+                        attendee_last_name = fix_magic_quotes(attendee_last_name)
 
                 if ticket_id == 0 or ticket_type == "":
                     continue
@@ -617,20 +747,21 @@ class TicketSocketService:
                 ticket.attendee_last_name = attendee_last_name
                 if shirt_size is not None:
                     shirt_size = shirt_size.strip()
-                    if shirt_size.lower() == "3xl":
-                        shirt_size = "XXXL"
-                    elif shirt_size.lower() == "2xl":
-                        shirt_size = "XXL"
-                    elif shirt_size.lower() == "extra large":
-                        shirt_size = "XL"
-                    elif shirt_size.lower() == "large":
-                        shirt_size = "L"
-                    elif shirt_size.lower() == "medium":
-                        shirt_size = "M"
-                    elif shirt_size.lower() == "small":
-                        shirt_size = "S"
-                    elif shirt_size.lower() == "extra small":
-                        shirt_size = "XS"
+                    if len(shirt_size) > 0:
+                        if shirt_size.lower() == "3xl":
+                            shirt_size = "XXXL"
+                        elif shirt_size.lower() == "2xl":
+                            shirt_size = "XXL"
+                        elif shirt_size.lower() == "extra large":
+                            shirt_size = "XL"
+                        elif shirt_size.lower() == "large":
+                            shirt_size = "L"
+                        elif shirt_size.lower() == "medium":
+                            shirt_size = "M"
+                        elif shirt_size.lower() == "small":
+                            shirt_size = "S"
+                        elif shirt_size.lower() == "extra small":
+                            shirt_size = "XS"
                 ticket.shirt_size = shirt_size
                 order_tickets.append(ticket)
 
@@ -647,7 +778,7 @@ def get_all_accounts():
     sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
     rows = db_query_all(sql)
     for row in rows:
-        ticket_socket_id = int(row["TicketSocketId"])
+        ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
         account = TicketSocketService(ticket_socket_id)
         accounts.append(account)
     return accounts

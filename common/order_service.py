@@ -14,7 +14,13 @@ from common.db import (
 from common.daily_order_service import DailyOrderService
 from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller
 from common.models.ticket_socket import TicketSocketTicketType
-from common.utility import get_override_int_value_or_default
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
+)
 
 
 class OrderService:
@@ -125,7 +131,7 @@ class OrderService:
         data = {}
 
         where_clause: list[str] = []
-        if ts_order_id is not None:
+        if ts_order_id is not None and ts_order_id > 0:
             where_clause.append("TicketSocketOrders.Id = %(order_id)s")
             data["order_id"] = ts_order_id
         else:
@@ -164,7 +170,7 @@ class OrderService:
                 where_clause.append(both_dates_sql)
                 data["startDate"] = midnight_start
                 data["endDate"] = midnight_end
-            elif end is not None:
+            elif end is not None and end > datetime.now().timestamp():
                 where_clause.append(start_date_sql)
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
                 data["endDate"] = midnight_end
@@ -186,94 +192,70 @@ class OrderService:
 
         order_rows = db_query_all(sql, data)
         for row in order_rows:
-            order_id = int(row["OrderId"])
-            event_id = int(row["EventId"])
-            ticket_socket_order_id = int(row["Id"])
+            order_id = get_override_int_value_or_default(row["OrderId"])
+            event_id = get_override_int_value_or_default(row["EventId"])
+            ticket_socket_order_id = get_override_int_value_or_default(row["Id"])
             order = VipOrder()
             order.order_id = order_id
             order.event_id = event_id
-            order.event_title = (
-                str(row["EventTitle"]) if row["EventTitle"] is not None else None
+            order.event_title = get_override_string_value_or_default(row["EventTitle"])
+            order.venue = get_override_string_value_or_default(row["Venue"])
+            order.event_address = get_override_string_value_or_default(
+                row["EventAddress"]
             )
-            order.venue = str(row["Venue"]) if row["Venue"] is not None else None
-            order.event_address = (
-                str(row["EventAddress"]) if row["EventAddress"] is not None else None
+            order.event_city = get_override_string_value_or_default(row["EventCity"])
+            order.event_state = get_override_string_value_or_default(row["EventState"])
+            order.event_zip = get_override_string_value_or_default(row["EventZip"])
+            order.event_country = get_override_string_value_or_default(
+                row["EventCountry"]
             )
-            order.event_city = (
-                str(row["EventCity"]) if row["EventCity"] is not None else None
+            order.event_date = get_override_string_value_or_default(row["EventDate"])
+            order.seller_name = get_override_string_value_or_default(row["SellerName"])
+            order.seller_id = get_override_int_value_or_default(row["SellerId"])
+            order.ticket_socket_event_id = get_override_int_value_or_default(
+                row["TicketSocketEventId"]
             )
-            order.event_state = (
-                str(row["EventState"]) if row["EventState"] is not None else None
-            )
-            order.event_zip = (
-                str(row["EventZip"]) if row["EventZip"] is not None else None
-            )
-            order.event_country = (
-                str(row["EventCountry"]) if row["EventCountry"] is not None else None
-            )
-            order.event_date = (
-                str(row["EventDate"]) if row["EventDate"] is not None else None
-            )
-            order.seller_name = (
-                str(row["SellerName"]) if row["SellerName"] is not None else None
-            )
-            order.seller_id = int(row["SellerId"])
-            order.ticket_socket_event_id = int(row["TicketSocketEventId"])
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.purchase_date = (
-                str(row["PurchaseDate"]) if row["PurchaseDate"] is not None else None
+            order.purchase_date = get_override_string_value_or_default(
+                row["PurchaseDate"]
             )
-            order.purchase_timestamp = (
-                str(row["PurchaseTimestamp"])
-                if row["PurchaseTimestamp"] is not None
-                else None
+            order.purchase_timestamp = get_override_string_value_or_default(
+                row["PurchaseTimestamp"]
             )
-            order.user_id = int(row["UserId"])
-            order.phone = str(row["Phone"]) if row["Phone"] is not None else None
-            order.email = str(row["Email"]) if row["Email"] is not None else None
-            order.purchaser_last_name = (
-                str(row["PurchaserLastName"])
-                if row["PurchaserLastName"] is not None
-                else None
+            order.user_id = get_override_int_value_or_default(row["UserId"])
+            order.phone = get_override_string_value_or_default(row["Phone"])
+            order.email = get_override_string_value_or_default(row["Email"])
+            order.purchaser_last_name = get_override_string_value_or_default(
+                row["PurchaserLastName"]
             )
-            order.purchaser_first_name = (
-                str(row["PurchaserFirstName"])
-                if row["PurchaserFirstName"] is not None
-                else None
+            order.purchaser_first_name = get_override_string_value_or_default(
+                row["PurchaserFirstName"]
             )
-            order.purchaser_city = (
-                str(row["PurchaserCity"]) if row["PurchaserCity"] is not None else None
+            order.purchaser_city = get_override_string_value_or_default(
+                row["PurchaserCity"]
             )
-            order.purchaser_state = (
-                str(row["PurchaserState"])
-                if row["PurchaserState"] is not None
-                else None
+            order.purchaser_state = get_override_string_value_or_default(
+                row["PurchaserState"]
             )
-            order.purchaser_zip_code = (
-                str(row["PurchaserZip"]) if row["PurchaserZip"] is not None else None
+            order.purchaser_zip_code = get_override_string_value_or_default(
+                row["PurchaserZip"]
             )
-            order.purchaser_country = (
-                str(row["PurchaserCountry"])
-                if row["PurchaserCountry"] is not None
-                else None
+            order.purchaser_country = get_override_string_value_or_default(
+                row["PurchaserCountry"]
             )
-            order.purchaser_ip_address = (
-                str(row["PurchaserIpAddress"])
-                if row["PurchaserIpAddress"] is not None
-                else None
+            order.purchaser_ip_address = get_override_string_value_or_default(
+                row["PurchaserIpAddress"]
             )
-            order.exchange_rate = float(row["ExchangeRate"])
-            order.currency_abbrev = (
-                str(row["CurrencyAbbrev"])
-                if row["CurrencyAbbrev"] is not None
-                else None
+            order.exchange_rate = get_override_float_value_or_default(
+                row["ExchangeRate"]
             )
-            order.currency_symbol = (
-                str(row["Symbol"]) if row["Symbol"] is not None else None
+            order.currency_abbrev = get_override_string_value_or_default(
+                row["CurrencyAbbrev"]
             )
-            order.is_active = True if int(row["IsActive"]) == 1 else False
-            order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
-            order.is_comped = True if int(row["IsComped"]) == 1 else False
+            order.currency_symbol = get_override_string_value_or_default(row["Symbol"])
+            order.is_active = get_override_bool_value_or_default(row["IsActive"])
+            order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
+            order.is_comped = get_override_bool_value_or_default(row["IsComped"])
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -335,95 +317,68 @@ class OrderService:
 
         rows = db_query_all(sql, data)
         for row in rows:
-            order_id = int(row["OrderId"])
-            event_id = int(row["EventId"])
-            ticket_socket_order_id = int(row["Id"])
+            order_id = get_override_int_value_or_default(row["OrderId"])
+            event_id = get_override_int_value_or_default(row["EventId"])
+            ticket_socket_order_id = get_override_int_value_or_default(row["Id"])
             order = VipOrder()
             order.order_id = order_id
             order.event_id = event_id
-            order.venue = str(row["Venue"]) if row["Venue"] is not None else None
-            order.event_title = (
-                str(row["EventTitle"]) if row["EventTitle"] is not None else None
+            order.venue = get_override_string_value_or_default(row["Venue"])
+            order.event_title = get_override_string_value_or_default(row["EventTitle"])
+            order.event_address = get_override_string_value_or_default(
+                row["EventAddress"]
             )
-            order.event_address = (
-                str(row["EventAddress"]) if row["EventAddress"] is not None else None
+            order.event_city = get_override_string_value_or_default(row["EventCity"])
+            order.event_state = get_override_string_value_or_default(row["EventState"])
+            order.event_zip = get_override_string_value_or_default(row["EventZip"])
+            order.event_country = get_override_string_value_or_default(
+                row["EventCountry"]
             )
-            order.event_city = (
-                str(row["EventCity"]) if row["EventCity"] is not None else None
-            )
-            order.event_state = (
-                str(row["EventState"]) if row["EventState"] is not None else None
-            )
-            order.event_zip = (
-                str(row["EventZip"]) if row["EventZip"] is not None else None
-            )
-            order.event_country = (
-                str(row["EventCountry"]) if row["EventCountry"] is not None else None
-            )
-            order.event_date = (
-                str(row["EventDate"]) if row["EventDate"] is not None else None
-            )
-            order.seller_name = (
-                str(row["SellerName"]) if row["SellerName"] is not None else None
-            )
-            order.seller_id = int(row["SellerId"])
+            order.event_date = get_override_string_value_or_default(row["EventDate"])
+            order.seller_name = get_override_string_value_or_default(row["SellerName"])
+            order.seller_id = get_override_int_value_or_default(row["SellerId"])
             order.ticket_socket_event_id = ticket_socket_event_id
             order.ticket_socket_order_id = ticket_socket_order_id
-            order.purchase_date = (
-                str(row["PurchaseDate"]) if row["PurchaseDate"] is not None else None
+            order.purchase_date = get_override_string_value_or_default(
+                row["PurchaseDate"]
             )
-            order.purchase_timestamp = (
-                str(row["PurchaseTimestamp"])
-                if row["PurchaseTimestamp"] is not None
-                else None
+            order.purchase_timestamp = get_override_string_value_or_default(
+                row["PurchaseTimestamp"]
             )
-            order.user_id = int(row["UserId"])
-            order.phone = str(row["Phone"]) if row["Phone"] is not None else None
-            order.email = str(row["Email"]) if row["Email"] is not None else None
-            order.purchaser_last_name = (
-                str(row["PurchaserLastName"])
-                if row["PurchaserLastName"] is not None
-                else None
+            order.user_id = get_override_int_value_or_default(row["UserId"])
+            order.phone = get_override_string_value_or_default(row["Phone"])
+            order.email = get_override_string_value_or_default(row["Email"])
+            order.purchaser_last_name = get_override_string_value_or_default(
+                row["PurchaserLastName"]
             )
-            order.purchaser_first_name = (
-                str(row["PurchaserFirstName"])
-                if row["PurchaserFirstName"] is not None
-                else None
+            order.purchaser_first_name = get_override_string_value_or_default(
+                row["PurchaserFirstName"]
             )
-            order.purchaser_city = (
-                str(row["PurchaserCity"]) if row["PurchaserCity"] is not None else None
+            order.purchaser_city = get_override_string_value_or_default(
+                row["PurchaserCity"]
             )
-            order.purchaser_state = (
-                str(row["PurchaserState"])
-                if row["PurchaserState"] is not None
-                else None
+            order.purchaser_state = get_override_string_value_or_default(
+                row["PurchaserState"]
             )
-            order.purchaser_zip_code = (
-                str(row["PurchaserZip"]) if row["PurchaserZip"] is not None else None
+            order.purchaser_zip_code = get_override_string_value_or_default(
+                row["PurchaserZip"]
             )
-            order.purchaser_country = (
-                str(row["PurchaserCountry"])
-                if row["PurchaserCountry"] is not None
-                else None
+            order.purchaser_country = get_override_string_value_or_default(
+                row["PurchaserCountry"]
             )
-            order.purchaser_ip_address = (
-                str(row["PurchaserIpAddress"])
-                if row["PurchaserIpAddress"] is not None
-                else None
+            order.purchaser_ip_address = get_override_string_value_or_default(
+                row["PurchaserIpAddress"]
             )
-
-            order.exchange_rate = float(row["ExchangeRate"])
-            order.currency_abbrev = (
-                str(row["CurrencyAbbrev"])
-                if row["CurrencyAbbrev"] is not None
-                else None
+            order.exchange_rate = get_override_float_value_or_default(
+                row["ExchangeRate"]
             )
-            order.currency_symbol = (
-                str(row["Symbol"]) if row["Symbol"] is not None else None
+            order.currency_abbrev = get_override_string_value_or_default(
+                row["CurrencyAbbrev"]
             )
-            order.is_active = True if int(row["IsActive"]) == 1 else False
-            order.is_deleted = True if int(row["IsDeleted"]) == 1 else False
-            order.is_comped = True if int(row["IsComped"]) == 1 else False
+            order.currency_symbol = get_override_string_value_or_default(row["Symbol"])
+            order.is_active = get_override_bool_value_or_default(row["IsActive"])
+            order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
+            order.is_comped = get_override_bool_value_or_default(row["IsComped"])
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -468,9 +423,13 @@ class OrderService:
         event_data = {"ticket_socket_order_id": order_id}
         event_row = db_query_one(event_sql, event_data)
         if event_row:
-            event_id: int = event_row["TicketSocketEventId"]
-            event_year: int = event_row["EventYear"]
-            event_seller_id: int = event_row["SellerId"]
+            event_id: int = get_override_int_value_or_default(
+                event_row["TicketSocketEventId"]
+            )
+            event_year: int = get_override_int_value_or_default(event_row["EventYear"])
+            event_seller_id: int = get_override_int_value_or_default(
+                event_row["SellerId"]
+            )
 
             start = datetime.strptime(
                 f"{event_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
@@ -499,73 +458,61 @@ class OrderService:
 
         rows = db_query_all(sql, data)
         for row in rows:
-            ticket_id: int = 0
-            if row["TicketId"] is not None and row["TicketId"] != "":
-                ticket_id = int(row["TicketId"])
+            ticket_id: int = get_override_int_value_or_default(row["TicketId"])
             ticket = VipTicket()
             ticket.ticket_id = ticket_id
-            ticket.is_active = True if int(row["IsActive"]) == 1 else False
-            ticket.ticket_type = (
-                str(row["TicketType"]) if row["TicketType"] is not None else None
+            ticket.is_active = get_override_bool_value_or_default(row["IsActive"])
+            ticket.ticket_type = get_override_string_value_or_default(row["TicketType"])
+            ticket.price = get_override_float_value_or_default(row["Price"])
+            ticket.service_fee = get_override_float_value_or_default(row["ServiceFee"])
+            ticket.ticket_type_id = get_override_int_value_or_default(
+                row["TicketSocketTicketTypeId"]
             )
-            ticket.price = float(row["Price"])
-            ticket.service_fee = float(row["ServiceFee"])
-            ticket.ticket_type_id = int(row["TicketSocketTicketTypeId"])
-            ticket.barcode = str(row["BarCode"]) if row["BarCode"] is not None else None
-            ticket.available_scans = int(row["AvailableScans"])
-            ticket.purchase_location = (
-                str(row["PurchaseLocation"])
-                if row["PurchaseLocation"] is not None
-                else None
+            ticket.barcode = get_override_string_value_or_default(row["BarCode"])
+            ticket.available_scans = get_override_int_value_or_default(
+                row["AvailableScans"]
             )
-            ticket.scanned_timestamp = int(row["ScannedTimestamp"])
-            ticket.attendee_first_name = (
-                str(row["AttendeeFirstName"])
-                if row["AttendeeFirstName"] is not None
-                else None
+            ticket.purchase_location = get_override_string_value_or_default(
+                row["PurchaseLocation"]
             )
-            ticket.attendee_last_name = (
-                str(row["AttendeeLastName"])
-                if row["AttendeeLastName"] is not None
-                else None
+            ticket.scanned_timestamp = get_override_int_value_or_default(
+                row["ScannedTimestamp"]
             )
-            ticket.last_update = (
-                str(row["LastUpdate"]) if row["LastUpdate"] is not None else None
+            ticket.attendee_first_name = get_override_string_value_or_default(
+                row["AttendeeFirstName"]
             )
-            ticket.attendee_phone = (
-                str(row["AttendeePhone"]) if row["AttendeePhone"] is not None else None
+            ticket.attendee_last_name = get_override_string_value_or_default(
+                row["AttendeeLastName"]
             )
-            ticket.attendee_email = (
-                str(row["AttendeeEmail"]) if row["AttendeeEmail"] is not None else None
+            ticket.last_update = get_override_string_value_or_default(row["LastUpdate"])
+            ticket.attendee_phone = get_override_string_value_or_default(
+                row["AttendeePhone"]
             )
-            ticket.shirt_size = (
-                str(row["ShirtSize"]) if row["ShirtSize"] is not None else None
+            ticket.attendee_email = get_override_string_value_or_default(
+                row["AttendeeEmail"]
             )
+            ticket.shirt_size = get_override_string_value_or_default(row["ShirtSize"])
             ticket.ticket_socket_order_id = ticket_socket_order_id
-            ticket.ticket_socket_order_ticket_id = int(row["Id"])
-            is_refunded: bool = True if int(row["IsRefunded"]) == 1 else False
-            ticket.is_service_fee_refunded = (
-                True if int(row["IsServiceFeeRefunded"]) == 1 else False
+            ticket.ticket_socket_order_ticket_id = get_override_int_value_or_default(
+                row["Id"]
+            )
+            is_refunded: bool = get_override_bool_value_or_default(row["IsRefunded"])
+            ticket.is_service_fee_refunded = get_override_bool_value_or_default(
+                row["IsServiceFeeRefunded"]
             )
             ticket.is_refunded = is_refunded
-            ticket.refund_date = (
-                str(row["RefundDate"])
-                if (is_refunded is True and row["RefundDate"] is not None)
-                else None
-            )
-            is_checked_in = True if int(row["IsCheckedIn"]) == 1 else False
+            ticket.refund_date = get_override_string_value_or_default(row["RefundDate"])
+            is_checked_in = get_override_bool_value_or_default(row["IsCheckedIn"])
             ticket.is_checked_in = is_checked_in
-            ticket.checked_in_date = (
-                str(row["CheckedInDate"])
-                if (is_checked_in is True and row["CheckedInDate"] is not None)
-                else None
+            ticket.checked_in_date = get_override_string_value_or_default(
+                row["CheckedInDate"]
             )
-            is_charged_back: bool = True if int(row["IsChargedBack"]) == 1 else False
+            is_charged_back: bool = get_override_bool_value_or_default(
+                row["IsChargedBack"]
+            )
             ticket.is_charged_back = is_charged_back
-            ticket.chargeback_date = (
-                str(row["ChargebackDate"])
-                if (is_charged_back is True and row["ChargebackDate"] is not None)
-                else None
+            ticket.chargeback_date = get_override_string_value_or_default(
+                row["ChargebackDate"]
             )
             tickets.append(ticket)
         return tickets
@@ -582,7 +529,9 @@ class OrderService:
                         WHERE Id=%(ticket_socket_order_id)s"""
             data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
-                "is_active": 0 if disabled is True else 1,
+                "is_active": get_override_tinyint_value_or_default_from_bool(
+                    not disabled
+                ),
             }
             success = db_update(sql, data)
             if success is False:
@@ -603,7 +552,7 @@ class OrderService:
                         WHERE Id=%(ticket_socket_order_id)s"""
             data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
-                "isDeleted": 1 if deleted is True else 0,
+                "isDeleted": get_override_tinyint_value_or_default_from_bool(deleted),
             }
             success = db_update(sql, data)
             if success is False:
@@ -627,7 +576,9 @@ class OrderService:
                         WHERE Id=%(ticket_socket_order_ticket_id)s"""
             data = {
                 "ticket_socket_order_ticket_id": ticket_socket_order_ticket_id,
-                "checkedIn": 1 if checked_in is True else 0,
+                "checkedIn": get_override_tinyint_value_or_default_from_bool(
+                    checked_in
+                ),
                 "checkedInDate": (
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     if checked_in is True
@@ -696,10 +647,13 @@ class OrderService:
         Update single order from admin
         """
         success: bool = True
-        if order_to_update is None or order_to_update.ticket_socket_order_id <= 0:
+        ticket_socket_order_id: int = get_override_int_value_or_default(
+            order_to_update.ticket_socket_order_id
+        )
+
+        if order_to_update is None or ticket_socket_order_id <= 0:
             return False
 
-        ticket_socket_order_id: int = order_to_update.ticket_socket_order_id
         sql = """SELECT * FROM TicketSocketOrders WHERE Id=%(ticket_socket_order_id)s"""
         data = {"ticket_socket_order_id": ticket_socket_order_id}
         existing_order: VipOrder = db_query_one(sql, data)
@@ -713,25 +667,51 @@ class OrderService:
                              WHERE Id=%(ticket_socket_order_id)s"""
             update_data = {
                 "ticket_socket_order_id": ticket_socket_order_id,
-                "is_active": 1 if order_to_update.is_active is True else 0,
-                "isDeleted": 1 if order_to_update.is_deleted is True else 0,
-                "isComped": 1 if order_to_update.is_comped is True else 0,
+                "is_active": get_override_tinyint_value_or_default_from_bool(
+                    order_to_update.is_active
+                ),
+                "isDeleted": get_override_tinyint_value_or_default_from_bool(
+                    order_to_update.is_deleted
+                ),
+                "isComped": get_override_tinyint_value_or_default_from_bool(
+                    order_to_update.is_comped
+                ),
             }
             success = db_update(update_sql, update_data)
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
                 for ticket in order_to_update.tickets:
                     order_ticket_data = {
-                        "ticketId": ticket.ticket_socket_order_ticket_id,
-                        "ticket_socket_order_id": ticket.ticket_socket_order_id,
-                        "price": ticket.price,
-                        "serviceFee": ticket.service_fee,
-                        "is_checked_in": 1 if ticket.is_checked_in is True else 0,
-                        "attendeeFirstName": ticket.attendee_first_name,
-                        "attendeeLastName": ticket.attendee_last_name,
-                        "attendeeEmail": ticket.attendee_email,
-                        "attendeePhone": ticket.attendee_phone,
-                        "shirtSize": ticket.shirt_size,
-                        "isActive": ticket.is_active,
+                        "ticketId": get_override_int_value_or_default(
+                            ticket.ticket_socket_order_ticket_id
+                        ),
+                        "ticket_socket_order_id": get_override_int_value_or_default(
+                            ticket.ticket_socket_order_id
+                        ),
+                        "price": get_override_float_value_or_default(ticket.price),
+                        "serviceFee": get_override_float_value_or_default(
+                            ticket.service_fee
+                        ),
+                        "is_checked_in": get_override_tinyint_value_or_default_from_bool(
+                            ticket.is_checked_in
+                        ),
+                        "attendeeFirstName": get_override_string_value_or_default(
+                            ticket.attendee_first_name
+                        ),
+                        "attendeeLastName": get_override_string_value_or_default(
+                            ticket.attendee_last_name
+                        ),
+                        "attendeeEmail": get_override_string_value_or_default(
+                            ticket.attendee_email
+                        ),
+                        "attendeePhone": get_override_string_value_or_default(
+                            ticket.attendee_phone
+                        ),
+                        "shirtSize": get_override_string_value_or_default(
+                            ticket.shirt_size
+                        ),
+                        "isActive": get_override_tinyint_value_or_default_from_bool(
+                            ticket.is_active
+                        ),
                     }
 
                     order_ticket_sql = """UPDATE TicketSocketOrderTickets
@@ -746,10 +726,14 @@ class OrderService:
                                             ShirtSize=%(shirtSize)s,"""
 
                     if ticket.is_refunded is True:
-                        order_ticket_data["refundDate"] = ticket.refund_date
+                        order_ticket_data["refundDate"] = (
+                            get_override_string_value_or_default(ticket.refund_date)
+                        )
                         order_ticket_sql += """ RefundDate=%(refundDate)s,"""
                     elif ticket.is_charged_back is True:
-                        order_ticket_data["chargebackDate"] = ticket.chargeback_date
+                        order_ticket_data["chargebackDate"] = (
+                            get_override_string_value_or_default(ticket.chargeback_date)
+                        )
                         order_ticket_sql += """ ChargebackDate=%(chargebackDate)s,"""
 
                     order_ticket_sql += """

@@ -6,6 +6,10 @@ from datetime import datetime
 
 from common.models.user import UserActivity
 from common.db import db_query_all, db_update
+from common.utility import (
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 
 
 class UserActivityService:
@@ -20,7 +24,7 @@ class UserActivityService:
         """
         sql = ""
         data = {"userId": user_id, "activityId": activity_id}
-        if len(activity_data) > 0:
+        if activity_data is not None and len(activity_data) > 0:
             sql = """INSERT INTO UserActivity
                         (UserId, ActivityId, ActivityData, Timestamp)
                          VALUES (%(userId)s, %(activityId)s, %(activityData)s,
@@ -112,14 +116,14 @@ class UserActivityService:
 
         rows = db_query_all(sql, data)
         for row in rows:
-            activity_user_id = int(row["UserId"])
-            activity_type = int(row["ActivityId"])
-            activity_name = str(row["ActivityName"])
-            username = str(row["Username"])
-            activity_data = str(row["ActivityData"])
-            activity_time = str(row["Timestamp"])
-            full_name = str(row["UserFullName"])
-            seller_name = str(row["SellerName"])
+            activity_user_id = get_override_int_value_or_default(row["UserId"])
+            activity_type = get_override_int_value_or_default(row["ActivityId"])
+            activity_name = get_override_string_value_or_default(row["ActivityName"])
+            username = get_override_string_value_or_default(row["Username"])
+            activity_data = get_override_string_value_or_default(row["ActivityData"])
+            activity_time = get_override_string_value_or_default(row["Timestamp"])
+            full_name = get_override_string_value_or_default(row["UserFullName"])
+            seller_name = get_override_string_value_or_default(row["SellerName"])
             activity = UserActivity(
                 activity_user_id,
                 activity_type,

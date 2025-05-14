@@ -16,6 +16,7 @@ from common.utility import (
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
 )
 
 
@@ -119,7 +120,7 @@ class PageService:
             page_seller.page_seller_id = page_seller_id
             page_seller.page_id = page_id
 
-            seller_name = str(row["SellerName"])
+            seller_name = get_override_string_value_or_default(row["SellerName"])
             show_display_name = get_override_bool_value_or_default(
                 row["ShowDisplayName"]
             )
@@ -135,61 +136,104 @@ class PageService:
             else:
                 page_seller.display_name = display_name
 
-            default_address = row["Address"] if is_public is True else None
+            default_address: str = None
+            if is_public is True:
+                default_address = get_override_string_value_or_default(row["Address"])
             page_seller.address = get_override_string_value_or_default(
                 row["AddressOverride"], default_address
             )
-            default_city = row["City"] if is_public is True else None
+
+            default_city: str = None
+            if is_public is True:
+                default_city = get_override_string_value_or_default(row["City"])
             page_seller.city = get_override_string_value_or_default(
                 row["CityOverride"], default_city
             )
-            default_state = row["State"] if is_public is True else None
+
+            default_state: str = None
+            if is_public is True:
+                default_state = get_override_string_value_or_default(row["State"])
             page_seller.state = get_override_string_value_or_default(
                 row["StateOverride"], default_state
             )
-            default_zip = row["Zip"] if is_public is True else None
+
+            default_zip: str = None
+            if is_public is True:
+                default_zip = get_override_string_value_or_default(row["Zip"])
             page_seller.zip = get_override_string_value_or_default(
                 row["ZipOverride"], default_zip
             )
-            default_country = row["Country"] if is_public is True else None
+
+            default_country: str = None
+            if is_public is True:
+                default_country = get_override_string_value_or_default(row["Country"])
             page_seller.country = get_override_string_value_or_default(
                 row["CountryOverride"], default_country
             )
-            default_address = row["Address"] if is_public is True else None
+
+            default_address: str = None
+            if is_public is True:
+                default_address = get_override_string_value_or_default(row["Address"])
             page_seller.phone = get_override_string_value_or_default(
                 row["PhoneOverride"], row["Phone"]
             )
-            default_email = row["Email"] if is_public is True else None
+
+            default_email: str = None
+            if is_public is True:
+                default_email = get_override_string_value_or_default(row["Email"])
             page_seller.email = get_override_string_value_or_default(
                 row["EmailOverride"], default_email
             )
-            default_twitter = row["Twitter"] if is_public is True else None
+
+            default_twitter: str = None
+            if is_public is True:
+                default_twitter = get_override_string_value_or_default(row["Twitter"])
             page_seller.twitter = get_override_string_value_or_default(
                 row["TwitterOverride"], default_twitter
             )
-            default_facebook = row["Facebook"] if is_public is True else None
+
+            default_facebook: str = None
+            if is_public is True:
+                default_facebook = get_override_string_value_or_default(row["Facebook"])
             page_seller.facebook = get_override_string_value_or_default(
                 row["FacebookOverride"], default_facebook
             )
-            default_instagram = row["Instagram"] if is_public is True else None
+
+            default_instagram: str = None
+            if is_public is True:
+                default_instagram = get_override_string_value_or_default(
+                    row["Instagram"]
+                )
             page_seller.instagram = get_override_string_value_or_default(
                 row["InstagramOverride"], default_instagram
             )
-            default_youtube = row["YouTube"] if is_public is True else None
+
+            default_youtube: str = None
+            if is_public is True:
+                default_youtube = get_override_string_value_or_default(row["YouTube"])
             page_seller.youtube = get_override_string_value_or_default(
                 row["YouTubeOverride"], default_youtube
             )
-            default_spotify = row["Spotify"] if is_public is True else None
+
+            default_spotify: str = None
+            if is_public is True:
+                default_spotify = get_override_string_value_or_default(row["Spotify"])
             page_seller.spotify = get_override_string_value_or_default(
                 row["SpotifyOverride"], default_spotify
             )
-            default_website = row["Website"] if is_public is True else None
+
+            default_website: str = None
+            if is_public is True:
+                default_website = get_override_string_value_or_default(row["Website"])
             page_seller.website = get_override_string_value_or_default(
                 row["WebsiteOverride"], default_website
             )
-            default_website_display_text = (
-                row["WebsiteDisplayText"] if is_public is True else None
-            )
+
+            default_website_display_text: str = None
+            if is_public is True:
+                default_website_display_text = get_override_string_value_or_default(
+                    row["WebsiteDisplayText"]
+                )
             page_seller.website_display_text = get_override_string_value_or_default(
                 row["WebsiteDisplayTextOverride"], default_website_display_text
             )
@@ -226,7 +270,9 @@ class PageService:
             "title2": get_override_string_value_or_default(page_to_update.title2),
             "subtitle2": get_override_string_value_or_default(page_to_update.subtitle2),
             "htmlText": get_override_string_value_or_default(page_to_update.html_text),
-            "inactive": 1 if page_to_update.is_active is False else 0,
+            "inactive": get_override_tinyint_value_or_default_from_bool(
+                not page_to_update.is_active
+            ),
             "includeStart": get_override_string_value_or_default(
                 page_to_update.include_start
             ),
@@ -315,13 +361,15 @@ class PageService:
                                 LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                 WHERE PageSellerId=%(pageSellerId)s"""
                             update_data = {
-                                "sellerId": seller.seller_id,
+                                "sellerId": get_override_int_value_or_default(
+                                    seller.seller_id
+                                ),
                                 "pageId": page_id,
                                 "displayName": get_override_string_value_or_default(
                                     seller.display_name
                                 ),
-                                "showDisplayName": (
-                                    1 if seller.show_display_name is True else 0
+                                "showDisplayName": get_override_tinyint_value_or_default_from_bool(
+                                    seller.show_display_name
                                 ),
                                 "address": get_override_string_value_or_default(
                                     seller.address
@@ -363,14 +411,20 @@ class PageService:
                                 "websiteDisplayText": get_override_string_value_or_default(
                                     seller.website_display_text
                                 ),
-                                "pageSellerId": found_seller.page_seller_id,
+                                "pageSellerId": get_override_int_value_or_default(
+                                    found_seller.page_seller_id
+                                ),
                             }
                             success = db_update(update_sql, update_data)
                             sellers_updated = success
                         else:
                             delete_sql = """DELETE FROM PageSellers
                                 WHERE PageSellerId=%(pageSellerId)s"""
-                            delete_data = {"pageSellerId": found_seller.page_seller_id}
+                            delete_data = {
+                                "pageSellerId": get_override_int_value_or_default(
+                                    found_seller.page_seller_id
+                                )
+                            }
                             success = db_delete(delete_sql, delete_data)
                             sellers_updated = success
                 elif seller.seller_id > 0:
@@ -384,13 +438,13 @@ class PageService:
                         %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, %(spotify)s, %(website)s,
                         %(websiteDisplayText)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                     insert_data = {
-                        "sellerId": seller.seller_id,
+                        "sellerId": get_override_int_value_or_default(seller.seller_id),
                         "pageId": page_id,
                         "displayName": get_override_string_value_or_default(
                             seller.display_name
                         ),
-                        "showDisplayName": (
-                            1 if seller.show_display_name is True else 0
+                        "showDisplayName": get_override_tinyint_value_or_default_from_bool(
+                            seller.show_display_name
                         ),
                         "address": get_override_string_value_or_default(seller.address),
                         "city": get_override_string_value_or_default(seller.city),
@@ -485,16 +539,23 @@ class PageService:
         """
         sql = "SELECT * FROM PageType ORDER BY PageType ASC"
         rows = db_query_all(sql)
-        
+
         page_types: list[PageType] = []
-        
+
         for row in rows:
             page_type = PageType()
-            page_type.page_type_id = get_override_int_value_or_default(row["PageTypeID"])
-            page_type.page_type_name = get_override_string_value_or_default(row["PageType"])
-            page_type.page_type_template = get_override_string_value_or_default(row["Template"])
-            page_type.page_type_component = get_override_string_value_or_default(row["Component"])
+            page_type.page_type_id = get_override_int_value_or_default(
+                row["PageTypeID"]
+            )
+            page_type.page_type_name = get_override_string_value_or_default(
+                row["PageType"]
+            )
+            page_type.page_type_template = get_override_string_value_or_default(
+                row["Template"]
+            )
+            page_type.page_type_component = get_override_string_value_or_default(
+                row["Component"]
+            )
             page_types.append(page_type)
-            
+
         return page_types
-            

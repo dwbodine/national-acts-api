@@ -14,7 +14,11 @@ from common.common_api import get_user_from_jwt
 from common.seller_service import SellerService
 from common.user_activity_service import UserActivityService
 from common.user_service import UserService
-from common.utility import convert_to_json
+from common.utility import (
+    convert_to_json,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 from common.models.user import User
 
 user_api = Blueprint("user_api", __name__)
@@ -41,15 +45,18 @@ def log_user_activity():
     """
     success: bool = False
     user = get_user_from_jwt()
-    activity_type = request.json.get("activityType")
+    activity_type = get_override_int_value_or_default(
+        request.json.get("activityType"), default=None
+    )
 
-    if user is not None and activity_type is not None:
+    if user is not None and activity_type is not None and activity_type > 0:
         user_id = user.user_id
-        activity_data = request.json.get("activityData")
+        activity_data = get_override_string_value_or_default(
+            request.json.get("activityData"), default=""
+        )
 
         service = UserActivityService()
-        data: str = str(activity_data) if activity_data is not None else ""
-        success = service.log_user_activity(user_id, int(activity_type), data)
+        success = service.log_user_activity(user_id, activity_type, activity_data)
     return convert_to_json(success)
 
 
@@ -59,14 +66,14 @@ def create_token():
     API to log in user and create token
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    username = request.json.get("username", None)
-    password = request.json.get("password", None)
+    username = get_override_string_value_or_default(request.json.get("username", None))
+    password = get_override_string_value_or_default(request.json.get("password", None))
 
     if username is None or password is None:
         return {"msg", "Bad request"}, 400
@@ -120,19 +127,23 @@ def register():
     API method to register new user
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    username = request.json.get("username", None)
-    first_name = request.json.get("firstName", None)
-    last_name = request.json.get("lastName", None)
-    seller_id = request.json.get("sellerId", None)
-    password = request.json.get("password", None)
-    confirm_password = request.json.get("confirmPassword", None)
-    notes = request.json.get("notes", None)
+    username = get_override_string_value_or_default(request.json.get("username", None))
+    first_name = get_override_string_value_or_default(
+        request.json.get("firstName", None)
+    )
+    last_name = get_override_string_value_or_default(request.json.get("lastName", None))
+    seller_id = get_override_string_value_or_default(request.json.get("sellerId", None))
+    password = get_override_string_value_or_default(request.json.get("password", None))
+    confirm_password = get_override_string_value_or_default(
+        request.json.get("confirmPassword", None)
+    )
+    notes = get_override_string_value_or_default(request.json.get("notes", None))
     service = UserService()
     if (
         username is None
@@ -155,18 +166,28 @@ def reset_password():
     API method to reset password (not logged in)
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    username = request.json.get("username", None)
-    password = request.json.get("password", None)
-    confirm_password = request.json.get("confirmPassword", None)
-    code = request.json.get("code", None)
+    username = get_override_string_value_or_default(request.json.get("username", None))
+    password = get_override_string_value_or_default(request.json.get("password", None))
+    confirm_password = get_override_string_value_or_default(
+        request.json.get("confirmPassword", None)
+    )
+    code = get_override_int_value_or_default(
+        request.json.get("code", None), default=None
+    )
     service = UserService()
-    if username is None or password is None or confirm_password is None or code is None:
+    if (
+        username is None
+        or password is None
+        or confirm_password is None
+        or code is None
+        or code <= 0
+    ):
         return {"msg", "Bad request"}, 400
     result = service.reset_password(username, code, password, confirm_password)
     return convert_to_json(result)
@@ -178,9 +199,11 @@ def reset_password_secured():
     """
     API method to reset password (logged in)
     """
-    username = request.json.get("username", None)
-    password = request.json.get("password", None)
-    confirm_password = request.json.get("confirmPassword", None)
+    username = get_override_string_value_or_default(request.json.get("username", None))
+    password = get_override_string_value_or_default(request.json.get("password", None))
+    confirm_password = get_override_string_value_or_default(
+        request.json.get("confirmPassword", None)
+    )
     service = UserService()
     if username is None or password is None or confirm_password is None:
         return {"msg", "Bad request"}, 400
@@ -194,11 +217,14 @@ def get_user_sellers(user_id: int):
     API method to get all sellers by user_id
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
+
+    if user_id is None or user_id <= 0:
+        return {"msg", "Bad request"}, 400
 
     service = SellerService()
     results = service.get_user_sellers(user_id)
@@ -211,13 +237,13 @@ def send_password_reset():
     API method to send password reset email with code (not logged in)
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    username = request.json.get("username", None)
+    username = get_override_string_value_or_default(request.json.get("username", None))
     if username is None:
         return {"msg", "Bad request"}, 400
     service = UserService()
@@ -231,15 +257,17 @@ def validate_reset_code():
     API method to validate code sent for password reset
     """
     # secured by user api key
-    sender_key = str(request.headers.get("x-api-key"))
-    api_key = str(os.environ.get("USER_API_KEY"))
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("USER_API_KEY"))
 
-    if sender_key != api_key:
+    if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    username = request.json.get("username", None)
-    code = request.json.get("code", None)
-    if username is None or code is None:
+    username = get_override_string_value_or_default(request.json.get("username", None))
+    code = get_override_int_value_or_default(
+        request.json.get("code", None), default=None
+    )
+    if username is None or code is None or code <= 0:
         return {"msg", "Bad request"}, 400
     service = UserService()
     success = service.validate_password_reset_code(str(username), int(code))

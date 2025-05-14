@@ -8,7 +8,11 @@ import time
 
 from common.db import db_query_one, db_insert, db_update
 from common.models.exchange_rate import ExchangeRate
-from common.utility import get_https_response
+from common.utility import (
+    get_https_response,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+)
 
 
 class ExchangeRateService:
@@ -36,7 +40,7 @@ class ExchangeRateService:
                 host="api.striperates.com", url=url, api_key=api_key
             )
 
-            if json_data is not None:
+            if json_data is not None and len(json_data) > 0:
                 usd_rate = json_data[0]["rates"]["usd"]
                 exchange_rate_value = float(usd_rate) * self.exchange_rate.multiplier
 
@@ -57,16 +61,16 @@ class ExchangeRateService:
 
         utc_date_incoming = datetime.fromtimestamp(unix_time)
 
-        utci_yr = int(utc_date_incoming.strftime("%Y"))
-        utci_mo = int(utc_date_incoming.strftime("%m"))
-        utci_dy = int(utc_date_incoming.strftime("%d"))
+        utci_yr = get_override_int_value_or_default(utc_date_incoming.strftime("%Y"))
+        utci_mo = get_override_int_value_or_default(utc_date_incoming.strftime("%m"))
+        utci_dy = get_override_int_value_or_default(utc_date_incoming.strftime("%d"))
         utc_incoming_midnight_time = datetime(utci_yr, utci_mo, utci_dy)
         midnight_date = utc_incoming_midnight_time.strftime("%Y-%m-%d")
 
         utc_date_current = datetime.fromtimestamp(int(time.time()))
-        utcc_yr = int(utc_date_current.strftime("%Y"))
-        utcc_mo = int(utc_date_current.strftime("%m"))
-        utcc_dy = int(utc_date_current.strftime("%d"))
+        utcc_yr = get_override_int_value_or_default(utc_date_current.strftime("%Y"))
+        utcc_mo = get_override_int_value_or_default(utc_date_current.strftime("%m"))
+        utcc_dy = get_override_int_value_or_default(utc_date_current.strftime("%d"))
         utc_current_midnight_time = datetime(utcc_yr, utcc_mo, utcc_dy)
 
         existing_rate: float = 0
@@ -82,7 +86,7 @@ class ExchangeRateService:
 
         row = db_query_one(sql, data)
         if row:
-            existing_rate = float(row["USDRate"])
+            existing_rate = get_override_float_value_or_default(row["USDRate"])
 
         success: bool = True
         if (
@@ -104,7 +108,9 @@ class ExchangeRateService:
                            %(currentRate)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                 data2 = {
-                    "exchangeRateId": self.exchange_rate.exchange_rate_id,
+                    "exchangeRateId": get_override_int_value_or_default(
+                        self.exchange_rate.exchange_rate_id
+                    ),
                     "midnightDate": midnight_date,
                     "currentRate": current_rate,
                 }
@@ -118,7 +124,9 @@ class ExchangeRateService:
                             AND MidnightDate=%(midnightDate)s"""
 
                 data2 = {
-                    "exchangeRateId": self.exchange_rate.exchange_rate_id,
+                    "exchangeRateId": get_override_int_value_or_default(
+                        self.exchange_rate.exchange_rate_id
+                    ),
                     "midnightDate": midnight_date,
                     "currentRate": current_rate,
                 }

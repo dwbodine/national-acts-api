@@ -11,6 +11,12 @@ from common.db import (
     db_update,
 )
 from common.models.national_acts import Note
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
+)
 
 
 class CalendarService:
@@ -35,13 +41,13 @@ class CalendarService:
             "externalEventId": (
                 external_event_id if external_event_id is not None else None
             ),
-            "note": note,
+            "note": get_override_string_value_or_default(note),
         }
 
         if calendar_date is not None:
             sql += """%(noteTitle)s, %(noteTimestamp)s"""
-            data["noteTitle"] = note_title
-            data["noteTimestamp"] = calendar_date
+            data["noteTitle"] = get_override_string_value_or_default(note_title)
+            data["noteTimestamp"] = get_override_string_value_or_default(calendar_date)
         else:
             sql += """NULL, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
 
@@ -69,11 +75,13 @@ class CalendarService:
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE EventNoteId=%(noteId)s"""
         data = {
-            "note": note,
-            "noteTitle": note_title,
-            "noteId": note_id,
-            "noteDate": note_date,
-            "isCompleted": 1 if is_completed is True else 0,
+            "note": get_override_string_value_or_default(note),
+            "noteTitle": get_override_string_value_or_default(note_title),
+            "noteId": get_override_int_value_or_default(note_id),
+            "noteDate": get_override_string_value_or_default(note_date),
+            "isCompleted": get_override_tinyint_value_or_default_from_bool(
+                is_completed
+            ),
         }
 
         success = db_update(sql, data)
@@ -109,13 +117,13 @@ class CalendarService:
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
-            note.note_id = int(row["EventNoteId"])
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
-            note.note_title = (
-                str(row["NoteTitle"]) if row["NoteTitle"] is not None else None
+            note.note_id = get_override_int_value_or_default(row["EventNoteId"])
+            note.note = get_override_string_value_or_default(row["Note"])
+            note.note_timestamp = get_override_string_value_or_default(
+                row["NoteTimestamp"]
             )
-            note.is_completed = True if int(row["IsCompleted"]) == 1 else False
+            note.note_title = get_override_string_value_or_default(row["NoteTitle"])
+            note.is_completed = get_override_bool_value_or_default(row["IsCompleted"])
             notes.append(note)
         return notes
 
@@ -131,9 +139,11 @@ class CalendarService:
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
-            note.note_id = int(row["EventNoteId"])
+            note.note_id = get_override_int_value_or_default(row["EventNoteId"])
             note.external_event_id = external_event_id
-            note.note = str(row["Note"])
-            note.note_timestamp = str(row["NoteTimestamp"])
+            note.note = get_override_string_value_or_default(row["Note"])
+            note.note_timestamp = get_override_string_value_or_default(
+                row["NoteTimestamp"]
+            )
             notes.append(note)
         return notes

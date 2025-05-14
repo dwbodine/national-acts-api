@@ -4,6 +4,8 @@ Environment variable service
 
 import os
 
+from common.utility import get_override_string_value_or_default
+
 
 def load_env():
     """
@@ -14,8 +16,9 @@ def load_env():
         f = open(path, "r", encoding="utf-8")
         for x in f:
             env = x.split("=")
-            key = env[0].strip()
-            val = env[1].strip()
-            if (key in os.environ) is False:
-                os.environ[key] = val
+            if len(env) > 1:
+                key = get_override_string_value_or_default(env[0])
+                val = get_override_string_value_or_default(env[1])
+                if (key in os.environ) is False:
+                    os.environ[key] = val
         f.close()

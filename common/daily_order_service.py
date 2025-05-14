@@ -16,6 +16,7 @@ from common.models.national_acts import (
     DailyOrderData,
     TicketSocketRefreshHistory,
 )
+from common.utility import get_override_tinyint_value_or_default_from_bool
 
 
 class DailyOrderService:
@@ -73,8 +74,12 @@ class DailyOrderService:
                 "ticketRevenue": order_data.ticket_revenue_usd,
                 "serviceFeeRevenue": order_data.service_fees_revenue_usd,
                 "totalRevenue": order_data.total_revenue_usd,
-                "isRefunded": 1 if order_data.is_refunded is True else 0,
-                "isChargeback": 1 if order_data.is_charged_back is True else 0,
+                "isRefunded": get_override_tinyint_value_or_default_from_bool(
+                    order_data.is_refunded
+                ),
+                "isChargeback": get_override_tinyint_value_or_default_from_bool(
+                    order_data.is_charged_back
+                ),
                 "numTicketsRefunded": order_data.num_tickets_refunded,
                 "revenueRefunded": order_data.revenue_refunded,
                 "serviceFeeRevenueRefunded": order_data.service_fee_revenue_refunded,
@@ -117,7 +122,8 @@ class DailyOrderService:
                                     %(revenueRefunded)s, %(serviceFeeRevenueRefunded)s,
                                     %(numTicketsChargedBack)s, %(revenueChargedBack)s,
                                     %(serviceFeeRevenueChargedBack)s,
-                                    %(ticketSocketOrderId)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                                    %(ticketSocketOrderId)s,
+                                    CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
                 daily_order_data_id = db_insert(insert_sql, update_data)
                 success = daily_order_data_id > 0

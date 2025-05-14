@@ -21,6 +21,9 @@ from common.user_service import UserService
 from common.utility import (
     convert_to_json,
     convert_json_to_snake_case_object,
+    get_override_bool_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
 )
 from common.models.national_acts import (
     Seller,
@@ -43,16 +46,16 @@ def cancel_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_id = request.json.get("eventId", None)
+    event_id = get_override_int_value_or_default(request.json.get("eventId", None))
 
-    if event_id is None:
+    if event_id is None or event_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     cancelled_str = request.json.get("cancelled", None)
-    cancelled: bool = True if cancelled_str == 1 else False
+    cancelled: bool = get_override_bool_value_or_default(cancelled_str)
 
     service = EventService()
-    success = service.cancel_event(int(event_id), cancelled)
+    success = service.cancel_event(event_id, cancelled)
     return convert_to_json(success)
 
 
@@ -66,19 +69,21 @@ def refund_event():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_id = request.json.get("eventId", None)
+    event_id = get_override_int_value_or_default(request.json.get("eventId", None))
 
-    if event_id is None:
+    if event_id is None or event_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     refund_service_fees_str = request.json.get("refundServiceFees", None)
     mark_cancelled_str = request.json.get("markCancelled", None)
-    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
-    mark_cancelled: bool = True if mark_cancelled_str == 1 else False
+    refund_service_fees: bool = get_override_bool_value_or_default(
+        refund_service_fees_str
+    )
+    mark_cancelled: bool = get_override_bool_value_or_default(mark_cancelled_str)
 
     service = EventService()
     success = service.refund_all_event_orders(
-        int(event_id), refund_service_fees, mark_cancelled
+        event_id, refund_service_fees, mark_cancelled
     )
     return convert_to_json(success)
 
@@ -93,15 +98,14 @@ def send_list_to_band():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_id = request.json.get("eventId", None)
-    if event_id is None:
+    event_id = get_override_int_value_or_default(request.json.get("eventId", None))
+    if event_id is None or event_id <= 0:
         return {"msg": "Bad Request"}, 400
 
-    is_sent_str = request.json.get("isSent", None)
-    is_sent = True if is_sent_str == 1 else False
+    is_sent = get_override_bool_value_or_default(request.json.get("isSent", None))
 
     service = EventService()
-    updated_event = service.send_list_to_band(int(event_id), is_sent)
+    updated_event = service.send_list_to_band(event_id, is_sent)
     return convert_to_json(updated_event)
 
 
@@ -115,9 +119,12 @@ def get_only_ts_events():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    seller_id: int = None
+    seller_id: int = 0
     if request.args.get("sellerId") is not None:
-        seller_id = int(request.args.get("sellerId"))
+        seller_id = get_override_int_value_or_default(request.args.get("sellerId"))
+
+    if seller_id <= 0:
+        return {"msg": "Bad Request"}, 400
 
     service = EventService()
     events = service.get_ticket_socket_events_only(seller_id)
@@ -151,29 +158,30 @@ def add_note():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    note = request.json.get("note", None)
+    note = get_override_string_value_or_default(request.json.get("note", None))
 
     if note is None:
         return {"msg": "Bad Request"}, 400
 
-    event_id_str = request.json.get("eventId", None)
-    event_id: int = int(event_id_str) if event_id_str is not None else None
+    event_id: int = get_override_int_value_or_default(
+        request.json.get("eventId", None), default=None
+    )
 
     calendar_date: str = None
     note_title: str = None
-    if event_id is None:
-        calendar_date_str = request.json.get("calendarDate", None)
-        note_title_str = request.json.get("noteTitle", None)
-        calendar_date = (
-            str(calendar_date_str) if calendar_date_str is not None else None
+    if event_id is None or event_id <= 0:
+        calendar_date = get_override_string_value_or_default(
+            request.json.get("calendarDate", None)
         )
-        note_title = str(note_title_str) if note_title_str is not None else None
+        note_title = get_override_string_value_or_default(
+            request.json.get("noteTitle", None)
+        )
 
-    if event_id is None and calendar_date is None:
+    if (event_id is None or event_id <= 0) and calendar_date is None:
         return {"msg": "Bad Request"}, 400
 
     service = CalendarService()
-    success = service.add_note(str(note), event_id, calendar_date, note_title)
+    success = service.add_note(note, event_id, calendar_date, note_title)
     return convert_to_json(success)
 
 
@@ -187,14 +195,12 @@ def get_calendar_notes():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    start: int = None
-    end: int = None
-    if request.args.get("start") is not None:
-        start = int(request.args.get("start"))
-    if request.args.get("end") is not None:
-        end = int(request.args.get("end"))
+    start: int = get_override_int_value_or_default(
+        request.args.get("start"), default=None
+    )
+    end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
 
-    if start is None or end is None:
+    if start is None or end is None or start <= 0 or end <= 0:
         return {"msg": "Bad Request"}, 400
 
     service = CalendarService()
@@ -212,9 +218,11 @@ def delete_note():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    note_id = request.json.get("noteId", None)
+    note_id = get_override_int_value_or_default(
+        request.json.get("noteId", None), default=None
+    )
 
-    if note_id is None:
+    if note_id is None or note_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     service = CalendarService()
@@ -232,16 +240,21 @@ def edit_note():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    note_id = request.json.get("noteId", None)
-    note_date = request.json.get("noteDate")
+    note_id = get_override_int_value_or_default(
+        request.json.get("noteId", None), default=None
+    )
+    note_date = get_override_string_value_or_default(request.json.get("noteDate"))
 
-    if note_id is None or note_date is None:
+    if (note_id is None or note_id <= 0) or note_date is None:
         return {"msg": "Bad Request"}, 400
 
-    note = request.json.get("note", None)
-    note_title = request.json.get("noteTitle", None)
-    is_completed_str = request.json.get("isCompleted", None)
-    is_completed = True if is_completed_str == 1 else False
+    note = get_override_string_value_or_default(request.json.get("note", None))
+    note_title = get_override_string_value_or_default(
+        request.json.get("noteTitle", None)
+    )
+    is_completed = get_override_bool_value_or_default(
+        request.json.get("isCompleted", None)
+    )
 
     service = CalendarService()
     success = service.edit_note(note_id, note, note_date, note_title, is_completed)
@@ -258,14 +271,18 @@ def comp_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    event_id = request.json.get("eventId", None)
-    num_tickets = request.json.get("numTickets", None)
+    event_id = get_override_int_value_or_default(
+        request.json.get("eventId", None), default=None
+    )
+    num_tickets = get_override_int_value_or_default(
+        request.json.get("numTickets", None), default=None
+    )
 
-    if event_id is None or num_tickets is None:
+    if (event_id is None or event_id <= 0) or (num_tickets is None or num_tickets <= 0):
         return {"msg": "Bad Request"}, 400
 
     service = OrderService()
-    success = service.add_comped_order(int(event_id), int(num_tickets))
+    success = service.add_comped_order(event_id, num_tickets)
     return convert_to_json(success)
 
 
@@ -279,19 +296,22 @@ def refund_order():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    order_id = request.json.get("orderId", None)
+    order_id = get_override_int_value_or_default(
+        request.json.get("orderId", None), default=None
+    )
 
-    if order_id is None:
+    if order_id is None or order_id <= 0:
         return {"msg": "Bad Request"}, 400
 
-    refund_service_fees_str = request.json.get("refundServiceFees", None)
-    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
-
-    mark_chargeback_str = request.json.get("markChargeback", None)
-    mark_chargeback: bool = True if mark_chargeback_str == 1 else False
+    refund_service_fees = get_override_bool_value_or_default(
+        request.json.get("refundServiceFees", None)
+    )
+    mark_chargeback = get_override_bool_value_or_default(
+        request.json.get("markChargeback", None)
+    )
 
     service = OrderService()
-    success = service.refund_order(int(order_id), refund_service_fees, mark_chargeback)
+    success = service.refund_order(order_id, refund_service_fees, mark_chargeback)
     return convert_to_json(success)
 
 
@@ -406,6 +426,9 @@ def delete_roles():
 
     role_ids: list[int] = json.loads(data, object_hook=lambda d: SimpleNamespace(**d))
 
+    if len(role_ids) == 0:
+        return {"msg": "Bad Request"}, 400
+
     service = RoleService()
     success = service.delete_roles(role_ids)
     return convert_to_json(success)
@@ -495,16 +518,19 @@ def refund_ticket():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    ticket_id = request.json.get("ticketId", None)
+    ticket_id = get_override_int_value_or_default(
+        request.json.get("ticketId", None), default=None
+    )
 
-    if ticket_id is None:
+    if ticket_id is None or ticket_id <= 0:
         return {"msg": "Bad Request"}, 400
 
-    refund_service_fees_str = request.json.get("refundServiceFees", None)
-    refund_service_fees: bool = True if refund_service_fees_str == 1 else False
+    refund_service_fees = get_override_bool_value_or_default(
+        request.json.get("refundServiceFees", None)
+    )
 
     service = OrderService()
-    success = service.refund_ticket(int(ticket_id), refund_service_fees)
+    success = service.refund_ticket(ticket_id, refund_service_fees)
     return convert_to_json(success)
 
 
@@ -573,9 +599,11 @@ def delete_user():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    user_id = request.json.get("userId", None)
+    user_id = get_override_int_value_or_default(
+        request.json.get("userId", None), default=None
+    )
 
-    if user_id is None:
+    if user_id is None or user_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     service = UserService()
@@ -642,11 +670,13 @@ def delete_venue():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    venue_id = request.json.get("venueId", None)
+    venue_id = get_override_int_value_or_default(
+        request.json.get("venueId", None), default=None
+    )
 
-    if venue_id is None:
+    if venue_id is None or venue_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     service = AdminService()
-    success = service.delete_external_venue(int(venue_id))
+    success = service.delete_external_venue(venue_id)
     return convert_to_json(success)

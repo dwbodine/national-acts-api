@@ -48,7 +48,7 @@ class EventService:
         ignore_flags: bool = False,
         show_cancelled: bool = True,
         seller_ids: list[int] = None,
-        tour_id: list[int] = None,
+        tour_id: int = None,
     ):
         """
         main method to fetch events and orders
@@ -66,6 +66,7 @@ class EventService:
             search_term = search_term.replace("'", "''")
             search_term = search_term.replace('"', "")
             search_term = search_term.replace("=", "")
+            search_term = search_term.strip()
         else:
             search_term = None
 
@@ -131,17 +132,17 @@ class EventService:
             tour_sql = "SELECT ExternalEventId FROM TourEvent WHERE TourId=%(tour_id)s"
             tour_data = {"tour_id": tour_id}
             tour_rows = db_query_all(tour_sql, tour_data)
-            event_ids: list[int] = []
+            tour_event_ids: list[int] = []
             for tour_row in tour_rows:
                 tour_event_id = get_override_int_value_or_default(
-                    tour_row["ExternalEventId"]
+                    tour_row["ExternalEventId"], default=None
                 )
-                if tour_event_id is not None:
-                    event_ids.append(tour_event_id)
+                if tour_event_id is not None and tour_event_id > 0:
+                    tour_event_ids.append(tour_event_id)
 
-            if len(event_ids) > 0:
+            if len(tour_event_ids) > 0:
                 event_ids_str = db_convert_list_to_parameters(
-                    event_ids, data, "eventId"
+                    tour_event_ids, data, "eventId"
                 )
                 where_clause.append("ExternalEvents.EventId IN " + event_ids_str)
         else:
@@ -195,7 +196,7 @@ class EventService:
                 )
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
                 data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-            elif end is not None:
+            elif end is not None and end > datetime.now().timestamp():
                 where_clause.append(
                     "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s"
                 )
@@ -284,10 +285,11 @@ class EventService:
             )
             event_id = get_override_int_value_or_default(row["EventId"])
             ticket_socket_event_id = get_override_int_value_or_default(
-                row["TicketSocketEventId"]
+                row["TicketSocketEventId"], default=None
             )
 
             is_external: bool = (external_event_id > 0) and (
+                ticket_socket_event_id is None or 
                 ticket_socket_event_id <= 0
             )
 
@@ -304,7 +306,7 @@ class EventService:
 
             # event data
             vip_event.seller_event_category_id = get_override_int_value_or_default(
-                row["SellerEventCategoryId"]
+                row["SellerEventCategoryId"], default=None
             )
             vip_event.event_date = get_override_string_value_or_default(
                 row["EventDate"]
@@ -411,12 +413,7 @@ class EventService:
             if vip_event.is_deleted is True:
                 vip_event.is_active = False
 
-            if vip_event.event_time is None:
-                vip_event.event_time = ""
-            if vip_event.meet_and_greet_time is None:
-                vip_event.meet_and_greet_time = ""
-
-            notes = calendar_service.get_event_notes(event_id)
+            notes = calendar_service.get_event_notes(vip_event.external_event_id)
             vip_event.notes = notes
 
             if get_orders is True:
@@ -500,14 +497,12 @@ class EventService:
 
         rows = db_query_all(sql, data)
         for row in rows:
-            ticket_type_id = int(row["TicketSocketTicketTypeId"])
-            name = (
-                str(row["TicketTypeName"])
-                if row["TicketTypeName"] is not None
-                else None
+            ticket_type_id = get_override_int_value_or_default(
+                row["TicketSocketTicketTypeId"]
             )
-            total = int(row["TotalAvailable"])
-            is_active: bool = int(row["IsActive"]) == 1
+            name = get_override_string_value_or_default(row["TicketTypeName"])
+            total = get_override_int_value_or_default(row["TotalAvailable"])
+            is_active = get_override_bool_value_or_default(row["IsActive"])
             ticket_type = TicketSocketTicketType(
                 ticket_socket_event_id, ticket_type_id, name, total, is_active
             )
@@ -528,13 +523,15 @@ class EventService:
                         WHERE EventId=%(event_id)s"""
                 data = {
                     "event_id": event_id,
-                    "is_active": 0 if disabled is True else 1,
+                    "is_active": get_override_tinyint_value_or_default_from_bool(
+                        not disabled
+                    ),
                 }
                 success = db_update(sql, data)
                 if success is False:
                     break
                 else:
-                    sql_id = """SELECT TicketSocketEventId 
+                    sql_id = """SELECT TicketSocketEventId
                                     FROM ExternalEvents 
                                     WHERE EventId=%(event_id)s"""
                     data_id = {"event_id": event_id}
@@ -563,23 +560,24 @@ class EventService:
                         WHERE EventId=%(event_id)s"""
                 data = {
                     "event_id": event_id,
-                    "isDeleted": 1 if deleted is True else 0,
+                    "isDeleted": get_override_tinyint_value_or_default_from_bool(
+                        deleted
+                    ),
                 }
                 success = db_update(sql, data)
                 if success is False:
                     break
                 else:
-                    sql_id = """SELECT TicketSocketEventId 
+                    sql_id = """SELECT TicketSocketEventId
                                     FROM ExternalEvents 
                                     WHERE EventId=%(event_id)s"""
                     data_id = {"event_id": event_id}
                     row = db_query_one(sql_id, data_id)
-                    if "TicketSocketEventId" in row:
-                        ts_id = get_override_int_value_or_default(
-                            row["TicketSocketEventId"]
-                        )
-                        if ts_id is not None and ts_id > 0:
-                            self.rebuild_daily_order_data_for_event(ts_id)
+                    ts_id = get_override_int_value_or_default(
+                        row["TicketSocketEventId"], default=None
+                    )
+                    if ts_id is not None and ts_id > 0:
+                        self.rebuild_daily_order_data_for_event(ts_id)
 
         return success
 
@@ -596,7 +594,7 @@ class EventService:
                             WHERE EventId=%(event_id)s"""
                 data = {
                     "event_id": event_id,
-                    "isHidden": 1 if hidden is True else 0,
+                    "isHidden": get_override_tinyint_value_or_default_from_bool(hidden),
                 }
                 success = db_update(sql, data)
                 if success is False:
@@ -681,12 +679,11 @@ class EventService:
         if event_to_update is None:
             return False
 
-        ticket_socket_event_id: int = (
-            event_to_update.ticket_socket_event_id
-            if event_to_update.ticket_socket_event_id is not None
-            and event_to_update.ticket_socket_event_id > 0
-            else None
+        ticket_socket_event_id: int = get_override_int_value_or_default(
+            event_to_update.ticket_socket_event_id, default=None
         )
+        if ticket_socket_event_id is not None and ticket_socket_event_id <= 0:
+            ticket_socket_event_id = None
 
         update_data = {
             "ticket_socket_event_id": ticket_socket_event_id,
@@ -760,7 +757,9 @@ class EventService:
                 move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
 
         if event_to_update.event_id > 0:
-            update_data["event_id"] = event_to_update.external_event_id
+            update_data["event_id"] = get_override_int_value_or_default(
+                event_to_update.external_event_id
+            )
             update_sql = """UPDATE ExternalEvents
                             SET TicketSocketEventId=%(ticket_socket_event_id)s, 
                                 Title=%(title)s,
@@ -793,7 +792,9 @@ class EventService:
 
             success = db_update(update_sql, update_data)
         else:
-            update_data["seller_id"] = event_to_update.seller_id
+            update_data["seller_id"] = get_override_int_value_or_default(
+                event_to_update.seller_id
+            )
             update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
                 TicketSocketEventId, EventTime, MeetAndGreetTime, DoorsOpenTime, URL, 
                 ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
@@ -835,10 +836,16 @@ class EventService:
                                     WHERE TicketSocketTicketTypeId=%(ticket_type_id)s 
                                     AND TicketSocketEventId=%(ticket_socket_event_id)s"""
                 ticket_type_data = {
-                    "ticket_type_id": ticket_type.ticket_type_id,
+                    "ticket_type_id": get_override_int_value_or_default(
+                        ticket_type.ticket_type_id
+                    ),
                     "ticket_socket_event_id": ticket_socket_event_id,
-                    "is_active": 1 if ticket_type.is_active is True else 0,
-                    "ticketTypeName": ticket_type.ticket_type_name,
+                    "is_active": get_override_tinyint_value_or_default_from_bool(
+                        ticket_type.is_active
+                    ),
+                    "ticketTypeName": get_override_string_value_or_default(
+                        ticket_type.ticket_type_name
+                    ),
                 }
                 success = db_update(ticket_type_wql, ticket_type_data)
                 if success is False:

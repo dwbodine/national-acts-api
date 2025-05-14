@@ -38,7 +38,7 @@ class TourService:
             )
             data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
             data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-        elif end is not None:
+        elif end is not None and end > datetime.now().timestamp:
             where_clause.append(
                 "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
             )

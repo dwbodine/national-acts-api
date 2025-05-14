@@ -13,7 +13,12 @@ from common.order_service import OrderService
 from common.tour_service import TourService
 from common.data_refresh_service import DataRefreshService
 from common.models.national_acts import VipOrder
-from common.utility import convert_to_json
+from common.utility import (
+    convert_to_json,
+    get_override_bool_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+)
 
 event_api = Blueprint("event_api", __name__)
 
@@ -25,56 +30,49 @@ def get_events_and_orders_secured():
     API method to fetch events and orders for Sellers
     """
     service = EventService()
-    seller_id: int = None
+    seller_id: int = get_override_int_value_or_default(
+        request.args.get("sellerId"), default=None
+    )
+    start: int = get_override_int_value_or_default(
+        request.args.get("start"), default=None
+    )
+    end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
+    exclude_start: int = get_override_int_value_or_default(
+        request.args.get("excludeStart"), default=None
+    )
+    exclude_end: int = get_override_int_value_or_default(
+        request.args.get("excludeEnd"), default=None
+    )
+    search_term: str = get_override_string_value_or_default(request.args.get("search"))
+    show_inactive: bool = get_override_bool_value_or_default(
+        request.args.get("deleted")
+    )
+    show_deleted: bool = get_override_bool_value_or_default(
+        request.args.get("inactive")
+    )
+    show_hidden: bool = get_override_bool_value_or_default(request.args.get("hidden"))
+    event_id: int = get_override_int_value_or_default(
+        request.args.get("eventId"), default=None
+    )
+    tour_id: int = get_override_int_value_or_default(
+        request.args.get("tourId"), default=None
+    )
+    exclude_external: bool = get_override_bool_value_or_default(
+        request.args.get("excludeExternal")
+    )
+    ignore_flags: bool = get_override_bool_value_or_default(
+        request.args.get("ignoreFlags")
+    )
+    omit_orders: bool = get_override_bool_value_or_default(
+        request.args.get("omitOrders")
+    )
+
     seller_ids: list[int] = None
-    start: int = None
-    end: int = None
-    exclude_start: int = None
-    exclude_end: int = None
-    search_term: str = None
-    show_inactive: bool = False
-    show_deleted: bool = False
-    show_hidden: bool = False
-    event_id: int = None
-    tour_id: int = None
-    exclude_external: bool = False
-    ignore_flags: bool = False
-    get_orders: bool = True
-    if request.args.get("sellerId") is not None:
-        seller_id = int(request.args.get("sellerId"))
     if request.args.get("sellerIds") is not None:
         seller_ids = [int(x) for x in str(request.args.get("sellerIds")).split(",")]
-    if request.args.get("start") is not None:
-        start = int(request.args.get("start"))
-    if request.args.get("end") is not None:
-        end = int(request.args.get("end"))
-    if request.args.get("excludeStart") is not None:
-        exclude_start = int(request.args.get("excludeStart"))
-    if request.args.get("excludeEnd") is not None:
-        exclude_end = int(request.args.get("excludeEnd"))
-    if request.args.get("inactive") is not None:
-        show_inactive = True if int(request.args.get("inactive")) == 1 else False
-    if request.args.get("deleted") is not None:
-        show_deleted = True if int(request.args.get("deleted")) == 1 else False
-    if request.args.get("hidden") is not None:
-        show_hidden = True if int(request.args.get("hidden")) == 1 else False
-    if request.args.get("search") is not None:
-        search_term = str(request.args.get("search"))
-    if request.args.get("eventId") is not None:
-        event_id = int(request.args.get("eventId"))
-    if request.args.get("tourId") is not None:
-        tour_id = int(request.args.get("tourId"))
-    if request.args.get("excludeExternal") is not None:
-        exclude_external = (
-            True if int(request.args.get("excludeExternal")) == 1 else False
-        )
-    if request.args.get("ignoreFlags") is not None:
-        ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
-    if request.args.get("omitOrders") is not None:
-        get_orders = False if int(request.args.get("omitOrders")) == 1 else True
 
     results = service.get_events_and_orders(
-        get_orders=get_orders,
+        get_orders=(not omit_orders),
         seller_id=seller_id,
         start=start,
         end=end,
@@ -101,11 +99,11 @@ def order_by_id():
     API method to fetch an order by id
     """
     service = OrderService()
-    order_id: int = None
-    if request.args.get("tsOrderId") is not None:
-        order_id = int(request.args.get("tsOrderId"))
+    order_id: int = get_override_int_value_or_default(
+        request.args.get("tsOrderId"), default=None
+    )
 
-    if order_id is None:
+    if order_id is None or order_id <= 0:
         return {"msg": "Bad Request"}, 400
 
     results = service.get_orders(ts_order_id=order_id)
@@ -119,24 +117,20 @@ def orders_secured():
     API method to fetch orders for seller
     """
     service = OrderService()
-    seller_id: int = None
-    start: int = None
-    end: int = None
-    show_inactive: bool = False
-    show_deleted: bool = False
-    ignore_flags: bool = False
-    if request.args.get("sellerId") is not None:
-        seller_id = int(request.args.get("sellerId"))
-    if request.args.get("start") is not None:
-        start = int(request.args.get("start"))
-    if request.args.get("end") is not None:
-        end = int(request.args.get("end"))
-    if request.args.get("inactive") is not None:
-        show_inactive = True if int(request.args.get("inactive")) == 1 else False
-    if request.args.get("deleted") is not None:
-        show_deleted = True if int(request.args.get("deleted")) == 1 else False
-    if request.args.get("ignoreFlags") is not None:
-        ignore_flags = True if int(request.args.get("ignoreFlags")) == 1 else False
+    seller_id: int = get_override_int_value_or_default(
+        request.args.get("sellerId"), default=None
+    )
+    start: int = get_override_int_value_or_default(
+        request.args.get("start"), default=None
+    )
+    end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
+    show_inactive: bool = get_override_bool_value_or_default(
+        request.args.get("inactive")
+    )
+    show_deleted: bool = get_override_bool_value_or_default(request.args.get("deleted"))
+    ignore_flags: bool = get_override_bool_value_or_default(
+        request.args.get("ignoreFlags")
+    )
 
     results = service.get_orders(
         seller_id,
@@ -175,15 +169,13 @@ def refresh_events_from_service(seller_id: int = None):
         return {"msg": "Unauthorized"}, 401
 
     service = DataRefreshService()
-    start: int = None
-    end: int = None
+    start: int = get_override_int_value_or_default(
+        request.args.get("start"), default=None
+    )
+    end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
     user_id: int = user.user_id
-    if request.args.get("start") is not None:
-        start = int(request.args.get("start"))
-    if request.args.get("end") is not None:
-        end = int(request.args.get("end"))
 
-    if seller_id is not None:
+    if seller_id is not None and seller_id > 0:
         results = service.refresh_database_from_ticket_socket(
             seller_id, start, end, user_id
         )
@@ -235,12 +227,11 @@ def set_event_deleted_secured():
     API method to mark event(s) as deleted
     """
     event_ids: list[int] = request.json.get("eventIdList", [])
-    is_deleted = request.json.get("isDeleted", None)
 
-    if (event_ids is None or len(event_ids) == 0) or is_deleted is None:
+    if event_ids is None or len(event_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    deleted: bool = True if int(is_deleted) == 1 else False
+    deleted = get_override_bool_value_or_default(request.json.get("isDeleted", None))
 
     service = EventService()
 
@@ -257,12 +248,11 @@ def set_event_hidden_secured():
     API method to mark event(s) as hidden
     """
     event_ids: list[int] = request.json.get("eventIdList", [])
-    is_hidden = request.json.get("isHidden", None)
 
-    if (event_ids is None or len(event_ids) == 0) or is_hidden is None:
+    if event_ids is None or len(event_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    hidden: bool = True if int(is_hidden) == 1 else False
+    hidden = get_override_bool_value_or_default(request.json.get("isHidden", None))
     service = EventService()
     if len(event_ids) > 0:
         result = service.hide_events(event_ids, hidden)
@@ -278,12 +268,13 @@ def set_event_inactive_secured():
     API method to mark event(s) as inactive
     """
     event_ids: list[int] = request.json.get("eventIdList", [])
-    is_active = request.json.get("isActive", None)
 
-    if (event_ids is None or len(event_ids) == 0) or is_active is None:
+    if event_ids is None or len(event_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    disabled: bool = True if int(is_active) == 0 else False
+    disabled = not get_override_bool_value_or_default(
+        request.json.get("isActive", None)
+    )
     service = EventService()
     if len(event_ids) > 0:
         result = service.disable_events(event_ids, disabled)
@@ -299,12 +290,11 @@ def set_order_deleted_secured():
     API method to mark order(s) as deleted
     """
     order_ids: list[int] = request.json.get("orderIdList", None)
-    is_deleted = request.json.get("isDeleted", None)
 
-    if order_ids is None or len(order_ids) == 0 or is_deleted is None:
+    if order_ids is None or len(order_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    deleted: bool = True if int(is_deleted) == 1 else False
+    deleted = get_override_bool_value_or_default(request.json.get("isDeleted", None))
     service = OrderService()
     if len(order_ids) > 0:
         result = service.delete_orders(order_ids, deleted)
@@ -320,12 +310,13 @@ def set_order_inactive_secured():
     API method to mark order(s) as inactive
     """
     order_ids: list[int] = request.json.get("orderIdList", None)
-    is_active = request.json.get("isActive", None)
 
-    if order_ids is None or len(order_ids) == 0 or is_active is None:
+    if order_ids is None or len(order_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    disabled: bool = True if int(is_active) == 0 else False
+    disabled = not get_override_bool_value_or_default(
+        request.json.get("isActive", None)
+    )
     service = OrderService()
     if len(order_ids) > 0:
         result = service.disable_orders(order_ids, disabled)
@@ -341,12 +332,13 @@ def set_ticket_checkin_secured():
     API method to mark ticket(s) as checked-in
     """
     ticket_ids: list[int] = request.json.get("ticketIdList", None)
-    is_checked_in = request.json.get("isCheckedIn", None)
 
-    if ticket_ids is None or len(ticket_ids) == 0 or is_checked_in is None:
+    if ticket_ids is None or len(ticket_ids) == 0:
         return {"msg": "Bad Request"}, 400
 
-    checked_in: bool = True if int(is_checked_in) == 1 else False
+    checked_in = get_override_bool_value_or_default(
+        request.json.get("isCheckedIn", None)
+    )
     service = OrderService()
     if len(ticket_ids) > 0:
         result = service.check_in_tickets(ticket_ids, checked_in)

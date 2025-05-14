@@ -6,7 +6,13 @@ from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
 from common.models.ticket_socket import TicketSocketAccount
 from common.ticket_socket_service import TicketSocketService
-from common.utility import move_temp_file_to_public_folder
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    move_temp_file_to_public_folder,
+)
 
 
 class AdminService:
@@ -23,12 +29,14 @@ class AdminService:
         rows = db_query_all(sql)
         for row in rows:
             setting = SiteSetting()
-            setting.setting_id = int(row["ID"])
-            setting.name = str(row["Name"])
-            setting.display_name = str(row["DisplayName"])
-            setting.type = str(row["Type"])
-            setting.value = str(row["Value"])
-            setting.file_path = str(row["FilePath"])
+            setting.setting_id = get_override_int_value_or_default(row["ID"])
+            setting.name = get_override_string_value_or_default(row["Name"])
+            setting.display_name = get_override_string_value_or_default(
+                row["DisplayName"]
+            )
+            setting.type = get_override_string_value_or_default(row["Type"])
+            setting.value = get_override_string_value_or_default(row["Value"])
+            setting.file_path = get_override_string_value_or_default(row["FilePath"])
             setting.dirty = False
             settings.append(setting)
 
@@ -43,10 +51,10 @@ class AdminService:
 
         success: bool = True
         data = {
-            "name": setting.name,
-            "displayName": setting.display_name,
-            "type": setting.type,
-            "value": setting.value,
+            "name": get_override_string_value_or_default(setting.name),
+            "displayName": get_override_string_value_or_default(setting.display_name),
+            "type": get_override_string_value_or_default(setting.type),
+            "value": get_override_string_value_or_default(setting.value),
         }
         if setting.setting_id is None or setting.setting_id <= 0:
             sql = """INSERT INTO Settings (Name, DisplayName, Type, Value)
@@ -61,7 +69,7 @@ class AdminService:
                         Value=%(value)s, 
                         LastUpdated=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                         WHERE ID=%(setting_id)s"""
-            data["setting_id"] = setting.setting_id
+            data["setting_id"] = get_override_int_value_or_default(setting.setting_id)
             success = db_update(sql, data)
 
         # move temp image to final place
@@ -78,17 +86,29 @@ class AdminService:
         sql = "SELECT TicketSocketId FROM TicketSocket"
         rows = db_query_all(sql)
         for row in rows:
-            ticket_socket_id = int(row["TicketSocketId"])
+            ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
             service = TicketSocketService(ticket_socket_id)
             account = TicketSocketAccount()
             account.ticket_socket_id = ticket_socket_id
-            account.name = service.name
-            account.currency_symbol = service.currency_symbol
-            account.exchange_rate_id = service.exchange_rate_id
-            account.exchange_rate_slug = service.exchange_rate_slug
-            account.mulitiplier = service.mulitiplier
-            account.service_url = service.service_url
-            account.utc_offset_hours = service.utc_offset_hours
+            account.name = get_override_string_value_or_default(service.name)
+            account.currency_symbol = get_override_string_value_or_default(
+                service.currency_symbol
+            )
+            account.exchange_rate_id = get_override_int_value_or_default(
+                service.exchange_rate_id
+            )
+            account.exchange_rate_slug = get_override_string_value_or_default(
+                service.exchange_rate_slug
+            )
+            account.mulitiplier = get_override_float_value_or_default(
+                service.mulitiplier
+            )
+            account.service_url = get_override_string_value_or_default(
+                service.service_url
+            )
+            account.utc_offset_hours = get_override_int_value_or_default(
+                service.utc_offset_hours
+            )
             account.categories = service.get_categories()
             accounts.append(account)
         return accounts
@@ -106,14 +126,14 @@ class AdminService:
         rows = db_query_all(sql)
         for row in rows:
             venue = ExternalVenue()
-            venue.venue_id = int(row["VenueID"])
-            venue.venue = str(row["Venue"])
-            venue.address = str(row["Address"])
-            venue.city = str(row["City"])
-            venue.state = str(row["State"]) if row["State"] is not None else None
-            venue.zip_code = str(row["Zip"]) if row["Zip"] is not None else None
-            venue.country = str(row["Country"]) if row["Country"] is not None else None
-            venue.has_events = True if row["HasEvents"] is not None else False
+            venue.venue_id = get_override_int_value_or_default(row["VenueID"])
+            venue.venue = get_override_string_value_or_default(row["Venue"])
+            venue.address = get_override_string_value_or_default(row["Address"])
+            venue.city = get_override_string_value_or_default(row["City"])
+            venue.state = get_override_string_value_or_default(row["State"])
+            venue.zip_code = get_override_string_value_or_default(row["Zip"])
+            venue.country = get_override_string_value_or_default(row["Country"])
+            venue.has_events = get_override_bool_value_or_default(row["HasEvents"])
             venues.append(venue)
 
         return venues
@@ -126,12 +146,12 @@ class AdminService:
         success = False
         sql = ""
         data = {
-            "venue": venue.venue,
-            "address": venue.address,
-            "city": venue.city,
-            "state": venue.state if venue.state is not None else None,
-            "zip": venue.zip_code if venue.zip_code is not None else None,
-            "country": venue.country if venue.country is not None else None,
+            "venue": get_override_string_value_or_default(venue.venue),
+            "address": get_override_string_value_or_default(venue.address),
+            "city": get_override_string_value_or_default(venue.city),
+            "state": get_override_string_value_or_default(venue.state),
+            "zip": get_override_string_value_or_default(venue.zip_code),
+            "country": get_override_string_value_or_default(venue.country),
         }
 
         if venue.venue_id is None or venue.venue_id == 0:
@@ -141,7 +161,7 @@ class AdminService:
             success = venue_id > 0
             venue.venue_id = venue_id
         else:
-            data["venue_id"] = venue.venue_id
+            data["venue_id"] = get_override_int_value_or_default(venue.venue_id)
             sql = """UPDATE ExternalEventVenues SET Venue=%(venue)s,
                         Address=%(address)s,
                         City=%(city)s, 

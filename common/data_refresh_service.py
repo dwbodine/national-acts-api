@@ -14,7 +14,16 @@ from common.db import (
     db_get_connection,
     db_delete,
 )
-from common.utility import log_message, convert_to_json, send_email
+from common.utility import (
+    get_override_bool_value_or_default,
+    get_override_float_value_or_default,
+    get_override_int_value_or_default,
+    get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
+    log_message,
+    convert_to_json,
+    send_email,
+)
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
     VipEvent,
@@ -50,8 +59,8 @@ class DataRefreshService:
         # query events across all TS services
         all_events: list[VipEvent] = []
         for row in rows:
-            ticket_socket_id = int(row["TicketSocketId"])
-            is_vip_service = int(row["IsVip"]) == 1
+            ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
+            is_vip_service = get_override_bool_value_or_default(row["IsVip"])
             tss = TicketSocketService(ticket_socket_id)
 
             # get event category for this TS account, if the seller has one
@@ -187,23 +196,29 @@ class DataRefreshService:
                     address = evt.venue.address1
 
                     event_data = {
-                        "title": evt.title.strip(),
-                        "eventDate": evt.event_date.strip(),
-                        "url": evt.ticket_socket_url.strip(),
-                        "venue": evt.venue.name.strip(),
-                        "address": address.strip(),
-                        "city": evt.venue.city.strip(),
-                        "state": evt.venue.state.strip(),
-                        "zip": evt.venue.postal_code.strip(),
-                        "country": (
-                            evt.venue.country.strip()
-                            if evt.venue.country is not None
-                            else None
+                        "title": get_override_string_value_or_default(evt.title),
+                        "eventDate": get_override_string_value_or_default(
+                            evt.event_date
                         ),
-                        "thumbnail": (
-                            evt.thumbnail.strip() if evt.thumbnail is not None else None
+                        "url": get_override_string_value_or_default(
+                            evt.ticket_socket_url
                         ),
-                        "isVip": 1 if evt.is_vip else 0,
+                        "venue": get_override_string_value_or_default(evt.venue.name),
+                        "address": get_override_string_value_or_default(address),
+                        "city": get_override_string_value_or_default(evt.venue.city),
+                        "state": get_override_string_value_or_default(evt.venue.state),
+                        "zip": get_override_string_value_or_default(
+                            evt.venue.postal_code
+                        ),
+                        "country": get_override_string_value_or_default(
+                            evt.venue.country
+                        ),
+                        "thumbnail": get_override_string_value_or_default(
+                            evt.thumbnail
+                        ),
+                        "isVip": get_override_tinyint_value_or_default_from_bool(
+                            evt.is_vip
+                        ),
                     }
 
                     # determine if event already exists
@@ -224,7 +239,9 @@ class DataRefreshService:
 
                     if existing_event:
                         # update existing event
-                        ticket_socket_event_id = int(existing_event["Id"])
+                        ticket_socket_event_id = get_override_int_value_or_default(
+                            existing_event["Id"]
+                        )
                         event_data["id"] = ticket_socket_event_id
                         sql = """UPDATE TicketSocketEvents SET Title=%(title)s,
                                 EventDate=%(eventDate)s, URL=%(url)s,
@@ -237,9 +254,13 @@ class DataRefreshService:
                     else:
                         event_add_new = True
                         # insert new event
-                        event_data["event_id"] = int(evt.event_id)
-                        event_data["sellerEventCategoryId"] = int(
-                            evt.seller_event_category_id
+                        event_data["event_id"] = get_override_int_value_or_default(
+                            evt.event_id
+                        )
+                        event_data["sellerEventCategoryId"] = (
+                            get_override_int_value_or_default(
+                                evt.seller_event_category_id
+                            )
                         )
                         sql = """INSERT INTO TicketSocketEvents (SellerEventCategoryId,
                                     EventId, Title, EventDate, URL, Venue, Address,
@@ -256,16 +277,24 @@ class DataRefreshService:
 
                         # automatically add new events to external events table
                         if event_success is True:
-                            event_data["seller_id"] = int(evt.seller_id)
+                            event_data["seller_id"] = get_override_int_value_or_default(
+                                evt.seller_id
+                            )
                             event_data["id"] = ticket_socket_event_id
 
                             if evt.is_vip is True:
                                 event_data["url"] = None
                                 event_data["external_vip_link"] = (
-                                    evt.ticket_socket_url.strip()
+                                    get_override_string_value_or_default(
+                                        evt.ticket_socket_url
+                                    )
                                 )
                             else:
-                                event_data["url"] = evt.ticket_socket_url.strip()
+                                event_data["url"] = (
+                                    get_override_string_value_or_default(
+                                        evt.ticket_socket_url
+                                    )
+                                )
                                 event_data["external_vip_link"] = None
 
                             sql = """INSERT INTO ExternalEvents(TicketSocketEventId, SellerId,
@@ -295,11 +324,19 @@ class DataRefreshService:
                             event_ticket_types.append(ticket_type.ticket_type_id)
 
                             ticket_type_data = {
-                                "ticketSocketTicketTypeId": ticket_type.ticket_type_id,
+                                "ticketSocketTicketTypeId": get_override_int_value_or_default(
+                                    ticket_type.ticket_type_id
+                                ),
                                 "ticket_socket_event_id": ticket_socket_event_id,
-                                "ticketTypeName": ticket_type.ticket_type_name,
-                                "totalAvailable": ticket_type.total_available,
-                                "is_active": 1 if ticket_type.is_active else 0,
+                                "ticketTypeName": get_override_string_value_or_default(
+                                    ticket_type.ticket_type_name
+                                ),
+                                "totalAvailable": get_override_int_value_or_default(
+                                    ticket_type.total_available
+                                ),
+                                "is_active": get_override_tinyint_value_or_default_from_bool(
+                                    ticket_type.is_active
+                                ),
                             }
 
                             ticket_type_sql = """SELECT
@@ -308,7 +345,9 @@ class DataRefreshService:
                                     WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                     AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
                             ticket_type_sql_data = {
-                                "ticketSocketTicketTypeId": ticket_type.ticket_type_id,
+                                "ticketSocketTicketTypeId": get_override_int_value_or_default(
+                                    ticket_type.ticket_type_id
+                                ),
                                 "ticket_socket_event_id": ticket_socket_event_id,
                             }
 
@@ -366,69 +405,44 @@ class DataRefreshService:
                             # compile order data for update
 
                             order_data = {
-                                "purchaseDate": order.purchase_date.strip(),
-                                "purchaseTimestamp": order.purchase_timestamp.strip(),
-                                "phone": (
-                                    order.phone.strip()
-                                    if order.phone is not None
-                                    else None
+                                "purchaseDate": get_override_string_value_or_default(
+                                    order.purchase_date
                                 ),
-                                "user_id": order.user_id,
-                                "event_id": order.event_id,
-                                "purchaserLastName": (
-                                    order.purchaser_last_name.strip()
-                                    if order.purchaser_last_name is not None
-                                    else None
+                                "purchaseTimestamp": get_override_string_value_or_default(
+                                    order.purchase_timestamp
                                 ),
-                                "purchaserFirstName": (
-                                    order.purchaser_first_name.strip()
-                                    if order.purchaser_first_name is not None
-                                    else None
+                                "phone": get_override_string_value_or_default(
+                                    order.phone
                                 ),
-                                "purchaserCity": (
-                                    order.purchaser_city.strip()
-                                    if (
-                                        order.purchaser_city is not None
-                                        and order.purchaser_city != ""
-                                    )
-                                    else None
+                                "user_id": get_override_string_value_or_default(
+                                    order.user_id
                                 ),
-                                "purchaserState": (
-                                    order.purchaser_state.strip()
-                                    if (
-                                        order.purchaser_state is not None
-                                        and order.purchaser_state != ""
-                                    )
-                                    else None
+                                "event_id": get_override_int_value_or_default(
+                                    order.event_id
                                 ),
-                                "purchaserZip": (
-                                    order.purchaser_zip_code.strip()
-                                    if (
-                                        order.purchaser_zip_code is not None
-                                        and order.purchaser_zip_code != ""
-                                    )
-                                    else None
+                                "purchaserLastName": get_override_string_value_or_default(
+                                    order.purchaser_last_name
                                 ),
-                                "purchaserCountry": (
-                                    order.purchaser_country.strip()
-                                    if (
-                                        order.purchaser_country is not None
-                                        and order.purchaser_country != ""
-                                    )
-                                    else None
+                                "purchaserFirstName": get_override_string_value_or_default(
+                                    order.purchaser_first_name
                                 ),
-                                "purchaserIpAddress": (
-                                    order.purchaser_ip_address.strip()
-                                    if (
-                                        order.purchaser_ip_address is not None
-                                        and order.purchaser_ip_address != ""
-                                    )
-                                    else None
+                                "purchaserCity": get_override_string_value_or_default(
+                                    order.purchaser_city
                                 ),
-                                "email": (
-                                    order.email.strip()
-                                    if order.email is not None
-                                    else None
+                                "purchaserState": get_override_string_value_or_default(
+                                    order.purchaser_state
+                                ),
+                                "purchaserZip": get_override_string_value_or_default(
+                                    order.purchaser_zip_code
+                                ),
+                                "purchaserCountry": get_override_string_value_or_default(
+                                    order.purchaser_country
+                                ),
+                                "purchaserIpAddress": get_override_string_value_or_default(
+                                    order.purchaser_ip_address
+                                ),
+                                "email": get_override_string_value_or_default(
+                                    order.email
                                 ),
                             }
 
@@ -450,14 +464,24 @@ class DataRefreshService:
                             order_add_new: bool = False
 
                             if existing_order:
-                                ticket_socket_order_id = int(existing_order["Id"])
+                                ticket_socket_order_id = (
+                                    get_override_int_value_or_default(
+                                        existing_order["Id"]
+                                    )
+                                )
                                 order_data["id"] = ticket_socket_order_id
                                 # if purchase date changed, clear out daily order data for event
                                 order_purchase_timestamp = datetime.strptime(
-                                    order.purchase_date, "%Y-%m-%d"
+                                    get_override_string_value_or_default(
+                                        order.purchase_date
+                                    ),
+                                    "%Y-%m-%d",
                                 ).timestamp()
                                 existing_purchase_timestamp = datetime.strptime(
-                                    str(existing_order["PurchaseDate"]), "%Y-%m-%d"
+                                    get_override_string_value_or_default(
+                                        existing_order["PurchaseDate"]
+                                    ),
+                                    "%Y-%m-%d",
                                 ).timestamp()
                                 if (
                                     order_purchase_timestamp
@@ -465,7 +489,7 @@ class DataRefreshService:
                                 ):
                                     check_cleanup_data = {
                                         "ticket_socket_event_id": ticket_socket_event_id,
-                                        "purchaseDate": str(
+                                        "purchaseDate": get_override_string_value_or_default(
                                             existing_order["PurchaseDate"]
                                         ),
                                     }
@@ -508,7 +532,9 @@ class DataRefreshService:
                             else:
                                 order_add_new = True
                                 # insert new order
-                                order_data["order_id"] = int(order.order_id)
+                                order_data["order_id"] = (
+                                    get_override_int_value_or_default(order.order_id)
+                                )
                                 order_data["ticket_socket_event_id"] = (
                                     ticket_socket_event_id
                                 )
@@ -556,29 +582,40 @@ class DataRefreshService:
                                     order_tickets.append(ticket.ticket_id)
                                     # compile ticket data for update
                                     ticket_data = {
-                                        "ticket_type": ticket.ticket_type.strip(),
-                                        "ticket_type_id": ticket.ticket_type_id,
-                                        "serviceFee": (
-                                            ticket.service_fee
-                                            if ticket.service_fee is not None
-                                            else 0
+                                        "ticket_type": get_override_string_value_or_default(
+                                            ticket.ticket_type
                                         ),
-                                        "availableScans": ticket.available_scans,
-                                        "barcode": ticket.barcode,
-                                        "purchaseLocation": ticket.purchase_location,
-                                        "scannedTimestamp": ticket.scanned_timestamp,
-                                        "attendeeFirstName": ticket.attendee_first_name,
-                                        "attendeeLastName": ticket.attendee_last_name,
-                                        "shirtSize": (
+                                        "ticket_type_id": get_override_int_value_or_default(
+                                            ticket.ticket_type_id
+                                        ),
+                                        "serviceFee": get_override_float_value_or_default(
+                                            ticket.service_fee
+                                        ),
+                                        "availableScans": get_override_int_value_or_default(
+                                            ticket.available_scans
+                                        ),
+                                        "barcode": get_override_string_value_or_default(
+                                            ticket.barcode
+                                        ),
+                                        "purchaseLocation": get_override_string_value_or_default(
+                                            ticket.purchase_location
+                                        ),
+                                        "scannedTimestamp": get_override_int_value_or_default(
+                                            ticket.scanned_timestamp
+                                        ),
+                                        "attendeeFirstName": get_override_string_value_or_default(
+                                            ticket.attendee_first_name
+                                        ),
+                                        "attendeeLastName": get_override_string_value_or_default(
+                                            ticket.attendee_last_name
+                                        ),
+                                        "shirtSize": get_override_string_value_or_default(
                                             ticket.shirt_size
-                                            if ticket.shirt_size is not None
-                                            and len(ticket.shirt_size) > 0
-                                            else None
                                         ),
                                     }
 
-                                    ticket_price = (
-                                        ticket.price if ticket.price is not None else 0
+                                    ticket_price = get_override_float_value_or_default(
+                                        ticket.price
                                     )
 
                                     if ticket_price > 0:
@@ -605,8 +642,10 @@ class DataRefreshService:
 
                                     if existing_ticket:
                                         # update existing ticket
-                                        ticket_socket_order_ticket_id = int(
-                                            existing_ticket["Id"]
+                                        ticket_socket_order_ticket_id = (
+                                            get_override_int_value_or_default(
+                                                existing_ticket["Id"]
+                                            )
                                         )
                                         ticket_data["id"] = (
                                             ticket_socket_order_ticket_id
@@ -633,12 +672,18 @@ class DataRefreshService:
                                     else:
                                         # insert new ticket
                                         ticket_add_new = True
-                                        ticket_data["ticketId"] = int(ticket.ticket_id)
+                                        ticket_data["ticketId"] = (
+                                            get_override_int_value_or_default(
+                                                ticket.ticket_id
+                                            )
+                                        )
                                         ticket_data["ticket_socket_order_id"] = (
                                             ticket_socket_order_id
                                         )
                                         ticket_data["is_checked_in"] = (
-                                            1 if ticket.scanned_timestamp != 0 else 0
+                                            get_override_tinyint_value_or_default_from_bool(
+                                                ticket.scanned_timestamp != 0
+                                            )
                                         )
                                         sql = """INSERT INTO TicketSocketOrderTickets
                                             (TicketSocketOrderId, TicketId, TicketSocketTicketTypeId,
@@ -765,46 +810,69 @@ class DataRefreshService:
 
         rows = db_query_all(sql)
         for row in rows:
-            user_id = int(row["UserId"])
+            user_id = get_override_int_value_or_default(row["UserId"])
             if user_id == 0:
                 username = "System"
             else:
-                username = str(row["UserName"]) + " (" + str(row["Email"]) + ")"
-            seller_id = int(row["SellerId"]) if row["SellerId"] is not None else None
-            seller_name = (
-                str(row["SellerName"]) if row["SellerName"] is not None else None
+                username = (
+                    get_override_string_value_or_default(row["UserName"])
+                    + " ("
+                    + get_override_string_value_or_default(row["Email"])
+                    + ")"
+                )
+            seller_id = get_override_int_value_or_default(row["SellerId"], default=None)
+            seller_name = get_override_string_value_or_default(row["SellerName"])
+            start = get_override_int_value_or_default(row["Start"], default=None)
+            end = get_override_int_value_or_default(row["End"], default=None)
+            start_timer = get_override_int_value_or_default(row["StartTimer"])
+            end_timer = get_override_int_value_or_default(row["EndTimer"])
+            duration = get_override_float_value_or_default(row["Duration"])
+            succeeded = get_override_bool_value_or_default(row["Success"])
+            error_message = get_override_string_value_or_default(row["ErrorMessage"])
+            service_events_skipped = get_override_string_value_or_default(
+                row["ServiceEventsSkipped"]
             )
-            start = int(row["Start"]) if row["Start"] is not None else None
-            end = int(row["End"]) if row["End"] is not None else None
-            start_timer = int(row["StartTimer"])
-            end_timer = int(row["EndTimer"])
-            duration = float(row["Duration"])
-            succeeded = True if int(row["Success"]) == 1 else False
-            error_message = str(row["ErrorMessage"])
-            service_events_skipped = str(row["ServiceEventsSkipped"])
-            events_failed = str(row["EventsFailed"])
-            orders_failed = str(row["OrdersFailed"])
-            tickets_failed = str(row["TicketsFailed"])
-            ticket_types_failed = str(row["TicketTypesFailed"])
-            total_events_from_service = int(row["TotalEventsFromService"])
-            events_updated = int(row["EventsUpdated"])
-            events_inserted = int(row["EventsInserted"])
-            orders_inserted = int(row["OrdersInserted"])
-            orders_updated = int(row["OrdersUpdated"])
-            orders_deleted = int(row["OrdersDeleted"])
-            tickets_updated = int(row["TicketsUpdated"])
-            tickets_inserted = int(row["TicketsInserted"])
-            ticket_types_updated = int(row["TicketTypesUpdated"])
-            ticket_types_inserted = int(row["TicketTypesInserted"])
-            order_data_update_succeeded = (
-                True if int(row["OrderDataUpdateSucceeded"]) == 1 else False
+            events_failed = get_override_string_value_or_default(row["EventsFailed"])
+            orders_failed = get_override_string_value_or_default(row["OrdersFailed"])
+            tickets_failed = get_override_string_value_or_default(row["TicketsFailed"])
+            ticket_types_failed = get_override_string_value_or_default(
+                row["TicketTypesFailed"]
             )
-            order_data_update_duration = float(row["OrderDataUpdateDuration"])
-            total_duration = float(row["TotalDuration"])
-            order_data_rows_total = int(row["OrderDataRowsTotal"])
-            order_data_rows_inserted = int(row["OrderDataRowsInserted"])
-            order_data_rows_updated = int(row["OrderDataRowsUpdated"])
-            order_data_rows_removed = int(row["OrderDataRowsRemoved"])
+            total_events_from_service = get_override_int_value_or_default(
+                row["TotalEventsFromService"]
+            )
+            events_updated = get_override_int_value_or_default(row["EventsUpdated"])
+            events_inserted = get_override_int_value_or_default(row["EventsInserted"])
+            orders_inserted = get_override_int_value_or_default(row["OrdersInserted"])
+            orders_updated = get_override_int_value_or_default(row["OrdersUpdated"])
+            orders_deleted = get_override_int_value_or_default(row["OrdersDeleted"])
+            tickets_updated = get_override_int_value_or_default(row["TicketsUpdated"])
+            tickets_inserted = get_override_int_value_or_default(row["TicketsInserted"])
+            ticket_types_updated = get_override_int_value_or_default(
+                row["TicketTypesUpdated"]
+            )
+            ticket_types_inserted = get_override_int_value_or_default(
+                row["TicketTypesInserted"]
+            )
+            order_data_update_succeeded = get_override_bool_value_or_default(
+                row["OrderDataUpdateSucceeded"]
+            )
+            order_data_update_duration = get_override_float_value_or_default(
+                row["OrderDataUpdateDuration"]
+            )
+            total_duration = get_override_float_value_or_default(row["TotalDuration"])
+            order_data_rows_total = get_override_int_value_or_default(
+                row["OrderDataRowsTotal"]
+            )
+            order_data_rows_inserted = get_override_int_value_or_default(
+                row["OrderDataRowsInserted"]
+            )
+            order_data_rows_updated = get_override_int_value_or_default(
+                row["OrderDataRowsUpdated"]
+            )
+            order_data_rows_removed = get_override_int_value_or_default(
+                row["OrderDataRowsRemoved"]
+            )
 
             history = TicketSocketRefreshHistory(
                 service_events_skipped,

@@ -10,6 +10,7 @@ from common.utility import (
     get_override_float_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_override_tinyint_value_or_default_from_bool,
     log_message,
 )
 from common.models.ticket_socket import (
@@ -89,8 +90,12 @@ class SellerEventCategory:
         data = {"sellerId": self.seller_id, "ticketSocketId": self.ticket_socket_id}
         sec = db_query_one(sql, data)
         if sec:
-            self.event_category_id = sec["EventCategoryId"]
-            self.seller_event_category_id = sec["SellerEventCategoryId"]
+            self.event_category_id = get_override_int_value_or_default(
+                sec["EventCategoryId"]
+            )
+            self.seller_event_category_id = get_override_int_value_or_default(
+                sec["SellerEventCategoryId"]
+            )
 
     def __populate_from_ticket_socket_id_and_event_category_id(
         self, ticket_socket_id: int, event_category_id: int
@@ -106,8 +111,10 @@ class SellerEventCategory:
         }
         sec = db_query_one(sql, data)
         if sec:
-            self.seller_id = sec["SellerId"]
-            self.seller_event_category_id = sec["SellerEventCategoryId"]
+            self.seller_id = get_override_int_value_or_default(sec["SellerId"])
+            self.seller_event_category_id = get_override_int_value_or_default(
+                sec["SellerEventCategoryId"]
+            )
 
     def __populate_from_seller_event_category_id(self, seller_event_category_id: int):
         self.seller_event_category_id = seller_event_category_id
@@ -116,9 +123,13 @@ class SellerEventCategory:
         data = {"sellerEventCategoryId": self.seller_event_category_id}
         sec = db_query_one(sql, data)
         if sec:
-            self.seller_id = sec["SellerId"]
-            self.ticket_socket_id = sec["TicketSocketId"]
-            self.event_category_id = sec["EventCategoryId"]
+            self.seller_id = get_override_int_value_or_default(sec["SellerId"])
+            self.ticket_socket_id = get_override_int_value_or_default(
+                sec["TicketSocketId"]
+            )
+            self.event_category_id = get_override_int_value_or_default(
+                sec["EventCategoryId"]
+            )
 
     def __find_events(self):
         sql = """SELECT COUNT(TicketSocketEvents.Id) AS NumEvents
@@ -127,7 +138,7 @@ class SellerEventCategory:
                 %(sellerEventCategoryId)s"""
         data = {"sellerEventCategoryId": self.seller_event_category_id}
         row = db_query_one(sql, data)
-        self.has_events = True if int(row["NumEvents"]) > 0 else False
+        self.has_events = get_override_bool_value_or_default(row["NumEvents"])
 
 
 class ShirtSales:
@@ -712,14 +723,24 @@ class TicketSocketRefreshHistory:
                     LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
                     WHERE TicketSocketRefreshHistoryId=%(ticketSocketRefreshHistoryId)s"""
         data = {
-            "successVal": 1 if success is True else 0,
-            "ticketSocketRefreshHistoryId": self.ticket_socket_refresh_history_id,
-            "orderDataUpdateDuration": duration,
-            "totalDuration": total_duration,
-            "orderDataRowsTotal": self.order_data_rows_total,
-            "orderDataRowsInserted": self.order_data_rows_inserted,
-            "orderDataRowsUpdated": self.order_data_rows_updated,
-            "orderDataRowsRemoved": self.order_data_rows_removed,
+            "successVal": get_override_tinyint_value_or_default_from_bool(success),
+            "ticketSocketRefreshHistoryId": get_override_int_value_or_default(
+                self.ticket_socket_refresh_history_id
+            ),
+            "orderDataUpdateDuration": get_override_float_value_or_default(duration),
+            "totalDuration": get_override_float_value_or_default(total_duration),
+            "orderDataRowsTotal": get_override_int_value_or_default(
+                self.order_data_rows_total
+            ),
+            "orderDataRowsInserted": get_override_int_value_or_default(
+                self.order_data_rows_inserted
+            ),
+            "orderDataRowsUpdated": get_override_int_value_or_default(
+                self.order_data_rows_updated
+            ),
+            "orderDataRowsRemoved": get_override_int_value_or_default(
+                self.order_data_rows_removed
+            ),
         }
         db_update(sql, data, cnx)
 
@@ -747,30 +768,52 @@ class TicketSocketRefreshHistory:
                  CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
         data = {
-            "userId": self.user_id,
-            "sellerId": self.seller_id,
-            "start": self.start,
-            "end": self.end,
-            "startTimer": self.start_timer,
-            "endTimer": self.end_timer,
-            "duration": self.duration,
-            "success": 1 if self.succeeded is True else 0,
-            "errorMessage": self.error_message,
+            "userId": get_override_int_value_or_default(self.user_id),
+            "sellerId": get_override_int_value_or_default(self.seller_id),
+            "start": get_override_int_value_or_default(self.start),
+            "end": get_override_int_value_or_default(self.end),
+            "startTimer": get_override_int_value_or_default(self.start_timer),
+            "endTimer": get_override_int_value_or_default(self.end_timer),
+            "duration": get_override_float_value_or_default(self.duration),
+            "success": get_override_tinyint_value_or_default_from_bool(self.succeeded),
+            "errorMessage": get_override_string_value_or_default(self.error_message),
             "serviceEventsSkipped": ", ".join(self.service_events_skipped),
-            "eventsFailed": ", ".join(str(v) for v in self.events_failed),
-            "ordersFailed": ", ".join(str(v) for v in self.orders_failed),
-            "ticketsFailed": ", ".join(str(v) for v in self.tickets_failed),
-            "ticketTypesFailed": ", ".join(str(v) for v in self.ticket_types_failed),
-            "totalEventsFromService": self.total_events_from_service,
-            "eventsUpdated": self.events_updated,
-            "eventsInserted": self.events_inserted,
-            "ordersInserted": self.orders_inserted,
-            "ordersUpdated": self.orders_updated,
-            "ordersDeleted": self.orders_deleted,
-            "ticketsUpdated": self.tickets_updated,
-            "ticketsInserted": self.tickets_inserted,
-            "ticketTypesUpdated": self.ticket_types_updated,
-            "ticketTypesInserted": self.ticket_types_inserted,
+            "eventsFailed": (
+                ", ".join(str(v) for v in self.events_failed)
+                if self.events_failed is not None
+                else None
+            ),
+            "ordersFailed": (
+                ", ".join(str(v) for v in self.orders_failed)
+                if self.orders_failed is not None
+                else None
+            ),
+            "ticketsFailed": (
+                ", ".join(str(v) for v in self.tickets_failed)
+                if self.tickets_failed is not None
+                else None
+            ),
+            "ticketTypesFailed": (
+                ", ".join(str(v) for v in self.ticket_types_failed)
+                if self.ticket_types_failed is not None
+                else None
+            ),
+            "totalEventsFromService": get_override_int_value_or_default(
+                self.total_events_from_service
+            ),
+            "eventsUpdated": get_override_int_value_or_default(self.events_updated),
+            "eventsInserted": get_override_int_value_or_default(self.events_inserted),
+            "ordersInserted": get_override_int_value_or_default(self.orders_inserted),
+            "ordersUpdated": get_override_int_value_or_default(self.orders_updated),
+            "ordersDeleted": get_override_int_value_or_default(self.orders_deleted),
+            "ticketsUpdated": get_override_int_value_or_default(self.tickets_updated),
+            "ticketsInserted": get_override_int_value_or_default(self.tickets_inserted),
+            "ticketTypesUpdated": get_override_int_value_or_default(
+                self.ticket_types_updated
+            ),
+            "ticketTypesInserted": get_override_int_value_or_default(
+                self.ticket_types_inserted
+            ),
         }
 
         self.ticket_socket_refresh_history_id = db_insert(sql, data, cnx)
