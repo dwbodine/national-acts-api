@@ -23,6 +23,7 @@ from common.utility import (
     get_override_string_value_or_default,
     get_override_tinyint_value_or_default_from_bool,
     move_temp_file_to_public_folder,
+    remove_file,
 )
 
 
@@ -289,8 +290,7 @@ class EventService:
             )
 
             is_external: bool = (external_event_id > 0) and (
-                ticket_socket_event_id is None or 
-                ticket_socket_event_id <= 0
+                ticket_socket_event_id is None or ticket_socket_event_id <= 0
             )
 
             if external_event_id == 0 or (exclude_external and is_external):
@@ -316,10 +316,15 @@ class EventService:
             external_thumbnail = get_override_string_value_or_default(
                 row["ExternalThumbnail"]
             )
+
+            # ExternalEvents.Thumbnail overrides the thumbnail from TS, but preserve both
             if external_thumbnail is not None:
                 vip_event.thumbnail = external_thumbnail
+                vip_event.external_thumbnail = external_thumbnail
             else:
                 vip_event.thumbnail = thumbnail
+                vip_event.external_thumbnail = None
+
             vip_event.ticket_socket_url = get_override_string_value_or_default(
                 row["URL"]
             )
@@ -685,6 +690,16 @@ class EventService:
         if ticket_socket_event_id is not None and ticket_socket_event_id <= 0:
             ticket_socket_event_id = None
 
+        existing_event: VipEvent = None
+        if event_to_update.external_event_id > 0:
+            existing_events = self.get_events_and_orders(
+                get_orders=False,
+                ignore_flags=True,
+                event_id=event_to_update.external_event_id,
+            )
+            if len(existing_events) > 0:
+                existing_event = existing_events[0]
+
         update_data = {
             "ticket_socket_event_id": ticket_socket_event_id,
             "title": get_override_string_value_or_default(event_to_update.title),
@@ -746,17 +761,54 @@ class EventService:
             "disable_vip_link_reason": get_override_string_value_or_default(
                 event_to_update.disable_vip_link_reason
             ),
+            "thumbnail": get_override_string_value_or_default(
+                event_to_update.external_thumbnail
+            ),
         }
 
-        if event_to_update.thumbnail is not None:
-            thumb_file = create_thumbnail(event_to_update.thumbnail)
-            if thumb_file is not None:
-                update_data["thumbnail"] = get_override_string_value_or_default(
-                    thumb_file
+        if event_to_update.external_thumbnail is not None:
+            is_new_thumbnail: bool = False
+            if existing_event is not None:
+                is_new_thumbnail = (
+                    event_to_update.external_thumbnail
+                    != existing_event.external_thumbnail
                 )
-                move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
+            else:
+                is_new_thumbnail = True
 
-        if event_to_update.external_event_id > 0:
+            if is_new_thumbnail is True:
+                event_date_str: str = ""
+                event_time = get_override_string_value_or_default(
+                    event_to_update.event_time
+                )
+                if event_time is not None:
+                    event_date = datetime.strptime(
+                        event_to_update.event_time, "%Y-%m-%d %H:%M:%S"
+                    )
+                    event_date_str = event_date.strftime("%Y%m%d%H%M%S")
+                else:
+                    event_date = datetime.strptime(
+                        event_to_update.event_date, "%Y-%m-%d"
+                    )
+                    event_date_str = event_date.strftime("%Y%m%d")
+
+                image_id = f"{event_date_str}_{event_to_update.seller_id}"
+                thumb_file = create_thumbnail(
+                    event_to_update.external_thumbnail, image_id
+                )
+                if thumb_file is not None:
+                    update_data["thumbnail"] = get_override_string_value_or_default(
+                        thumb_file
+                    )
+                    move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
+        elif existing_event is not None:
+            existing_thumbnail = get_override_string_value_or_default(
+                existing_event.external_thumbnail
+            )
+            if existing_thumbnail is not None:
+                remove_file(existing_thumbnail, "common/thumbnails")
+
+        if existing_event is not None:
             update_data["event_id"] = get_override_int_value_or_default(
                 event_to_update.external_event_id
             )
@@ -782,13 +834,10 @@ class EventService:
                                 CheckInLocation=%(checkInLocation)s,
                                 CheckInNotes=%(checkInNotes)s,
                                 EmailSentToVips=%(emailSentToVips)s,
-                                TextSentToVips=%(textSentToVips)s, """
-
-            if "thumbnail" in update_data:
-                update_sql += """Thumbnail=%(thumbnail)s, """
-
-            update_sql += """LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                WHERE EventId=%(event_id)s"""
+                                TextSentToVips=%(textSentToVips)s,
+                                Thumbnail=%(thumbnail)s,
+                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE EventId=%(event_id)s"""
 
             success = db_update(update_sql, update_data)
         else:
@@ -800,25 +849,16 @@ class EventService:
                 ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
                 DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, 
                 IsDeleted, IsHidden, AnnounceDate, CheckInLocation, CheckInNotes, 
-                EmailSentToVips, TextSentToVips, Created, LastUpdate"""
-
-            if "thumbnail" in update_data:
-                update_sql += """, Thumbnail"""
-
-            update_sql += """) VALUES (%(seller_id)s, %(title)s, %(event_date)s,
-                %(ticket_socket_event_id)s, %(event_time)s, %(meet_and_greet_time)s,
-                %(doors_open_time)s, %(url)s, %(external_event_venue_id)s, %(disable_link_button)s,
+                EmailSentToVips, TextSentToVips, Thumbnail, Created, LastUpdate) VALUES
+                (%(seller_id)s, %(title)s, %(event_date)s,%(ticket_socket_event_id)s,
+                %(event_time)s, %(meet_and_greet_time)s,%(doors_open_time)s, %(url)s,
+                %(external_event_venue_id)s, %(disable_link_button)s,
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
                 %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isDeleted)s, 
                 %(isHidden)s, %(announceDate)s, %(checkInLocation)s, %(checkInNotes)s,
-                %(emailSentToVips)s, %(textSentToVips)s, 
+                %(emailSentToVips)s, %(textSentToVips)s, %(thumbnail)s, 
                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 
-                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')"""
-
-            if "thumbnail" in update_data:
-                update_sql += """, %(thumbnail)s"""
-
-            update_sql += """)"""
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0

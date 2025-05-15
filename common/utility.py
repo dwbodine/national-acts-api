@@ -101,7 +101,18 @@ def move_temp_file_to_public_folder(temp_file_name: str, public_rel_path: str):
         os.replace(origin_file, dest_file)
 
 
-def create_thumbnail(image_name):
+def remove_file(file_name: str, public_rel_path: str):
+    """
+    Remove a physical file that has had its reference deleted from the database
+    """
+    www_path = os.getenv("WWW_PUBLIC_FOLDER")
+    remove_path = os.path.join(www_path, public_rel_path)
+    remove_file_path = os.path.join(remove_path, file_name)
+    if os.path.exists(remove_file_path):
+        os.remove(remove_file_path)
+
+
+def create_thumbnail(image_name: str, image_id: str):
     """
     Resizes an image using Pillow
     """
@@ -119,7 +130,7 @@ def create_thumbnail(image_name):
             last_index = filename.rfind(".")
             if last_index < 0:
                 return None
-            thumbfile_path = f"{filename[0:last_index]}_thumb{filename[last_index:]}"
+            thumbfile_path = f"{filename[0:last_index]}_{image_id}_thumb{filename[last_index:]}"
             thumbnail_size = int(os.getenv("THUMBNAIL_SIZE"))
             size = thumbnail_size, thumbnail_size
             image.thumbnail(size, Image.Resampling.LANCZOS)

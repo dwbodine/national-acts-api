@@ -311,6 +311,7 @@ class VipEvent(TicketSocketEvent):
     list_sent_num_vips: int = None
     check_in_location: str = None
     check_in_notes: str = None
+    external_thumbnail: str = None
 
     # collections
     notes: list[Note] = []
