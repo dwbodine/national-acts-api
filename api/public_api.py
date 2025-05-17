@@ -161,6 +161,13 @@ def upload_temp_file():
     try:
         file = request.files["tempFile"]
         filename = file.filename
+        
+        # replace garbage characters from Windows/Mac
+        filename = filename.replace(" ", "_")
+        filename = filename.replace("(", "_")
+        filename = filename.replace(")", "_")
+        filename = filename.replace("__", "_")
+        
         file.save(os.path.join("tmp", filename))
     except Exception as error:  # pylint: disable=broad-exception-caught
         filename = None

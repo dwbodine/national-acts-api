@@ -112,39 +112,58 @@ def remove_file(file_name: str, public_rel_path: str):
         os.remove(remove_file_path)
 
 
-def create_thumbnail(image_name: str, image_id: str):
+def resize_tmp_image(image_name: str, image_id: str, resize_width: int = 0):
     """
-    Resizes an image using Pillow
+    Resizes an image in the /tmp folder using Pillow
     """
 
     api_path = os.getenv("API_FILE_PATH")  # absolute path to /tmp in api
     temp_dir = os.path.join(api_path, "tmp")
 
     image_path = os.path.join(temp_dir, image_name)
-    thumbfile_name: str = None
+    resize_file_name: str = None
 
     if os.path.exists(image_path):
         try:
             image = Image.open(image_path)
             filename = image.filename
+
             last_index = filename.rfind(".")
             if last_index < 0:
                 return None
-            thumbfile_path = f"{filename[0:last_index]}_{image_id}_thumb{filename[last_index:]}"
-            thumbnail_size = int(os.getenv("THUMBNAIL_SIZE"))
-            size = thumbnail_size, thumbnail_size
-            image.thumbnail(size, Image.Resampling.LANCZOS)
-            image.save(thumbfile_path, image.format)
-            if not os.path.exists(thumbfile_path):
-                thumbfile_name = None
+            resize_file_path = (
+                f"{filename[0:last_index]}_{image_id}_{filename[last_index:]}"
+            )
+
+            # default to square(ish) thumbnail if no width given
+            if resize_width <= 0:
+                resize_width = int(os.getenv("THUMBNAIL_SIZE"))
+
+            # only resize if width is not as desired
+            if image.width != resize_width:
+                # get current dimensions
+                width = image.width
+                height = image.height
+
+                # manually calculate ratio
+                ratio = image.height / image.width
+                width = resize_width
+                height = width * ratio
+
+                # set dimensions and resize
+                size = width, height
+                image.thumbnail(size, Image.Resampling.LANCZOS)
+            image.save(resize_file_path, image.format)
+            if not os.path.exists(resize_file_path):
+                resize_file_name = None
             else:
                 os.remove(image_path)
-                thumbfile_name = os.path.basename(thumbfile_path)
+                resize_file_name = os.path.basename(resize_file_path)
         except Exception as e:  # pylint: disable=broad-exception-caught
-            thumbfile_name = None
+            resize_file_name = None
             log_message(f"Unexpected {e=}, {type(e)=}")
 
-    return thumbfile_name
+    return resize_file_name
 
 
 class SendEmailResult:
