@@ -37,6 +37,7 @@ class OrderService:
         show_deleted: bool = False,
         ignore_flags: bool = False,
         ts_order_id: int = None,
+        search_term: str = None
     ):
         """
         Retreive order data from database
@@ -65,7 +66,7 @@ class OrderService:
 
         sql = ""
 
-        if ts_order_id is None and (
+        if ts_order_id is None and search_term is None and (
             midnight_start is not None and midnight_end is not None
         ):
             sql += """
@@ -85,7 +86,7 @@ class OrderService:
                                 BETWEEN %(startDate)s AND %(endDate)s
                         )
                 )"""
-        elif ts_order_id is None and (
+        elif ts_order_id is None and search_term is None and (
             end is not None or start is not None or seller_id is None
         ):
             sql += """
@@ -108,18 +109,20 @@ class OrderService:
                     ExchangeRates.Symbol,
                     UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, 
                     TicketSocketOrders.*,
-                    TicketSocketEvents.Title as EventTitle, 
+                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) as EventTitle, 
                     TicketSocketEvents.EventDate, 
                     Sellers.Name AS SellerName, 
                     Sellers.SellerId, 
-                    TicketSocketEvents.Venue, 
-                    TicketSocketEvents.Address AS EventAddress, 
-                    TicketSocketEvents.City AS EventCity, 
-                    TicketSocketEvents.State AS EventState, 
-                    TicketSocketEvents.Zip AS EventZip, 
-                    TicketSocketEvents.Country AS EventCountry 
+                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue, 
+                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS EventAddress, 
+                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS EventCity, 
+                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS EventState, 
+                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
+                    COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS EventCountry 
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                    JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
+                    JOIN ExternalEventVenues ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
                     JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
                     JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId 
                     JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
@@ -134,6 +137,19 @@ class OrderService:
         if ts_order_id is not None and ts_order_id > 0:
             where_clause.append("TicketSocketOrders.Id = %(order_id)s")
             data["order_id"] = ts_order_id
+        elif search_term is not None and len(search_term) > 0:
+            where_clause.append(
+                """CONCAT_WS (' ', Sellers.Name, 
+                            COALESCE(ExternalEvents.Title, TicketSocketEvents.Title),
+                            COALESCE(TicketSocketOrders.OrderId, ''),
+                            COALESCE(TicketSocketOrders.PurchaserLastName, ''),
+                            COALESCE(TicketSocketOrders.PurchaserFirstName, ''),
+                            COALESCE(TicketSocketOrders.Email, ''),
+                            COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country, '')) 
+                            LIKE ('%"""
+                + search_term
+                + """%')"""
+            )
         else:
             if ignore_flags is not True:
                 if show_deleted is not True:
@@ -184,9 +200,14 @@ class OrderService:
         if len(where_clause) > 0:
             sql += " AND ".join(where_clause)
 
-        sql += """ ORDER BY TicketSocketOrders.PurchaseDate ASC,
-                   TicketSocketEvents.EventDate ASC, 
-                   TicketSocketEvents.Title ASC"""
+        if search_term is not None:
+            sql += """ ORDER BY TicketSocketOrders.PurchaserLastName ASC,
+                    TicketSocketOrders.PurchaserFirstName ASC, 
+                    TicketSocketOrders.Email ASC"""
+        else:
+            sql += """ ORDER BY TicketSocketOrders.PurchaseDate ASC,
+                    TicketSocketEvents.EventDate ASC, 
+                    TicketSocketEvents.Title ASC"""
 
         sql = sql.replace("\n", "")
 

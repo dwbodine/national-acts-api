@@ -315,6 +315,26 @@ def refund_order():
     return convert_to_json(success)
 
 
+@admin_api.route("/admin/orders/search")
+@jwt_required()
+def search_orders():
+    """
+    API method to search all orders
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    search_term: str = get_override_string_value_or_default(request.args.get("sTerm"))
+
+    if search_term is None or len(search_term) < 3:
+        return {"msg": "Bad Request"}, 400
+
+    service = OrderService()
+    orders = service.get_orders(ignore_flags=True, search_term=search_term)
+    return convert_to_json(orders)
+
+
 @admin_api.route("/admin/orders/update", methods=["POST"])
 @jwt_required()
 def update_order():
