@@ -17,7 +17,7 @@ from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketTyp
 from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
 from common.utility import (
-    create_thumbnail,
+    resize_tmp_image,
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
@@ -793,7 +793,7 @@ class EventService:
                     event_date_str = event_date.strftime("%Y%m%d")
 
                 image_id = f"{event_date_str}_{event_to_update.seller_id}"
-                thumb_file = create_thumbnail(
+                thumb_file = resize_tmp_image(
                     event_to_update.external_thumbnail, image_id
                 )
                 if thumb_file is not None:
@@ -801,6 +801,12 @@ class EventService:
                         thumb_file
                     )
                     move_temp_file_to_public_folder(thumb_file, "common/thumbnails")
+                    if existing_event is not None:
+                        existing_thumbnail = get_override_string_value_or_default(
+                            existing_event.external_thumbnail
+                        )
+                        if existing_thumbnail is not None:
+                            remove_file(existing_thumbnail, "common/thumbnails")
         elif existing_event is not None:
             existing_thumbnail = get_override_string_value_or_default(
                 existing_event.external_thumbnail
