@@ -318,10 +318,19 @@ class DataRefreshService:
                         update_success = False
                         continue
 
+                    total_tickets_available: int = 0
+                    total_tickets_sold: int = 0
+
                     if ticket_socket_event_id and len(evt.ticket_types) > 0:
                         event_ticket_types: list[int] = []
                         for ticket_type in evt.ticket_types:
                             event_ticket_types.append(ticket_type.ticket_type_id)
+
+                            tickets_available: int = get_override_int_value_or_default(
+                                ticket_type.total_available
+                            )
+
+                            total_tickets_available += tickets_available
 
                             ticket_type_data = {
                                 "ticketSocketTicketTypeId": get_override_int_value_or_default(
@@ -331,9 +340,7 @@ class DataRefreshService:
                                 "ticketTypeName": get_override_string_value_or_default(
                                     ticket_type.ticket_type_name
                                 ),
-                                "totalAvailable": get_override_int_value_or_default(
-                                    ticket_type.total_available
-                                ),
+                                "totalAvailable": tickets_available,
                                 "is_active": get_override_tinyint_value_or_default_from_bool(
                                     ticket_type.is_active
                                 ),
@@ -399,6 +406,10 @@ class DataRefreshService:
                     if ticket_socket_event_id and len(evt.orders) > 0:
                         event_orders: list[int] = []
                         for order in evt.orders:
+                            order_comped: bool = False
+                            order_deleted: bool = False
+                            order_active: bool = True
+
                             if order.event_id != evt.event_id:
                                 continue
                             event_orders.append(order.order_id)
@@ -464,6 +475,16 @@ class DataRefreshService:
                             order_add_new: bool = False
 
                             if existing_order:
+                                order_comped = get_override_bool_value_or_default(
+                                    existing_order["IsComped"]
+                                )
+                                order_deleted = get_override_bool_value_or_default(
+                                    existing_order["IsDeleted"]
+                                )
+                                order_active = get_override_bool_value_or_default(
+                                    existing_order["IsActive"]
+                                )
+
                                 ticket_socket_order_id = (
                                     get_override_int_value_or_default(
                                         existing_order["Id"]
@@ -651,6 +672,32 @@ class DataRefreshService:
                                             ticket_socket_order_ticket_id
                                         )
 
+                                        is_refunded: bool = (
+                                            get_override_bool_value_or_default(
+                                                existing_ticket["IsRefunded"]
+                                            )
+                                        )
+                                        is_charged_back: bool = (
+                                            get_override_bool_value_or_default(
+                                                existing_ticket["IsChargedBack"]
+                                            )
+                                        )
+                                        is_active: bool = (
+                                            get_override_bool_value_or_default(
+                                                existing_ticket["IsActive"]
+                                            )
+                                        )
+
+                                        if (
+                                            order_active is True
+                                            and order_deleted is False
+                                            and order_comped is False
+                                            and is_active is True
+                                            and is_refunded is False
+                                            and is_charged_back is False
+                                        ):
+                                            total_tickets_sold += 1
+
                                         sql = """UPDATE TicketSocketOrderTickets
                                                 SET TicketType=%(ticket_type)s,
                                                 TicketSocketTicketTypeId=%(ticket_type_id)s,
@@ -720,6 +767,26 @@ class DataRefreshService:
                                         tickets_failed.append(ticket.ticket_id)
                                         update_success = False
                                         continue
+
+                    if (
+                        ticket_socket_event_id
+                        and total_tickets_sold > 0
+                        and total_tickets_available > 0
+                    ):
+                        is_sold_out: bool = (
+                            total_tickets_sold >= total_tickets_available
+                        )
+                        sql = """UPDATE TicketSocketEvents SET IsSoldOut=%(sold_out)s, 
+                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                                 WHERE Id=%(ticket_socket_event_id)s"""
+                        data = {
+                            "ticket_socket_event_id": ticket_socket_event_id,
+                            "sold_out": get_override_tinyint_value_or_default_from_bool(
+                                is_sold_out
+                            ),
+                        }
+                        update_success = db_update(sql, data)
+
             else:
                 update_success = True
 

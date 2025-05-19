@@ -114,7 +114,8 @@ class EventService:
                     TicketSocketEvents.URL AS URL,
                     TicketSocketEvents.Thumbnail,                 
                     Tour.AnnounceDate AS TourAnnounceDate,
-                    COALESCE(Tour.IsActive, 0) AS IsTourActive
+                    COALESCE(Tour.IsActive, 0) AS IsTourActive,
+                    COALESCE(TicketSocketEvents.IsSoldOut, 0) AS IsSoldOut
                  FROM ExternalEvents
             JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId
             LEFT JOIN TicketSocketEvents ON TicketSocketEvents.Id = ExternalEvents.TicketSocketEventId
@@ -316,6 +317,7 @@ class EventService:
             external_thumbnail = get_override_string_value_or_default(
                 row["ExternalThumbnail"]
             )
+            vip_event.is_sold_out = get_override_bool_value_or_default(row["IsSoldOut"])
 
             # ExternalEvents.Thumbnail overrides the thumbnail from TS, but preserve both
             if external_thumbnail is not None:
@@ -485,6 +487,7 @@ class EventService:
                 "",
             )
             vip_event.is_vip = get_override_bool_value_or_default(row["IsVip"])
+            vip_event.is_sold_out = get_override_bool_value_or_default(row["IsSoldOut"])
             events.append(vip_event)
         return events
 

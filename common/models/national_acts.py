@@ -283,6 +283,7 @@ class VipEvent(TicketSocketEvent):
     ticket_socket_event_id: int = 0
     seller_event_category_id: int = None
     is_vip: bool = True
+    is_sold_out: bool = False
 
     # ExternalEvent properties
     external_event_id: int = None
@@ -416,7 +417,7 @@ class VipEvent(TicketSocketEvent):
         self.total_checked_in = total_checked_in
         self.total_shirts = total_shirts
         self.num_tickets_refunded = total_tickets_refunded
-        self.num_tickets_charged_back = total_tickets_refunded
+        self.num_tickets_charged_back = total_tickets_charged_back
         self.revenue_refunded = total_revenue_refunded
         self.revenue_charged_back = total_revenue_charged_back
         self.service_fee_revenue_refunded = total_service_fee_revenue_refunded
