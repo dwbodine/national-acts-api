@@ -50,6 +50,7 @@ class EventService:
         show_cancelled: bool = True,
         seller_ids: list[int] = None,
         tour_id: int = None,
+        is_public: bool = False,
     ):
         """
         main method to fetch events and orders
@@ -207,9 +208,7 @@ class EventService:
             elif start is not None:
                 where_clause.append("ExternalEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
-            elif ignore_flags is not True and (
-                get_orders is False or seller_id is None
-            ):
+            elif is_public is True:
                 where_clause.append("ExternalEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.now().strftime("%Y-%m-%d")
 
@@ -264,22 +263,13 @@ class EventService:
                     announce_date_str, "%Y-%m-%d %H:%M:%S"
                 ).timestamp()
 
-            # skip events where the announce date has not yet passed
-            if ignore_flags is not True and (get_orders is False or seller_id is None):
-                if tad_ts is not None and ad_ts is not None:
-                    if tad_ts >= ad_ts:
-                        if tad_ts > now_ts:
-                            continue
-                        elif ad_ts > now_ts:
-                            continue
-                    else:
-                        if ad_ts > now_ts:
-                            continue
+            # for public page, skip events where the announce date has not yet passed
+            if is_public is True and (ad_ts is not None or tad_ts is not None):
+                if ad_ts is not None:
+                    if ad_ts > now_ts:
+                        continue
                 elif tad_ts is not None:
                     if tad_ts > now_ts:
-                        continue
-                elif ad_ts is not None:
-                    if ad_ts > now_ts:
                         continue
 
             external_event_id = get_override_int_value_or_default(
@@ -423,7 +413,7 @@ class EventService:
             notes = calendar_service.get_event_notes(vip_event.external_event_id)
             vip_event.notes = notes
 
-            if get_orders is True:
+            if is_public is False and get_orders is True:
                 ticket_types = self.__get_ticket_types_from_event_id(
                     ticket_socket_event_id
                 )
