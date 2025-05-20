@@ -776,7 +776,7 @@ class DataRefreshService:
                         is_sold_out: bool = (
                             total_tickets_sold >= total_tickets_available
                         )
-                        sql = """UPDATE TicketSocketEvents SET IsSoldOut=%(sold_out)s, 
+                        sql = """UPDATE TicketSocketEvents SET IsSoldOut=%(sold_out)s,
                                 LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                  WHERE Id=%(ticket_socket_event_id)s"""
                         data = {
@@ -785,7 +785,7 @@ class DataRefreshService:
                                 is_sold_out
                             ),
                         }
-                        update_success = db_update(sql, data)
+                        db_update(sql, data)
 
             else:
                 update_success = True

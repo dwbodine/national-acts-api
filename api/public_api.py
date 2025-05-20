@@ -67,6 +67,7 @@ def get_events():
         exclude_end=exclude_end,
         show_cancelled=False,
         seller_ids=seller_ids,
+        is_public=True,
     )
     return convert_to_json(results)
 
@@ -161,13 +162,13 @@ def upload_temp_file():
     try:
         file = request.files["tempFile"]
         filename = file.filename
-        
+
         # replace garbage characters from Windows/Mac
         filename = filename.replace(" ", "_")
         filename = filename.replace("(", "_")
         filename = filename.replace(")", "_")
         filename = filename.replace("__", "_")
-        
+
         file.save(os.path.join("tmp", filename))
     except Exception as error:  # pylint: disable=broad-exception-caught
         filename = None
