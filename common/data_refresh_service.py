@@ -242,6 +242,7 @@ class DataRefreshService:
                         ticket_socket_event_id = get_override_int_value_or_default(
                             existing_event["Id"]
                         )
+
                         event_data["id"] = ticket_socket_event_id
                         sql = """UPDATE TicketSocketEvents SET Title=%(title)s,
                                 EventDate=%(eventDate)s, URL=%(url)s,
@@ -282,6 +283,25 @@ class DataRefreshService:
                             )
                             event_data["id"] = ticket_socket_event_id
 
+                            # try to find venue in existing data if possible
+                            venue_id: int = 0
+                            venue_sql = """SELECT VenueID FROM ExternalEventVenues
+                                WHERE Venue=%(venue)s AND City=%(city)s LIMIT 0, 1"""
+                            venue_data = {
+                                "venue": event_data["venue"],
+                                "city": event_data["city"],
+                            }
+                            venue_row = db_query_one(venue_sql, venue_data)
+                            if venue_row:
+                                venue_id = get_override_int_value_or_default(
+                                    venue_row["VenueID"]
+                                )
+
+                            if venue_id > 0:
+                                event_data["venue_id"] = venue_id
+                            else:
+                                event_data["venue_id"] = None
+
                             if evt.is_vip is True:
                                 event_data["url"] = None
                                 event_data["external_vip_link"] = (
@@ -298,9 +318,10 @@ class DataRefreshService:
                                 event_data["external_vip_link"] = None
 
                             sql = """INSERT INTO ExternalEvents(TicketSocketEventId, SellerId,
-                                Title, EventDate, Thumbnail, URL, ExternalVipLink, Created,
-                                LastUpdate) VALUES (%(id)s, %(seller_id)s, %(title)s,
-                                %(eventDate)s, %(thumbnail)s, %(url)s, %(external_vip_link)s,
+                                Title, EventDate, Thumbnail, URL, ExternalVipLink, 
+                                ExternalEventVenueId, Created, LastUpdate) VALUES
+                                (%(id)s, %(seller_id)s, %(title)s, %(eventDate)s,
+                                %(thumbnail)s, %(url)s, %(external_vip_link)s, %(venue_id)s, 
                                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
                                 CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                             external_event_id = db_insert(sql, event_data, cnx)

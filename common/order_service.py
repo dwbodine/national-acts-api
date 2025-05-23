@@ -37,7 +37,7 @@ class OrderService:
         show_deleted: bool = False,
         ignore_flags: bool = False,
         ts_order_id: int = None,
-        search_term: str = None
+        search_term: str = None,
     ):
         """
         Retreive order data from database
@@ -66,8 +66,10 @@ class OrderService:
 
         sql = ""
 
-        if ts_order_id is None and search_term is None and (
-            midnight_start is not None and midnight_end is not None
+        if (
+            ts_order_id is None
+            and search_term is None
+            and (midnight_start is not None and midnight_end is not None)
         ):
             sql += """
                 WITH
@@ -86,8 +88,10 @@ class OrderService:
                                 BETWEEN %(startDate)s AND %(endDate)s
                         )
                 )"""
-        elif ts_order_id is None and search_term is None and (
-            end is not None or start is not None or seller_id is None
+        elif (
+            ts_order_id is None
+            and search_term is None
+            and (end is not None or start is not None or seller_id is None)
         ):
             sql += """
                 WITH
@@ -120,15 +124,22 @@ class OrderService:
                     COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
                     COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS EventCountry 
                     FROM TicketSocketOrders
-                    JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
-                    JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                    JOIN ExternalEventVenues ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
-                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
-                    JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId 
-                    JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
-                    JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
+                    JOIN TicketSocketEvents
+                        ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                    JOIN ExternalEvents
+                        ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
+                    JOIN SellerEventCategory 
+                        ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+                    JOIN Sellers
+                        ON Sellers.SellerId = SellerEventCategory.SellerId 
+                    JOIN TicketSocket
+                        ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
+                    JOIN ExchangeRates
+                        ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                     LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate"""
+                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate
+                    LEFT JOIN ExternalEventVenues
+                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID"""
 
         sql += " WHERE "
         data = {}
@@ -141,14 +152,14 @@ class OrderService:
             where_clause.append(
                 """CONCAT_WS (' ', Sellers.Name, 
                             COALESCE(ExternalEvents.Title, TicketSocketEvents.Title),
-                            COALESCE(TicketSocketOrders.OrderId, ''),
                             COALESCE(TicketSocketOrders.PurchaserLastName, ''),
                             COALESCE(TicketSocketOrders.PurchaserFirstName, ''),
                             COALESCE(TicketSocketOrders.Email, ''),
                             COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country, '')) 
                             LIKE ('%"""
                 + search_term
-                + """%')"""
+                + """%') OR TicketSocketOrders.OrderId="""
+                + search_term
             )
         else:
             if ignore_flags is not True:
