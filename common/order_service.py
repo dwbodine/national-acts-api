@@ -149,18 +149,22 @@ class OrderService:
             where_clause.append("TicketSocketOrders.Id = %(order_id)s")
             data["order_id"] = ts_order_id
         elif search_term is not None and len(search_term) > 0:
-            where_clause.append(
-                """CONCAT_WS (' ', Sellers.Name, 
+            search_sql: str = ""
+            if search_term.isnumeric():
+                search_sql = """TicketSocketOrders.OrderId=""" + search_term
+            else:
+                search_sql = (
+                    """CONCAT_WS (' ', Sellers.Name, 
                             COALESCE(ExternalEvents.Title, TicketSocketEvents.Title),
                             COALESCE(TicketSocketOrders.PurchaserLastName, ''),
                             COALESCE(TicketSocketOrders.PurchaserFirstName, ''),
                             COALESCE(TicketSocketOrders.Email, ''),
                             COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country, '')) 
                             LIKE ('%"""
-                + search_term
-                + """%') OR TicketSocketOrders.OrderId="""
-                + search_term
-            )
+                    + search_term
+                    + """%')"""
+                )
+            where_clause.append(search_sql)
         else:
             if ignore_flags is not True:
                 if show_deleted is not True:
