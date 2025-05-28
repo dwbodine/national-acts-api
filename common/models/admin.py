@@ -4,6 +4,8 @@ Models specific to site or portal administration
 
 from enum import Enum
 
+from common.models.national_acts import VipEvent
+
 
 class SiteSettingType(str, Enum):
     """
@@ -103,10 +105,13 @@ class Page:
     subtitle2: str = None
     html_text: str = None
     is_active: bool = True
+    use_include_dates: bool = False
     include_start: str = None
     include_end: str = None
+    use_exclude_dates: bool = False
     exclude_start: str = None
     exclude_end: str = None
     google_analytics_id: str = None
     page_order: int = 1
     sellers: list[PageSeller] = []
+    events: list[VipEvent] = []
