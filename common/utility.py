@@ -393,10 +393,10 @@ def get_override_string_value_or_default(
     """
     Get string value from override vs. default
     """
-    if override is not None:
+    if override is not None and str(override).strip() != '':
         override_val = str(override).strip()
         return override_val if len(override_val) > 0 else None
-    elif default is not None:
+    elif default is not None and str(default).strip() != '':
         default_val = str(default).strip()
         return default_val if len(default_val) > 0 else None
     else:

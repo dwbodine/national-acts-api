@@ -3,6 +3,7 @@ Page Service
 """
 
 from datetime import datetime
+import operator
 
 from common.db import (
     db_delete,
@@ -11,7 +12,9 @@ from common.db import (
     db_insert,
     db_update,
 )
+from common.event_service import EventService
 from common.models.admin import Page, PageSeller, PageType
+from common.models.national_acts import VipEvent
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
@@ -64,7 +67,9 @@ class PageService:
 
         sql = """SELECT Pages.*, PageType.PageType AS PageTypeName,
                     PageType.Template, PageType.Component
-                    FROM Pages WHERE Pages.Inactive=0 and Pages.Route=%(route)s"""
+                    FROM Pages 
+                    JOIN PageType ON PageType.PageTypeID = Pages.PageTypeID
+                    WHERE Pages.Inactive=0 and Pages.Route=%(route)s"""
         data = {"route": route}
         row = db_query_one(sql, data)
         page = self.__get_page_from_row_object(row)
@@ -76,6 +81,60 @@ class PageService:
         ):
             page_sellers = self.get_page_sellers(page.page_id, True)
             page.sellers = page_sellers
+
+            page_events: list[VipEvent] = []
+            event_service = EventService()
+            if page.sellers is not None and len(page.sellers) > 0:
+                for seller in page.sellers:
+                    start: int = None
+                    end: int = None
+                    if page.use_include_dates is True:
+                        if page.include_start is not None:
+                            start = datetime.strptime(
+                                page.include_start, "%Y-%m-%d %H:%M:%S"
+                            ).timestamp()
+
+                        if page.include_end is not None:
+                            end = datetime.strptime(
+                                page.include_end, "%Y-%m-%d %H:%M:%S"
+                            ).timestamp()
+
+                    exclude_start: int = None
+                    exclude_end: int = None
+                    if page.use_exclude_dates is True:
+                        if page.exclude_start is not None:
+                            exclude_start = datetime.strptime(
+                                page.exclude_start, "%Y-%m-%d %H:%M:%S"
+                            ).timestamp()
+                            exclude_start += 7 * 60 * 60
+
+                        if page.exclude_end is not None:
+                            exclude_end = datetime.strptime(
+                                page.exclude_end, "%Y-%m-%d %H:%M:%S"
+                            ).timestamp()
+                            exclude_end += 7 * 60 * 60
+
+                    seller_events = event_service.get_events_and_orders(
+                        is_public=True,
+                        get_orders=False,
+                        seller_id=seller.seller_id,
+                        start=start,
+                        end=end,
+                        exclude_start=exclude_start,
+                        exclude_end=exclude_end,
+                    )
+                    if seller_events is not None and len(seller_events) > 0:
+                        page_events = page_events + seller_events
+
+                page_events.sort(
+                    key=operator.attrgetter(
+                        "event_date",
+                        "event_time",
+                        "meet_and_greet_time",
+                        "title",
+                    )
+                )
+                page.events = page_events
 
         return page
 
@@ -119,6 +178,8 @@ class PageService:
             page_seller = PageSeller()
             page_seller.page_seller_id = page_seller_id
             page_seller.page_id = page_id
+
+            page_seller.seller_id = get_override_int_value_or_default(row["SellerId"])
 
             seller_name = get_override_string_value_or_default(row["SellerName"])
             show_display_name = get_override_bool_value_or_default(
@@ -273,11 +334,17 @@ class PageService:
             "inactive": get_override_tinyint_value_or_default_from_bool(
                 not page_to_update.is_active
             ),
+            "useIncludeDates": get_override_tinyint_value_or_default_from_bool(
+                page_to_update.use_include_dates
+            ),
             "includeStart": get_override_string_value_or_default(
                 page_to_update.include_start
             ),
             "includeEnd": get_override_string_value_or_default(
                 page_to_update.include_end
+            ),
+            "useExcludeDates": get_override_tinyint_value_or_default_from_bool(
+                page_to_update.use_exclude_dates
             ),
             "excludeStart": get_override_string_value_or_default(
                 page_to_update.exclude_start
@@ -297,20 +364,25 @@ class PageService:
                 Thumbnail=%(thumbnail)s, LinkPreviewImage=%(linkPreviewImage)s, 
                 LogoOnly=%(logoOnly)s, Title1=%(title1)s, SubTitle1=%(subtitle1)s,
                 Title2=%(title2)s, SubTitle2=%(subtitle2)s, HTMLText=%(htmlText)s,
-                Inactive=%(inactive)s, IncludeStart=%(includeStart)s,
-                IncludeEnd=%(includeEnd)s, ExcludeStart=%(excludeStart)s,
-                ExcludeEnd=%(excludeEnd)s, GoogleAnalyticsID=%(googleAnalyticsId)s
+                Inactive=%(inactive)s, UseIncludeDates=%(useIncludeDates)s,
+                IncludeStart=%(includeStart)s, IncludeEnd=%(includeEnd)s,
+                UseExcludeDates=%(useExcludeDates)s, ExcludeStart=%(excludeStart)s,
+                ExcludeEnd=%(excludeEnd)s, GoogleAnalyticsID=%(googleAnalyticsId)s,
+                LastUpdated=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                 WHERE PageID=%(pageId)s"""
             success = db_update(sql, data)
         else:
             sql = """INSERT INTO Pages (Route, Title, PageTypeID, Image, Thumbnail,
                 LinkPreviewImage, LogoOnly, Title1, SubTitle1, Title2, SubTitle2,
-                HTMLText, Inactive, IncludeStart, IncludeEnd, ExcludeStart,
-                ExcludeEnd, GoogleAnalyticsID) VALUES (%(route)s, %(title)s,
-                %(pageTypeId)s, %(image)s, %(thumbnail)s, %(linkPreviewImage)s,
-                %(logoOnly)s, %(title1)s, %(subtitle1)s, %(title2)s, %(subtitle2)s,
-                %(htmlText)s, %(inactive)s, %(includeStart)s, %(includeEnd)s,
-                %(excludeStart)s, %(excludeEnd)s, %(googleAnalyticsId)s)"""
+                HTMLText, Inactive, UseIncludeDates, IncludeStart, IncludeEnd,
+                UseExcludeDates, ExcludeStart, ExcludeEnd, GoogleAnalyticsID,
+                LastUpdated) VALUES (%(route)s, %(title)s, %(pageTypeId)s,
+                %(image)s, %(thumbnail)s, %(linkPreviewImage)s, %(logoOnly)s,
+                %(title1)s, %(subtitle1)s, %(title2)s, %(subtitle2)s,
+                %(htmlText)s, %(inactive)s, %(useIncludeDates)s,
+                %(includeStart)s, %(includeEnd)s, %(useExcludeDates)s,
+                %(excludeStart)s, %(excludeEnd)s, %(googleAnalyticsId)s, 
+                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
             page_id = db_insert(sql, data)
             success = page_id > 0
 
@@ -324,6 +396,7 @@ class PageService:
             existing_sellers = self.get_page_sellers(page_id)
 
             sellers_updated: bool = False
+            # check for updates/adds in new sellers list
             for seller in new_sellers:
                 found_seller = next(
                     (
@@ -334,137 +407,217 @@ class PageService:
                     None,
                 )
                 if found_seller is not None:
-                    if (
-                        found_seller.seller_id != seller.seller_id
-                        or seller.seller_id == 0
-                    ):
-                        if seller.seller_id is not None and seller.seller_id > 0:
-                            update_sql = """UPDATE PageSellers SET
-                                SellerId=%(sellerId)s, 
-                                PageId=%(pageId)s,
-                                DisplayName=%(displayName)s,
-                                ShowDisplayName=%(showDisplayName)s,
-                                AddressOverride=%(address)s,
-                                CityOverride=%(city)s,
-                                StateOverride=%(state)s,
-                                ZipOverride=%(zip)s,
-                                CountryOverride=%(country)s,
-                                PhoneOverride=%(phone)s,
-                                EmailOverride=%(email)s,
-                                TwitterOverride=%(twitter)s,
-                                FacebookOverride=%(facebook)s,
-                                InstagramOverride=%(instagram)s,
-                                YouTubeOverride=%(youtube)s,
-                                SpotifyOverride=%(spotify)s,
-                                WebsiteOverride=%(website)s,
-                                WebsiteDisplayTextOverride=%(websiteDisplayText)s,                                
-                                LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
-                                WHERE PageSellerId=%(pageSellerId)s"""
-                            update_data = {
-                                "sellerId": get_override_int_value_or_default(
-                                    seller.seller_id
-                                ),
-                                "pageId": page_id,
-                                "displayName": get_override_string_value_or_default(
-                                    seller.display_name
-                                ),
-                                "showDisplayName": get_override_tinyint_value_or_default_from_bool(
-                                    seller.show_display_name
-                                ),
-                                "address": get_override_string_value_or_default(
-                                    seller.address
-                                ),
-                                "city": get_override_string_value_or_default(
-                                    seller.city
-                                ),
-                                "state": get_override_string_value_or_default(
-                                    seller.state
-                                ),
-                                "zip": get_override_string_value_or_default(seller.zip),
-                                "country": get_override_string_value_or_default(
-                                    seller.country
-                                ),
-                                "phone": get_override_string_value_or_default(
-                                    seller.phone
-                                ),
-                                "email": get_override_string_value_or_default(
-                                    seller.email
-                                ),
-                                "twitter": get_override_string_value_or_default(
-                                    seller.twitter
-                                ),
-                                "facebook": get_override_string_value_or_default(
-                                    seller.facebook
-                                ),
-                                "instagram": get_override_string_value_or_default(
-                                    seller.instagram
-                                ),
-                                "youtube": get_override_string_value_or_default(
-                                    seller.youtube
-                                ),
-                                "spotify": get_override_string_value_or_default(
-                                    seller.spotify
-                                ),
-                                "website": get_override_string_value_or_default(
-                                    seller.website
-                                ),
-                                "websiteDisplayText": get_override_string_value_or_default(
-                                    seller.website_display_text
-                                ),
-                                "pageSellerId": get_override_int_value_or_default(
-                                    found_seller.page_seller_id
-                                ),
-                            }
-                            success = db_update(update_sql, update_data)
-                            sellers_updated = success
-                        else:
-                            delete_sql = """DELETE FROM PageSellers
-                                WHERE PageSellerId=%(pageSellerId)s"""
-                            delete_data = {
-                                "pageSellerId": get_override_int_value_or_default(
-                                    found_seller.page_seller_id
-                                )
-                            }
-                            success = db_delete(delete_sql, delete_data)
-                            sellers_updated = success
+                    update_sql = """UPDATE PageSellers SET
+                        SellerId=%(sellerId)s, 
+                        PageId=%(pageId)s,
+                        DisplayName=%(displayName)s,
+                        ShowDisplayName=%(showDisplayName)s,
+                        AddressOverride=%(address)s,
+                        CityOverride=%(city)s,
+                        StateOverride=%(state)s,
+                        ZipOverride=%(zip)s,
+                        CountryOverride=%(country)s,
+                        PhoneOverride=%(phone)s,
+                        EmailOverride=%(email)s,
+                        TwitterOverride=%(twitter)s,
+                        FacebookOverride=%(facebook)s,
+                        InstagramOverride=%(instagram)s,
+                        YouTubeOverride=%(youtube)s,
+                        SpotifyOverride=%(spotify)s,
+                        WebsiteOverride=%(website)s,
+                        WebsiteDisplayTextOverride=%(websiteDisplayText)s,                                
+                        LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                        WHERE PageSellerId=%(pageSellerId)s"""
+                    update_data = {
+                        "sellerId": get_override_int_value_or_default(seller.seller_id),
+                        "pageId": page_id,
+                        "displayName": (
+                            get_override_string_value_or_default(seller.display_name)
+                            if hasattr(seller, "display_name")
+                            else None
+                        ),
+                        "showDisplayName": (
+                            get_override_tinyint_value_or_default_from_bool(
+                                seller.show_display_name
+                            )
+                            if hasattr(seller, "show_display_name")
+                            else False
+                        ),
+                        "address": (
+                            get_override_string_value_or_default(seller.address)
+                            if hasattr(seller, "address")
+                            else None
+                        ),
+                        "city": (
+                            get_override_string_value_or_default(seller.city)
+                            if hasattr(seller, "city")
+                            else None
+                        ),
+                        "state": (
+                            get_override_string_value_or_default(seller.state)
+                            if hasattr(seller, "state")
+                            else None
+                        ),
+                        "zip": (
+                            get_override_string_value_or_default(seller.zip)
+                            if hasattr(seller, "zip")
+                            else None
+                        ),
+                        "country": (
+                            get_override_string_value_or_default(seller.country)
+                            if hasattr(seller, "country")
+                            else None
+                        ),
+                        "phone": (
+                            get_override_string_value_or_default(seller.phone)
+                            if hasattr(seller, "phone")
+                            else None
+                        ),
+                        "email": (
+                            get_override_string_value_or_default(seller.email)
+                            if hasattr(seller, "email")
+                            else None
+                        ),
+                        "twitter": (
+                            get_override_string_value_or_default(seller.twitter)
+                            if hasattr(seller, "twitter")
+                            else None
+                        ),
+                        "facebook": (
+                            get_override_string_value_or_default(seller.facebook)
+                            if hasattr(seller, "facebook")
+                            else None
+                        ),
+                        "instagram": (
+                            get_override_string_value_or_default(seller.instagram)
+                            if hasattr(seller, "instagram")
+                            else None
+                        ),
+                        "youtube": (
+                            get_override_string_value_or_default(seller.youtube)
+                            if hasattr(seller, "youtube")
+                            else None
+                        ),
+                        "spotify": (
+                            get_override_string_value_or_default(seller.spotify)
+                            if hasattr(seller, "spotify")
+                            else None
+                        ),
+                        "website": (
+                            get_override_string_value_or_default(seller.website)
+                            if hasattr(seller, "website")
+                            else None
+                        ),
+                        "websiteDisplayText": (
+                            get_override_string_value_or_default(
+                                seller.website_display_text
+                            )
+                            if hasattr(seller, "website_display_text")
+                            else None
+                        ),
+                        "pageSellerId": get_override_int_value_or_default(
+                            found_seller.page_seller_id
+                        ),
+                    }
+                    success = db_update(update_sql, update_data)
+                    sellers_updated = success
+
                 elif seller.seller_id > 0:
                     insert_sql = """INSERT INTO PageSellers
                         (SellerId, PageId, DisplayName, ShowDisplayName, AddressOverride,
                         CityOverride, StateOverride, ZipOverride, CountryOverride, PhoneOverride,
                         EmailOverride, TwitterOverride, FacebookOverride, InstagramOverride,
                         YouTubeOverride, SpotifyOverride, WebsiteOverride, WebsiteDisplayTextOverride,
-                        LastUpdated) VALUES (%(sellerId)s, %(pageId)s, %(displayName)s, %(address)s,
-                        %(city)s, %(state)s, %(zip)s, %(country)s, %(phone)s, %(email)s,
+                        LastUpdate) VALUES (%(sellerId)s, %(pageId)s, %(displayName)s, %(showDisplayName)s, 
+                        %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s, %(phone)s, %(email)s,
                         %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, %(spotify)s, %(website)s,
                         %(websiteDisplayText)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                     insert_data = {
                         "sellerId": get_override_int_value_or_default(seller.seller_id),
                         "pageId": page_id,
-                        "displayName": get_override_string_value_or_default(
-                            seller.display_name
+                        "displayName": (
+                            get_override_string_value_or_default(seller.display_name)
+                            if hasattr(seller, "display_name")
+                            else None
                         ),
-                        "showDisplayName": get_override_tinyint_value_or_default_from_bool(
-                            seller.show_display_name
+                        "showDisplayName": (
+                            get_override_tinyint_value_or_default_from_bool(
+                                seller.show_display_name
+                            )
+                            if hasattr(seller, "show_display_name")
+                            else False
                         ),
-                        "address": get_override_string_value_or_default(seller.address),
-                        "city": get_override_string_value_or_default(seller.city),
-                        "state": get_override_string_value_or_default(seller.state),
-                        "zip": get_override_string_value_or_default(seller.zip),
-                        "country": get_override_string_value_or_default(seller.country),
-                        "phone": get_override_string_value_or_default(seller.phone),
-                        "email": get_override_string_value_or_default(seller.email),
-                        "twitter": get_override_string_value_or_default(seller.twitter),
-                        "facebook": get_override_string_value_or_default(
-                            seller.facebook
+                        "address": (
+                            get_override_string_value_or_default(seller.address)
+                            if hasattr(seller, "address")
+                            else None
                         ),
-                        "instagram": get_override_string_value_or_default(
-                            seller.instagram
+                        "city": (
+                            get_override_string_value_or_default(seller.city)
+                            if hasattr(seller, "city")
+                            else None
                         ),
-                        "youtube": get_override_string_value_or_default(seller.youtube),
-                        "spotify": get_override_string_value_or_default(seller.spotify),
-                        "website": get_override_string_value_or_default(seller.website),
-                        "websiteDisplayText": get_override_string_value_or_default(
-                            seller.website_display_text
+                        "state": (
+                            get_override_string_value_or_default(seller.state)
+                            if hasattr(seller, "state")
+                            else None
+                        ),
+                        "zip": (
+                            get_override_string_value_or_default(seller.zip)
+                            if hasattr(seller, "zip")
+                            else None
+                        ),
+                        "country": (
+                            get_override_string_value_or_default(seller.country)
+                            if hasattr(seller, "country")
+                            else None
+                        ),
+                        "phone": (
+                            get_override_string_value_or_default(seller.phone)
+                            if hasattr(seller, "phone")
+                            else None
+                        ),
+                        "email": (
+                            get_override_string_value_or_default(seller.email)
+                            if hasattr(seller, "email")
+                            else None
+                        ),
+                        "twitter": (
+                            get_override_string_value_or_default(seller.twitter)
+                            if hasattr(seller, "twitter")
+                            else None
+                        ),
+                        "facebook": (
+                            get_override_string_value_or_default(seller.facebook)
+                            if hasattr(seller, "facebook")
+                            else None
+                        ),
+                        "instagram": (
+                            get_override_string_value_or_default(seller.instagram)
+                            if hasattr(seller, "instagram")
+                            else None
+                        ),
+                        "youtube": (
+                            get_override_string_value_or_default(seller.youtube)
+                            if hasattr(seller, "youtube")
+                            else None
+                        ),
+                        "spotify": (
+                            get_override_string_value_or_default(seller.spotify)
+                            if hasattr(seller, "spotify")
+                            else None
+                        ),
+                        "website": (
+                            get_override_string_value_or_default(seller.website)
+                            if hasattr(seller, "website")
+                            else None
+                        ),
+                        "websiteDisplayText": (
+                            get_override_string_value_or_default(
+                                seller.website_display_text
+                            )
+                            if hasattr(seller, "website_display_text")
+                            else None
                         ),
                     }
                     ps_id = db_insert(insert_sql, insert_data)
@@ -472,6 +625,30 @@ class PageService:
                     sellers_updated = success
                     if sellers_updated is True:
                         seller.page_seller_id = ps_id
+
+                if success is not True:
+                    break
+
+            # check for deletes
+            for seller in existing_sellers:
+                found_seller = next(
+                    (
+                        sl
+                        for sl in new_sellers
+                        if sl.page_seller_id == seller.page_seller_id
+                    ),
+                    None,
+                )
+                if found_seller is None:
+                    delete_sql = """DELETE FROM PageSellers
+                        WHERE PageSellerId=%(pageSellerId)s"""
+                    delete_data = {
+                        "pageSellerId": get_override_int_value_or_default(
+                            seller.page_seller_id
+                        )
+                    }
+                    success = db_delete(delete_sql, delete_data)
+                    sellers_updated = success
 
                 if success is not True:
                     break
@@ -488,6 +665,7 @@ class PageService:
             if page_id > 0:
                 page = Page()
                 page.page_id = page_id
+                page.is_active = not get_override_bool_value_or_default(row["Inactive"])
                 page.route = get_override_string_value_or_default(row["Route"])
                 page.title = get_override_string_value_or_default(row["Title"])
                 page.image = get_override_string_value_or_default(row["Image"])
@@ -495,16 +673,25 @@ class PageService:
                 page.link_preview_image = get_override_string_value_or_default(
                     row["LinkPreviewImage"]
                 )
+                page.logo_only_image = get_override_string_value_or_default(
+                    row["LogoOnly"]
+                )
                 page.title1 = get_override_string_value_or_default(row["Title1"])
                 page.subtitle1 = get_override_string_value_or_default(row["SubTitle1"])
                 page.title2 = get_override_string_value_or_default(row["Title2"])
                 page.subtitle2 = get_override_string_value_or_default(row["SubTitle2"])
                 page.html_text = get_override_string_value_or_default(row["HTMLText"])
+                page.use_include_dates = get_override_bool_value_or_default(
+                    row["UseIncludeDates"]
+                )
                 page.include_start = get_override_string_value_or_default(
                     row["IncludeStart"]
                 )
                 page.include_end = get_override_string_value_or_default(
                     row["IncludeEnd"]
+                )
+                page.use_exclude_dates = get_override_bool_value_or_default(
+                    row["UseExcludeDates"]
                 )
                 page.exclude_start = get_override_string_value_or_default(
                     row["ExcludeStart"]
