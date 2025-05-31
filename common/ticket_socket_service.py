@@ -681,9 +681,7 @@ class TicketSocketService:
                                                 z,
                                                 phonenumbers.PhoneNumberFormat.INTERNATIONAL,
                                             )
-                                    except (
-                                        Exception
-                                    ) as error:  # pylint: disable=broad-exception-caught
+                                    except Exception as error:  # pylint: disable=broad-exception-caught
                                         error_message: str = (
                                             str(error) + "\n" + traceback.format_exc()
                                         )
