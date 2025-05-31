@@ -421,19 +421,9 @@ class SenderApiService:
                 )
                 new_sub.venue_country = venue_country
 
-                phone = get_override_string_value_or_default(row["Phone"], default="")
-
-                if (
-                    venue_country == ""
-                    or venue_country == "USA"
-                    or venue_country == "United States"
-                    or venue_country == "Canada"
-                ):
-                    new_sub.phone = (
-                        self.__format_us_or_canada_phone_number_for_sender_api(phone)
-                    )
-                else:
-                    new_sub.phone = ""
+                new_sub.phone = get_override_string_value_or_default(
+                    row["Phone"], default=""
+                )
 
                 new_sub.band = get_override_string_value_or_default(
                     row["Band"], default=""
@@ -448,14 +438,3 @@ class SenderApiService:
             log_message(f"""[{now}] - {error_message}\r\n""")
 
         return stored_subscribers
-
-    def __format_us_or_canada_phone_number_for_sender_api(self, phone: str):
-        if phone.strip() == "":
-            return ""
-
-        phone = phone.replace("+1", "")
-        phone = phone.replace("(", "")
-        phone = phone.replace(")", "")
-        phone = phone.replace("-", "")
-        phone = phone.replace(" ", "")
-        return f"+1{phone}"

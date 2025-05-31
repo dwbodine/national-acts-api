@@ -150,3 +150,20 @@ def get_missing_subscribers():
     service = SenderApiService()
     result = service.get_missing_subscribers_csv()
     return convert_to_json(result)
+
+
+@cron_api.route("/cron/formatAllPhoneNumbers")
+def format_phones():
+    """
+    API for cron to format all existing phone numbers
+    """
+    # secured by internal api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("CRON_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = UpdateService()
+    result = service.format_all_phone_numbers()
+    return convert_to_json(result)

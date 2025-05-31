@@ -14,6 +14,8 @@ from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
 from PIL import Image
 
+from common.db import db_query_one
+
 
 class CamelCaseJsonEncoder(json.JSONEncoder):
     """
@@ -393,10 +395,10 @@ def get_override_string_value_or_default(
     """
     Get string value from override vs. default
     """
-    if override is not None and str(override).strip() != '':
+    if override is not None and str(override).strip() != "":
         override_val = str(override).strip()
         return override_val if len(override_val) > 0 else None
-    elif default is not None and str(default).strip() != '':
+    elif default is not None and str(default).strip() != "":
         default_val = str(default).strip()
         return default_val if len(default_val) > 0 else None
     else:
@@ -455,3 +457,60 @@ def get_override_bool_value_or_default(
         return int(default) >= 1
     else:
         return False
+
+
+def get_country_code_from_country_name(country: str) -> str:
+    """
+    Fetches the two-character code for the country from the database, if available
+    """
+    if country is None or len(country.strip()) == 0:
+        return "US"
+    country_code: str = "US"
+    if country == "Belguim":
+        country = "Belgium"
+    elif country == "Budapest":
+        country = "Hungary"
+    elif country == "Candada":
+        country = "Canada"
+    elif country == "Columbia":
+        country = "Colombia"
+    elif country == "Czechia":
+        country = "Czech Republic"
+    elif country == "Türkiye":
+        country = "Turkey"
+    elif (
+        country == "England"
+        or country == "UK"
+        or country == "GB"
+        or country == "Great Britian"
+        or country == "London"
+        or country == "Scotland"
+    ):
+        country = "United Kingdom"
+    elif country == "USA" or country == "US":
+        country = "United States"
+
+    sql = """SELECT CountryCode from CountryCodes WHERE Country=%(country)s"""
+    data = {"country": country.strip()}
+    row = db_query_one(sql, data)
+    if row:
+        country_code = get_override_string_value_or_default(row["CountryCode"])
+    return country_code
+
+
+def clean_up_phone_input_for_parsing(phone: str) -> str:
+    """
+    Cleans a phone input up for parsing
+    """
+    if phone is None or len(phone.strip()) == 0:
+        return None
+    phone = phone.replace("(", "")
+    phone = phone.replace(")", "")
+    phone = phone.replace("-", "")
+    phone = phone.replace(" ", "")
+    phone = phone.replace(":", "")
+    phone = phone.replace("O", "0")
+    phone = phone.replace("o", "0")
+    phone = re.sub(r"[a-zA-Z]", "", phone)
+    phone = phone.strip()
+    return phone

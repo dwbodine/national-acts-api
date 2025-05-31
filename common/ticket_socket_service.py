@@ -7,11 +7,16 @@ import json
 import re
 import time
 from datetime import datetime
+import traceback
 from typing import Any
 
+import phonenumbers
+
 from common.utility import (
+    clean_up_phone_input_for_parsing,
     fix_magic_quotes,
     format_phone,
+    get_country_code_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -327,10 +332,6 @@ class TicketSocketService:
                 else:
                     country = ""
 
-                format_phones: bool = True
-                if country != "" and country != "USA" and country != "United States":
-                    format_phones = False
-
                 timezone = ""
                 if custom_fields != {} and "timezone" in custom_fields:
                     timezone = get_override_string_value_or_default(
@@ -382,9 +383,7 @@ class TicketSocketService:
                 event.ticket_types = ticket_types
 
                 # orders
-                event.orders = self.get_orders_from_event_id(
-                    event.event_id, format_phones
-                )
+                event.orders = self.get_orders_from_event_id(event.event_id, country)
 
                 self.events.append(event)
 
@@ -420,7 +419,7 @@ class TicketSocketService:
 
         return ttypes
 
-    def get_orders_from_event_id(self, event_id: int, format_phone_numbers: bool):
+    def get_orders_from_event_id(self, event_id: int, country: str = None):
         """
         Get order data per event from TS
         """
@@ -456,7 +455,7 @@ class TicketSocketService:
                     continue
 
                 order: TicketSocketOrder = self.__parse_response_to_order_object(
-                    incoming_order_id, event_id, format_phone_numbers, json_data
+                    incoming_order_id, event_id, json_data, country
                 )
 
                 orders.append(order)
@@ -464,7 +463,7 @@ class TicketSocketService:
         return orders
 
     def get_order_from_order_id(
-        self, order_id: int, event_id: int = 0, format_phone_numbers: bool = True
+        self, order_id: int, event_id: int = 0, country: str = None
     ):
         """
         API method to only return TS data for one order
@@ -490,7 +489,7 @@ class TicketSocketService:
 
             if incoming_order_id > 0 or incoming_order_id != order_id:
                 order = self.__parse_response_to_order_object(
-                    incoming_order_id, event_id, format_phone_numbers, json_data
+                    incoming_order_id, event_id, json_data, country
                 )
 
         return order
@@ -525,7 +524,7 @@ class TicketSocketService:
         return order_ids
 
     def __parse_response_to_order_object(
-        self, order_id: int, event_id: int, format_phone_numbers: bool, json_data: any
+        self, order_id: int, event_id: int, json_data: any, country: str = None
     ):
         # get data from order
         order = TicketSocketOrder()
@@ -665,12 +664,39 @@ class TicketSocketService:
                                 question_item["answerText"], default=""
                             )
 
-                        if answer != "":
+                        if answer is not None and answer != "":
                             if question.find("phone") >= 0 and order.phone == "":
-                                if format_phone_numbers:
-                                    order.phone = format_phone(answer)
+                                phone = get_override_string_value_or_default(
+                                    answer, default=""
+                                )
+                                phone = clean_up_phone_input_for_parsing(phone)
+                                if phone is not None and len(phone) > 0:
+                                    try:
+                                        region = get_country_code_from_country_name(
+                                            country
+                                        )
+                                        z = phonenumbers.parse(phone, region)
+                                        if phonenumbers.is_possible_number(z):
+                                            phone = phonenumbers.format_number(
+                                                z,
+                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL,
+                                            )
+                                    except (
+                                        Exception
+                                    ) as error:  # pylint: disable=broad-exception-caught
+                                        error_message: str = (
+                                            str(error) + "\n" + traceback.format_exc()
+                                        )
+                                        now = datetime.now().strftime(
+                                            "%Y-%m-%d %H:%M:%S"
+                                        )
+                                        log_message(
+                                            f"""[{now}] - {error_message}\r\n"""
+                                        )
+                                        phone = None
                                 else:
-                                    order.phone = answer
+                                    phone = None
+                                order.phone = phone
                             elif question.find("shirt") >= 0:
                                 shirt_size = answer
 
