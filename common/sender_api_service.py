@@ -382,6 +382,7 @@ class SenderApiService:
                     AND TicketSocketOrders.IsDeleted <> 1
                     AND TicketSocketOrders.IsSenderUpdated <> 1 
                     AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
+                    ORDER BY TicketSocketOrders.PurchaseDate DESC
                     """
 
             if limit > 0:
