@@ -20,6 +20,9 @@ from common.utility import (
     get_override_int_value_or_default,
     get_override_string_value_or_default,
     get_override_tinyint_value_or_default_from_bool,
+    move_temp_file_to_public_folder,
+    remove_file,
+    resize_tmp_image,
 )
 
 
@@ -310,6 +313,10 @@ class PageService:
         if page_to_update is None:
             return None
 
+        existing_page: Page = None
+        if page_to_update.page_id > 0:
+            existing_page = self.get_page_by_route(page_to_update.route)
+
         success: bool = False
         page_id = page_to_update.page_id
         data = {
@@ -356,6 +363,99 @@ class PageService:
                 page_to_update.google_analytics_id
             ),
         }
+
+        remove_old_header: bool = False
+        if page_to_update.image is not None:
+            if existing_page is None or existing_page.image != page_to_update.image:
+                image_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                image_file = resize_tmp_image(page_to_update.image, image_id, 1600)
+                if image_file is not None:
+                    data["image"] = get_override_string_value_or_default(image_file)
+                    move_temp_file_to_public_folder(image_file, "common/headers")
+                    remove_old_header = True
+        else:
+            remove_old_header = True
+
+        if remove_old_header is True and existing_page is not None:
+            existing_image = get_override_string_value_or_default(existing_page.image)
+            if existing_image is not None:
+                remove_file(existing_image, "common/thumbnails")
+
+        remove_old_thumbnail: bool = False
+        if page_to_update.thumbnail is not None:
+            if (
+                existing_page is None
+                or existing_page.thumbnail != page_to_update.thumbnail
+            ):
+                thumbnail_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                thumbnail_file = resize_tmp_image(
+                    page_to_update.thumbnail, thumbnail_id, 400
+                )
+                if thumbnail_file is not None:
+                    data["thumbnail"] = get_override_string_value_or_default(
+                        thumbnail_file
+                    )
+                    move_temp_file_to_public_folder(thumbnail_file, "common/thumbnails")
+                    remove_old_thumbnail = True
+        else:
+            remove_old_thumbnail = True
+
+        if remove_old_thumbnail and existing_page is not None:
+            existing_thumbnail = get_override_string_value_or_default(
+                existing_page.thumbnail
+            )
+            if existing_thumbnail is not None:
+                remove_file(existing_thumbnail, "common/thumbnails")
+
+        remove_old_preview: bool = False
+        if page_to_update.link_preview_image is not None:
+            if (
+                existing_page is None
+                or existing_page.link_preview_image != page_to_update.link_preview_image
+            ):
+                preview_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                preview_file = resize_tmp_image(
+                    page_to_update.link_preview_image, preview_id, 400
+                )
+                if preview_file is not None:
+                    data["linkPreviewImage"] = get_override_string_value_or_default(
+                        preview_file
+                    )
+                    move_temp_file_to_public_folder(preview_file, "common/preview")
+                    remove_old_preview = True
+        else:
+            remove_old_preview = True
+
+        if remove_old_preview is True and existing_page is not None:
+            existing_preview = get_override_string_value_or_default(
+                existing_page.link_preview_image
+            )
+            if existing_preview is not None:
+                remove_file(existing_preview, "common/preview")
+
+        remove_old_logo: bool = True
+        if page_to_update.logo_only_image is not None:
+            if (
+                existing_page is None
+                or existing_page.logo_only_image != page_to_update.logo_only_image
+            ):
+                logo_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                logo_file = resize_tmp_image(
+                    page_to_update.logo_only_image, logo_id, 400
+                )
+                if logo_file is not None:
+                    data["logoOnly"] = get_override_string_value_or_default(logo_file)
+                    move_temp_file_to_public_folder(logo_file, "common/logos")
+                    remove_old_logo = True
+        else:
+            remove_old_logo = True
+
+        if remove_old_logo is True and existing_page is not None:
+            existing_logo = get_override_string_value_or_default(
+                existing_page.logo_only_image
+            )
+            if existing_logo is not None:
+                remove_file(existing_logo, "common/logos")
 
         if page_id > 0:
             data["pageId"] = page_id

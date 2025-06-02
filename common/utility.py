@@ -141,8 +141,8 @@ def resize_tmp_image(image_name: str, image_id: str, resize_width: int = 0):
             if resize_width <= 0:
                 resize_width = int(os.getenv("THUMBNAIL_SIZE"))
 
-            # only resize if width is not as desired
-            if image.width != resize_width:
+            # only resize if image width is larger than desired
+            if image.width > resize_width:
                 # get current dimensions
                 width = image.width
                 height = image.height
