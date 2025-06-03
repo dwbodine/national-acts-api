@@ -5,6 +5,7 @@ Data Refresh Service
 import time
 from datetime import datetime
 import traceback
+import phonenumbers
 
 from common.db import (
     db_query_all,
@@ -15,6 +16,7 @@ from common.db import (
     db_delete,
 )
 from common.utility import (
+    get_country_code_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -443,9 +445,6 @@ class DataRefreshService:
                                 "purchaseTimestamp": get_override_string_value_or_default(
                                     order.purchase_timestamp
                                 ),
-                                "phone": get_override_string_value_or_default(
-                                    order.phone
-                                ),
                                 "user_id": get_override_string_value_or_default(
                                     order.user_id
                                 ),
@@ -479,7 +478,7 @@ class DataRefreshService:
                             }
 
                             # determine if order already exists
-                            order_sql = """SELECT TicketSocketOrders.*
+                            order_sql = """SELECT *
                                             FROM TicketSocketOrders
                                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
                                             AND OrderId=%(order_id)s"""
@@ -496,6 +495,44 @@ class DataRefreshService:
                             order_add_new: bool = False
 
                             if existing_order:
+                                # format phone before attempting to update
+                                phone = get_override_string_value_or_default(
+                                    order.phone
+                                )
+                                if phone is not None and len(phone) > 0:
+                                    try:
+                                        country = (
+                                            evt.venue.country
+                                            if evt.venue is not None
+                                            else None
+                                        )
+                                        region = get_country_code_from_country_name(
+                                            country
+                                        )
+                                        z = phonenumbers.parse(phone, region)
+                                        if phonenumbers.is_possible_number(z):
+                                            phone = phonenumbers.format_number(
+                                                z,
+                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL,
+                                            )
+                                    except Exception as error:  # pylint: disable=broad-exception-caught
+                                        error_message: str = (
+                                            str(error) + "\n" + traceback.format_exc()
+                                        )
+                                        now = datetime.now().strftime(
+                                            "%Y-%m-%d %H:%M:%S"
+                                        )
+                                        log_message(
+                                            f"""[{now}] - {error_message}\r\n"""
+                                        )
+                                        phone = None
+
+                                existing_phone = existing_order["Phone"]
+                                if phone is not None and existing_phone != phone:
+                                    order_data["phone"] = phone
+                                else:
+                                    order_data["phone"] = existing_phone
+
                                 order_comped = get_override_bool_value_or_default(
                                     existing_order["IsComped"]
                                 )

@@ -148,7 +148,21 @@ class SenderApiService:
             success = bool(response_json["success"])
 
         if success is False:
-            print("false")
+            fail_msg = f"Error creating subscriber {subscriber.email}"
+            err_msg: str = None
+            if response_json is not None:
+                err_msg = (
+                    response_json["message"]
+                    if response_json["message"] is not None
+                    else None
+                )
+            if err_msg is not None:
+                fail_msg += " - " + err_msg
+                if err_msg.lower().find("phone") >= 0: # invalid phone, clear out and try again
+                    self.clear_subscriber_phone(subscriber.order_id)
+                elif err_msg.lower().find("email") >= 0: # invalid email, cannot be a subscriber
+                    self.update_subscriber_order(subscriber.order_id)
+            print(fail_msg)
 
         return success
 
@@ -206,7 +220,21 @@ class SenderApiService:
             success = bool(response_json["success"])
 
         if success is False:
-            print("false")
+            fail_msg = f"Error updating subscriber {subscriber.email}"
+            err_msg: str = None
+            if response_json is not None:
+                err_msg = (
+                    response_json["message"]
+                    if response_json["message"] is not None
+                    else None
+                )
+            if err_msg is not None:
+                fail_msg += " - " + err_msg
+                if err_msg.lower().find("phone") >= 0: # invalid phone, clear out and try again
+                    self.clear_subscriber_phone(subscriber.order_id)
+                elif err_msg.lower().find("email") >= 0: # invalid email, cannot be a subscriber
+                    self.update_subscriber_order(subscriber.order_id)
+            print(fail_msg)
 
         return success
 
@@ -270,6 +298,17 @@ class SenderApiService:
         Sets the order as already updated with Sender
         """
         sql = """UPDATE TicketSocketOrders SET IsSenderUpdated=1,
+            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+            WHERE Id=%(orderId)s"""
+        data = {"orderId": order_id}
+        return db.db_update(sql, data)
+
+    def clear_subscriber_phone(self, order_id: int):
+        """
+        Clears out the phone number if it errors out with Sender
+        """
+        sql = """UPDATE TicketSocketOrders SET Phone=NULL,
+            IsSenderUpdated=0,
             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
             WHERE Id=%(orderId)s"""
         data = {"orderId": order_id}
@@ -381,7 +420,6 @@ class SenderApiService:
                     WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
                     AND TicketSocketOrders.IsDeleted <> 1
                     AND TicketSocketOrders.IsSenderUpdated <> 1 
-                    AND NOT EXISTS (SELECT 1 FROM TicketSocketOrderTickets WHERE TicketSocketOrderId=TicketSocketOrders.Id and IsRefunded=1)
                     ORDER BY TicketSocketOrders.PurchaseDate DESC
                     """
 

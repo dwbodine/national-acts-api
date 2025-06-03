@@ -137,8 +137,6 @@ class UpdateService:
             order_id = get_override_int_value_or_default(row["Id"])
             phone = get_override_string_value_or_default(row["Phone"])
             country = get_override_string_value_or_default(row["Country"])
-            if country is None or country == "US" or country == "USA":
-                country = "United States"
             phone = clean_up_phone_input_for_parsing(phone)
             if phone is not None and len(phone) > 0:
                 try:
