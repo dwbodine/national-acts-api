@@ -494,39 +494,31 @@ class DataRefreshService:
                             ticket_socket_order_id: int = 0
                             order_add_new: bool = False
 
-                            if existing_order:
-                                # format phone before attempting to update
-                                phone = get_override_string_value_or_default(
-                                    order.phone
-                                )
-                                if phone is not None and len(phone) > 0:
-                                    try:
-                                        country = (
-                                            evt.venue.country
-                                            if evt.venue is not None
-                                            else None
+                            # format phone before attempting to update
+                            phone = get_override_string_value_or_default(
+                                order.phone
+                            )
+                            if phone is not None and len(phone) > 0:
+                                try:
+                                    country = (
+                                        evt.venue.country
+                                        if evt.venue is not None
+                                        else None
+                                    )
+                                    region = get_country_code_from_country_name(
+                                        country
+                                    )
+                                    z = phonenumbers.parse(phone, region)
+                                    if phonenumbers.is_possible_number(z):
+                                        phone = phonenumbers.format_number(
+                                            z,
+                                            phonenumbers.PhoneNumberFormat.INTERNATIONAL,
                                         )
-                                        region = get_country_code_from_country_name(
-                                            country
-                                        )
-                                        z = phonenumbers.parse(phone, region)
-                                        if phonenumbers.is_possible_number(z):
-                                            phone = phonenumbers.format_number(
-                                                z,
-                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL,
-                                            )
-                                    except Exception as error:  # pylint: disable=broad-exception-caught
-                                        error_message: str = (
-                                            str(error) + "\n" + traceback.format_exc()
-                                        )
-                                        now = datetime.now().strftime(
-                                            "%Y-%m-%d %H:%M:%S"
-                                        )
-                                        log_message(
-                                            f"""[{now}] - {error_message}\r\n"""
-                                        )
-                                        phone = None
+                                except Exception:  # pylint: disable=broad-exception-caught
+                                    # if phonenumbers can't format it, reject it
+                                    phone = None
 
+                            if existing_order:
                                 existing_phone = existing_order["Phone"]
                                 if phone is not None and existing_phone != phone:
                                     order_data["phone"] = phone
@@ -610,6 +602,7 @@ class DataRefreshService:
                                 order_success = db_update(sql, order_data, cnx)
                             else:
                                 order_add_new = True
+                                order_data["phone"] = phone
                                 # insert new order
                                 order_data["order_id"] = (
                                     get_override_int_value_or_default(order.order_id)
