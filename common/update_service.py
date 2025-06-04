@@ -5,7 +5,6 @@ Perform Cron job updates
 from datetime import datetime
 import traceback
 import phonenumbers
-import re
 from common.db import db_query_all, db_update
 from common.exchange_rate_service import ExchangeRateService, ExchangeRate
 from common.data_refresh_service import DataRefreshService
