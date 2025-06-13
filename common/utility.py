@@ -9,6 +9,7 @@ import http.client
 from datetime import datetime
 import traceback
 from types import SimpleNamespace
+import pytz
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
@@ -489,7 +490,7 @@ def get_country_code_from_country_name(country: str) -> str:
     elif country == "USA" or country == "US":
         country = "United States"
 
-    sql = """SELECT CountryCode from CountryCodes WHERE Country=%(country)s"""
+    sql = """SELECT CountryCode from Country WHERE CountryName=%(country)s"""
     data = {"country": country.strip()}
     row = db_query_one(sql, data)
     if row:
@@ -513,3 +514,51 @@ def clean_up_phone_input_for_parsing(phone: str) -> str:
     phone = re.sub(r"[a-zA-Z]", "", phone)
     phone = phone.strip()
     return phone
+
+
+def get_timezone_name(timezone: str, country_code: str):
+    """
+    Get timezone name from Timezone Abbreviation plus Country Code
+    """
+
+    # see if it's already a valid time zone name
+    if timezone in pytz.all_timezones:
+        return timezone
+
+    # look up the abbreviation
+    country_tzones = None
+    try:
+        country_tzones = pytz.country_timezones[country_code]
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+    set_zones = set()
+    if country_tzones is not None and len(country_tzones) > 0:
+        for name in country_tzones:
+            tzone = pytz.timezone(name)
+            for utcoffset, dstoffset, tzabbrev in getattr(
+                tzone,
+                "_transition_info",
+                [[None, None, datetime.now(tzone).tzname()]],
+            ):
+                if tzabbrev.upper() == timezone.upper():
+                    set_zones.add(name)
+
+        if len(set_zones) > 0:
+            return min(set_zones, key=len)
+
+        # none matched, at least pick one in the right country
+        return min(country_tzones, key=len)
+
+    # invalid country, just try to match the timezone abbreviation to any time zone
+    for name in pytz.all_timezones:
+        tzone = pytz.timezone(name)
+        for utcoffset, dstoffset, tzabbrev in getattr(
+            tzone,
+            "_transition_info",
+            [[None, None, datetime.now(tzone).tzname()]],
+        ):
+            if tzabbrev.upper() == timezone.upper():
+                set_zones.add(name)
+
+    return min(set_zones, key=len)

@@ -20,12 +20,14 @@ from common.utility import (
 )
 from common.db import db_query_all, db_query_one
 from common.models.ticket_socket import (
+    Country,
     TicketSocketCategory,
     TicketSocketEvent,
     TicketSocketVenue,
     TicketSocketTicketType,
     TicketSocketTicket,
     TicketSocketOrder,
+    TimeZone,
 )
 from common.utility import log_message
 
@@ -782,3 +784,41 @@ def get_all_accounts():
         account = TicketSocketService(ticket_socket_id)
         accounts.append(account)
     return accounts
+
+
+def get_all_countries():
+    """
+    Gets stored data for countries
+    """
+    countries: list[Country] = []
+    sql = """SELECT * FROM Country ORDER BY CountryName ASC"""
+    rows = db_query_all(sql)
+    for row in rows:
+        country = Country()
+        country.country_code_id = get_override_int_value_or_default(
+            row["CountryCodeId"]
+        )
+        country.country = get_override_string_value_or_default(row["Country"])
+        country.country_code = get_override_string_value_or_default(row["CountryCode"])
+        if country.country_code is None:
+            continue
+        tz_sql = """SELECT * FROM TimeZone WHERE CountryCode=%(countryCode)s
+                        ORDER BY TimeZoneId"""
+        tz_data = {"countryCode": country.country_code}
+        tz_rows = db_query_all(tz_sql, tz_data)
+        timezones: list[TimeZone] = []
+        for tz_row in tz_rows:
+            timezone = TimeZone()
+            timezone.timezone_id = get_override_int_value_or_default(
+                tz_row["TimeZoneId"]
+            )
+            timezone.timezone_name = get_override_string_value_or_default(
+                tz_row["ZoneName"]
+            )
+            timezone.timezone_abbrev = get_override_string_value_or_default(
+                tz_row["Abbreviation"]
+            )
+            timezones.append(timezone)
+        country.timezones = timezones
+        countries.append(country)
+    return countries

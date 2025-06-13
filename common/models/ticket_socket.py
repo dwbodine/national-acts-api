@@ -29,6 +29,23 @@ class TicketSocketAccount:
     currency_symbol: str = ""
     categories: list[TicketSocketCategory] = []
 
+class TimeZone:
+    """
+    Model representatino of TimeZone data
+    """
+    timezone_id: int
+    timezone_name: str
+    timezone_abbrev: str
+
+
+class Country:
+    """
+    Model representation of Country data
+    """
+    country_code_id: int
+    country: str
+    country_code: str
+    timezones: list[TimeZone] = []
 
 class TicketSocketVenue:
     """
