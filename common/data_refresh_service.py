@@ -16,7 +16,6 @@ from common.db import (
     db_delete,
 )
 from common.utility import (
-    get_country_code_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -500,20 +499,19 @@ class DataRefreshService:
                             )
                             if phone is not None and len(phone) > 0:
                                 try:
-                                    country = (
-                                        evt.venue.country
+                                    region = (
+                                        evt.venue.country.country_code
                                         if evt.venue is not None
+                                        and evt.venue.country is not None
                                         else None
                                     )
-                                    region = get_country_code_from_country_name(
-                                        country
-                                    )
-                                    z = phonenumbers.parse(phone, region)
-                                    if phonenumbers.is_possible_number(z):
-                                        phone = phonenumbers.format_number(
-                                            z,
-                                            phonenumbers.PhoneNumberFormat.INTERNATIONAL,
-                                        )
+                                    if region is not None:
+                                        z = phonenumbers.parse(phone, region)
+                                        if phonenumbers.is_possible_number(z):
+                                            phone = phonenumbers.format_number(
+                                                z,
+                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL,
+                                            )
                                 except Exception:  # pylint: disable=broad-exception-caught
                                     # if phonenumbers can't format it, reject it
                                     phone = None

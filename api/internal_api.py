@@ -3,7 +3,8 @@ Internal API routes - used by legacy PHP admin code
 """
 
 from flask import Blueprint
-from common.ticket_socket_service import TicketSocketService, get_all_accounts
+from common.admin_service import AdminService
+from common.ticket_socket_service import TicketSocketService
 from common.utility import convert_to_json
 
 internal_api = Blueprint("internal_api", __name__)
@@ -14,7 +15,8 @@ def get_accounts():
     """
     API method to fetch account
     """
-    accounts = get_all_accounts()
+    service = AdminService()
+    accounts = service.get_all_accounts()
     return convert_to_json(accounts)
 
 

@@ -11,6 +11,7 @@ from typing import Any
 
 from common.utility import (
     fix_magic_quotes,
+    get_country_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -27,7 +28,6 @@ from common.models.ticket_socket import (
     TicketSocketTicketType,
     TicketSocketTicket,
     TicketSocketOrder,
-    TimeZone,
 )
 from common.utility import log_message
 
@@ -315,24 +315,28 @@ class TicketSocketService:
                 else:
                     zip_code = ""
 
-                country = None
+                country_name = None
                 if "venueCountry" in item and item["venueCountry"] != "":
-                    country = get_override_string_value_or_default(item["venueCountry"])
+                    country_name = get_override_string_value_or_default(
+                        item["venueCountry"]
+                    )
                 elif custom_fields != {} and "venueCountry" in custom_fields:
-                    country = get_override_string_value_or_default(
+                    country_name = get_override_string_value_or_default(
                         custom_fields["venueCountry"]
                     )
 
-                if country is not None:
-                    country = fix_magic_quotes(country)
+                if country_name is not None:
+                    country_name = fix_magic_quotes(country_name)
                 else:
-                    country = ""
+                    country_name = ""
 
                 timezone = ""
                 if custom_fields != {} and "timezone" in custom_fields:
                     timezone = get_override_string_value_or_default(
                         custom_fields["timezone"], default=""
                     )
+
+                country = get_country_from_country_name(country_name)
 
                 event_venue = TicketSocketVenue(
                     venue, address1, city, state, zip_code, country, timezone
@@ -771,54 +775,6 @@ class TicketSocketService:
             order.tickets = order_tickets
         return order
 
+    
 
-def get_all_accounts():
-    """
-    Gets stored data for all TS accounts
-    """
-    accounts: list[TicketSocketService] = []
-    sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
-    rows = db_query_all(sql)
-    for row in rows:
-        ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
-        account = TicketSocketService(ticket_socket_id)
-        accounts.append(account)
-    return accounts
-
-
-def get_all_countries():
-    """
-    Gets stored data for countries
-    """
-    countries: list[Country] = []
-    sql = """SELECT * FROM Country ORDER BY CountryName ASC"""
-    rows = db_query_all(sql)
-    for row in rows:
-        country = Country()
-        country.country_code_id = get_override_int_value_or_default(
-            row["CountryCodeId"]
-        )
-        country.country = get_override_string_value_or_default(row["Country"])
-        country.country_code = get_override_string_value_or_default(row["CountryCode"])
-        if country.country_code is None:
-            continue
-        tz_sql = """SELECT * FROM TimeZone WHERE CountryCode=%(countryCode)s
-                        ORDER BY TimeZoneId"""
-        tz_data = {"countryCode": country.country_code}
-        tz_rows = db_query_all(tz_sql, tz_data)
-        timezones: list[TimeZone] = []
-        for tz_row in tz_rows:
-            timezone = TimeZone()
-            timezone.timezone_id = get_override_int_value_or_default(
-                tz_row["TimeZoneId"]
-            )
-            timezone.timezone_name = get_override_string_value_or_default(
-                tz_row["ZoneName"]
-            )
-            timezone.timezone_abbrev = get_override_string_value_or_default(
-                tz_row["Abbreviation"]
-            )
-            timezones.append(timezone)
-        country.timezones = timezones
-        countries.append(country)
-    return countries
+    

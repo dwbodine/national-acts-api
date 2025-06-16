@@ -8,7 +8,6 @@ import traceback
 from flask import Blueprint, request
 
 from common.admin_service import AdminService
-from common.db import db_query_all
 from common.event_service import EventService
 from common.page_service import PageService
 from common.seller_service import SellerService
@@ -16,7 +15,6 @@ from common.utility import (
     convert_to_json,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
-    get_timezone_name,
     log_message,
 )
 
@@ -143,26 +141,6 @@ def get_all_settings():
     service = AdminService()
     settings = service.get_site_settings()
     return convert_to_json(settings)
-
-
-@public_api.route("/public/updateTimezone")
-def update_all_timezones():
-    """
-    Updates timezones
-    """
-
-    sql = """SELECT * FROM TimeZone ORDER BY CountryCode, Abbreviation"""
-    rows = db_query_all(sql)
-    names: list[str] = []
-    for row in rows:
-        # id = get_override_int_value_or_default(row["TimeZoneId"])
-        code = get_override_string_value_or_default(row["CountryCode"])
-        abbrev = get_override_string_value_or_default(row["Abbreviation"])
-        name = get_timezone_name(abbrev, code)
-        if name is not None and len(name) <= 3:
-            names.append(f"{code}/{abbrev} = {name}")
-
-    return names
 
 
 @public_api.route("/public/uploadFile", methods=["POST"])

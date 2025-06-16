@@ -28,24 +28,26 @@ class TicketSocketAccount:
     mulitiplier: float = 1
     currency_symbol: str = ""
     categories: list[TicketSocketCategory] = []
-
-class TimeZone:
+    
+class Timezone:
     """
-    Model representatino of TimeZone data
+    Model representation of timezone for drop-downs
     """
-    timezone_id: int
-    timezone_name: str
-    timezone_abbrev: str
-
+    timezone: str
+    display_name: str
 
 class Country:
     """
     Model representation of Country data
     """
-    country_code_id: int
-    country: str
-    country_code: str
-    timezones: list[TimeZone] = []
+
+    timezones: list[Timezone] = []
+
+    def __init__(self, country_id: int, country_name: str, country_code: str):
+        self.country_id = country_id
+        self.country_name = country_name
+        self.country_code = country_code
+
 
 class TicketSocketVenue:
     """
@@ -59,7 +61,7 @@ class TicketSocketVenue:
         city: str,
         state: str,
         postal_code: str,
-        country: str,
+        country: Country,
         timezone: str,
     ):
         self.name = name

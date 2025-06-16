@@ -13,10 +13,16 @@ from common.db import (
     db_convert_list_to_parameters,
 )
 from common.models.national_acts import VipEvent
-from common.models.ticket_socket import TicketSocketVenue, TicketSocketTicketType
+from common.models.ticket_socket import (
+    TicketSocketVenue,
+    TicketSocketTicketType,
+    Country,
+)
 from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
 from common.utility import (
+    get_country_from_country_name,
+    get_timezones_from_country_code,
     resize_tmp_image,
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
@@ -88,7 +94,10 @@ class EventService:
                     COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
                     COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
                     COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip,
-                    COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS Country,
+                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,
+                    ExternalEventVenues.TimeZone AS TimeZone,
+                    Country.CountryId AS CountryId,
+                    Country.CountryCode AS CountryCode,
                     COALESCE(ExternalEvents.EmailSentToVips, 0) AS EmailSentToVips,
                     COALESCE(ExternalEvents.TextSentToVips, 0) AS TextSentToVips,
                     COALESCE(ExternalEvents.ListSentToBand, 0) AS ListSentToBand,
@@ -122,6 +131,7 @@ class EventService:
             LEFT JOIN TicketSocketEvents ON TicketSocketEvents.Id = ExternalEvents.TicketSocketEventId
             LEFT JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
             LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
+            LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
             LEFT JOIN TourEvent ON TourEvent.ExternalEventId = ExternalEvents.EventId
             LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId            
             WHERE """
@@ -178,11 +188,11 @@ class EventService:
                 where_clause.append(
                     """CONCAT_WS (' ', Sellers.Name, 
                                 COALESCE(ExternalEvents.Title, TicketSocketEvents.Title),
+                                COALESCE(Country.CountryName, ''),
                                 COALESCE(ExternalEventVenues.Venue, ''),
                                 COALESCE(ExternalEventVenues.Address, ''),
                                 COALESCE(ExternalEventVenues.City, ''),
                                 COALESCE(ExternalEventVenues.State, ''),
-                                COALESCE(ExternalEventVenues.Country, ''),
                                 COALESCE(TicketSocketEvents.Venue, ''),
                                 COALESCE(TicketSocketEvents.Address, ''),
                                 COALESCE(TicketSocketEvents.City, ''),
@@ -388,9 +398,18 @@ class EventService:
             state = get_override_string_value_or_default(row["State"])
             zip_code = get_override_string_value_or_default(row["Zip"])
             vip_country = get_override_string_value_or_default(row["Country"])
+            country_id = get_override_int_value_or_default(row["CountryId"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
+            timezone = get_override_string_value_or_default(row["TimeZone"])
+            country: Country = None
+            if country_code is not None:
+                country = Country(country_id, vip_country, country_code)
+                if is_public is not True:
+                    timezones = get_timezones_from_country_code(country_code, vip_event.event_date)
+                    country.timezones = timezones
 
             venue = TicketSocketVenue(
-                venue_name, address, city, state, zip_code, vip_country, ""
+                venue_name, address, city, state, zip_code, country, timezone
             )
             vip_event.venue = venue
 
@@ -467,13 +486,22 @@ class EventService:
             vip_event.ticket_socket_url = get_override_string_value_or_default(
                 row["URL"]
             )
+
+            country = get_country_from_country_name(
+                get_override_string_value_or_default(row["Country"])
+            )
+            
+            if country is not None and country.country_code is not None:
+                timezones = get_timezones_from_country_code(country.country_code, vip_event.event_date)
+                country.timezones = timezones
+            
             vip_event.venue = TicketSocketVenue(
                 get_override_string_value_or_default(row["Venue"]),
                 get_override_string_value_or_default(row["Address"]),
                 get_override_string_value_or_default(row["City"]),
                 get_override_string_value_or_default(row["State"]),
                 get_override_string_value_or_default(row["Zip"]),
-                get_override_string_value_or_default(row["Country"]),
+                country,
                 "",
             )
             vip_event.is_vip = get_override_bool_value_or_default(row["IsVip"])

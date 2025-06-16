@@ -4,7 +4,7 @@ Admin service module
 
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
-from common.models.ticket_socket import TicketSocketAccount
+from common.models.ticket_socket import Country, TicketSocketAccount
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
     get_override_bool_value_or_default,
@@ -113,6 +113,19 @@ class AdminService:
             accounts.append(account)
         return accounts
 
+    def get_all_accounts(self):
+        """
+        Gets stored data for all TS accounts
+        """
+        accounts: list[TicketSocketService] = []
+        sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
+        rows = db_query_all(sql)
+        for row in rows:
+            ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
+            account = TicketSocketService(ticket_socket_id)
+            accounts.append(account)
+        return accounts
+
     def get_external_venues(self):
         """
         Fetch all external venues from database
@@ -181,3 +194,20 @@ class AdminService:
         data = {"venue_id": venue_id}
         db_delete(sql, data)
         return True
+
+    def get_all_countries(self):
+        """
+        Gets stored data for countries
+        """
+        countries: list[Country] = []
+        sql = """SELECT * FROM Country ORDER BY CountryName ASC"""
+        rows = db_query_all(sql)
+        for row in rows:
+            country_id = get_override_int_value_or_default(row["CountryId"])
+            country_name = get_override_string_value_or_default(row["CountryName"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
+            country = Country(country_id, country_name, country_code)
+            if country.country_code is None:
+                continue
+            countries.append(country)
+        return countries

@@ -13,7 +13,6 @@ from common.models.national_acts import TicketSocketRefreshHistory
 from common.order_service import OrderService
 from common.utility import (
     clean_up_phone_input_for_parsing,
-    get_country_code_from_country_name,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
@@ -125,22 +124,22 @@ class UpdateService:
         success: bool = True
         sql = """SELECT TicketSocketOrders.Id,
                 TicketSocketOrders.Phone, 
-                COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country, 'United States') AS Country 
+                COALESCE(Country.CountryCode, 'US') AS CountryCode
                 FROM TicketSocketOrders 
                 JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId
                 JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
+                LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
+                LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
                 WHERE TicketSocketOrders.Phone IS NOT NULL"""
         rows = db_query_all(sql)
         for row in rows:
             order_id = get_override_int_value_or_default(row["Id"])
             phone = get_override_string_value_or_default(row["Phone"])
-            country = get_override_string_value_or_default(row["Country"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
             phone = clean_up_phone_input_for_parsing(phone)
             if phone is not None and len(phone) > 0:
                 try:
-                    region = get_country_code_from_country_name(country)
-                    z = phonenumbers.parse(phone, region)
+                    z = phonenumbers.parse(phone, country_code)
                     if phonenumbers.is_possible_number(z):
                         phone = phonenumbers.format_number(
                             z,

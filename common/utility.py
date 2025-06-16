@@ -9,6 +9,7 @@ import http.client
 from datetime import datetime
 import traceback
 from types import SimpleNamespace
+from pytz import country_timezones
 import pytz
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
@@ -16,6 +17,7 @@ from stringcase import camelcase, snakecase
 from PIL import Image
 
 from common.db import db_query_one
+from common.models.ticket_socket import Country, Timezone
 
 
 class CamelCaseJsonEncoder(json.JSONEncoder):
@@ -459,45 +461,6 @@ def get_override_bool_value_or_default(
         return False
 
 
-def get_country_code_from_country_name(country: str) -> str:
-    """
-    Fetches the two-character code for the country from the database, if available
-    """
-    if country is None or len(country.strip()) == 0:
-        return "US"
-    country_code: str = "US"
-    if country == "Belguim":
-        country = "Belgium"
-    elif country == "Budapest":
-        country = "Hungary"
-    elif country == "Candada":
-        country = "Canada"
-    elif country == "Columbia":
-        country = "Colombia"
-    elif country == "Czechia":
-        country = "Czech Republic"
-    elif country == "Türkiye":
-        country = "Turkey"
-    elif (
-        country == "England"
-        or country == "UK"
-        or country == "GB"
-        or country == "Great Britian"
-        or country == "London"
-        or country == "Scotland"
-    ):
-        country = "United Kingdom"
-    elif country == "USA" or country == "US":
-        country = "United States"
-
-    sql = """SELECT CountryCode from Country WHERE CountryName=%(country)s"""
-    data = {"country": country.strip()}
-    row = db_query_one(sql, data)
-    if row:
-        country_code = get_override_string_value_or_default(row["CountryCode"])
-    return country_code
-
-
 def clean_up_phone_input_for_parsing(phone: str) -> str:
     """
     Cleans a phone input up for parsing
@@ -516,49 +479,53 @@ def clean_up_phone_input_for_parsing(phone: str) -> str:
     return phone
 
 
-def get_timezone_name(timezone: str, country_code: str):
+def get_timezones_from_country_code(country_code: str, time: str = None):
     """
-    Get timezone name from Timezone Abbreviation plus Country Code
+    Programatically return timezone data by country code
     """
+    timezones: list[Timezone] = []
+    zones = country_timezones[country_code]
+    for zone in zones:
+        timezone = Timezone()
+        timezone.timezone = zone
+        display_name = zone
+        abbrev = get_timezone_abbreviation(zone, time)
+        if abbrev is not None:
+            display_name = f"{zone} ({abbrev})"
+        timezone.display_name = display_name
+        timezones.append(timezone)
+    return timezones
 
-    # see if it's already a valid time zone name
-    if timezone in pytz.all_timezones:
-        return timezone
 
-    # look up the abbreviation
-    country_tzones = None
-    try:
-        country_tzones = pytz.country_timezones[country_code]
-    except Exception:  # pylint: disable=broad-exception-caught
-        pass
+def get_timezone_abbreviation(timezone_str: str, time: str = None):
+    """
+    Get the local abbreviation for a timezone
+    """
+    timezone = pytz.timezone(timezone_str)
+    datetime_object: datetime = None
+    if time is not None:
+        timestamp = datetime.strptime(time, "%Y-%m-%d").timestamp()
+        datetime_object = datetime.fromtimestamp(timestamp, timezone)
+    else:
+        datetime_object = datetime.now(timezone)
+    timezone_abbreviation = datetime_object.strftime("%Z")
+    return timezone_abbreviation
 
-    set_zones = set()
-    if country_tzones is not None and len(country_tzones) > 0:
-        for name in country_tzones:
-            tzone = pytz.timezone(name)
-            for utcoffset, dstoffset, tzabbrev in getattr(
-                tzone,
-                "_transition_info",
-                [[None, None, datetime.now(tzone).tzname()]],
-            ):
-                if tzabbrev.upper() == timezone.upper():
-                    set_zones.add(name)
 
-        if len(set_zones) > 0:
-            return min(set_zones, key=len)
-
-        # none matched, at least pick one in the right country
-        return min(country_tzones, key=len)
-
-    # invalid country, just try to match the timezone abbreviation to any time zone
-    for name in pytz.all_timezones:
-        tzone = pytz.timezone(name)
-        for utcoffset, dstoffset, tzabbrev in getattr(
-            tzone,
-            "_transition_info",
-            [[None, None, datetime.now(tzone).tzname()]],
-        ):
-            if tzabbrev.upper() == timezone.upper():
-                set_zones.add(name)
-
-    return min(set_zones, key=len)
+def get_country_from_country_name(country_name: str):
+    """
+    Helper method to get Country object from country name
+    """
+    if country_name is None or len(country_name) == 0:
+        return None
+    country: Country = None
+    sql = """SELECT * FROM Country WHERE LCASE(CountryName)=%(country_name)s"""
+    data = {"country_name": country_name.lower()}
+    row = db_query_one(sql, data)
+    if row:
+        country_id = get_override_int_value_or_default(row["CountryId"])
+        country_name = get_override_string_value_or_default(row["CountryName"])
+        country_code = get_override_string_value_or_default(row["CountryCode"])
+        if country_code is not None:
+            country = Country(country_id, country_name, country_code)
+    return country
