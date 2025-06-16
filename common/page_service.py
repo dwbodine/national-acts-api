@@ -433,7 +433,7 @@ class PageService:
             if existing_preview is not None:
                 remove_file(existing_preview, "common/preview")
 
-        remove_old_logo: bool = True
+        remove_old_logo: bool = False
         if page_to_update.logo_only_image is not None:
             if (
                 existing_page is None
