@@ -212,7 +212,7 @@ class DataRefreshService:
                             evt.venue.postal_code
                         ),
                         "country": get_override_string_value_or_default(
-                            evt.venue.country
+                            evt.venue.country.country_name
                         ),
                         "thumbnail": get_override_string_value_or_default(
                             evt.thumbnail

@@ -529,3 +529,21 @@ def get_country_from_country_name(country_name: str):
         if country_code is not None:
             country = Country(country_id, country_name, country_code)
     return country
+
+def get_country_from_country_id(country_id: int):
+    """
+    Helper method to get Country object from country id
+    """
+    if country_id is None or country_id == 0:
+        country_id = int(os.getenv("DEFAULT_COUNTRY_ID"))
+    country: Country = None
+    sql = """SELECT * FROM Country WHERE CountryId=%(country_id)s"""
+    data = {"country_id": country_id}
+    row = db_query_one(sql, data)
+    if row:
+        country_id = get_override_int_value_or_default(row["CountryId"])
+        country_name = get_override_string_value_or_default(row["CountryName"])
+        country_code = get_override_string_value_or_default(row["CountryCode"])
+        if country_code is not None:
+            country = Country(country_id, country_name, country_code)
+    return country

@@ -408,7 +408,7 @@ class SenderApiService:
                         COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS VenueCity,
                         COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS VenueState,
                         COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS VenueZip,
-                        COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS VenueCountry,
+                        COALESCE(Country.CountryName, TicketSocketEvents.Country) AS VenueCountry,
                         Sellers.Name as Band,
                         TicketSocketOrders.Id as OrderId 
                     FROM TicketSocketOrders 
@@ -417,6 +417,7 @@ class SenderApiService:
                     JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
                     LEFT JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
                     LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
+                    LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
                     WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
                     AND TicketSocketOrders.IsDeleted <> 1
                     AND TicketSocketOrders.IsSenderUpdated <> 1 

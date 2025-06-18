@@ -337,6 +337,8 @@ class TicketSocketService:
                     )
 
                 country = get_country_from_country_name(country_name)
+                if country is None:
+                    country = Country(None, country_name, None)
 
                 event_venue = TicketSocketVenue(
                     venue, address1, city, state, zip_code, country, timezone

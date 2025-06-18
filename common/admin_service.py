@@ -2,11 +2,13 @@
 Admin service module
 """
 
+import os
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
 from common.models.ticket_socket import Country, TicketSocketAccount
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
+    get_country_from_country_id,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -145,7 +147,12 @@ class AdminService:
             venue.city = get_override_string_value_or_default(row["City"])
             venue.state = get_override_string_value_or_default(row["State"])
             venue.zip_code = get_override_string_value_or_default(row["Zip"])
-            venue.country = get_override_string_value_or_default(row["Country"])
+            country_id = get_override_int_value_or_default(
+                row["CountryId"], int(os.getenv("DEFAULT_COUNTRY_ID"))
+            )
+            if country_id is not None:
+                country = get_country_from_country_id(country_id)
+                venue.country = country
             venue.has_events = get_override_bool_value_or_default(row["HasEvents"])
             venues.append(venue)
 
@@ -164,12 +171,14 @@ class AdminService:
             "city": get_override_string_value_or_default(venue.city),
             "state": get_override_string_value_or_default(venue.state),
             "zip": get_override_string_value_or_default(venue.zip_code),
-            "country": get_override_string_value_or_default(venue.country),
+            "country_id": get_override_string_value_or_default(
+                venue.country.country_id, int(os.getenv("DEFAULT_COUNTRY_ID"))
+            ),
         }
 
         if venue.venue_id is None or venue.venue_id == 0:
-            sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, Country)
-                        VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s)"""
+            sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, CountryId)
+                        VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country_id)s)"""
             venue_id = db_insert(sql, data)
             success = venue_id > 0
             venue.venue_id = venue_id
@@ -180,7 +189,7 @@ class AdminService:
                         City=%(city)s, 
                         State=%(state)s,
                         Zip=%(zip)s,
-                        Country=%(country)s
+                        CountryId=%(country_id)s
                         WHERE VenueID=%(venue_id)s"""
             success = db_update(sql, data)
         return venue if success is True else None

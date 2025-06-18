@@ -150,12 +150,14 @@ class PageService:
         data = {"pageId": page_id}
 
         sql = """SELECT PageSellers.*,
+                pc.CountryName AS CountryNameOverride,
                 Sellers.Name AS SellerName,
                 Sellers.Address,
                 Sellers.City,
                 Sellers.State,
                 Sellers.Zip,
-                Sellers.Country,
+                Sellers.CountryId,
+                sc.CountryName as CountryName,
                 Sellers.Phone,
                 Sellers.Email,
                 Sellers.Twitter,
@@ -167,6 +169,8 @@ class PageService:
                 Sellers.WebsiteDisplayText
                 FROM PageSellers
                 JOIN Sellers ON Sellers.SellerId = PageSellers.SellerId
+                LEFT JOIN Country pc on pc.CountryId = PageSellers.CountryIdOverride
+                LEFT JOIN Country sc on sc.CountryId = Sellers.CountryId
                 WHERE PageSellers.PageId=%(pageId)s"""
 
         if is_public is True:
@@ -228,11 +232,18 @@ class PageService:
                 row["ZipOverride"], default_zip
             )
 
-            default_country: str = None
+            default_country_id: int = None
             if is_public is True:
-                default_country = get_override_string_value_or_default(row["Country"])
+                default_country_id = get_override_int_value_or_default(row["CountryId"], None)
+            page_seller.country_id = get_override_int_value_or_default(
+                row["CountryIdOverride"], default_country_id
+            )
+            
+            default_country_name: str = None
+            if is_public is True:
+                default_country_name = get_override_string_value_or_default(row["CountryName"])
             page_seller.country = get_override_string_value_or_default(
-                row["CountryOverride"], default_country
+                row["CountryNameOverride"], default_country_name
             )
 
             default_address: str = None
@@ -516,7 +527,7 @@ class PageService:
                         CityOverride=%(city)s,
                         StateOverride=%(state)s,
                         ZipOverride=%(zip)s,
-                        CountryOverride=%(country)s,
+                        CountryIdOverride=%(country_id)s,
                         PhoneOverride=%(phone)s,
                         EmailOverride=%(email)s,
                         TwitterOverride=%(twitter)s,
@@ -563,9 +574,9 @@ class PageService:
                             if hasattr(seller, "zip")
                             else None
                         ),
-                        "country": (
-                            get_override_string_value_or_default(seller.country)
-                            if hasattr(seller, "country")
+                        "country_id": (
+                            get_override_int_value_or_default(seller.country_id, None)
+                            if hasattr(seller, "country_id")
                             else None
                         ),
                         "phone": (
@@ -625,11 +636,11 @@ class PageService:
                 elif seller.seller_id > 0:
                     insert_sql = """INSERT INTO PageSellers
                         (SellerId, PageId, DisplayName, ShowDisplayName, AddressOverride,
-                        CityOverride, StateOverride, ZipOverride, CountryOverride, PhoneOverride,
+                        CityOverride, StateOverride, ZipOverride, CountryIdOverride, PhoneOverride,
                         EmailOverride, TwitterOverride, FacebookOverride, InstagramOverride,
                         YouTubeOverride, SpotifyOverride, WebsiteOverride, WebsiteDisplayTextOverride,
                         LastUpdate) VALUES (%(sellerId)s, %(pageId)s, %(displayName)s, %(showDisplayName)s, 
-                        %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s, %(phone)s, %(email)s,
+                        %(address)s, %(city)s, %(state)s, %(zip)s, %(country_id)s, %(phone)s, %(email)s,
                         %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, %(spotify)s, %(website)s,
                         %(websiteDisplayText)s, CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
                     insert_data = {
@@ -667,9 +678,9 @@ class PageService:
                             if hasattr(seller, "zip")
                             else None
                         ),
-                        "country": (
-                            get_override_string_value_or_default(seller.country)
-                            if hasattr(seller, "country")
+                        "country_id": (
+                            get_override_int_value_or_default(seller.country_id)
+                            if hasattr(seller, "country_id")
                             else None
                         ),
                         "phone": (

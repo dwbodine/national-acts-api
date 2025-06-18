@@ -405,7 +405,9 @@ class EventService:
             if country_code is not None:
                 country = Country(country_id, vip_country, country_code)
                 if is_public is not True:
-                    timezones = get_timezones_from_country_code(country_code, vip_event.event_date)
+                    timezones = get_timezones_from_country_code(
+                        country_code, vip_event.event_date
+                    )
                     country.timezones = timezones
 
             venue = TicketSocketVenue(
@@ -487,14 +489,17 @@ class EventService:
                 row["URL"]
             )
 
-            country = get_country_from_country_name(
-                get_override_string_value_or_default(row["Country"])
-            )
-            
+            country_name = get_override_string_value_or_default(row["Country"])
+            country = get_country_from_country_name(country_name)
+
             if country is not None and country.country_code is not None:
-                timezones = get_timezones_from_country_code(country.country_code, vip_event.event_date)
+                timezones = get_timezones_from_country_code(
+                    country.country_code, vip_event.event_date
+                )
                 country.timezones = timezones
-            
+            else:
+                country = Country(None, country_name, None)
+
             vip_event.venue = TicketSocketVenue(
                 get_override_string_value_or_default(row["Venue"]),
                 get_override_string_value_or_default(row["Address"]),

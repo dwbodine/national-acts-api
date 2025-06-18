@@ -101,7 +101,7 @@ class SellerService:
             "city": get_override_string_value_or_default(seller_to_udpdate.city),
             "state": get_override_string_value_or_default(seller_to_udpdate.state),
             "zip": get_override_string_value_or_default(seller_to_udpdate.zip),
-            "country": get_override_string_value_or_default(seller_to_udpdate.country),
+            "country_id": get_override_string_value_or_default(seller_to_udpdate.country_id),
             "phone": get_override_string_value_or_default(seller_to_udpdate.phone),
             "email": get_override_string_value_or_default(seller_to_udpdate.email),
             "twitter": get_override_string_value_or_default(seller_to_udpdate.twitter),
@@ -132,7 +132,7 @@ class SellerService:
                         City=%(city)s,
                         State=%(state)s,
                         Zip=%(zip)s,
-                        Country=%(country)s,
+                        CountryId=%(country_id)s,
                         Phone=%(phone)s,
                         Email=%(email)s,
                         Twitter=%(twitter)s,
@@ -148,10 +148,10 @@ class SellerService:
             seller_id = seller_to_udpdate.seller_id if success else 0
         else:
             sql = """INSERT INTO Sellers (Name, SellerTypeId, HideInList, Inactive,
-                    Address, City, State, Zip, Country, Phone, Email, Twitter, Facebook, 
+                    Address, City, State, Zip, CountryId, Phone, Email, Twitter, Facebook, 
                     Instagram, YouTube, Spotify, Website, WebsiteDisplayText, Created, LastUpdate)
                     VALUES (%(name)s, %(sellerTypeId)s, %(hideInList)s, %(inactive)s, 
-                    %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s, %(phone)s, 
+                    %(address)s, %(city)s, %(state)s, %(zip)s, %(country_id)s, %(phone)s, 
                     %(email)s, %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, 
                     %(spotify)s, %(website)s, %(websiteDisplayText)s, 
                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'), 

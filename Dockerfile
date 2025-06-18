@@ -47,6 +47,8 @@ ENV SENDER_API_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoi
 ENV API_FILE_PATH=D:\Websites\national-acts-api
 ENV WWW_PUBLIC_FOLDER=D:\Websites\national-acts\public
 ENV THUMBNAIL_SIZE=100
+ENV DEFAULT_COUNTRY_ID=235
+ENV DEFAULT_COUNTRY_CODE=US
 
 # Install pip requirements
 COPY requirements_docker.txt .

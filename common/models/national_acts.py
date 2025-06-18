@@ -517,6 +517,7 @@ class Seller:
     state: str = None
     zip: str = None
     country: str = None
+    country_id: int = None
     phone: str = None
     email: str = None
     twitter: str = None
@@ -538,8 +539,9 @@ class Seller:
         """
         Initialize seller from database
         """
-        sql = """SELECT Sellers.*
+        sql = """SELECT Sellers.*, Country.CountryName
             FROM Sellers
+            LEFT JOIN Country ON Sellers.CountryId = Country.CountryId
             WHERE Sellers.SellerId=%(sellerId)s"""
         data = {"sellerId": self.seller_id}
 
@@ -551,7 +553,8 @@ class Seller:
             self.city = get_override_string_value_or_default(row["City"])
             self.state = get_override_string_value_or_default(row["State"])
             self.zip = get_override_string_value_or_default(row["Zip"])
-            self.country = get_override_string_value_or_default(row["Country"])
+            self.country = get_override_string_value_or_default(row["CountryName"])
+            self.country_id = get_override_int_value_or_default(row["CountryId"], None)
             self.phone = get_override_string_value_or_default(row["Phone"])
             self.email = get_override_string_value_or_default(row["Email"])
             self.twitter = get_override_string_value_or_default(row["Twitter"])
