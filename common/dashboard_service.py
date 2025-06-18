@@ -94,7 +94,7 @@ class DashboardService:
             )
             order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
             order_data.event_title = get_override_string_value_or_default(
-                row["EventTitle"]
+                row["Title"]
             )
             order_data.event_date = get_override_string_value_or_default(
                 row["EventDate"]
