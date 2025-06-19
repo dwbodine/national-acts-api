@@ -35,6 +35,7 @@ from common.models.user import User, Role
 
 admin_api = Blueprint("admin_api", __name__)
 
+
 @admin_api.route("/admin/countries")
 @jwt_required()
 def get_countries():
@@ -48,6 +49,7 @@ def get_countries():
     service = AdminService()
     countries = service.get_all_countries()
     return convert_to_json(countries)
+
 
 @admin_api.route("/admin/events/cancel", methods=["POST"])
 @jwt_required()
@@ -671,8 +673,10 @@ def get_all_venues():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
+    search_term: str = get_override_string_value_or_default(request.args.get("search"))
+
     service = AdminService()
-    venues = service.get_external_venues()
+    venues = service.get_external_venues(search_term)
     return convert_to_json(venues)
 
 

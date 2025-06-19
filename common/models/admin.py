@@ -48,6 +48,7 @@ class ExternalVenue:
     zip_code: str = None
     country: Country = None
     has_events: bool = False
+    timezone: str = None
 
 
 class PageType:
@@ -75,8 +76,7 @@ class PageSeller:
     city: str = None
     state: str = None
     zip: str = None
-    country: str = None
-    country_id: int = None
+    country: Country = None
     phone: str = None
     email: str = None
     twitter: str = None

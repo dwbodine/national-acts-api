@@ -101,7 +101,13 @@ class SellerService:
             "city": get_override_string_value_or_default(seller_to_udpdate.city),
             "state": get_override_string_value_or_default(seller_to_udpdate.state),
             "zip": get_override_string_value_or_default(seller_to_udpdate.zip),
-            "country_id": get_override_string_value_or_default(seller_to_udpdate.country_id),
+            "country_id": (
+                get_override_int_value_or_default(
+                    seller_to_udpdate.country.country_id, None
+                )
+                if seller_to_udpdate.country is not None
+                else None
+            ),
             "phone": get_override_string_value_or_default(seller_to_udpdate.phone),
             "email": get_override_string_value_or_default(seller_to_udpdate.email),
             "twitter": get_override_string_value_or_default(seller_to_udpdate.twitter),

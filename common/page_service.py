@@ -15,6 +15,7 @@ from common.db import (
 from common.event_service import EventService
 from common.models.admin import Page, PageSeller, PageType
 from common.models.national_acts import VipEvent
+from common.models.ticket_socket import Country
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_int_value_or_default,
@@ -149,8 +150,27 @@ class PageService:
         sql: str = ""
         data = {"pageId": page_id}
 
-        sql = """SELECT PageSellers.*,
+        sql = """SELECT PageSellers.PageSellerId,
+                PageSellers.SellerId,
+                PageSellers.PageId,
+                PageSellers.DisplayName,
+                PageSellers.ShowDisplayName,
+                PageSellers.AddressOverride,
+                PageSellers.CityOverride,
+                PageSellers.StateOverride,
+                PageSellers.ZipOverride,
+                PageSellers.CountryIdOverride,
+                PageSellers.PhoneOverride,
+                PageSellers.EmailOverride,
+                PageSellers.TwitterOverride,
+                PageSellers.FacebookOverride,
+                PageSellers.InstagramOverride,
+                PageSellers.YouTubeOverride,
+                PageSellers.SpotifyOverride,
+                PageSellers.WebsiteOverride,
+                PageSellers.WebsiteDisplayTextOverride,
                 pc.CountryName AS CountryNameOverride,
+                pc.CountryCode AS CountryCodeOverride,
                 Sellers.Name AS SellerName,
                 Sellers.Address,
                 Sellers.City,
@@ -158,6 +178,7 @@ class PageService:
                 Sellers.Zip,
                 Sellers.CountryId,
                 sc.CountryName as CountryName,
+                sc.CountryCode as CountryCode,
                 Sellers.Phone,
                 Sellers.Email,
                 Sellers.Twitter,
@@ -234,17 +255,33 @@ class PageService:
 
             default_country_id: int = None
             if is_public is True:
-                default_country_id = get_override_int_value_or_default(row["CountryId"], None)
-            page_seller.country_id = get_override_int_value_or_default(
+                default_country_id = get_override_int_value_or_default(
+                    row["CountryId"], None
+                )
+            country_id = get_override_int_value_or_default(
                 row["CountryIdOverride"], default_country_id
             )
-            
+
             default_country_name: str = None
             if is_public is True:
-                default_country_name = get_override_string_value_or_default(row["CountryName"])
-            page_seller.country = get_override_string_value_or_default(
+                default_country_name = get_override_string_value_or_default(
+                    row["CountryName"]
+                )
+            country_name = get_override_string_value_or_default(
                 row["CountryNameOverride"], default_country_name
             )
+
+            default_country_code: str = None
+            if is_public is True:
+                default_country_code = get_override_string_value_or_default(
+                    row["CountryCode"]
+                )
+            country_code = get_override_string_value_or_default(
+                row["CountryCodeOverride"], default_country_code
+            )
+
+            if country_id is not None:
+                page_seller.country = Country(country_id, country_name, country_code)
 
             default_address: str = None
             if is_public is True:

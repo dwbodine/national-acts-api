@@ -17,6 +17,7 @@ from common.models.ticket_socket import (
     TicketSocketTicket,
     TicketSocketOrder,
     TicketSocketEvent,
+    Country,
 )
 from common.db import db_query_all, db_query_one, db_insert, db_update, db_delete
 
@@ -516,8 +517,7 @@ class Seller:
     city: str = None
     state: str = None
     zip: str = None
-    country: str = None
-    country_id: int = None
+    country: Country = None
     phone: str = None
     email: str = None
     twitter: str = None
@@ -539,7 +539,27 @@ class Seller:
         """
         Initialize seller from database
         """
-        sql = """SELECT Sellers.*, Country.CountryName
+        sql = """SELECT Sellers.SellerId,
+            Sellers.Name, 
+            Sellers.SellerTypeId,
+            Sellers.Address,
+            Sellers.City,
+            Sellers.State,
+            Sellers.Zip,
+            Sellers.CountryId, 
+            Country.CountryName,
+            Country.CountryCode,
+            Sellers.Phone,
+            Sellers.Email,
+            Sellers.Twitter,
+            Sellers.Facebook,
+            Sellers.Instagram,
+            Sellers.YouTube,
+            Sellers.Spotify,
+            Sellers.Website,
+            Sellers.WebsiteDisplayText,
+            Sellers.HideInList,
+            Sellers.Inactive
             FROM Sellers
             LEFT JOIN Country ON Sellers.CountryId = Country.CountryId
             WHERE Sellers.SellerId=%(sellerId)s"""
@@ -553,8 +573,6 @@ class Seller:
             self.city = get_override_string_value_or_default(row["City"])
             self.state = get_override_string_value_or_default(row["State"])
             self.zip = get_override_string_value_or_default(row["Zip"])
-            self.country = get_override_string_value_or_default(row["CountryName"])
-            self.country_id = get_override_int_value_or_default(row["CountryId"], None)
             self.phone = get_override_string_value_or_default(row["Phone"])
             self.email = get_override_string_value_or_default(row["Email"])
             self.twitter = get_override_string_value_or_default(row["Twitter"])
@@ -568,6 +586,12 @@ class Seller:
             )
             self.hide_in_list = get_override_bool_value_or_default(row["HideInList"])
             self.is_active = not get_override_bool_value_or_default(row["Inactive"])
+
+            country_id = get_override_int_value_or_default(row["CountryId"], None)
+            country_name = get_override_string_value_or_default(row["CountryName"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
+            if country_id is not None:
+                self.country = Country(country_id, country_name, country_code)
 
             self.__get_seller_event_categories()
 

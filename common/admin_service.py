@@ -8,7 +8,6 @@ from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
 from common.models.ticket_socket import Country, TicketSocketAccount
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
-    get_country_from_country_id,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -128,16 +127,39 @@ class AdminService:
             accounts.append(account)
         return accounts
 
-    def get_external_venues(self):
+    def get_external_venues(self, search_term: str = None):
         """
         Fetch all external venues from database
         """
         venues: list[ExternalVenue] = []
-        sql = """SELECT ExternalEventVenues.*,
+        sql = """SELECT ExternalEventVenues.VenueID,
+            ExternalEventVenues.Venue,
+            ExternalEventVenues.Address,
+            ExternalEventVenues.City,
+            ExternalEventVenues.State,
+            ExternalEventVenues.Zip,
+            ExternalEventVenues.CountryId,
+            ExternalEventVenues.TimeZone,
+            Country.CountryName,
+            Country.CountryCode,
             (SELECT 1 FROM ExternalEvents
                 WHERE ExternalEvents.ExternalEventVenueId = 
                 ExternalEventVenues.VenueID Limit 0, 1) as HasEvents
-            FROM ExternalEventVenues ORDER BY Venue ASC"""
+            FROM ExternalEventVenues 
+            LEFT JOIN Country on Country.CountryId = ExternalEventVenues.CountryId """
+        if search_term is not None and len(search_term) >= 3:
+            sql += (
+                """WHERE CONCAT_WS (' ', COALESCE(Country.CountryName, ''),
+                    COALESCE(ExternalEventVenues.Venue, ''),
+                    COALESCE(ExternalEventVenues.Address, ''),
+                    COALESCE(ExternalEventVenues.City, ''),
+                    COALESCE(ExternalEventVenues.State, ''))
+                    LIKE ('%"""
+                + search_term
+                + """%') """
+            )
+        sql += """ORDER BY Venue ASC"""
+        sql = sql.replace("\n", "")
         rows = db_query_all(sql)
         for row in rows:
             venue = ExternalVenue()
@@ -147,11 +169,12 @@ class AdminService:
             venue.city = get_override_string_value_or_default(row["City"])
             venue.state = get_override_string_value_or_default(row["State"])
             venue.zip_code = get_override_string_value_or_default(row["Zip"])
-            country_id = get_override_int_value_or_default(
-                row["CountryId"], int(os.getenv("DEFAULT_COUNTRY_ID"))
-            )
+            venue.timezone = get_override_string_value_or_default(row["TimeZone"])
+            country_id = get_override_int_value_or_default(row["CountryId"])
+            country_name = get_override_string_value_or_default(row["CountryName"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
             if country_id is not None:
-                country = get_country_from_country_id(country_id)
+                country = Country(country_id, country_name, country_code)
                 venue.country = country
             venue.has_events = get_override_bool_value_or_default(row["HasEvents"])
             venues.append(venue)
@@ -204,13 +227,18 @@ class AdminService:
         db_delete(sql, data)
         return True
 
-    def get_all_countries(self):
+    def get_all_countries(self, country_code: str = None):
         """
         Gets stored data for countries
         """
         countries: list[Country] = []
-        sql = """SELECT * FROM Country ORDER BY CountryName ASC"""
-        rows = db_query_all(sql)
+        data = {}
+        sql = """SELECT * FROM Country"""
+        if country_code is not None:
+            sql += """ WHERE CountryCode=%(country_code)s"""
+            data["country_code"] = country_code
+        sql += """ ORDER BY CountryName ASC"""
+        rows = db_query_all(sql, data)
         for row in rows:
             country_id = get_override_int_value_or_default(row["CountryId"])
             country_name = get_override_string_value_or_default(row["CountryName"])
