@@ -5,7 +5,7 @@ Models specific to site or portal administration
 from enum import Enum
 
 from common.models.national_acts import VipEvent
-from common.models.ticket_socket import Country
+from common.models.ticket_socket import Country, Timezone
 
 
 class SiteSettingType(str, Enum):
@@ -48,7 +48,7 @@ class ExternalVenue:
     zip_code: str = None
     country: Country = None
     has_events: bool = False
-    timezone: str = None
+    timezone: Timezone = None
 
 
 class PageType:

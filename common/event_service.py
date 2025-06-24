@@ -22,6 +22,7 @@ from common.order_service import OrderService
 from common.daily_order_service import DailyOrderService
 from common.utility import (
     get_country_from_country_name,
+    get_timezone_abbreviation,
     get_timezones_from_country_code,
     resize_tmp_image,
     get_override_bool_value_or_default,
@@ -400,7 +401,8 @@ class EventService:
             vip_country = get_override_string_value_or_default(row["Country"])
             country_id = get_override_int_value_or_default(row["CountryId"])
             country_code = get_override_string_value_or_default(row["CountryCode"])
-            timezone = get_override_string_value_or_default(row["TimeZone"])
+            timezone_code = get_override_string_value_or_default(row["TimeZone"])
+            timezone = get_timezone_abbreviation(timezone_code, vip_event.event_date)
             country: Country = None
             if country_code is not None:
                 country = Country(country_id, vip_country, country_code)

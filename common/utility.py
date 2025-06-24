@@ -501,6 +501,8 @@ def get_timezone_abbreviation(timezone_str: str, time: str = None):
     """
     Get the local abbreviation for a timezone
     """
+    if timezone_str is None:
+        return None
     timezone = pytz.timezone(timezone_str)
     datetime_object: datetime = None
     if time is not None:

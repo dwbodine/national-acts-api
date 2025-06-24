@@ -5,13 +5,14 @@ Admin service module
 import os
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
-from common.models.ticket_socket import Country, TicketSocketAccount
+from common.models.ticket_socket import Country, TicketSocketAccount, Timezone
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_timezones_from_country_code,
     move_temp_file_to_public_folder,
 )
 
@@ -169,12 +170,16 @@ class AdminService:
             venue.city = get_override_string_value_or_default(row["City"])
             venue.state = get_override_string_value_or_default(row["State"])
             venue.zip_code = get_override_string_value_or_default(row["Zip"])
-            venue.timezone = get_override_string_value_or_default(row["TimeZone"])
+            timezone = Timezone()
+            timezone.timezone = get_override_string_value_or_default(row["TimeZone"])
+            venue.timezone = timezone
             country_id = get_override_int_value_or_default(row["CountryId"])
             country_name = get_override_string_value_or_default(row["CountryName"])
             country_code = get_override_string_value_or_default(row["CountryCode"])
-            if country_id is not None:
+            if country_id is not None and country_code is not None:
                 country = Country(country_id, country_name, country_code)
+                timezones = get_timezones_from_country_code(country_code)
+                country.timezones = timezones
                 venue.country = country
             venue.has_events = get_override_bool_value_or_default(row["HasEvents"])
             venues.append(venue)
@@ -197,11 +202,14 @@ class AdminService:
             "country_id": get_override_string_value_or_default(
                 venue.country.country_id, int(os.getenv("DEFAULT_COUNTRY_ID"))
             ),
+            "timezone": get_override_string_value_or_default(venue.timezone.timezone),
         }
 
         if venue.venue_id is None or venue.venue_id == 0:
-            sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, CountryId)
-                        VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country_id)s)"""
+            sql = """INSERT INTO ExternalEventVenues
+                        (Venue, Address, City, State, Zip, CountryId, TimeZone)
+                     VALUES(%(venue)s, %(address)s, %(city)s, %(state)s,
+                     %(zip)s, %(country_id)s, %(timezone)s)"""
             venue_id = db_insert(sql, data)
             success = venue_id > 0
             venue.venue_id = venue_id
@@ -212,7 +220,8 @@ class AdminService:
                         City=%(city)s, 
                         State=%(state)s,
                         Zip=%(zip)s,
-                        CountryId=%(country_id)s
+                        CountryId=%(country_id)s,
+                        TimeZone=%(timezone)s
                         WHERE VenueID=%(venue_id)s"""
             success = db_update(sql, data)
         return venue if success is True else None
@@ -246,5 +255,7 @@ class AdminService:
             country = Country(country_id, country_name, country_code)
             if country.country_code is None:
                 continue
+            timezones = get_timezones_from_country_code(country_code)
+            country.timezones = timezones
             countries.append(country)
         return countries

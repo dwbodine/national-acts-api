@@ -612,8 +612,8 @@ class PageService:
                             else None
                         ),
                         "country_id": (
-                            get_override_int_value_or_default(seller.country_id, None)
-                            if hasattr(seller, "country_id")
+                            get_override_int_value_or_default(seller.country.country_id, None)
+                            if hasattr(seller, "country")
                             else None
                         ),
                         "phone": (
