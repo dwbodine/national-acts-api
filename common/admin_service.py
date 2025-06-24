@@ -2,15 +2,17 @@
 Admin service module
 """
 
+import os
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
-from common.models.ticket_socket import TicketSocketAccount
+from common.models.ticket_socket import Country, TicketSocketAccount, Timezone
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_timezones_from_country_code,
     move_temp_file_to_public_folder,
 )
 
@@ -113,16 +115,52 @@ class AdminService:
             accounts.append(account)
         return accounts
 
-    def get_external_venues(self):
+    def get_all_accounts(self):
+        """
+        Gets stored data for all TS accounts
+        """
+        accounts: list[TicketSocketService] = []
+        sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
+        rows = db_query_all(sql)
+        for row in rows:
+            ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
+            account = TicketSocketService(ticket_socket_id)
+            accounts.append(account)
+        return accounts
+
+    def get_external_venues(self, search_term: str = None):
         """
         Fetch all external venues from database
         """
         venues: list[ExternalVenue] = []
-        sql = """SELECT ExternalEventVenues.*,
+        sql = """SELECT ExternalEventVenues.VenueID,
+            ExternalEventVenues.Venue,
+            ExternalEventVenues.Address,
+            ExternalEventVenues.City,
+            ExternalEventVenues.State,
+            ExternalEventVenues.Zip,
+            ExternalEventVenues.CountryId,
+            ExternalEventVenues.TimeZone,
+            Country.CountryName,
+            Country.CountryCode,
             (SELECT 1 FROM ExternalEvents
                 WHERE ExternalEvents.ExternalEventVenueId = 
                 ExternalEventVenues.VenueID Limit 0, 1) as HasEvents
-            FROM ExternalEventVenues ORDER BY Venue ASC"""
+            FROM ExternalEventVenues 
+            LEFT JOIN Country on Country.CountryId = ExternalEventVenues.CountryId """
+        if search_term is not None and len(search_term) >= 3:
+            sql += (
+                """WHERE CONCAT_WS (' ', COALESCE(Country.CountryName, ''),
+                    COALESCE(ExternalEventVenues.Venue, ''),
+                    COALESCE(ExternalEventVenues.Address, ''),
+                    COALESCE(ExternalEventVenues.City, ''),
+                    COALESCE(ExternalEventVenues.State, ''))
+                    LIKE ('%"""
+                + search_term
+                + """%') """
+            )
+        sql += """ORDER BY Venue ASC"""
+        sql = sql.replace("\n", "")
         rows = db_query_all(sql)
         for row in rows:
             venue = ExternalVenue()
@@ -132,7 +170,17 @@ class AdminService:
             venue.city = get_override_string_value_or_default(row["City"])
             venue.state = get_override_string_value_or_default(row["State"])
             venue.zip_code = get_override_string_value_or_default(row["Zip"])
-            venue.country = get_override_string_value_or_default(row["Country"])
+            timezone = Timezone()
+            timezone.timezone = get_override_string_value_or_default(row["TimeZone"])
+            venue.timezone = timezone
+            country_id = get_override_int_value_or_default(row["CountryId"])
+            country_name = get_override_string_value_or_default(row["CountryName"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
+            if country_id is not None and country_code is not None:
+                country = Country(country_id, country_name, country_code)
+                timezones = get_timezones_from_country_code(country_code)
+                country.timezones = timezones
+                venue.country = country
             venue.has_events = get_override_bool_value_or_default(row["HasEvents"])
             venues.append(venue)
 
@@ -151,12 +199,17 @@ class AdminService:
             "city": get_override_string_value_or_default(venue.city),
             "state": get_override_string_value_or_default(venue.state),
             "zip": get_override_string_value_or_default(venue.zip_code),
-            "country": get_override_string_value_or_default(venue.country),
+            "country_id": get_override_string_value_or_default(
+                venue.country.country_id, int(os.getenv("DEFAULT_COUNTRY_ID"))
+            ),
+            "timezone": get_override_string_value_or_default(venue.timezone.timezone),
         }
 
         if venue.venue_id is None or venue.venue_id == 0:
-            sql = """INSERT INTO ExternalEventVenues (Venue, Address, City, State, Zip, Country)
-                        VALUES(%(venue)s, %(address)s, %(city)s, %(state)s, %(zip)s, %(country)s)"""
+            sql = """INSERT INTO ExternalEventVenues
+                        (Venue, Address, City, State, Zip, CountryId, TimeZone)
+                     VALUES(%(venue)s, %(address)s, %(city)s, %(state)s,
+                     %(zip)s, %(country_id)s, %(timezone)s)"""
             venue_id = db_insert(sql, data)
             success = venue_id > 0
             venue.venue_id = venue_id
@@ -167,7 +220,8 @@ class AdminService:
                         City=%(city)s, 
                         State=%(state)s,
                         Zip=%(zip)s,
-                        Country=%(country)s
+                        CountryId=%(country_id)s,
+                        TimeZone=%(timezone)s
                         WHERE VenueID=%(venue_id)s"""
             success = db_update(sql, data)
         return venue if success is True else None
@@ -181,3 +235,27 @@ class AdminService:
         data = {"venue_id": venue_id}
         db_delete(sql, data)
         return True
+
+    def get_all_countries(self, country_code: str = None):
+        """
+        Gets stored data for countries
+        """
+        countries: list[Country] = []
+        data = {}
+        sql = """SELECT * FROM Country"""
+        if country_code is not None:
+            sql += """ WHERE CountryCode=%(country_code)s"""
+            data["country_code"] = country_code
+        sql += """ ORDER BY CountryName ASC"""
+        rows = db_query_all(sql, data)
+        for row in rows:
+            country_id = get_override_int_value_or_default(row["CountryId"])
+            country_name = get_override_string_value_or_default(row["CountryName"])
+            country_code = get_override_string_value_or_default(row["CountryCode"])
+            country = Country(country_id, country_name, country_code)
+            if country.country_code is None:
+                continue
+            timezones = get_timezones_from_country_code(country_code)
+            country.timezones = timezones
+            countries.append(country)
+        return countries

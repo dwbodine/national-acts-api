@@ -15,6 +15,7 @@ from common.utility import (
     convert_to_json,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
+    get_timezones_from_country_code,
     log_message,
 )
 
@@ -141,6 +142,32 @@ def get_all_settings():
     service = AdminService()
     settings = service.get_site_settings()
     return convert_to_json(settings)
+
+
+@public_api.route("/public/timezones")
+def get_all_timezones():
+    """
+    API method to fetch all available timezones
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    country_code: str = get_override_string_value_or_default(
+        request.args.get("country_code")
+    )
+
+    service = AdminService()
+    countries = service.get_all_countries(country_code)
+    for country in countries:
+        if country.country_code is None:
+            continue
+        timezones = get_timezones_from_country_code(country.country_code)
+        country.timezones = timezones
+    return convert_to_json(countries)
 
 
 @public_api.route("/public/uploadFile", methods=["POST"])

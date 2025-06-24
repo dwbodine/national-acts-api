@@ -16,7 +16,6 @@ from common.db import (
     db_delete,
 )
 from common.utility import (
-    get_country_code_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -213,7 +212,7 @@ class DataRefreshService:
                             evt.venue.postal_code
                         ),
                         "country": get_override_string_value_or_default(
-                            evt.venue.country
+                            evt.venue.country.country_name
                         ),
                         "thumbnail": get_override_string_value_or_default(
                             evt.thumbnail
@@ -495,35 +494,50 @@ class DataRefreshService:
                             order_add_new: bool = False
 
                             # format phone before attempting to update
-                            phone = get_override_string_value_or_default(
-                                order.phone
-                            )
+                            phone = get_override_string_value_or_default(order.phone)
+                            phone_formatted: str = None
                             if phone is not None and len(phone) > 0:
                                 try:
-                                    country = (
-                                        evt.venue.country
+                                    region = (
+                                        evt.venue.country.country_code
                                         if evt.venue is not None
+                                        and evt.venue.country is not None
                                         else None
                                     )
-                                    region = get_country_code_from_country_name(
-                                        country
-                                    )
-                                    z = phonenumbers.parse(phone, region)
-                                    if phonenumbers.is_possible_number(z):
-                                        phone = phonenumbers.format_number(
-                                            z,
-                                            phonenumbers.PhoneNumberFormat.INTERNATIONAL,
-                                        )
+                                    if region is not None:
+                                        z = phonenumbers.parse(phone, region)
+                                        if phonenumbers.is_possible_number(z):
+                                            phone_formatted = phonenumbers.format_number(
+                                                z,
+                                                phonenumbers.PhoneNumberFormat.INTERNATIONAL,
+                                            )
                                 except Exception:  # pylint: disable=broad-exception-caught
                                     # if phonenumbers can't format it, reject it
-                                    phone = None
+                                    phone_formatted = None
 
                             if existing_order:
-                                existing_phone = existing_order["Phone"]
+                                existing_phone_formatted = (
+                                    get_override_string_value_or_default(
+                                        existing_order["PhoneFormatted"]
+                                    )
+                                )
+                                existing_phone = get_override_string_value_or_default(
+                                    existing_order["Phone"]
+                                )
                                 if phone is not None and existing_phone != phone:
                                     order_data["phone"] = phone
                                 else:
                                     order_data["phone"] = existing_phone
+
+                                if (
+                                    phone_formatted is not None
+                                    and existing_phone_formatted != phone_formatted
+                                ):
+                                    order_data["phone_formatted"] = phone_formatted
+                                else:
+                                    order_data["phone_formatted"] = (
+                                        existing_phone_formatted
+                                    )
 
                                 order_comped = get_override_bool_value_or_default(
                                     existing_order["IsComped"]
@@ -590,7 +604,8 @@ class DataRefreshService:
                                 sql = """UPDATE TicketSocketOrders
                                         SET PurchaseDate=%(purchaseDate)s,
                                         PurchaseTimestamp=%(purchaseTimestamp)s,
-                                        Phone=%(phone)s, EventId=%(event_id)s,
+                                        Phone=%(phone)s, PhoneFormatted=%(phone_formatted)s,
+                                        EventId=%(event_id)s,
                                         UserId=%(user_id)s, PurchaserLastName=%(purchaserLastName)s,
                                         PurchaserFirstName=%(purchaserFirstName)s, PurchaserCity=%(purchaserCity)s, 
                                         PurchaserState=%(purchaserState)s, PurchaserZip=%(purchaserZip)s,
@@ -598,11 +613,14 @@ class DataRefreshService:
                                         PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
                                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                         WHERE Id=%(id)s"""
+                                        
+                                sql = sql.replace("\n", "")
 
                                 order_success = db_update(sql, order_data, cnx)
                             else:
                                 order_add_new = True
                                 order_data["phone"] = phone
+                                order_data["phone_formatted"] = phone_formatted
                                 # insert new order
                                 order_data["order_id"] = (
                                     get_override_int_value_or_default(order.order_id)
@@ -612,16 +630,19 @@ class DataRefreshService:
                                 )
                                 sql = """INSERT INTO TicketSocketOrders
                                             (TicketSocketEventId, OrderId,
-                                            PurchaseDate, PurchaseTimestamp, Phone, EventId, UserId,
+                                            PurchaseDate, PurchaseTimestamp, Phone, PhoneFormatted,
+                                            EventId, UserId,
                                             PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState,
                                             PurchaserZip, PurchaserCountry,
                                             PurchaserIpAddress, Email, LastUpdate) VALUES
                                     (%(ticket_socket_event_id)s, %(order_id)s,
-                                    %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s,
+                                    %(purchaseDate)s, %(purchaseTimestamp)s, %(phone)s, %(phone_formatted)s, 
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
                                     %(purchaserIpAddress)s,  %(email)s,
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                                    
+                                sql = sql.replace("\n", "")
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0

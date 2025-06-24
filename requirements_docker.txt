@@ -9,3 +9,4 @@ stringcase==1.2.0
 requests==2.32.3
 pillow==11.1.0
 phonenumbers==9.0.6
+pytz==2025.2

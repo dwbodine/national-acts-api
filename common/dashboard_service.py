@@ -49,18 +49,21 @@ class DashboardService:
         end = now.strftime("%Y-%m-%d 23:59:59")
 
         sql = """SELECT DailyOrderData.*,
-                    TicketSocketEvents.Title AS EventTitle,
-                    TicketSocketEvents.EventDate,
-                    TicketSocketEvents.Venue,
-                    TicketSocketEvents.City,
-                    TicketSocketEvents.State,
-                    TicketSocketEvents.Country,
-                    TicketSocketEvents.Zip, 
+                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
+                    COALESCE(ExternalEvents.EventDate, TicketSocketEvents.EventDate) AS EventDate,
+                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
+                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
+                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
+                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip, 
+                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,                    
                     Sellers.Name AS SellerName,
                     Sellers.SellerId,
                     TicketSocket.TicketSocketId,
                     TicketSocket.AccountName 
                     FROM DailyOrderData 
+                    JOIN ExternalEvents 
+                        ON ExternalEvents.TicketSocketEventId
+                            = DailyOrderData.TicketSocketEventId 
                     JOIN TicketSocketEvents 
                         ON TicketSocketEvents.Id
                             = DailyOrderData.TicketSocketEventId 
@@ -70,8 +73,14 @@ class DashboardService:
                     JOIN TicketSocket 
                         ON TicketSocket.TicketSocketId
                             = SellerEventCategory.TicketSocketId 
+                    LEFT JOIN ExternalEventVenues
+                        ON ExternalEventVenues.VenueID
+                            = ExternalEvents.ExternalEventVenueId
+                    LEFT JOIN Country ON
+                        Country.CountryId = 
+                            ExternalEventVenues.CountryId
                     JOIN Sellers
-                        ON Sellers.SellerId = SellerEventCategory.SellerId 
+                        ON Sellers.SellerId = ExternalEvents.SellerId 
                  WHERE DailyOrderData.PurchaseDate
                     BETWEEN %(start)s and %(end)s 
                     ORDER BY DailyOrderData.PurchaseDate, Sellers.Name"""
@@ -85,7 +94,7 @@ class DashboardService:
             )
             order_data = DailyOrderData(purchase_date, ticket_socket_event_id)
             order_data.event_title = get_override_string_value_or_default(
-                row["EventTitle"]
+                row["Title"]
             )
             order_data.event_date = get_override_string_value_or_default(
                 row["EventDate"]

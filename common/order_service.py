@@ -122,7 +122,7 @@ class OrderService:
                     COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS EventCity, 
                     COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS EventState, 
                     COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
-                    COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country) AS EventCountry 
+                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS EventCountry 
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents
                         ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
@@ -139,7 +139,9 @@ class OrderService:
                     LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
                         AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate
                     LEFT JOIN ExternalEventVenues
-                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID"""
+                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
+                    LEFT JOIN Country
+                        ON Country.CountryId = ExternalEventVenues.CountryId"""
 
         sql += " WHERE "
         data = {}
@@ -159,7 +161,7 @@ class OrderService:
                             COALESCE(TicketSocketOrders.PurchaserLastName, ''),
                             COALESCE(TicketSocketOrders.PurchaserFirstName, ''),
                             COALESCE(TicketSocketOrders.Email, ''),
-                            COALESCE(ExternalEventVenues.Country, TicketSocketEvents.Country, '')) 
+                            COALESCE(Country.CountryName, TicketSocketEvents.Country, '')) 
                             LIKE ('%"""
                     + search_term
                     + """%')"""
@@ -317,17 +319,22 @@ class OrderService:
         orders: list[VipOrder] = []
         sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
                     ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev,
-                    TicketSocketOrders.*, TicketSocketEvents.Title as EventTitle,
-                    TicketSocketEvents.EventDate, Sellers.Name AS SellerName,
-                    Sellers.SellerId, TicketSocketEvents.Venue, 
-                    TicketSocketEvents.Address AS EventAddress,
-                    TicketSocketEvents.City AS EventCity,
-                    TicketSocketEvents.State AS EventState, 
-                    TicketSocketEvents.Zip AS EventZip,
-                    TicketSocketEvents.Country AS EventCountry 
+                    TicketSocketOrders.*,
+                    TicketSocketEvents.Title as EventTitle,
+                    TicketSocketEvents.EventDate, 
+                    Sellers.Name AS SellerName,
+                    Sellers.SellerId,
+                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue, 
+                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS EventAddress, 
+                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS EventCity, 
+                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS EventState, 
+                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
+                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS EventCountry 
                     FROM TicketSocketOrders
                     JOIN TicketSocketEvents 
                         ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                    JOIN ExternalEvents
+                        ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
                     JOIN SellerEventCategory 
                         ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
                     JOIN Sellers 
@@ -339,6 +346,10 @@ class OrderService:
                     LEFT JOIN ExchangeRateHistory 
                         ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
                         AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate
+                    LEFT JOIN ExternalEventVenues
+                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
+                    LEFT JOIN Country
+                        ON Country.CountryId = ExternalEventVenues.CountryId 
                     WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s"""
         data = {"ticketSocketEventId": ticket_socket_event_id}
 

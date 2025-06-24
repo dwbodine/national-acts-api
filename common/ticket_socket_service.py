@@ -11,6 +11,7 @@ from typing import Any
 
 from common.utility import (
     fix_magic_quotes,
+    get_country_from_country_name,
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
     get_override_int_value_or_default,
@@ -20,6 +21,7 @@ from common.utility import (
 )
 from common.db import db_query_all, db_query_one
 from common.models.ticket_socket import (
+    Country,
     TicketSocketCategory,
     TicketSocketEvent,
     TicketSocketVenue,
@@ -313,24 +315,30 @@ class TicketSocketService:
                 else:
                     zip_code = ""
 
-                country = None
+                country_name = None
                 if "venueCountry" in item and item["venueCountry"] != "":
-                    country = get_override_string_value_or_default(item["venueCountry"])
+                    country_name = get_override_string_value_or_default(
+                        item["venueCountry"]
+                    )
                 elif custom_fields != {} and "venueCountry" in custom_fields:
-                    country = get_override_string_value_or_default(
+                    country_name = get_override_string_value_or_default(
                         custom_fields["venueCountry"]
                     )
 
-                if country is not None:
-                    country = fix_magic_quotes(country)
+                if country_name is not None:
+                    country_name = fix_magic_quotes(country_name)
                 else:
-                    country = ""
+                    country_name = ""
 
                 timezone = ""
                 if custom_fields != {} and "timezone" in custom_fields:
                     timezone = get_override_string_value_or_default(
                         custom_fields["timezone"], default=""
                     )
+
+                country = get_country_from_country_name(country_name)
+                if country is None:
+                    country = Country(None, country_name, None)
 
                 event_venue = TicketSocketVenue(
                     venue, address1, city, state, zip_code, country, timezone
@@ -769,16 +777,6 @@ class TicketSocketService:
             order.tickets = order_tickets
         return order
 
+    
 
-def get_all_accounts():
-    """
-    Gets stored data for all TS accounts
-    """
-    accounts: list[TicketSocketService] = []
-    sql = "SELECT TicketSocketId FROM TicketSocket ORDER BY TicketSocketId"
-    rows = db_query_all(sql)
-    for row in rows:
-        ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
-        account = TicketSocketService(ticket_socket_id)
-        accounts.append(account)
-    return accounts
+    

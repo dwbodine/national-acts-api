@@ -9,12 +9,15 @@ import http.client
 from datetime import datetime
 import traceback
 from types import SimpleNamespace
+from pytz import country_timezones
+import pytz
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
 from PIL import Image
 
 from common.db import db_query_one
+from common.models.ticket_socket import Country, Timezone
 
 
 class CamelCaseJsonEncoder(json.JSONEncoder):
@@ -458,45 +461,6 @@ def get_override_bool_value_or_default(
         return False
 
 
-def get_country_code_from_country_name(country: str) -> str:
-    """
-    Fetches the two-character code for the country from the database, if available
-    """
-    if country is None or len(country.strip()) == 0:
-        return "US"
-    country_code: str = "US"
-    if country == "Belguim":
-        country = "Belgium"
-    elif country == "Budapest":
-        country = "Hungary"
-    elif country == "Candada":
-        country = "Canada"
-    elif country == "Columbia":
-        country = "Colombia"
-    elif country == "Czechia":
-        country = "Czech Republic"
-    elif country == "Türkiye":
-        country = "Turkey"
-    elif (
-        country == "England"
-        or country == "UK"
-        or country == "GB"
-        or country == "Great Britian"
-        or country == "London"
-        or country == "Scotland"
-    ):
-        country = "United Kingdom"
-    elif country == "USA" or country == "US":
-        country = "United States"
-
-    sql = """SELECT CountryCode from CountryCodes WHERE Country=%(country)s"""
-    data = {"country": country.strip()}
-    row = db_query_one(sql, data)
-    if row:
-        country_code = get_override_string_value_or_default(row["CountryCode"])
-    return country_code
-
-
 def clean_up_phone_input_for_parsing(phone: str) -> str:
     """
     Cleans a phone input up for parsing
@@ -513,3 +477,75 @@ def clean_up_phone_input_for_parsing(phone: str) -> str:
     phone = re.sub(r"[a-zA-Z]", "", phone)
     phone = phone.strip()
     return phone
+
+
+def get_timezones_from_country_code(country_code: str, time: str = None):
+    """
+    Programatically return timezone data by country code
+    """
+    timezones: list[Timezone] = []
+    zones = country_timezones[country_code]
+    for zone in zones:
+        timezone = Timezone()
+        timezone.timezone = zone
+        display_name = zone
+        abbrev = get_timezone_abbreviation(zone, time)
+        if abbrev is not None:
+            display_name = f"{zone} ({abbrev})"
+        timezone.display_name = display_name
+        timezones.append(timezone)
+    return timezones
+
+
+def get_timezone_abbreviation(timezone_str: str, time: str = None):
+    """
+    Get the local abbreviation for a timezone
+    """
+    if timezone_str is None:
+        return None
+    timezone = pytz.timezone(timezone_str)
+    datetime_object: datetime = None
+    if time is not None:
+        timestamp = datetime.strptime(time, "%Y-%m-%d").timestamp()
+        datetime_object = datetime.fromtimestamp(timestamp, timezone)
+    else:
+        datetime_object = datetime.now(timezone)
+    timezone_abbreviation = datetime_object.strftime("%Z")
+    return timezone_abbreviation
+
+
+def get_country_from_country_name(country_name: str):
+    """
+    Helper method to get Country object from country name
+    """
+    if country_name is None or len(country_name) == 0:
+        return None
+    country: Country = None
+    sql = """SELECT * FROM Country WHERE LCASE(CountryName)=%(country_name)s"""
+    data = {"country_name": country_name.lower()}
+    row = db_query_one(sql, data)
+    if row:
+        country_id = get_override_int_value_or_default(row["CountryId"])
+        country_name = get_override_string_value_or_default(row["CountryName"])
+        country_code = get_override_string_value_or_default(row["CountryCode"])
+        if country_code is not None:
+            country = Country(country_id, country_name, country_code)
+    return country
+
+def get_country_from_country_id(country_id: int):
+    """
+    Helper method to get Country object from country id
+    """
+    if country_id is None or country_id == 0:
+        country_id = int(os.getenv("DEFAULT_COUNTRY_ID"))
+    country: Country = None
+    sql = """SELECT * FROM Country WHERE CountryId=%(country_id)s"""
+    data = {"country_id": country_id}
+    row = db_query_one(sql, data)
+    if row:
+        country_id = get_override_int_value_or_default(row["CountryId"])
+        country_name = get_override_string_value_or_default(row["CountryName"])
+        country_code = get_override_string_value_or_default(row["CountryCode"])
+        if country_code is not None:
+            country = Country(country_id, country_name, country_code)
+    return country
