@@ -613,11 +613,14 @@ class DataRefreshService:
                                         PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
                                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                         WHERE Id=%(id)s"""
+                                        
+                                sql = sql.replace("\n", "")
 
                                 order_success = db_update(sql, order_data, cnx)
                             else:
                                 order_add_new = True
                                 order_data["phone"] = phone
+                                order_data["phone_formatted"] = phone_formatted
                                 # insert new order
                                 order_data["order_id"] = (
                                     get_override_int_value_or_default(order.order_id)
@@ -638,6 +641,8 @@ class DataRefreshService:
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
                                     %(purchaserIpAddress)s,  %(email)s,
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+                                    
+                                sql = sql.replace("\n", "")
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0

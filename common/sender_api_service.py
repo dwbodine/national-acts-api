@@ -401,7 +401,7 @@ class SenderApiService:
             sql = """SELECT DISTINCT TicketSocketOrders.PurchaserLastName,
                         TicketSocketOrders.PurchaserFirstName, 
                         TicketSocketOrders.Email,
-                        TicketSocketOrders.Phone,
+                        COALESCE(TicketSocketOrders.PhoneFormatted, TicketSocketOrders.Phone) as Phone,
                         TicketSocketOrders.PurchaserZip,
                         COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) as Venue,
                         COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS VenueAddress,
