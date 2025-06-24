@@ -137,11 +137,12 @@ class UpdateService:
             phone = get_override_string_value_or_default(row["Phone"])
             country_code = get_override_string_value_or_default(row["CountryCode"])
             phone = clean_up_phone_input_for_parsing(phone)
+            phone_formatted: str = None
             if phone is not None and len(phone) > 0:
                 try:
                     z = phonenumbers.parse(phone, country_code)
                     if phonenumbers.is_possible_number(z):
-                        phone = phonenumbers.format_number(
+                        phone_formatted = phonenumbers.format_number(
                             z,
                             phonenumbers.PhoneNumberFormat.INTERNATIONAL,
                         )
@@ -149,11 +150,11 @@ class UpdateService:
                     error_message: str = str(error) + "\n" + traceback.format_exc()
                     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     log_message(f"""[{now}] - {error_message}\r\n""")
-                    phone = None
-            update_sql = """UPDATE TicketSocketOrders SET Phone=%(phone)s,
+                    phone_formatted = None
+            update_sql = """UPDATE TicketSocketOrders SET PhoneFormatted=%(phone)s,
                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                             WHERE Id=%(order_id)s"""
-            update_data = {"phone": phone, "order_id": order_id}
+            update_data = {"phone": phone_formatted, "order_id": order_id}
             success = db_update(update_sql, update_data)
             if success is not True:
                 break
