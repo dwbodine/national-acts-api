@@ -113,20 +113,34 @@ class ReportService:
         existing_files: list[str] = []
         for filename in os.listdir(thumb_path):
             if os.path.isfile(os.path.join(thumb_path, filename)):
-                existing_files.append(filename)
+                existing_files.append(str(filename))
         if len(existing_files) > 0:
             existing_files.sort(key=str.lower)
 
+        database_images: list[str] = []
         sql = """SELECT DISTINCT Thumbnail
                     FROM Pages
                     WHERE COALESCE(Thumbnail, '') <> ''
                     ORDER BY Thumbnail"""
         rows = db_query_all(sql)
-        database_images: list[str] = []
         for row in rows:
             image = get_override_string_value_or_default(row["Thumbnail"])
             if image is not None:
                 database_images.append(image)
+
+        sql = """SELECT DISTINCT Thumbnail
+                    FROM ExternalEvents
+                    WHERE COALESCE(Thumbnail, '') <> ''
+                    AND Thumbnail NOT LIKE 'http%'
+                    ORDER BY Thumbnail"""
+        rows = db_query_all(sql)
+        for row in rows:
+            image = get_override_string_value_or_default(row["Thumbnail"])
+            if image is not None and image not in database_images:
+                database_images.append(image)
+
+        if len(database_images) > 0:
+            database_images.sort(key=str.lower)
 
         orphaned_files: list[str] = []
         for file in existing_files:

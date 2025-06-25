@@ -5,12 +5,13 @@ Perform Cron job updates
 from datetime import datetime
 import traceback
 import phonenumbers
-from common.db import db_query_all, db_update
+from common.db import db_query_all, db_query_one, db_update
 from common.exchange_rate_service import ExchangeRateService, ExchangeRate
 from common.data_refresh_service import DataRefreshService
 from common.daily_order_service import DailyOrderService
 from common.models.national_acts import TicketSocketRefreshHistory
 from common.order_service import OrderService
+from common.report_service import ReportService
 from common.utility import (
     clean_up_phone_input_for_parsing,
     get_override_float_value_or_default,
@@ -158,4 +159,26 @@ class UpdateService:
             success = db_update(update_sql, update_data)
             if success is not True:
                 break
+        return success
+
+    def clear_out_missing_thumbnails(self):
+        """
+        Clears out the thumbnail field in old events if it says it's missing
+        """
+        success: bool = True
+        service = ReportService()
+        report = service.get_orphaned_and_missing_thumbnail_images()
+        if report.missing is not None and len(report.missing) > 0:
+            for missing_image in report.missing:
+                data = {"thumb": missing_image}
+                find_sql = """SELECT * FROM ExternalEvents WHERE Thumbnail=%(thumb)s LIMIT 0, 1"""
+                row = db_query_one(find_sql, data)
+                if row:
+                    sql = """UPDATE ExternalEvents SET Thumbnail=NULL,
+                            LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                            WHERE Thumbnail=%(thumb)s and EventDate < CURRENT_DATE"""
+                    
+                    success = db_update(sql, data)
+                if success is not True:
+                    break
         return success
