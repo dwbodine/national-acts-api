@@ -74,6 +74,8 @@ class ReportService:
         for filename in os.listdir(header_path):
             if os.path.isfile(os.path.join(header_path, filename)):
                 existing_files.append(filename)
+        if len(existing_files) > 0:
+            existing_files.sort(key=str.lower)
 
         sql = """SELECT DISTINCT Image
                     FROM Pages
@@ -112,6 +114,8 @@ class ReportService:
         for filename in os.listdir(thumb_path):
             if os.path.isfile(os.path.join(thumb_path, filename)):
                 existing_files.append(filename)
+        if len(existing_files) > 0:
+            existing_files.sort(key=str.lower)
 
         sql = """SELECT DISTINCT Thumbnail
                     FROM Pages
@@ -150,6 +154,8 @@ class ReportService:
         for filename in os.listdir(preview_path):
             if os.path.isfile(os.path.join(preview_path, filename)):
                 existing_files.append(filename)
+        if len(existing_files) > 0:
+            existing_files.sort(key=str.lower)
 
         sql = """SELECT DISTINCT LinkPreviewImage
                     FROM Pages
@@ -188,6 +194,8 @@ class ReportService:
         for filename in os.listdir(logo_path):
             if os.path.isfile(os.path.join(logo_path, filename)):
                 existing_files.append(filename)
+        if len(existing_files) > 0:
+            existing_files.sort(key=str.lower)
 
         sql = """SELECT DISTINCT LogoOnly
                         FROM Pages
@@ -226,6 +234,8 @@ class ReportService:
         for filename in os.listdir(banner_path):
             if os.path.isfile(os.path.join(banner_path, filename)):
                 existing_files.append(filename)
+        if len(existing_files) > 0:
+            existing_files.sort(key=str.lower)
 
         sql = """SELECT Value
                         FROM Settings
