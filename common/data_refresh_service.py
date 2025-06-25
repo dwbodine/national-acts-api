@@ -38,7 +38,7 @@ from common.user_service import UserService
 
 class DataRefreshService:
     """
-    Service to handle all event-related activity
+    Service to handle all data refreshing from TicketSocket
     """
 
     def retrieve_ticket_socket_events_for_update(
@@ -253,6 +253,34 @@ class DataRefreshService:
                                 LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                 WHERE Id=%(id)s"""
                         event_success = db_update(sql, event_data, cnx)
+
+                        # double-check date in External Events
+                        ex_sql = """SELECT * FROM ExternalEvents WHERE TicketSocketEventId=%(id)s"""
+                        ex_data = {"id": ticket_socket_event_id}
+                        ex_row = db_query_one(ex_sql, ex_data, cnx)
+                        if ex_row:
+                            # this should always be the case and is just
+                            # here to fix the event date if it's off
+                            ex_event_date = get_override_string_value_or_default(
+                                ex_row["EventDate"]
+                            )
+                            ex_id = get_override_int_value_or_default(ex_row["EventId"])
+                            if evt.event_date != ex_event_date:
+                                ex_sql2 = """UPDATE ExternalEvents SET EventDate=%(event_date)s,
+                                    LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
+                                    WHERE EventId=%(id)s"""
+                                ex_data2 = {"event_date": evt.event_date, "id": ex_id}
+                                event_success = db_update(ex_sql2, ex_data2, cnx)
+                        else:
+                            # but..if by some unforseen circumstance,
+                            # there is no matching ExternalEvent then add it
+                            event_data["seller_id"] = get_override_int_value_or_default(
+                                evt.seller_id
+                            )
+                            event_data["id"] = ticket_socket_event_id
+                            event_success = self.__add_to_external_events(
+                                event_data, evt, cnx
+                            )
                     else:
                         event_add_new = True
                         # insert new event
@@ -283,50 +311,9 @@ class DataRefreshService:
                                 evt.seller_id
                             )
                             event_data["id"] = ticket_socket_event_id
-
-                            # try to find venue in existing data if possible
-                            venue_id: int = 0
-                            venue_sql = """SELECT VenueID FROM ExternalEventVenues
-                                WHERE Venue=%(venue)s AND City=%(city)s LIMIT 0, 1"""
-                            venue_data = {
-                                "venue": event_data["venue"],
-                                "city": event_data["city"],
-                            }
-                            venue_row = db_query_one(venue_sql, venue_data)
-                            if venue_row:
-                                venue_id = get_override_int_value_or_default(
-                                    venue_row["VenueID"]
-                                )
-
-                            if venue_id > 0:
-                                event_data["venue_id"] = venue_id
-                            else:
-                                event_data["venue_id"] = None
-
-                            if evt.is_vip is True:
-                                event_data["url"] = None
-                                event_data["external_vip_link"] = (
-                                    get_override_string_value_or_default(
-                                        evt.ticket_socket_url
-                                    )
-                                )
-                            else:
-                                event_data["url"] = (
-                                    get_override_string_value_or_default(
-                                        evt.ticket_socket_url
-                                    )
-                                )
-                                event_data["external_vip_link"] = None
-
-                            sql = """INSERT INTO ExternalEvents(TicketSocketEventId, SellerId,
-                                Title, EventDate, Thumbnail, URL, ExternalVipLink, 
-                                ExternalEventVenueId, Created, LastUpdate) VALUES
-                                (%(id)s, %(seller_id)s, %(title)s, %(eventDate)s,
-                                %(thumbnail)s, %(url)s, %(external_vip_link)s, %(venue_id)s, 
-                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
-                                CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
-                            external_event_id = db_insert(sql, event_data, cnx)
-                            event_success = external_event_id > 0
+                            event_success = self.__add_to_external_events(
+                                event_data, evt, cnx
+                            )
 
                     # if the update succeeded, update counters
                     if event_success:
@@ -511,8 +498,10 @@ class DataRefreshService:
                                                 z,
                                                 phonenumbers.PhoneNumberFormat.INTERNATIONAL,
                                             )
-                                except Exception:  # pylint: disable=broad-exception-caught
-                                    # if phonenumbers can't format it, reject it
+                                except (
+                                    Exception  # pylint: disable=broad-exception-caught
+                                ):
+                                    # if phonenumbers can't format it, then never mind
                                     phone_formatted = None
 
                             if existing_order:
@@ -562,12 +551,14 @@ class DataRefreshService:
                                     ),
                                     "%Y-%m-%d",
                                 ).timestamp()
+
                                 existing_purchase_timestamp = datetime.strptime(
                                     get_override_string_value_or_default(
                                         existing_order["PurchaseDate"]
                                     ),
                                     "%Y-%m-%d",
                                 ).timestamp()
+
                                 if (
                                     order_purchase_timestamp
                                     != existing_purchase_timestamp
@@ -613,7 +604,7 @@ class DataRefreshService:
                                         PurchaserIpAddress=%(purchaserIpAddress)s, Email=%(email)s,
                                         LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                                         WHERE Id=%(id)s"""
-                                        
+
                                 sql = sql.replace("\n", "")
 
                                 order_success = db_update(sql, order_data, cnx)
@@ -641,7 +632,7 @@ class DataRefreshService:
                                     %(purchaserCity)s, %(purchaserState)s, %(purchaserZip)s, %(purchaserCountry)s,
                                     %(purchaserIpAddress)s,  %(email)s,
                                     CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
-                                    
+
                                 sql = sql.replace("\n", "")
 
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
@@ -933,121 +924,48 @@ class DataRefreshService:
 
         return results
 
-    def get_ticket_socket_refresh_history(self):
+    def __add_to_external_events(
+        self, event_data: dict[str, any], evt: VipEvent, cnx: any
+    ):
         """
-        Get history of TS refresh for admin screen
+        Add a new event to external events
         """
-        logs: list[TicketSocketRefreshHistory] = []
+        # try to find venue in existing data if possible
+        venue_id: int = 0
+        venue_sql = """SELECT VenueID FROM ExternalEventVenues
+            WHERE Venue=%(venue)s AND City=%(city)s LIMIT 0, 1"""
+        venue_data = {
+            "venue": event_data["venue"],
+            "city": event_data["city"],
+        }
+        venue_row = db_query_one(venue_sql, venue_data)
+        if venue_row:
+            venue_id = get_override_int_value_or_default(venue_row["VenueID"])
 
-        sql = """SELECT TicketSocketRefreshHistory.*,
-                CONCAT(Users.FirstName, ' ', Users.LastName) AS UserName,
-                Users.UserName AS Email, Sellers.Name AS SellerName
-                FROM TicketSocketRefreshHistory 
-                LEFT JOIN Users ON Users.UserId = TicketSocketRefreshHistory.UserId
-                LEFT JOIN Sellers ON Sellers.SellerId = TicketSocketRefreshHistory.SellerId
-                ORDER BY TicketSocketRefreshHistory.StartTimer DESC"""
+        if venue_id > 0:
+            event_data["venue_id"] = venue_id
+        else:
+            event_data["venue_id"] = None
 
-        rows = db_query_all(sql)
-        for row in rows:
-            user_id = get_override_int_value_or_default(row["UserId"])
-            if user_id == 0:
-                username = "System"
-            else:
-                username = (
-                    get_override_string_value_or_default(row["UserName"])
-                    + " ("
-                    + get_override_string_value_or_default(row["Email"])
-                    + ")"
-                )
-            seller_id = get_override_int_value_or_default(row["SellerId"], default=None)
-            seller_name = get_override_string_value_or_default(row["SellerName"])
-            start = get_override_int_value_or_default(row["Start"], default=None)
-            end = get_override_int_value_or_default(row["End"], default=None)
-            start_timer = get_override_int_value_or_default(row["StartTimer"])
-            end_timer = get_override_int_value_or_default(row["EndTimer"])
-            duration = get_override_float_value_or_default(row["Duration"])
-            succeeded = get_override_bool_value_or_default(row["Success"])
-            error_message = get_override_string_value_or_default(row["ErrorMessage"])
-            service_events_skipped = get_override_string_value_or_default(
-                row["ServiceEventsSkipped"]
+        if evt.is_vip is True:
+            event_data["url"] = None
+            event_data["external_vip_link"] = get_override_string_value_or_default(
+                evt.ticket_socket_url
             )
-            events_failed = get_override_string_value_or_default(row["EventsFailed"])
-            orders_failed = get_override_string_value_or_default(row["OrdersFailed"])
-            tickets_failed = get_override_string_value_or_default(row["TicketsFailed"])
-            ticket_types_failed = get_override_string_value_or_default(
-                row["TicketTypesFailed"]
+        else:
+            event_data["url"] = get_override_string_value_or_default(
+                evt.ticket_socket_url
             )
-            total_events_from_service = get_override_int_value_or_default(
-                row["TotalEventsFromService"]
-            )
-            events_updated = get_override_int_value_or_default(row["EventsUpdated"])
-            events_inserted = get_override_int_value_or_default(row["EventsInserted"])
-            orders_inserted = get_override_int_value_or_default(row["OrdersInserted"])
-            orders_updated = get_override_int_value_or_default(row["OrdersUpdated"])
-            orders_deleted = get_override_int_value_or_default(row["OrdersDeleted"])
-            tickets_updated = get_override_int_value_or_default(row["TicketsUpdated"])
-            tickets_inserted = get_override_int_value_or_default(row["TicketsInserted"])
-            ticket_types_updated = get_override_int_value_or_default(
-                row["TicketTypesUpdated"]
-            )
-            ticket_types_inserted = get_override_int_value_or_default(
-                row["TicketTypesInserted"]
-            )
-            order_data_update_succeeded = get_override_bool_value_or_default(
-                row["OrderDataUpdateSucceeded"]
-            )
-            order_data_update_duration = get_override_float_value_or_default(
-                row["OrderDataUpdateDuration"]
-            )
-            total_duration = get_override_float_value_or_default(row["TotalDuration"])
-            order_data_rows_total = get_override_int_value_or_default(
-                row["OrderDataRowsTotal"]
-            )
-            order_data_rows_inserted = get_override_int_value_or_default(
-                row["OrderDataRowsInserted"]
-            )
-            order_data_rows_updated = get_override_int_value_or_default(
-                row["OrderDataRowsUpdated"]
-            )
-            order_data_rows_removed = get_override_int_value_or_default(
-                row["OrderDataRowsRemoved"]
-            )
+            event_data["external_vip_link"] = None
 
-            history = TicketSocketRefreshHistory(
-                service_events_skipped,
-                events_failed,
-                orders_failed,
-                tickets_failed,
-                ticket_types_failed,
-                total_events_from_service,
-                events_updated,
-                events_inserted,
-                orders_inserted,
-                orders_updated,
-                orders_deleted,
-                tickets_updated,
-                tickets_inserted,
-                ticket_types_updated,
-                ticket_types_inserted,
-                start_timer,
-                end_timer,
-                duration,
-                user_id,
-                seller_id,
-                start,
-                end,
-                succeeded,
-                error_message,
-            )
-            history.seller_name = seller_name
-            history.username = username
-            history.order_data_update_succeeded = order_data_update_succeeded
-            history.order_data_update_duration = order_data_update_duration
-            history.order_data_rows_total = order_data_rows_total
-            history.order_data_rows_updated = order_data_rows_updated
-            history.order_data_rows_removed = order_data_rows_removed
-            history.order_data_rows_inserted = order_data_rows_inserted
-            history.total_duration = total_duration
-            logs.append(history)
+        sql = """INSERT INTO ExternalEvents(TicketSocketEventId, SellerId,
+            Title, EventDate, Thumbnail, URL, ExternalVipLink, 
+            ExternalEventVenueId, Created, LastUpdate) VALUES
+            (%(id)s, %(seller_id)s, %(title)s, %(eventDate)s,
+            %(thumbnail)s, %(url)s, %(external_vip_link)s, %(venue_id)s, 
+            CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'),
+            CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
+        external_event_id = db_insert(sql, event_data, cnx)
+        event_success = external_event_id > 0
 
-        return logs
+        return event_success

@@ -869,3 +869,13 @@ class Tour:
     is_active: bool = True
     announce_date: str
     events: list[VipEvent] = []
+
+
+class FileReport:
+    """
+    Represents a report of missing or orphaned files
+    """
+
+    def __init__(self, orphaned: list[str], missing: list[str]):
+        self.orphaned = orphaned
+        self.missing = missing

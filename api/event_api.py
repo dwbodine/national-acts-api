@@ -6,6 +6,7 @@ from datetime import datetime
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
+from common.admin_service import AdminService
 from common.common_api import get_user_from_jwt
 from common.daily_order_service import DailyOrderService
 from common.event_service import EventService
@@ -91,20 +92,6 @@ def get_events_and_orders_secured():
     )
     return convert_to_json(results)
 
-@event_api.route("/events/getMissingVenues")
-@jwt_required()
-def get_missing_venues():
-    """
-    API method to fetch External Events missing venue data
-    """
-    user = get_user_from_jwt()
-    if user is None or user.is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
-    service = DataRefreshService()
-    logs = service.get_ticket_socket_refresh_history()
-    return convert_to_json(logs)
-
 
 @event_api.route("/events/getOrderById")
 @jwt_required()
@@ -167,7 +154,7 @@ def get_update_history():
     if user is None or user.is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    service = DataRefreshService()
+    service = AdminService()
     logs = service.get_ticket_socket_refresh_history()
     return convert_to_json(logs)
 

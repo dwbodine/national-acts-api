@@ -113,6 +113,11 @@ def remove_file(file_name: str, public_rel_path: str):
     www_path = os.getenv("WWW_PUBLIC_FOLDER")
     remove_path = os.path.join(www_path, public_rel_path)
     remove_file_path = os.path.join(remove_path, file_name)
+
+    # replace Linux relative path separators for Windows
+    if os.name == "nt" and len(remove_file_path) > 0:
+        remove_file_path = remove_file_path.replace("/", "\\")
+
     if os.path.exists(remove_file_path):
         os.remove(remove_file_path)
 
@@ -137,7 +142,7 @@ def resize_tmp_image(image_name: str, image_id: str, resize_width: int = 0):
             if last_index < 0:
                 return None
             resize_file_path = (
-                f"{filename[0:last_index]}_{image_id}_{filename[last_index:]}"
+                f"{filename[0:last_index]}_{image_id}{filename[last_index:]}"
             )
 
             # default to square(ish) thumbnail if no width given
@@ -531,6 +536,7 @@ def get_country_from_country_name(country_name: str):
         if country_code is not None:
             country = Country(country_id, country_name, country_code)
     return country
+
 
 def get_country_from_country_id(country_id: int):
     """

@@ -25,3 +25,53 @@ def get_missing_venues():
     service = ReportService()
     events = service.get_missing_venue_events()
     return convert_to_json(events)
+
+
+@report_api.route("/reports/headerImages")
+def header_image_report():
+    """
+    Report to show missing/orphaned header images
+    """
+    service = ReportService()
+    report = service.get_orphaned_and_missing_header_images()
+    return convert_to_json(report)
+
+
+@report_api.route("/reports/thumbnailImages")
+def thumbnail_image_report():
+    """
+    Report to show missing/orphaned thumbnail images
+    """
+    service = ReportService()
+    report = service.get_orphaned_and_missing_thumbnail_images()
+    return convert_to_json(report)
+
+
+@report_api.route("/reports/previewImages")
+def preview_image_report():
+    """
+    Report to show missing/orphaned preview images
+    """
+    service = ReportService()
+    report = service.get_orphaned_and_missing_preview_images()
+    return convert_to_json(report)
+
+
+@report_api.route("/reports/logos")
+def logo_image_report():
+    """
+    Report to show missing/orphaned logos
+    """
+    service = ReportService()
+    report = service.get_orphaned_and_missing_logo_images()
+    return convert_to_json(report)
+
+
+@report_api.route("/reports/banners")
+def banner_image_report():
+    """
+    Report to show missing/orphaned banners
+    """
+    service = ReportService()
+    report = service.get_orphaned_and_missing_banner_images()
+    return convert_to_json(report)

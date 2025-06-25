@@ -427,7 +427,7 @@ class PageService:
         if remove_old_header is True and existing_page is not None:
             existing_image = get_override_string_value_or_default(existing_page.image)
             if existing_image is not None:
-                remove_file(existing_image, "common/thumbnails")
+                remove_file(existing_image, "common/headers")
 
         remove_old_thumbnail: bool = False
         if page_to_update.thumbnail is not None:
@@ -612,7 +612,9 @@ class PageService:
                             else None
                         ),
                         "country_id": (
-                            get_override_int_value_or_default(seller.country.country_id, None)
+                            get_override_int_value_or_default(
+                                seller.country.country_id, None
+                            )
                             if hasattr(seller, "country")
                             else None
                         ),

@@ -5,6 +5,7 @@ Admin service module
 import os
 from common.db import db_delete, db_query_all, db_insert, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
+from common.models.national_acts import TicketSocketRefreshHistory
 from common.models.ticket_socket import Country, TicketSocketAccount, Timezone
 from common.ticket_socket_service import TicketSocketService
 from common.utility import (
@@ -259,3 +260,122 @@ class AdminService:
             country.timezones = timezones
             countries.append(country)
         return countries
+
+    def get_ticket_socket_refresh_history(self):
+        """
+        Get history of TS refresh for admin screen
+        """
+        logs: list[TicketSocketRefreshHistory] = []
+
+        sql = """SELECT TicketSocketRefreshHistory.*,
+                CONCAT(Users.FirstName, ' ', Users.LastName) AS UserName,
+                Users.UserName AS Email, Sellers.Name AS SellerName
+                FROM TicketSocketRefreshHistory 
+                LEFT JOIN Users ON Users.UserId = TicketSocketRefreshHistory.UserId
+                LEFT JOIN Sellers ON Sellers.SellerId = TicketSocketRefreshHistory.SellerId
+                ORDER BY TicketSocketRefreshHistory.StartTimer DESC"""
+
+        rows = db_query_all(sql)
+        for row in rows:
+            user_id = get_override_int_value_or_default(row["UserId"])
+            if user_id == 0:
+                username = "System"
+            else:
+                username = (
+                    get_override_string_value_or_default(row["UserName"])
+                    + " ("
+                    + get_override_string_value_or_default(row["Email"])
+                    + ")"
+                )
+            seller_id = get_override_int_value_or_default(row["SellerId"], default=None)
+            seller_name = get_override_string_value_or_default(row["SellerName"])
+            start = get_override_int_value_or_default(row["Start"], default=None)
+            end = get_override_int_value_or_default(row["End"], default=None)
+            start_timer = get_override_int_value_or_default(row["StartTimer"])
+            end_timer = get_override_int_value_or_default(row["EndTimer"])
+            duration = get_override_float_value_or_default(row["Duration"])
+            succeeded = get_override_bool_value_or_default(row["Success"])
+            error_message = get_override_string_value_or_default(row["ErrorMessage"])
+            service_events_skipped = get_override_string_value_or_default(
+                row["ServiceEventsSkipped"]
+            )
+            events_failed = get_override_string_value_or_default(row["EventsFailed"])
+            orders_failed = get_override_string_value_or_default(row["OrdersFailed"])
+            tickets_failed = get_override_string_value_or_default(row["TicketsFailed"])
+            ticket_types_failed = get_override_string_value_or_default(
+                row["TicketTypesFailed"]
+            )
+            total_events_from_service = get_override_int_value_or_default(
+                row["TotalEventsFromService"]
+            )
+            events_updated = get_override_int_value_or_default(row["EventsUpdated"])
+            events_inserted = get_override_int_value_or_default(row["EventsInserted"])
+            orders_inserted = get_override_int_value_or_default(row["OrdersInserted"])
+            orders_updated = get_override_int_value_or_default(row["OrdersUpdated"])
+            orders_deleted = get_override_int_value_or_default(row["OrdersDeleted"])
+            tickets_updated = get_override_int_value_or_default(row["TicketsUpdated"])
+            tickets_inserted = get_override_int_value_or_default(row["TicketsInserted"])
+            ticket_types_updated = get_override_int_value_or_default(
+                row["TicketTypesUpdated"]
+            )
+            ticket_types_inserted = get_override_int_value_or_default(
+                row["TicketTypesInserted"]
+            )
+            order_data_update_succeeded = get_override_bool_value_or_default(
+                row["OrderDataUpdateSucceeded"]
+            )
+            order_data_update_duration = get_override_float_value_or_default(
+                row["OrderDataUpdateDuration"]
+            )
+            total_duration = get_override_float_value_or_default(row["TotalDuration"])
+            order_data_rows_total = get_override_int_value_or_default(
+                row["OrderDataRowsTotal"]
+            )
+            order_data_rows_inserted = get_override_int_value_or_default(
+                row["OrderDataRowsInserted"]
+            )
+            order_data_rows_updated = get_override_int_value_or_default(
+                row["OrderDataRowsUpdated"]
+            )
+            order_data_rows_removed = get_override_int_value_or_default(
+                row["OrderDataRowsRemoved"]
+            )
+
+            history = TicketSocketRefreshHistory(
+                service_events_skipped,
+                events_failed,
+                orders_failed,
+                tickets_failed,
+                ticket_types_failed,
+                total_events_from_service,
+                events_updated,
+                events_inserted,
+                orders_inserted,
+                orders_updated,
+                orders_deleted,
+                tickets_updated,
+                tickets_inserted,
+                ticket_types_updated,
+                ticket_types_inserted,
+                start_timer,
+                end_timer,
+                duration,
+                user_id,
+                seller_id,
+                start,
+                end,
+                succeeded,
+                error_message,
+            )
+            history.seller_name = seller_name
+            history.username = username
+            history.order_data_update_succeeded = order_data_update_succeeded
+            history.order_data_update_duration = order_data_update_duration
+            history.order_data_rows_total = order_data_rows_total
+            history.order_data_rows_updated = order_data_rows_updated
+            history.order_data_rows_removed = order_data_rows_removed
+            history.order_data_rows_inserted = order_data_rows_inserted
+            history.total_duration = total_duration
+            logs.append(history)
+
+        return logs
