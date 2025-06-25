@@ -3,7 +3,7 @@ Admin service module
 """
 
 import os
-from common.db import db_delete, db_query_all, db_insert, db_update
+from common.db import db_delete, db_query_all, db_insert, db_query_one, db_update
 from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
 from common.models.national_acts import TicketSocketRefreshHistory
 from common.models.ticket_socket import Country, TicketSocketAccount, Timezone
@@ -15,6 +15,7 @@ from common.utility import (
     get_override_string_value_or_default,
     get_timezones_from_country_code,
     move_temp_file_to_public_folder,
+    remove_file,
 )
 
 
@@ -59,12 +60,19 @@ class AdminService:
             "type": get_override_string_value_or_default(setting.type),
             "value": get_override_string_value_or_default(setting.value),
         }
+        orig_value: str = None
         if setting.setting_id is None or setting.setting_id <= 0:
             sql = """INSERT INTO Settings (Name, DisplayName, Type, Value)
                      VALUES(%(name)s, %(displayName)s, %(type)s, %(value)s)"""
             setting_id = db_insert(sql, data)
             success = setting_id > 0
         else:
+            orig_sql = """SELECT Value FROM Settings WHERE ID=%(setting_id)s"""
+            orig_data = {"setting_id": setting.setting_id}
+            orig_row = db_query_one(orig_sql, orig_data)
+            if orig_row:
+                orig_value = get_override_string_value_or_default(orig_row["Value"])
+
             sql = """UPDATE Settings
                         SET Name=%(name)s, 
                         DisplayName=%(displayName)s,
@@ -78,6 +86,8 @@ class AdminService:
         # move temp image to final place
         if setting.type == SiteSettingType.IMAGE:
             move_temp_file_to_public_folder(setting.value, setting.file_path)
+            if orig_value is not None:
+                remove_file(orig_value, setting.file_path)
 
         return success
 
