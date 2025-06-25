@@ -177,7 +177,7 @@ class UpdateService:
                     sql = """UPDATE ExternalEvents SET Thumbnail=NULL,
                             LastUpdate=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00')
                             WHERE Thumbnail=%(thumb)s and EventDate < CURRENT_DATE"""
-                    
+
                     success = db_update(sql, data)
                 if success is not True:
                     break
