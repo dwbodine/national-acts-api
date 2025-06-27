@@ -397,6 +397,35 @@ def get_all_pages():
     return convert_to_json(pages)
 
 
+@admin_api.route("/admin/pages/order", methods=["POST"])
+@jwt_required()
+def update_page_order():
+    """
+    API method to update client page orders
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    data = request.get_json()
+
+    if data is None or len(data) == 0:
+        return {"msg": "Bad Request"}, 400
+
+    save_success: bool = False
+    pages: list[Page] = []
+    for item in data:
+        page = convert_json_to_snake_case_object(item, Page())
+        if page is not None:
+            pages.append(page)
+
+    if len(pages) > 0:
+        service = PageService()
+        save_success = service.update_seller_page_order(pages)
+
+    return convert_to_json(save_success)
+
+
 @admin_api.route("/admin/pages/update", methods=["POST"])
 @jwt_required()
 def update_page():
