@@ -115,5 +115,6 @@ class Page:
     exclude_end: str = None
     google_analytics_id: str = None
     page_order: int = 1
+    last_update: str = None
     sellers: list[PageSeller] = []
     events: list[VipEvent] = []

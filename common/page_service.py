@@ -5,6 +5,7 @@ Page Service
 from datetime import datetime
 import operator
 
+from common.constants import PAGE_SELLER_TYPE_IDS
 from common.db import (
     db_delete,
     db_query_all,
@@ -32,28 +33,40 @@ class PageService:
     Service to handle page-based activity
     """
 
-    page_seller_type_ids: list[int] = [7, 14, 15, 16, 17, 18, 19]
-
-    def get_all_pages(self):
+    def get_all_pages(self, is_public: bool = False, page_type_id: int = None):
         """
-        Get all pages
+        Get all pages, optionally by type
         """
         pages: list[Page] = []
 
+        data = {}
         sql = """SELECT Pages.*, PageType.PageType AS PageTypeName,
                     PageType.Template, PageType.Component
                     FROM Pages 
-                    JOIN PageType ON Pages.PageTypeID = PageType.PageTypeID 
-                    ORDER BY Pages.Title ASC, Pages.Inactive DESC"""
-        rows = db_query_all(sql)
+                    JOIN PageType ON Pages.PageTypeID = PageType.PageTypeID"""
+
+        if page_type_id is not None and page_type_id > 0:
+            sql += """ WHERE Pages.PageTypeID=%(page_type_id)s"""
+            data["page_type_id"] = page_type_id
+            if is_public is True:
+                sql += """ AND Pages.Inactive=0"""
+        elif is_public is True:
+            sql += """ WHERE Pages.Inactive=0"""
+
+        if page_type_id is not None and page_type_id > 0:
+            sql += """ ORDER BY Pages.PageOrder ASC, Pages.LastUpdated DESC"""
+        else:
+            sql += """ ORDER BY Pages.Title ASC, Pages.Inactive DESC"""
+
+        rows = db_query_all(sql, data)
         for row in rows:
             page = self.__get_page_from_row_object(row)
             if page is not None:
                 if (
                     page.page_type is not None
-                    and page.page_type.page_type_id in self.page_seller_type_ids
+                    and page.page_type.page_type_id in PAGE_SELLER_TYPE_IDS
                 ):
-                    page_sellers = self.get_page_sellers(page.page_id)
+                    page_sellers = self.get_page_sellers(page.page_id, is_public)
                     page.sellers = page_sellers
                 pages.append(page)
 
@@ -81,7 +94,7 @@ class PageService:
         if (
             page is not None
             and page.page_type is not None
-            and page.page_type.page_type_id in self.page_seller_type_ids
+            and page.page_type.page_type_id in PAGE_SELLER_TYPE_IDS
         ):
             page_sellers = self.get_page_sellers(page.page_id, True)
             page.sellers = page_sellers
@@ -818,6 +831,7 @@ class PageService:
                 page.is_active = not get_override_bool_value_or_default(row["Inactive"])
                 page.route = get_override_string_value_or_default(row["Route"])
                 page.title = get_override_string_value_or_default(row["Title"])
+                page.page_order = get_override_int_value_or_default(row["PageOrder"])
                 page.image = get_override_string_value_or_default(row["Image"])
                 page.thumbnail = get_override_string_value_or_default(row["Thumbnail"])
                 page.link_preview_image = get_override_string_value_or_default(
@@ -852,6 +866,9 @@ class PageService:
                 page.google_analytics_id = get_override_string_value_or_default(
                     row["GoogleAnalyticsID"]
                 )
+                page.last_update = get_override_string_value_or_default(
+                    row["LastUpdated"]
+                )
 
                 page_type = PageType()
                 page_type.page_type_id = get_override_int_value_or_default(
@@ -870,11 +887,14 @@ class PageService:
 
         return page
 
-    def get_all_page_types(self):
+    def get_all_page_types(self, seller_types_only: bool = False):
         """
         Gets all page types
         """
-        sql = "SELECT * FROM PageType ORDER BY PageType ASC"
+        sql = """SELECT * FROM PageType"""
+        if seller_types_only is True:
+            sql += f""" WHERE PageTypeID in ({','.join(str(item) for item in PAGE_SELLER_TYPE_IDS)})"""
+        sql += """ ORDER BY PageType ASC"""
         rows = db_query_all(sql)
 
         page_types: list[PageType] = []
@@ -896,3 +916,26 @@ class PageService:
             page_types.append(page_type)
 
         return page_types
+
+    def update_seller_page_order(self, pages: list[Page]):
+        """
+        Updates just the page order for seller type pages
+        """
+        success: bool = True
+        for page in pages:
+            page_order: int = page.page_order
+            if (
+                page_order is None
+                or page.page_type is None
+                or page.page_type.page_type_id not in PAGE_SELLER_TYPE_IDS
+            ):
+                continue
+            sql = """UPDATE Pages
+                        SET PageOrder=%(page_order)s,
+                        LastUpdated=CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00') 
+                        WHERE PageID=%(page_id)s"""
+            data = {"page_order": page_order, "page_id": page.page_id}
+            success = db_update(sql, data)
+            if success is not True:
+                break
+        return success

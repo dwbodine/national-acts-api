@@ -93,6 +93,26 @@ def get_page_by_route(route: str):
     return convert_to_json(results)
 
 
+@public_api.route("/public/pages/<int:page_type_id>")
+def get_pages_by_type(page_type_id: int):
+    """
+    API method to fetch all pages by page type id
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    if page_type_id is None or page_type_id <= 0:
+        return {"msg": "Bad Request"}, 400
+
+    service = PageService()
+    results = service.get_all_pages(is_public=True, page_type_id=page_type_id)
+    return convert_to_json(results)
+
+
 @public_api.route("/public/page_types")
 def get_page_types():
     """
@@ -107,6 +127,23 @@ def get_page_types():
 
     service = PageService()
     results = service.get_all_page_types()
+    return convert_to_json(results)
+
+
+@public_api.route("/public/page_seller_types")
+def get_page_seller_types():
+    """
+    API method to fetch all page types
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = PageService()
+    results = service.get_all_page_types(seller_types_only=True)
     return convert_to_json(results)
 
 
