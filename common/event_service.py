@@ -822,7 +822,7 @@ class EventService:
 
                 image_id = f"{event_date_str}_{event_to_update.seller_id}"
                 thumb_file = resize_tmp_image(
-                    event_to_update.external_thumbnail, image_id
+                    event_to_update.external_thumbnail, image_id, 400
                 )
                 if thumb_file is not None:
                     update_data["thumbnail"] = get_override_string_value_or_default(
