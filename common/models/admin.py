@@ -118,3 +118,24 @@ class Page:
     last_update: str = None
     sellers: list[PageSeller] = []
     events: list[VipEvent] = []
+
+
+class FaqCategory:
+    """
+    Model for FAQ category
+    """
+
+    category_id: int
+    category_name: str
+
+
+class Faq:
+    """
+    Model for FAQ
+    """
+
+    faq_id: int
+    category: FaqCategory
+    order: int
+    question: str
+    answer: str
