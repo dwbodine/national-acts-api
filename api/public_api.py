@@ -9,6 +9,7 @@ from flask import Blueprint, request
 
 from common.admin_service import AdminService
 from common.event_service import EventService
+from common.faq_service import FaqService
 from common.page_service import PageService
 from common.seller_service import SellerService
 from common.utility import (
@@ -23,6 +24,42 @@ public_api = Blueprint("public_api", __name__)
 
 
 # BEGIN PUBLIC ROUTES
+@public_api.route("/public/faq/<int:category_id>")
+def get_faqs(category_id: int):
+    """
+    API method to fetch FAQ's by category_id (0 for all)
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    if category_id is None:
+        category_id = 0
+
+    service = FaqService()
+    faqs = service.get_faq_by_category_id(category_id)
+    return convert_to_json(faqs)
+
+@public_api.route("/public/faq_categories")
+def get_faq_categories():
+    """
+    API method to fetch all FAQ categories
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = FaqService()
+    categories = service.get_faq_categories()
+    return convert_to_json(categories)
+
+
 @public_api.route("/public/events")
 def get_events():
     """
