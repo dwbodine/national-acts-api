@@ -2,16 +2,9 @@
 Service to pull faq from database
 """
 
-import os
-from datetime import datetime
-import time
-
 from common.db import db_delete, db_query_all, db_query_one, db_insert, db_update
 from common.models.admin import Faq, FaqCategory
-from common.models.exchange_rate import ExchangeRate
 from common.utility import (
-    get_https_response,
-    get_override_float_value_or_default,
     get_override_int_value_or_default,
     get_override_string_value_or_default,
 )
