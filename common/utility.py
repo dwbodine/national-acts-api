@@ -11,12 +11,11 @@ import traceback
 from types import SimpleNamespace
 from pytz import country_timezones
 import pytz
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, From, To
 from stringcase import camelcase, snakecase
 from PIL import Image
 
 from common.db import db_query_one
+from common.messaging_service import MessagingService
 from common.models.ticket_socket import Country, Timezone
 
 
@@ -176,56 +175,6 @@ def resize_tmp_image(image_name: str, image_id: str, resize_width: int = 0):
     return resize_file_name
 
 
-class SendEmailResult:
-    """
-    Class for sending email
-    """
-
-    def __init__(self, success: bool, error: str = None):
-        self.success = success
-        self.error = error
-
-
-def send_email(
-    to_email_address: str,
-    subject: str,
-    html_content: str,
-    to_name: str = None,
-    cc_emails: list[str] = None,
-):
-    """
-    Utility to send email through Twilio
-    """
-    from_email = From("info@national-acts.com", "National Acts VIP")
-
-    if to_name is not None and to_name != "":
-        to_email = To(to_email_address, to_name)
-    else:
-        to_email = to_email_address
-
-    message = Mail(
-        from_email=from_email,
-        to_emails=to_email,
-        subject=subject,
-        html_content=html_content,
-    )
-
-    if cc_emails is not None:
-        for email in cc_emails:
-            message.add_cc(email)
-
-    result: SendEmailResult = None
-    try:
-        send_grid_key = os.environ.get("SENDGRID_API_KEY")
-        sg = SendGridAPIClient(send_grid_key)
-        sg.send(message)
-        result = SendEmailResult(True, None)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        result = SendEmailResult(False, str(e) + "\n" + traceback.format_exc())
-
-    return result
-
-
 def convert_to_json(obj: any):
     """
     Convert any object to JSON
@@ -339,7 +288,8 @@ def get_https_response(
         html += error_message
         to = "dwbodine@gmail.com"
         to_name = "dB"
-        send_email(to, subject, html, to_name)
+        service = MessagingService()
+        service.send_email(to, subject, html, to_name)
     finally:
         if conn is not None:
             conn.close()
@@ -389,7 +339,8 @@ def post_https_response(
         html += error_message
         to = "dwbodine@gmail.com"
         to_name = "dB"
-        send_email(to, subject, html, to_name)
+        service = MessagingService()
+        service.send_email(to, subject, html, to_name)
     finally:
         if conn is not None:
             conn.close()

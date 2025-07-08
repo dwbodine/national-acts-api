@@ -3,6 +3,7 @@ Event Service
 """
 
 from datetime import datetime
+import pytz
 
 from common.calendar_service import CalendarService
 from common.db import (
@@ -63,7 +64,9 @@ class EventService:
         main method to fetch events and orders
         """
         events: list[VipEvent] = []
-        now_ts: float = datetime.now().timestamp()
+
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        pac_now_ts: float = datetime.now(pacific_tz).timestamp()
 
         if seller_ids is None:
             seller_ids = []
@@ -263,24 +266,24 @@ class EventService:
             # get tour announce datetime from active tours only
             tad_ts: float = None
             if is_tour_active is True and tour_announce_date_str is not None:
-                tad_ts = datetime.strptime(
+                tad_ts_dt = datetime.strptime(
                     tour_announce_date_str, "%Y-%m-%d %H:%M:%S"
-                ).timestamp()
+                )
+                tad_ts = pacific_tz.localize(tad_ts_dt).timestamp()
 
             # get event announce datetime (if available)
             ad_ts: float = None
             if announce_date_str is not None:
-                ad_ts = datetime.strptime(
-                    announce_date_str, "%Y-%m-%d %H:%M:%S"
-                ).timestamp()
+                ad_ts_dt = datetime.strptime(announce_date_str, "%Y-%m-%d %H:%M:%S")
+                ad_ts = pacific_tz.localize(ad_ts_dt).timestamp()
 
             # for public page, skip events where the announce date has not yet passed
             if is_public is True and (ad_ts is not None or tad_ts is not None):
                 if ad_ts is not None:
-                    if ad_ts > now_ts:
+                    if ad_ts > pac_now_ts:
                         continue
                 elif tad_ts is not None:
-                    if tad_ts > now_ts:
+                    if tad_ts > pac_now_ts:
                         continue
 
             external_event_id = get_override_int_value_or_default(

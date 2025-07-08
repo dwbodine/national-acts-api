@@ -15,6 +15,7 @@ from common.db import (
     db_get_connection,
     db_delete,
 )
+from common.messaging_service import MessagingService
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
@@ -23,7 +24,6 @@ from common.utility import (
     get_override_tinyint_value_or_default_from_bool,
     log_message,
     convert_to_json,
-    send_email,
 )
 from common.ticket_socket_service import TicketSocketService
 from common.models.national_acts import (
@@ -920,7 +920,8 @@ class DataRefreshService:
                 html = error_message
             to = "dwbodine@gmail.com"
             to_name = "dB"
-            send_email(to, subject, html, to_name)
+            service = MessagingService()
+            service.send_email(to, subject, html, to_name)
 
         return results
 

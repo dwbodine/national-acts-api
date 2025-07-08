@@ -25,6 +25,7 @@ from api.internal_api import internal_api
 from api.public_api import public_api
 from api.user_api import user_api
 from api.report_api import report_api
+from api.messaging_api import messaging_api
 
 from common.common_api import is_admin_logged_in
 from common.utility import log_message, convert_to_json
@@ -49,6 +50,7 @@ app.register_blueprint(internal_api)
 app.register_blueprint(public_api)
 app.register_blueprint(user_api)
 app.register_blueprint(report_api)
+app.register_blueprint(messaging_api)
 
 
 @app.after_request

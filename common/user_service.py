@@ -6,6 +6,8 @@ from datetime import datetime
 import hashlib
 import random
 
+from common.messaging_service import MessagingService
+from common.models.messaging import SendEmailResult
 from common.models.user import (
     UserResponse,
     User,
@@ -20,9 +22,7 @@ from common.utility import (
     get_override_string_value_or_default,
     get_override_tinyint_value_or_default_from_bool,
     log_message,
-    send_email,
     validate_email_address,
-    SendEmailResult,
 )
 
 
@@ -165,7 +165,8 @@ class UserService:
                         to confirm your email in our system:\n\n{str(code)}"""
                     subject = "National Acts VIP - Password Reset"
                     to_name = user.first_name + " " + user.last_name
-                    result = send_email(username, subject, html, to_name)
+                    service = MessagingService()
+                    result = service.send_email(username, subject, html, to_name)
                     if result.success is not True:
                         user = None
                         error_message = (
@@ -835,8 +836,9 @@ class UserService:
             subject = "New User Registration"
             to = "tj@national-acts.com"
             # to = "dwbodine@gmail.com"
+            service = MessagingService()
 
-            result = send_email(to, subject, html, "New User Registration")
+            result = service.send_email(to, subject, html, "New User Registration")
         else:
             result.success = False
             result.error = "Could not find new user in database"
