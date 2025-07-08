@@ -213,18 +213,18 @@ class EventService:
                 )
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
                 data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-            elif end is not None and end > datetime.now().timestamp():
+            elif end is not None and end > datetime.now(pacific_tz).timestamp():
                 where_clause.append(
                     "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s"
                 )
-                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
                 data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
             elif start is not None:
                 where_clause.append("ExternalEvents.EventDate >= %(startDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
             elif is_public is True:
                 where_clause.append("ExternalEvents.EventDate >= %(startDate)s")
-                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
 
             if exclude_start is not None and exclude_end is not None:
                 where_clause.append(

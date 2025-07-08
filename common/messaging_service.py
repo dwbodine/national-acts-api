@@ -5,6 +5,7 @@ Class for Twilio/SendGrid/messaging
 from datetime import datetime
 import os
 import traceback
+import pytz
 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, From, To
@@ -22,6 +23,7 @@ class MessagingService:
         """
         Generates a new Google Auth Token for spam prevention
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         if google_id is None or len(google_id.strip()) == 0:
             return -1
 
@@ -32,7 +34,7 @@ class MessagingService:
             VALUES (%(google_id)s, %(expiration)s,
             CONVERT_TZ(CURRENT_TIMESTAMP,'+00:00','-1:00'))"""
 
-        time = datetime.now().timestamp() + 120
+        time = datetime.now(pacific_tz).timestamp() + 120
         expiration = datetime.fromtimestamp(time).strftime("%Y-%m-%d %H:%M:%S")
 
         data = {"google_id": google_id, "expiration": expiration}
@@ -44,6 +46,7 @@ class MessagingService:
         """
         Validate Google Auth token to prevent spam in contact form
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         if (
             google_id is None
             or len(google_id.strip()) == 0
@@ -68,10 +71,11 @@ class MessagingService:
                 else None
             )
             if time_str is not None:
-                time: float = datetime.strptime(
+                time_dt =  datetime.strptime(
                     time_str, "%Y-%m-%d %H:%M:%S"
-                ).timestamp()
-                now = datetime.now().timestamp()
+                )
+                time: float = pacific_tz.localize(time_dt).timestamp()
+                now = datetime.now(pacific_tz).timestamp()
                 if time > now :
                     valid = 1
                 else:

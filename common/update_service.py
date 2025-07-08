@@ -3,6 +3,7 @@ Perform Cron job updates
 """
 
 from datetime import datetime
+import pytz
 import traceback
 import phonenumbers
 from common.db import db_query_all, db_query_one, db_update
@@ -32,7 +33,8 @@ class UpdateService:
         """
         Update all exchange rates from Stripe
         """
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
         result_message: str = f"[{now}] - "
         try:
             rates: list[ExchangeRate] = []
@@ -63,7 +65,8 @@ class UpdateService:
         """
         Update all upcoming events/orders/tickets/ticket types from TS
         """
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
         result_message: str = f"[{now}] - "
 
         service = DataRefreshService()
@@ -72,9 +75,9 @@ class UpdateService:
             results = service.refresh_database_from_ticket_socket()
 
             if results is not None and results.succeeded is True:
-                current_year = datetime.now().year
-                month = datetime.now().month
-                day = datetime.now().day
+                current_year = datetime.now(pacific_tz).year
+                month = datetime.now(pacific_tz).month
+                day = datetime.now(pacific_tz).day
 
                 start = datetime.strptime(
                     f"{current_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
@@ -149,7 +152,8 @@ class UpdateService:
                         )
                 except Exception as error:  # pylint: disable=broad-exception-caught
                     error_message: str = str(error) + "\n" + traceback.format_exc()
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    pacific_tz = pytz.timezone("America/Los_Angeles")
+                    now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
                     log_message(f"""[{now}] - {error_message}\r\n""")
                     phone_formatted = None
             update_sql = """UPDATE TicketSocketOrders SET PhoneFormatted=%(phone)s,

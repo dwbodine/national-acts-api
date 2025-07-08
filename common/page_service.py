@@ -4,6 +4,7 @@ Page Service
 
 from datetime import datetime
 import operator
+import pytz
 
 from common.constants import PAGE_SELLER_TYPE_IDS
 from common.db import (
@@ -374,6 +375,7 @@ class PageService:
         if page_to_update is None:
             return None
 
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         existing_page: Page = None
         if page_to_update.page_id > 0:
             existing_page = self.get_page_by_route(page_to_update.route)
@@ -428,7 +430,7 @@ class PageService:
         remove_old_header: bool = False
         if page_to_update.image is not None:
             if existing_page is None or existing_page.image != page_to_update.image:
-                image_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                image_id: str = datetime.now(pacific_tz).strftime("%Y%m%d%H%M%S")
                 image_file = resize_tmp_image(page_to_update.image, image_id, 1600)
                 if image_file is not None:
                     data["image"] = get_override_string_value_or_default(image_file)
@@ -448,7 +450,7 @@ class PageService:
                 existing_page is None
                 or existing_page.thumbnail != page_to_update.thumbnail
             ):
-                thumbnail_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                thumbnail_id: str = datetime.now(pacific_tz).strftime("%Y%m%d%H%M%S")
                 thumbnail_file = resize_tmp_image(
                     page_to_update.thumbnail, thumbnail_id, 400
                 )
@@ -474,7 +476,7 @@ class PageService:
                 existing_page is None
                 or existing_page.link_preview_image != page_to_update.link_preview_image
             ):
-                preview_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                preview_id: str = datetime.now(pacific_tz).strftime("%Y%m%d%H%M%S")
                 preview_file = resize_tmp_image(
                     page_to_update.link_preview_image, preview_id, 400
                 )
@@ -500,7 +502,7 @@ class PageService:
                 existing_page is None
                 or existing_page.logo_only_image != page_to_update.logo_only_image
             ):
-                logo_id: str = datetime.now().strftime("%Y%m%d%H%M%S")
+                logo_id: str = datetime.now(pacific_tz).strftime("%Y%m%d%H%M%S")
                 logo_file = resize_tmp_image(
                     page_to_update.logo_only_image, logo_id, 400
                 )

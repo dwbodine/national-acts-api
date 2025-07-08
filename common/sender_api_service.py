@@ -3,6 +3,7 @@ Sender API module
 """
 
 from datetime import datetime
+import pytz
 import time
 import os
 import traceback
@@ -89,7 +90,8 @@ class SenderApiService:
                             )
         except Exception as error:  # pylint: disable=broad-exception-caught
             error_message: str = str(error) + "\n" + traceback.format_exc()
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            pacific_tz = pytz.timezone("America/Los_Angeles")
+            now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
             log_message(f"""[{now}] - {error_message}\r\n""")
 
         return subscriber
@@ -279,7 +281,8 @@ class SenderApiService:
 
             except Exception as error:  # pylint: disable=broad-exception-caught
                 error_message: str = str(error) + "\n" + traceback.format_exc()
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                pacific_tz = pytz.timezone("America/Los_Angeles")
+                now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
                 log_message(f"""[{now}] - {error_message}\r\n""")
 
         results = {
@@ -474,7 +477,8 @@ class SenderApiService:
 
         except Exception as error:  # pylint: disable=broad-exception-caught
             error_message: str = str(error) + "\n" + traceback.format_exc()
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            pacific_tz = pytz.timezone("America/Los_Angeles")
+            now = datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
             log_message(f"""[{now}] - {error_message}\r\n""")
 
         return stored_subscribers

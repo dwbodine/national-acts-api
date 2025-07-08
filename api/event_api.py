@@ -5,6 +5,7 @@ Event API routes
 from datetime import datetime
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
+import pytz
 
 from common.admin_service import AdminService
 from common.common_api import get_user_from_jwt
@@ -165,6 +166,7 @@ def refresh_events_from_service(seller_id: int = None):
     """
     API method to refresh TS events from the admin
     """
+    pacific_tz = pytz.timezone("America/Los_Angeles")
     user = get_user_from_jwt()
     if user is None or user.is_admin is False:
         return {"msg": "Unauthorized"}, 401
@@ -186,7 +188,7 @@ def refresh_events_from_service(seller_id: int = None):
             year = 0
             if start is not None:
                 year = datetime.fromtimestamp(start).year
-                now_year = datetime.now().year
+                now_year = datetime.now(pacific_tz).year
                 if year >= now_year or year < 2022:
                     year = 0
 
@@ -200,9 +202,9 @@ def refresh_events_from_service(seller_id: int = None):
                 month = 12
                 day = 31
             else:
-                current_year = datetime.now().year
-                month = datetime.now().month
-                day = datetime.now().day
+                current_year = datetime.now(pacific_tz).year
+                month = datetime.now(pacific_tz).month
+                day = datetime.now(pacific_tz).day
 
             start = datetime.strptime(
                 f"{current_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"

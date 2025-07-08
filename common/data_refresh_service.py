@@ -4,6 +4,7 @@ Data Refresh Service
 
 import time
 from datetime import datetime
+import pytz
 import traceback
 import phonenumbers
 
@@ -911,7 +912,8 @@ class DataRefreshService:
         if update_success is not True or (
             results is not None and results.succeeded is not True
         ):
-            subject = "Error in TS Refresh - " + datetime.now().strftime(
+            pacific_tz = pytz.timezone("America/Los_Angeles")
+            subject = "Error in TS Refresh - " + datetime.now(pacific_tz).strftime(
                 "%m/%d/%Y %H:%M:%S"
             )
             if results is not None:

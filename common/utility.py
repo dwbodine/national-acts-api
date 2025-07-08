@@ -242,7 +242,8 @@ def log_message(msg: str):
     """
     Write message to the log
     """
-    date_str = datetime.now().isoformat()
+    pacific_tz = pytz.timezone("America/Los_Angeles")
+    date_str = datetime.now(pacific_tz).isoformat()
     print("[" + date_str + "] " + msg)
 
 
@@ -281,7 +282,8 @@ def get_https_response(
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
-        subject = "Error in get_https_response - " + datetime.now().strftime(
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        subject = "Error in get_https_response - " + datetime.now(pacific_tz).strftime(
             "%m/%d/%Y %H:%M:%S"
         )
         html = f"get_https_response failed for {host}{url}\n"
@@ -332,7 +334,8 @@ def post_https_response(
     except Exception as error:  # pylint: disable=broad-exception-caught
         json_data = None
         error_message: str = str(error) + "\n" + traceback.format_exc()
-        subject = "Error in post_https_response - " + datetime.now().strftime(
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        subject = "Error in post_https_response - " + datetime.now(pacific_tz).strftime(
             "%m/%d/%Y %H:%M:%S"
         )
         html = f"post_https_response failed for {host}{url}\n"

@@ -3,6 +3,7 @@ Order Service
 """
 
 from datetime import datetime, timedelta
+import pytz
 
 from common.db import (
     db_query_all,
@@ -42,6 +43,7 @@ class OrderService:
         """
         Retreive order data from database
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         orders: list[VipOrder] = []
 
         midnight_start: str = None
@@ -203,16 +205,16 @@ class OrderService:
                 where_clause.append(both_dates_sql)
                 data["startDate"] = midnight_start
                 data["endDate"] = midnight_end
-            elif end is not None and end > datetime.now().timestamp():
+            elif end is not None and end > datetime.now(pacific_tz).timestamp():
                 where_clause.append(start_date_sql)
-                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
                 data["endDate"] = midnight_end
             elif start is not None:
                 where_clause.append(start_date_sql)
                 data["startDate"] = midnight_start
             elif seller_id is None:
                 where_clause.append(start_date_sql)
-                data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+                data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
 
         if len(where_clause) > 0:
             sql += " AND ".join(where_clause)
@@ -615,6 +617,7 @@ class OrderService:
         Marks tickets as checked in
         """
         success: bool = True
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         for ticket_socket_order_ticket_id in ticket_socket_order_ticket_ids:
             sql = """UPDATE TicketSocketOrderTickets
                         SET IsCheckedIn=%(checkedIn)s,
@@ -627,7 +630,7 @@ class OrderService:
                     checked_in
                 ),
                 "checkedInDate": (
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    datetime.now(pacific_tz).strftime("%Y-%m-%d %H:%M:%S")
                     if checked_in is True
                     else None
                 ),

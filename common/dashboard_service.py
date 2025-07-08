@@ -3,6 +3,7 @@ Dashboard Service
 """
 
 from datetime import datetime
+import pytz
 
 from common.db import db_query_all
 
@@ -32,15 +33,16 @@ class DashboardService:
         day: int = 0
         current_year: int = 0
         now = None
+        pacific_tz = pytz.timezone("America/Los_Angeles")
 
         if year > 0:
             current_year = year
             month = 12
             day = 31
         else:
-            current_year = datetime.now().year
-            month = datetime.now().month
-            day = datetime.now().day
+            current_year = datetime.now(pacific_tz).year
+            month = datetime.now(pacific_tz).month
+            day = datetime.now(pacific_tz).day
 
         now = datetime(current_year, month, day)
         dash_totals = DashboardTotals(current_year, month, day)

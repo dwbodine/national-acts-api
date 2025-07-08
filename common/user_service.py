@@ -5,6 +5,7 @@ User service module
 from datetime import datetime
 import hashlib
 import random
+import pytz
 
 from common.messaging_service import MessagingService
 from common.models.messaging import SendEmailResult
@@ -646,7 +647,8 @@ class UserService:
         if user is None:
             return 0
 
-        created_on = datetime.now().timestamp()
+        pacific_tz = pytz.timezone("America/Los_Angeles")
+        created_on = datetime.now(pacific_tz).timestamp()
         code = random.randint(100000, 999999)
 
         sql = """INSERT INTO ForgotPasswordToken

@@ -3,6 +3,7 @@ Tour service module
 """
 
 from datetime import datetime
+import pytz
 from common.event_service import EventService
 from common.models.national_acts import Seller, Tour, VipEvent
 from common.db import db_delete, db_insert, db_query_all, db_update
@@ -23,6 +24,7 @@ class TourService:
         """
         API method to fetch all tours
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         tours: list[Tour] = []
         sql = """SELECT Tour.*
                     FROM Tour 
@@ -38,11 +40,11 @@ class TourService:
             )
             data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
             data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
-        elif end is not None and end > datetime.now().timestamp:
+        elif end is not None and end > datetime.now(pacific_tz).timestamp:
             where_clause.append(
                 "Tour.AnnounceDate BETWEEN %(startDate)s AND %(endDate)s"
             )
-            data["startDate"] = datetime.now().strftime("%Y-%m-%d")
+            data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
             data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
         elif start is not None:
             where_clause.append("Tour.AnnounceDate >= %(startDate)s")

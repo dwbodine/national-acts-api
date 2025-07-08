@@ -3,6 +3,7 @@ Dashboard API routes
 """
 
 from datetime import datetime
+import pytz
 
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
@@ -30,7 +31,8 @@ def get_dashboard_data_secured(year: int):
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    current_year = datetime.now().year
+    pacific_tz = pytz.timezone("America/Los_Angeles")
+    current_year = datetime.now(pacific_tz).year
     if year is None or year >= current_year or year < 2022:
         year = 0
 
