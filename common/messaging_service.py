@@ -8,7 +8,7 @@ import traceback
 import pytz
 
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, From, To
+from sendgrid.helpers.mail import Mail, From, To, ReplyTo
 
 from common.db import db_insert, db_query_one, db_update
 from common.models.messaging import SendEmailResult
@@ -71,12 +71,10 @@ class MessagingService:
                 else None
             )
             if time_str is not None:
-                time_dt =  datetime.strptime(
-                    time_str, "%Y-%m-%d %H:%M:%S"
-                )
+                time_dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
                 time: float = pacific_tz.localize(time_dt).timestamp()
                 now = datetime.now(pacific_tz).timestamp()
-                if time > now :
+                if time > now:
                     valid = 1
                 else:
                     valid = -3
@@ -96,6 +94,8 @@ class MessagingService:
         html_content: str,
         to_name: str = None,
         cc_emails: list[str] = None,
+        reply_to: str = None,
+        reply_to_name: str = None,
     ):
         """
         Utility to send email through Twilio
@@ -117,6 +117,11 @@ class MessagingService:
         if cc_emails is not None:
             for email in cc_emails:
                 message.add_cc(email)
+
+        if reply_to is not None:
+            if reply_to_name is None:
+                reply_to_name = reply_to
+            message.reply_to = ReplyTo(reply_to, reply_to_name)
 
         result: SendEmailResult = None
         try:

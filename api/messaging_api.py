@@ -31,6 +31,9 @@ def send_email_from_web():
     to_name = request.json.get("toName", None)
     subject = request.json.get("subject", None)
     html_content = request.json.get("html", None)
+    reply_to = request.json.get("replyTo", None)
+    reply_to_name = request.json.get("replyToName", None)
+    cc_emails_str = request.json.get("ccEmails", None)
 
     if (
         to_email_address is None
@@ -44,8 +47,20 @@ def send_email_from_web():
     ):
         return {"msg": "Bad Request"}, 400
 
+    cc_emails: list[str] = None
+    if cc_emails_str is not None and len(cc_emails_str) > 0:
+        cc_emails = str(cc_emails_str).split(",")
+
     service = MessagingService()
-    result = service.send_email(to_email_address, subject, html_content, to_name)
+    result = service.send_email(
+        to_email_address,
+        subject,
+        html_content,
+        to_name,
+        cc_emails,
+        reply_to,
+        reply_to_name,
+    )
     return convert_to_json(result)
 
 
