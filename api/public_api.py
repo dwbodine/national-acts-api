@@ -44,6 +44,7 @@ def get_faqs(category_id: int):
     faqs = service.get_faq_by_category_id(category_id)
     return convert_to_json(faqs)
 
+
 @public_api.route("/public/faq_categories")
 def get_faq_categories():
     """
@@ -110,6 +111,7 @@ def get_events():
     )
     return convert_to_json(results)
 
+
 @public_api.route("/public/page/<string:route>")
 def get_page_by_route(route: str):
     """
@@ -125,8 +127,13 @@ def get_page_by_route(route: str):
     if route is None or len(route) == 0:
         return {"msg": "Bad Request"}, 400
 
+    show_inactive_int: int = get_override_int_value_or_default(
+        request.args.get("inactive")
+    )
+    show_inactive = show_inactive_int == 1
+
     service = PageService()
-    results = service.get_page_by_route(route)
+    results = service.get_page_by_route(route, show_inactive)
     return convert_to_json(results)
 
 

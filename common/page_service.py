@@ -73,7 +73,7 @@ class PageService:
 
         return pages
 
-    def get_page_by_route(self, route: str):
+    def get_page_by_route(self, route: str, show_inactive: bool = False):
         """
         Fetch page and page sellers by route
         """
@@ -87,7 +87,11 @@ class PageService:
                     PageType.Template, PageType.Component
                     FROM Pages 
                     JOIN PageType ON PageType.PageTypeID = Pages.PageTypeID
-                    WHERE Pages.Inactive=0 and Pages.Route=%(route)s"""
+                    WHERE Pages.Route=%(route)s"""
+        
+        if show_inactive is False:
+            sql += " AND Pages.Inactive = 0"
+
         data = {"route": route}
         row = db_query_one(sql, data)
         page = self.__get_page_from_row_object(row)
