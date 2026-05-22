@@ -1,0 +1,40 @@
+name: nationalactsvip
+
+services:
+  db-import:
+    image: mariadb:11.4
+    networks:
+      - internal_net
+    secrets:
+      - mysql_root_password
+    volumes:
+      - ./seeds/nationalacts20.sql:/seed.sql:ro
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - >
+        set -eu;
+        echo "== db-import starting ==";
+        ls -l /seed.sql || (echo "ERROR: /seed.sql not found" && exit 1);
+        PASS="$$(cat /run/secrets/mysql_root_password)";
+        HOST="nationalactsdb";
+        PORT="3306";
+        echo "Waiting for MariaDB at $${HOST}:$${PORT} ...";
+        i=1;
+        while [ "$$i" -le 60 ]; do
+          mariadb-admin --protocol=tcp -h "$${HOST}" -P "$${PORT}" -uroot -p"$$PASS" ping --silent && break;
+          echo "  still waiting ($$i/60)...";
+          i=$$((i+1));
+          sleep 2;
+        done;
+        echo "Importing into nationalacts20...";
+        mariadb --protocol=tcp -h "$${HOST}" -P "$${PORT}" -uroot -p"$$PASS" nationalacts20 < /seed.sql;
+        echo "== db-import completed =="
+
+networks:
+  internal_net:
+    external: true
+    name: nationalactsvip_internal_net
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt

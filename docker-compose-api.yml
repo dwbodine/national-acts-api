@@ -1,0 +1,25 @@
+name: national-acts-vip
+services:
+  nationalactsapi:
+    image: nationalactsvip/nationalactsapi:latest
+    container_name: nationalactsapi
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    secrets:
+      - mysql_root_password
+      - nationalactsapi_env
+    networks:
+      - app-network
+    ports:
+      - 5000:5000    
+
+networks:
+  app-network:
+    driver: bridge
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt
+  nationalactsapi_env:
+    file: ./secrets/nationalactsapi.env

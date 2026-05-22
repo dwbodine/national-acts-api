@@ -1,0 +1,16 @@
+# Default to LF for everything
+* text=auto eol=lf
+
+# Explicitly force LF for shell scripts
+*.sh text eol=lf
+
+# Dockerfiles must always be LF
+Dockerfile* text eol=lf
+*.Dockerfile* text eol=lf
+
+# Prevent Windows line endings in configs
+*.yml text eol=lf
+*.yaml text eol=lf
+*.env text eol=lf
+*.sql text eol=lf
+.gitattributes eol=lf

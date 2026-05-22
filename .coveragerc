@@ -1,0 +1,24 @@
+[run]
+branch = True
+relative_files = True
+omit =
+    test/*
+    .venv/*
+    */site-packages/*
+    */__pycache__/*
+    common/models/*
+
+[report]
+show_missing = True
+skip_covered = True
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

@@ -1,0 +1,50 @@
+name: national-acts-vip
+services:
+  nationalactsdb:
+    image: nationalactsdb
+    container_name: nationalactsdb
+    restart: always
+    build:
+      context: .
+      dockerfile: ./MySql.Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: nationalacts20
+    secrets:
+      - mysql_root_password
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./seeds/nationalacts20.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
+    networks:
+      - app-network
+    ports:
+      - 3306:3306
+
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    depends_on:
+      - nationalactsdb
+    environment:
+      PMA_HOST: nationalactsdb
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD: /run/secrets/mysql_root_password
+    secrets:
+      - mysql_root_password
+    ports:
+      - 8080:80
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+    
+volumes:
+  db_data:
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt

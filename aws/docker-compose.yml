@@ -1,0 +1,219 @@
+networks:
+  frontend_net:
+    driver: bridge
+  internal_net:
+    driver: bridge
+    internal: true
+
+volumes:
+  db_data:
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    group_add:
+      - 992
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--log.level=ERROR"
+      - "--accesslog=true"
+      - "--accesslog.filters.statuscodes=200-599"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=dB@nationalactsvip.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.letsencrypt.acme.preferredchain=ISRG Root X1"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt/acme.json:/letsencrypt/acme.json
+      - ./auth:/auth:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.nationalactsvip.com`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.middlewares.traefik-auth.basicauth.usersfile=/auth/traefik-users"
+      - "traefik.http.middlewares.dash-ips.ipwhitelist.sourcerange=${IP_ADDRESS}/32"
+      - "traefik.http.routers.traefik.middlewares=traefik-auth,dash-ips"
+      - "traefik.http.middlewares.redirect-www.redirectregex.regex=^https?://www\\.(.*)"
+      - "traefik.http.middlewares.redirect-www.redirectregex.replacement=https://$${1}"
+      - "traefik.http.middlewares.redirect-www.redirectregex.permanent=true"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - frontend_net
+
+  nationalactsdb:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsdb:latest
+    container_name: nationalactsdb
+    mem_limit: 900m
+    oom_kill_disable: false
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: nationalacts20
+    secrets:
+      - mysql_root_password
+    volumes:
+      - db_data:/var/lib/mysql
+    expose:
+      - "3306"
+    restart: always
+    logging: *default-logging
+    networks:
+      - internal_net
+
+  mysql-backup:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/mysql-backup
+    container_name: mysql-backup
+    restart: always
+    mem_limit: 256m
+    environment:
+      AWS_EC2_METADATA_DISABLED: "false"
+      MYSQL_CONTAINER: nationalactsdb
+      MYSQL_USER: root
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: nationalacts20
+      S3_BUCKET: nationalactsvip-mysql-backup
+      AWS_REGION: us-east-1
+    secrets:
+      - mysql_root_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging: *default-logging
+    networks:
+      - internal_net
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    depends_on:
+      - nationalactsdb
+    environment:
+      PMA_HOST: nationalactsdb
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets:
+      - mysql_root_password
+    volumes:
+      - ./phpmyadmin-config/config.inc.php:/etc/phpmyadmin/conf.d/config.inc.php:ro
+    expose:
+      - "80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.nationalactsvip.com`)"
+      - "traefik.http.routers.phpmyadmin.entrypoints=websecure"
+      - "traefik.http.routers.phpmyadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.phpmyadmin-auth.basicauth.usersfile=/auth/phpmyadmin-users"
+      - "traefik.http.middlewares.ipwhitelist.ipwhitelist.sourcerange=${IP_ADDRESS}/32"
+      - "traefik.http.routers.phpmyadmin.middlewares=phpmyadmin-auth,ipwhitelist"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - frontend_net
+      - internal_net
+
+  nationalactsapi:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsapi:latest
+    container_name: nationalactsapi
+    expose:
+      - "5000"
+    volumes:
+      - /home/ec2-user/nationalactsvip/tmp:/app/tmp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.nationalactsvip.com`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=5000"
+    depends_on:
+      - nationalactsdb
+    restart: unless-stopped
+    logging: *default-logging
+    secrets:
+      - mysql_root_password
+      - nationalactsapi_env
+    networks:
+      - frontend_net
+      - internal_net
+
+  nationalactsusers:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsusers:latest
+    container_name: nationalactsusers
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.users.rule=Host(`users.nationalactsvip.com`)"
+      - "traefik.http.routers.users.entrypoints=websecure"
+      - "traefik.http.routers.users.tls.certresolver=letsencrypt"
+      - "traefik.http.services.users.loadbalancer.server.port=3000"
+    depends_on:
+      - nationalactsapi
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - frontend_net
+
+  nationalactswww:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactswww:latest
+    container_name: nationalactswww
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www.rule=Host(`nationalactsvip.com`) || Host(`www.nationalactsvip.com`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls.certresolver=letsencrypt"
+      - "traefik.http.services.www.loadbalancer.server.port=3000"
+      - "traefik.http.routers.www.middlewares=redirect-www"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - frontend_net
+
+  nationalactswww-new:
+    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactswww-new:latest
+    container_name: nationalactswww-new
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.www-test.rule=Host(`test.nationalactsvip.com`)"
+      - "traefik.http.routers.www-test.entrypoints=websecure"
+      - "traefik.http.routers.www-test.priority=100"
+      - "traefik.http.routers.www-test.service=www-test"
+      - "traefik.http.routers.www-test.tls=true"
+      - "traefik.http.routers.www-test.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.www-test.tls.domains[0].main=test.nationalactsvip.com"
+      - "traefik.http.services.www-test.loadbalancer.server.port=3000"
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - frontend_net
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt
+  nationalactsapi_env:
+    file: ./secrets/nationalactsapi.env
