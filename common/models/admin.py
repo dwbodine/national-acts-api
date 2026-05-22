@@ -168,3 +168,27 @@ class FeaturedArtist:
         self.logo_image = logo_image
         self.href = href
         self.last_update = last_update
+
+
+class FanMoment:
+    """
+    Model for fan moments
+    """
+
+    def __init__(
+        self,
+        moment_date: str = None,
+        seller_id: int = None,
+        seller_name: str = None,
+        event_id: int = None,
+        event_title: str = None,
+        event_location: str = None,
+        url: str = None,
+    ):
+        self.moment_date = moment_date
+        self.seller_id = seller_id
+        self.seller_name = seller_name
+        self.event_id = event_id
+        self.event_title = event_title
+        self.event_location = event_location
+        self.url = url

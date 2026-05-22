@@ -3,6 +3,7 @@ Unit tests for common.event_service helpers.
 """
 
 from datetime import datetime
+from types import SimpleNamespace
 
 from common import event_service
 from common.models.national_acts import VipEvent
@@ -221,6 +222,56 @@ def create_vip_event(is_vip=True, ticket_socket_url="https://tickets.example.com
     event.is_vip = is_vip
     event.ticket_socket_url = ticket_socket_url
     return event
+
+
+def test_get_location_from_event_returns_none_without_event_or_venue():
+    """
+    Test that get_location_from_event handles missing event and venue values.
+    """
+    service = event_service.EventService()
+
+    assert service.get_location_from_event(None) is None
+    assert service.get_location_from_event(SimpleNamespace(venue=None)) is None
+
+
+def test_get_location_from_event_formats_venue_city_and_state():
+    """
+    Test that get_location_from_event formats venue, city, and state.
+    """
+    evt = SimpleNamespace(
+        venue=SimpleNamespace(
+            name="The Arena",
+            city="Austin",
+            state="TX",
+            country=None,
+        )
+    )
+
+    location = event_service.EventService().get_location_from_event(evt)
+
+    assert location == "The Arena, Austin, TX"
+
+
+def test_get_location_from_event_omits_empty_state_and_appends_country():
+    """
+    Test that get_location_from_event omits empty state and appends non-default country names.
+    """
+    evt = SimpleNamespace(
+        venue=SimpleNamespace(
+            name="The Hall",
+            city="Toronto",
+            state=None,
+            country=SimpleNamespace(
+                country_name="Canada",
+                country_code="CA",
+                countryName="Canada",
+            ),
+        )
+    )
+
+    location = event_service.EventService().get_location_from_event(evt)
+
+    assert location == "The Hall, Toronto, $Canada"
 
 
 def test_get_events_and_orders_builds_search_and_seller_filters(monkeypatch):

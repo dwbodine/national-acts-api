@@ -11,6 +11,7 @@ from PIL import Image
 
 from common.constants import (
     EVENT_THUMBNAIL_IMAGE_WIDTH,
+    FEATURED_ARTIST_IMAGE_WIDTH,
     HEADER_IMAGE_WIDTH,
     HOMEBANNER_IMAGE_WIDTH,
     LOGO_IMAGE_WIDTH,
@@ -998,6 +999,7 @@ def test_get_country_from_country_id_returns_none_when_country_code_is_missing(
         (ImageType.PREVIEWS, "S3_BUCKET_PREVIEW", "previews"),
         (ImageType.THUMBNAILS, "S3_BUCKET_THUMBNAILS", "thumbnails"),
         (ImageType.EVENT_THUMBNAILS, "S3_BUCKET_THUMBNAILS", "thumbnails"),
+        (ImageType.FEATURED_ARTISTS, "S3_BUCKET_FEATURED_ARTISTS", "featured"),
     ],
 )
 def test_get_bucket_name_from_image_type_reads_expected_environment_variable(
@@ -1027,6 +1029,7 @@ def test_get_bucket_name_from_image_type_returns_none_for_unknown_type():
         (ImageType.PREVIEWS, PREVIEW_IMAGE_WIDTH),
         (ImageType.THUMBNAILS, THUMBNAIL_IMAGE_WIDTH),
         (ImageType.EVENT_THUMBNAILS, EVENT_THUMBNAIL_IMAGE_WIDTH),
+        (ImageType.FEATURED_ARTISTS, FEATURED_ARTIST_IMAGE_WIDTH),
         ("unknown", 0),
     ],
 )

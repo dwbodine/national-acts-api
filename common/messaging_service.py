@@ -100,7 +100,7 @@ class MessagingService:
         from_name: str = None,
     ):
         """
-        Utility to send email through Twilio yep yep yep
+        Utility to send email through Twilio
         """
         if from_address is None:
             from_address = "info@nationalactsvip.com"

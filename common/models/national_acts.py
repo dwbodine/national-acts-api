@@ -631,12 +631,12 @@ class Seller:
 
     seller_event_categories: list[SellerEventCategory] = []
 
-    def __init__(self, seller_id: int = None):
+    def __init__(self, seller_id: int = None, get_event_categories: bool = True):
         if seller_id is not None:
             self.seller_id = seller_id
-            self.__initialize()
+            self.__initialize(get_event_categories)
 
-    def __initialize(self):
+    def __initialize(self, get_event_categories: bool = True):
         """
         Initialize seller from database
         """
@@ -698,7 +698,8 @@ class Seller:
             if country_id is not None:
                 self.country = Country(country_id, country_name, country_code)
 
-            self.__get_seller_event_categories()
+            if get_event_categories is True:
+                self.__get_seller_event_categories()
 
     def __get_seller_event_categories(self):
         """

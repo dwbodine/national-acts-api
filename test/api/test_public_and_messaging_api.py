@@ -233,6 +233,109 @@ def test_public_add_or_confirm_subscriber_validates_email(monkeypatch, client):
     assert response.get_json() == {"msg": "Bad Request"}
 
 
+def test_public_moment_routes_forward_filters_and_return_results(
+    monkeypatch, client, parse_json_response
+):
+    """
+    Forward moment route filters to the moments service and return service results.
+    """
+    captured = {}
+
+    class FakeMomentsService:
+        """
+        Fake moments service for public moment route tests.
+        """
+
+        def get_available_moment_dates(self, seller_id=None):
+            """
+            Record the seller filter for available dates.
+            """
+            captured["dates"] = seller_id
+            return ["2026-05-01"]
+
+        def get_available_moment_sellers(self, moment_date=None):
+            """
+            Record the date filter for available sellers.
+            """
+            captured["sellers"] = moment_date
+            return [SimpleNamespace(seller_id=20, name="Alpha Presents")]
+
+        def get_available_moment_events(self, moment_date=None, seller_id=None):
+            """
+            Record the date and seller filters for available events.
+            """
+            captured["events"] = (moment_date, seller_id)
+            return [
+                SimpleNamespace(
+                    external_event_id=300,
+                    event_date="2026-05-01",
+                    title="VIP Night",
+                )
+            ]
+
+        def filter_moments(self, moment_date=None, seller_id=None, event_id=None):
+            """
+            Record fan moment filters.
+            """
+            captured["filter"] = (moment_date, seller_id, event_id)
+            return [
+                SimpleNamespace(
+                    moment_date="2026-05-01",
+                    seller_id=20,
+                    event_id=300,
+                    url="moments-bucket/2026-05-01/20/300/a.jpg",
+                )
+            ]
+
+    monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
+    monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
+
+    dates_response = client.get(
+        "/public/getAllMomentDates?seller_id=20",
+        headers={"x-api-key": "public-key"},
+    )
+    sellers_response = client.get(
+        "/public/getAllMomentSellers?date=2026-05-01",
+        headers={"x-api-key": "public-key"},
+    )
+    events_response = client.get(
+        "/public/getAllMomentEvents?date=2026-05-01&sellerId=20",
+        headers={"x-api-key": "public-key"},
+    )
+    filter_response = client.get(
+        "/public/filterMomentEvents?date=2026-05-01&sellerId=20&eventId=300",
+        headers={"x-api-key": "public-key"},
+    )
+
+    assert dates_response.status_code == 200
+    assert parse_json_response(dates_response) == ["2026-05-01"]
+    assert sellers_response.status_code == 200
+    assert parse_json_response(sellers_response) == [
+        {"sellerId": 20, "name": "Alpha Presents"}
+    ]
+    assert events_response.status_code == 200
+    assert parse_json_response(events_response) == [
+        {
+            "externalEventId": 300,
+            "eventDate": "2026-05-01",
+            "title": "VIP Night",
+        }
+    ]
+    assert filter_response.status_code == 200
+    assert parse_json_response(filter_response) == [
+        {
+            "momentDate": "2026-05-01",
+            "sellerId": 20,
+            "eventId": 300,
+            "url": "moments-bucket/2026-05-01/20/300/a.jpg",
+        }
+    ]
+    assert captured["dates"] == 20
+    assert captured["sellers"] == "2026-05-01"
+    assert captured["events"] == ("2026-05-01", 20)
+    assert captured["filter"] == ("2026-05-01", 20, 300)
+
+
 def test_public_page_by_route_requires_non_empty_route(client):
     """
     Return 404 when the page-by-route endpoint is requested without a route.
@@ -652,6 +755,10 @@ def test_messaging_validate_token_returns_service_result(
         ("/public/settings", "get", None),
         ("/public/timezones", "get", None),
         ("/public/uploadImage/headers", "post", {}),
+        ("/public/getAllMomentDates", "get", None),
+        ("/public/getAllMomentSellers", "get", None),
+        ("/public/getAllMomentEvents", "get", None),
+        ("/public/filterMomentEvents", "get", None),
     ],
 )
 def test_public_routes_require_api_key(client, route, method, form_data):

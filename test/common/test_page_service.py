@@ -5,7 +5,7 @@ Unit tests for common.page_service helpers.
 from datetime import datetime
 
 from common import page_service
-from common.models.admin import Page, PageSeller, PageType
+from common.models.admin import FeaturedArtist, Page, PageSeller, PageType
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import Country
 
@@ -112,6 +112,23 @@ def create_event(event_date, event_time, meet_and_greet_time, title):
     event.meet_and_greet_time = meet_and_greet_time
     event.title = title
     return event
+
+
+def create_featured_artist(
+    featured_artist_id=1,
+    featured_artist_order=1,
+    page_seller_id=12,
+    background_image="new-background.jpg",
+):
+    """
+    Create a FeaturedArtist instance for update tests.
+    """
+    artist = FeaturedArtist()
+    artist.featured_artist_id = featured_artist_id
+    artist.featured_artist_order = featured_artist_order
+    artist.page_seller_id = page_seller_id
+    artist.background_image = background_image
+    return artist
 
 
 def build_page_row(**overrides):
@@ -592,6 +609,28 @@ def test_get_page_sellers_uses_display_name_for_public_pages_when_requested(
     assert sellers[0].display_name == "Featured Artist"
 
 
+def test_get_page_sellers_without_page_id_uses_featured_artist_page_filter(
+    monkeypatch,
+):
+    """
+    Test that get_page_sellers uses the featured-artist page join when no page id is provided.
+    """
+    calls = []
+    monkeypatch.setattr(
+        page_service,
+        "db_query_all",
+        lambda sql, data: calls.append((sql, data)) or [build_page_seller_row()],
+    )
+
+    sellers = page_service.PageService().get_page_sellers(is_public=True)
+
+    assert len(sellers) == 1
+    assert calls[0][1] == {}
+    assert "LEFT JOIN Pages ON Pages.PageID = PageSellers.PageId" in calls[0][0]
+    assert "WHERE Pages.PageTypeID = 7" in calls[0][0]
+    assert "AND Inactive = 0" in calls[0][0]
+
+
 def test_update_page_updates_existing_page_cleans_images_and_syncs_sellers(monkeypatch):
     """
     Test that update_page updates page data, removes replaced images, and syncs sellers.
@@ -965,3 +1004,179 @@ def test_update_seller_page_order_returns_true_when_all_pages_are_skipped():
     success = page_service.PageService().update_seller_page_order([skipped_page])
 
     assert success is True
+
+
+def test_update_featured_artist_order_skips_invalid_entries_and_updates_valid_ones(
+    monkeypatch,
+):
+    """
+    Test that update_featured_artist_order skips invalid artists and updates valid artists.
+    """
+    update_calls = []
+    monkeypatch.setattr(
+        page_service,
+        "db_update",
+        lambda sql, data: update_calls.append((sql, data)) or True,
+    )
+
+    invalid_artist = create_featured_artist(featured_artist_id=None)
+    valid_artist = create_featured_artist(featured_artist_id=7, featured_artist_order=3)
+
+    success = page_service.PageService().update_featured_artist_order(
+        [invalid_artist, valid_artist]
+    )
+
+    assert success is True
+    assert len(update_calls) == 1
+    assert "UPDATE FeaturedArtists" in update_calls[0][0]
+    assert update_calls[0][1] == {"fa_order": 3, "fa_id": 7}
+
+
+def test_update_featured_artist_order_stops_on_failure(monkeypatch):
+    """
+    Test that update_featured_artist_order stops after the first failed update.
+    """
+    update_calls = []
+    monkeypatch.setattr(
+        page_service,
+        "db_update",
+        lambda sql, data: update_calls.append((sql, data)) or False,
+    )
+
+    success = page_service.PageService().update_featured_artist_order(
+        [
+            create_featured_artist(featured_artist_id=7, featured_artist_order=3),
+            create_featured_artist(featured_artist_id=8, featured_artist_order=4),
+        ]
+    )
+
+    assert success is False
+    assert len(update_calls) == 1
+
+
+def test_update_featured_artist_rejects_invalid_payloads():
+    """
+    Test that update_featured_artist returns False for missing required data.
+    """
+    service = page_service.PageService()
+    missing_order = create_featured_artist(featured_artist_order=None)
+    missing_page_seller = create_featured_artist(page_seller_id=None)
+
+    assert service.update_featured_artist(None) is False
+    assert service.update_featured_artist(missing_order) is False
+    assert service.update_featured_artist(missing_page_seller) is False
+
+
+def test_update_featured_artist_updates_existing_artist_and_removes_replaced_image(
+    monkeypatch,
+):
+    """
+    Test that update_featured_artist updates an existing artist and removes replaced images.
+    """
+    query_calls = []
+    update_calls = []
+    removed_files = []
+    artist = create_featured_artist(
+        featured_artist_id=7,
+        featured_artist_order=3,
+        page_seller_id=12,
+        background_image="new-background.jpg",
+    )
+    monkeypatch.setattr(
+        page_service,
+        "db_query_one",
+        lambda sql, data: query_calls.append((sql, data))
+        or {"BackgroundImage": "old-background.jpg"},
+    )
+    monkeypatch.setattr(
+        page_service,
+        "db_update",
+        lambda sql, data: update_calls.append((sql, data)) or True,
+    )
+    monkeypatch.setattr(
+        page_service,
+        "get_bucket_name_from_image_type",
+        lambda image_type: "featured-bucket",
+    )
+    monkeypatch.setattr(
+        page_service,
+        "remove_file",
+        lambda file_name, bucket_name: removed_files.append((file_name, bucket_name)),
+    )
+
+    updated_artist = page_service.PageService().update_featured_artist(artist)
+
+    assert updated_artist is artist
+    assert query_calls[0][1] == {"fa_id": 7}
+    assert update_calls[0][1] == {
+        "background_image": "new-background.jpg",
+        "page_seller_id": 12,
+        "fa_order": 3,
+    }
+    assert removed_files == [("old-background.jpg", "featured-bucket")]
+
+
+def test_update_featured_artist_returns_none_when_update_fails_without_existing_row(
+    monkeypatch,
+):
+    """
+    Test that update_featured_artist returns None when the update fails.
+    """
+    query_calls = []
+    remove_calls = []
+    artist = create_featured_artist(
+        featured_artist_id=0,
+        featured_artist_order=3,
+        page_seller_id=12,
+        background_image=" ",
+    )
+    monkeypatch.setattr(
+        page_service,
+        "db_query_one",
+        lambda sql, data: query_calls.append((sql, data)) or None,
+    )
+    monkeypatch.setattr(page_service, "db_update", lambda sql, data: False)
+    monkeypatch.setattr(
+        page_service,
+        "remove_file",
+        lambda file_name, bucket_name: remove_calls.append((file_name, bucket_name)),
+    )
+
+    updated_artist = page_service.PageService().update_featured_artist(artist)
+
+    assert updated_artist is None
+    assert not query_calls
+    assert not remove_calls
+
+
+def test_update_featured_artist_updates_when_existing_artist_row_is_missing(
+    monkeypatch,
+):
+    """
+    Test that update_featured_artist can update an existing id even when no old row is found.
+    """
+    query_calls = []
+    remove_calls = []
+    artist = create_featured_artist(
+        featured_artist_id=7,
+        featured_artist_order=3,
+        page_seller_id=12,
+        background_image="new-background.jpg",
+    )
+    monkeypatch.setattr(
+        page_service,
+        "db_query_one",
+        lambda sql, data: query_calls.append((sql, data)) or None,
+    )
+    monkeypatch.setattr(page_service, "db_update", lambda sql, data: True)
+    monkeypatch.setattr(
+        page_service,
+        "remove_file",
+        lambda file_name, bucket_name: remove_calls.append((file_name, bucket_name)),
+    )
+
+    updated_artist = page_service.PageService().update_featured_artist(artist)
+
+    assert updated_artist is artist
+    assert query_calls[0][1] == {"fa_id": 7}
+    assert not remove_calls
