@@ -16,7 +16,7 @@ x-logging: &default-logging
 
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:v3.7.1
     container_name: traefik
     group_add:
       - 992
@@ -52,7 +52,7 @@ services:
       - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.middlewares.traefik-auth.basicauth.usersfile=/auth/traefik-users"
-      - "traefik.http.middlewares.dash-ips.ipwhitelist.sourcerange=${IP_ADDRESS}/32"
+      - "traefik.http.middlewares.dash-ips.ipallowlist.sourcerange=${IP_ADDRESS}/32"
       - "traefik.http.routers.traefik.middlewares=traefik-auth,dash-ips"
       - "traefik.http.middlewares.redirect-www.redirectregex.regex=^https?://www\\.(.*)"
       - "traefik.http.middlewares.redirect-www.redirectregex.replacement=https://$${1}"
@@ -125,8 +125,8 @@ services:
       - "traefik.http.routers.phpmyadmin.tls.certresolver=letsencrypt"
       - "traefik.http.services.phpmyadmin.loadbalancer.server.port=80"
       - "traefik.http.middlewares.phpmyadmin-auth.basicauth.usersfile=/auth/phpmyadmin-users"
-      - "traefik.http.middlewares.ipwhitelist.ipwhitelist.sourcerange=${IP_ADDRESS}/32"
-      - "traefik.http.routers.phpmyadmin.middlewares=phpmyadmin-auth,ipwhitelist"
+      - "traefik.http.middlewares.ipallowlist.ipallowlist.sourcerange=${IP_ADDRESS}/32"
+      - "traefik.http.routers.phpmyadmin.middlewares=phpmyadmin-auth,ipallowlist"
     restart: unless-stopped
     logging: *default-logging
     networks:
