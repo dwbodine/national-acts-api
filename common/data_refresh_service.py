@@ -389,12 +389,17 @@ class DataRefreshService:
                             }
 
                             if existing_ticket_type:
-                                existing_order = get_override_int_value_or_default(
-                                    existing_ticket_type["TicketTypeOrder"], default=1
+                                existing_ticket_type_order = (
+                                    get_override_int_value_or_default(
+                                        existing_ticket_type["TicketTypeOrder"],
+                                        default=1,
+                                    )
                                 )
 
-                                if existing_order != 1:
-                                    ticket_type_data["order"] = existing_order
+                                if existing_ticket_type_order != 1:
+                                    ticket_type_data["order"] = (
+                                        existing_ticket_type_order
+                                    )
 
                                 # update existing ticket type
                                 sql = """UPDATE TicketSocketTicketTypes
@@ -506,7 +511,7 @@ class DataRefreshService:
                                 "order_id": order.order_id,
                             }
 
-                            existing_order = db_query_one(order_sql, data, cnx)
+                            existing_order_row = db_query_one(order_sql, data, cnx)
 
                             order_success: bool = False
                             ticket_socket_order_id: int = 0
@@ -541,14 +546,14 @@ class DataRefreshService:
                                     # if phonenumbers can't format it, then never mind
                                     phone_formatted = None
 
-                            if existing_order:
+                            if existing_order_row:
                                 existing_phone_formatted = (
                                     get_override_string_value_or_default(
-                                        existing_order["PhoneFormatted"]
+                                        existing_order_row["PhoneFormatted"]
                                     )
                                 )
                                 existing_phone = get_override_string_value_or_default(
-                                    existing_order["Phone"]
+                                    existing_order_row["Phone"]
                                 )
                                 if phone is not None and existing_phone != phone:
                                     order_data["phone"] = phone
@@ -566,18 +571,18 @@ class DataRefreshService:
                                     )
 
                                 order_comped = get_override_bool_value_or_default(
-                                    existing_order["IsComped"]
+                                    existing_order_row["IsComped"]
                                 )
                                 order_deleted = get_override_bool_value_or_default(
-                                    existing_order["IsDeleted"]
+                                    existing_order_row["IsDeleted"]
                                 )
                                 order_active = get_override_bool_value_or_default(
-                                    existing_order["IsActive"]
+                                    existing_order_row["IsActive"]
                                 )
 
                                 ticket_socket_order_id = (
                                     get_override_int_value_or_default(
-                                        existing_order["Id"]
+                                        existing_order_row["Id"]
                                     )
                                 )
                                 order_data["id"] = ticket_socket_order_id
@@ -591,7 +596,7 @@ class DataRefreshService:
 
                                 existing_purchase_timestamp = datetime.strptime(
                                     get_override_string_value_or_default(
-                                        existing_order["PurchaseDate"]
+                                        existing_order_row["PurchaseDate"]
                                     ),
                                     "%Y-%m-%d",
                                 ).timestamp()
@@ -603,7 +608,7 @@ class DataRefreshService:
                                     check_cleanup_data = {
                                         "ticket_socket_event_id": ticket_socket_event_id,
                                         "purchaseDate": get_override_string_value_or_default(
-                                            existing_order["PurchaseDate"]
+                                            existing_order_row["PurchaseDate"]
                                         ),
                                     }
                                     check_cleanup_sql = """SELECT DailyOrderData.DailyOrderDataId

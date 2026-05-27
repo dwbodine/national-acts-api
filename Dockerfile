@@ -1,4 +1,4 @@
-FROM python:3.13.7-alpine
+FROM python:3.14.2-alpine
 
 RUN apk update && \
     apk add --no-cache gcc musl-dev python3-dev libffi-dev openssl-dev mariadb-dev su-exec
