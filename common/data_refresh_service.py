@@ -2,9 +2,11 @@
 Data Refresh Service
 """
 
+import os
 import time
 import logging
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 import traceback
 import pytz
 import phonenumbers
@@ -64,9 +66,7 @@ class DataRefreshService:
         ts_sql = "SELECT TicketSocketId, IsVip FROM TicketSocket"
         rows = db_query_all(ts_sql)
 
-        # query events across all TS services
-        all_events: list[VipEvent] = []
-        for row in rows:
+        def retrieve_events_for_ticket_socket(row: dict):
             ticket_socket_id = get_override_int_value_or_default(row["TicketSocketId"])
             is_vip_service = get_override_bool_value_or_default(row["IsVip"])
             tss = TicketSocketService(ticket_socket_id)
@@ -85,10 +85,11 @@ class DataRefreshService:
                 if seller_event_category is not None:
                     event_category_id = seller_event_category.event_category_id
                 else:
-                    continue
+                    return []
 
             events = tss.get_events_and_orders(event_category_id, start, end)
 
+            ticket_socket_events: list[VipEvent] = []
             if len(events) > 0:
                 for event in events:
                     # convert ts events to vip events
@@ -124,9 +125,31 @@ class DataRefreshService:
 
                     vip_event.orders = orders
 
-                    all_events.append(vip_event)
+                    ticket_socket_events.append(vip_event)
+
+            return ticket_socket_events
+
+        # query events across all TS services
+        all_events: list[VipEvent] = []
+        worker_count = self.__get_ticket_socket_fetch_worker_count(len(rows))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            for ticket_socket_events in executor.map(
+                retrieve_events_for_ticket_socket, rows
+            ):
+                all_events.extend(ticket_socket_events)
 
         return all_events
+
+    def __get_ticket_socket_fetch_worker_count(self, ticket_socket_count: int):
+        """
+        Keep TS account fetch concurrency useful but bounded.
+        """
+        configured_worker_count = get_override_int_value_or_default(
+            os.getenv("TS_ACCOUNT_FETCH_WORKERS"), default=4
+        )
+        if configured_worker_count <= 0:
+            configured_worker_count = 1
+        return max(1, min(configured_worker_count, ticket_socket_count))
 
     def refresh_database_from_ticket_socket(
         self,
@@ -168,15 +191,17 @@ class DataRefreshService:
             logger.info(
                 "refresh_database_from_ticket_socket - Retrieving events from TicketSocket"
             )
+            service_timer = time.time()
             all_events = self.retrieve_ticket_socket_events_for_update(
                 seller_id, start, end
             )
             logger.info(
-                "refresh_database_from_ticket_socket - TicketSocket fetch complete"
+                "refresh_database_from_ticket_socket - TicketSocket fetch complete "
+                "events=%s orders=%s duration=%.2fs",
+                len(all_events),
+                sum(len(event.orders) for event in all_events),
+                time.time() - service_timer,
             )
-
-            # service_timer = time.time()
-            # service_duration = service_timer - start_timer
 
             # get total number of events grabbed from service
             total_events_from_service = len(all_events)
@@ -185,6 +210,7 @@ class DataRefreshService:
             cnx = db_get_connection()
 
             if total_events_from_service > 0:
+                processing_timer = time.time()
                 event_service = EventService()
                 logger.info(
                     "refresh_database_from_ticket_socket - Got results from TS, processing..."
@@ -889,7 +915,9 @@ class DataRefreshService:
                         db_update(sql, data)
 
                 logger.info(
-                    "refresh_database_from_ticket_socket - Got results from TS, processing complete"
+                    "refresh_database_from_ticket_socket - Got results from TS, "
+                    "processing complete duration=%.2fs",
+                    time.time() - processing_timer,
                 )
             else:
                 logger.info("No events from TicketSocket")
