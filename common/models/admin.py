@@ -170,6 +170,25 @@ class FeaturedArtist:
         self.last_update = last_update
 
 
+class FanMomentKey:
+    """
+    Model for fan moment keys
+    """
+
+    seller_name: str = None
+    event_title: str = None
+    event_location: str = None
+
+    def __init__(self, moment_date: str, seller_id: int, event_id: int, filename: str = None):
+        self.moment_date = moment_date
+        self.seller_id = seller_id
+        self.event_id = event_id
+        self.filename = filename
+
+    def __str__(self) -> str:
+        return f"{self.moment_date}_{self.seller_id}_{self.event_id}"
+
+
 class FanMoment:
     """
     Model for fan moments
@@ -177,18 +196,8 @@ class FanMoment:
 
     def __init__(
         self,
-        moment_date: str = None,
-        seller_id: int = None,
-        seller_name: str = None,
-        event_id: int = None,
-        event_title: str = None,
-        event_location: str = None,
-        url: str = None,
+        key: FanMomentKey,
+        images: list[str] = None,
     ):
-        self.moment_date = moment_date
-        self.seller_id = seller_id
-        self.seller_name = seller_name
-        self.event_id = event_id
-        self.event_title = event_title
-        self.event_location = event_location
-        self.url = url
+        self.key = key
+        self.images = images

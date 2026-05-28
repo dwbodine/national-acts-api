@@ -11,7 +11,7 @@ from typing import Any
 import boto3
 
 from common.event_service import EventService
-from common.models.admin import FanMoment
+from common.models.admin import FanMoment, FanMomentKey
 from common.models.national_acts import Seller, VipEvent
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class MomentsService:
         """
         Get fan moment photo objects from the moments S3 bucket by filter criteria.
         """
-        keys = self._list_keys(
+        s3_keys = self._list_keys(
             self._build_filter_prefix(moment_date, seller_id, event_id)
         )
 
@@ -37,16 +37,22 @@ class MomentsService:
         seller_names_by_id: dict[int, str] = {}
         event_details_by_id: dict[int, tuple[str, str]] = {}
         event_service = EventService()
-        for key in keys:
-            parsed = self._parse_moment_key(key)
-            if parsed is None or not self._is_parsed_moment_match(
-                parsed, moment_date, seller_id, event_id
+        
+        current_fm_key: FanMomentKey = None
+        
+        for s3_key in s3_keys:
+            fm_key = self._parse_fan_moment_key(s3_key)
+            if fm_key is None or not self._is_parsed_moment_match(
+                fm_key, moment_date, seller_id, event_id
             ):
                 continue
+            
+            if current_fm_key is None:
+                current_fm_key = fm_key
+            elif current_fm_key.str() != fm_key.str():
+                
+                
 
-            moment_date_parsed = parsed["moment_date"]
-
-            seller_id_parsed = parsed["seller_id"]
             seller_name: str = None
             if seller_id_parsed is not None:
                 if seller_id_parsed not in seller_names_by_id:
@@ -55,8 +61,7 @@ class MomentsService:
                         seller.name if seller is not None else None
                     )
                 seller_name = seller_names_by_id[seller_id_parsed]
-
-            event_id_parsed = parsed["event_id"]
+            
             event_title: str = None
             event_location: str = None
             if event_id_parsed is not None:
@@ -360,7 +365,7 @@ class MomentsService:
             content_type = "application/octet-stream"
         return {"ContentType": content_type}
 
-    def _parse_moment_key(self, key: str) -> dict[str, Any]:
+    def _parse_fan_moment_key(self, key: str) -> FanMomentKey | None:
         """
         Parse a moment S3 object key into its folder components.
         """
@@ -377,12 +382,12 @@ class MomentsService:
         ):
             return None
 
-        return {
-            "moment_date": segments[0],
-            "seller_id": seller_id,
-            "event_id": event_id,
-            "filename": "/".join(segments[3:]),
-        }
+        return FanMomentKey(
+            moment_date=segments[0],
+            seller_id=seller_id,
+            event_id=event_id,
+            filename="/".join(segments[3:]),
+        )
 
     def _is_moment_key_match(
         self,
@@ -401,7 +406,7 @@ class MomentsService:
 
     def _is_parsed_moment_match(
         self,
-        parsed: dict[str, Any],
+        key: FanMomentKey,
         moment_date: str = None,
         seller_id: int = None,
         event_id: int = None,
@@ -409,11 +414,11 @@ class MomentsService:
         """
         Determine whether parsed moment key data matches the supplied filters.
         """
-        if moment_date is not None and parsed["moment_date"] != moment_date:
+        if moment_date is not None and key.moment_date != moment_date:
             return False
-        if seller_id is not None and parsed["seller_id"] != seller_id:
+        if seller_id is not None and key.seller_id != seller_id:
             return False
-        if event_id is not None and parsed["event_id"] != event_id:
+        if event_id is not None and key.event_id != event_id:
             return False
         return True
 
