@@ -222,8 +222,8 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
     assert calls[0] == (
         "api.tickets.test",
         "/api/v1/events?includeEnded=true&includeOffSale=true"
-        "&includeTicketTypes=true&limit=9999&category=3&startsAfter=100"
-        "&startsBefore=200",
+        "&includeTicketTypes=true&limit=9999&startsAfter=100"
+        "&startsBefore=200&category=3",
         "jwt-token",
     )
     assert events[0].event_id == 50

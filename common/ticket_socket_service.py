@@ -169,17 +169,13 @@ class TicketSocketService:
         url = """/api/v1/events?"""
         url += """includeEnded=true&includeOffSale=true"""
         url += """&includeTicketTypes=true&limit=9999"""
+        url += "&startsAfter=" + str(unix_start)
+
+        if unix_end is not None:
+            url += "&startsBefore=" + str(unix_end)
 
         if event_category_id is not None and event_category_id > 0:
             url += "&category=" + str(event_category_id)
-
-        if unix_start is None and unix_end is None:
-            url += "&startsAfter=" + str(int(time.time()))
-        else:
-            if unix_start is not None:
-                url += "&startsAfter=" + str(unix_start)
-            if unix_end is not None:
-                url += "&startsBefore=" + str(unix_end)
 
         events_timer = time.time()
         json_data = get_https_response(
