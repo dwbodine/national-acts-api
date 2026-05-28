@@ -7,6 +7,7 @@ import logging
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
@@ -180,12 +181,22 @@ class TicketSocketService:
             if unix_end is not None:
                 url += "&startsBefore=" + str(unix_end)
 
+        events_timer = time.time()
         json_data = get_https_response(
             host=self.service_url, url=url, bearer_token=self.token
+        )
+        logger.info(
+            "TicketSocket event list fetched ticket_socket_id=%s category=%s "
+            "raw_events=%s duration=%.2fs",
+            self.ticket_socket_id,
+            event_category_id,
+            len(json_data) if json_data is not None else 0,
+            time.time() - events_timer,
         )
 
         self.events = []
         if json_data is not None:
+            parse_timer = time.time()
             for item in json_data:
                 # basic info
                 event_id: int = 0
@@ -388,6 +399,15 @@ class TicketSocketService:
                 event.orders = self.get_orders_from_event_id(event.event_id)
 
                 self.events.append(event)
+            logger.info(
+                "TicketSocket events parsed ticket_socket_id=%s category=%s "
+                "events=%s orders=%s duration=%.2fs",
+                self.ticket_socket_id,
+                event_category_id,
+                len(self.events),
+                sum(len(event.orders) for event in self.events),
+                time.time() - parse_timer,
+            )
 
         return self.events
 
@@ -441,31 +461,28 @@ class TicketSocketService:
         if len(order_ids) <= 0:
             return []
 
-        # loop through and append orders
+        def fetch_order(order_id: int):
+            return self.get_order_from_order_id(order_id, event_id)
+
+        worker_count = self.__get_order_fetch_worker_count(len(order_ids))
         orders: list[TicketSocketOrder] = []
-        for order_id in order_ids:
-            url = "/api/v1/orders/" + str(order_id)
-            json_data = get_https_response(
-                host=self.service_url, url=url, bearer_token=self.token
-            )
-
-            if json_data is not None:
-                incoming_order_id: int = 0
-                if "id" in json_data:
-                    incoming_order_id = get_override_int_value_or_default(
-                        json_data["id"]
-                    )
-
-                if incoming_order_id == 0 or incoming_order_id != int(order_id):
-                    continue
-
-                order: TicketSocketOrder = self.__parse_response_to_order_object(
-                    incoming_order_id, event_id, json_data
-                )
-
-                orders.append(order)
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            for order in executor.map(fetch_order, order_ids):
+                if order is not None:
+                    orders.append(order)
 
         return orders
+
+    def __get_order_fetch_worker_count(self, order_count: int):
+        """
+        Keep external API concurrency useful but bounded.
+        """
+        configured_worker_count = get_override_int_value_or_default(
+            os.getenv("TS_ORDER_FETCH_WORKERS"), default=8
+        )
+        if configured_worker_count <= 0:
+            configured_worker_count = 1
+        return min(configured_worker_count, order_count)
 
     def get_order_from_order_id(self, order_id: int, event_id: int = 0):
         """
