@@ -3,10 +3,10 @@ Ticket Socket API service module
 """
 
 import os
+import copy
 import logging
 import json
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
@@ -169,7 +169,7 @@ class TicketSocketService:
         url = """/api/v1/events?"""
         url += """includeEnded=true&includeOffSale=true"""
         url += """&includeTicketTypes=true&limit=9999"""
-        url += "&startsAfter=" + str(unix_start)
+        url += """&startsAfter=""" + str(unix_start)
 
         if unix_end is not None:
             url += "&startsBefore=" + str(unix_end)
@@ -177,22 +177,12 @@ class TicketSocketService:
         if event_category_id is not None and event_category_id > 0:
             url += "&category=" + str(event_category_id)
 
-        events_timer = time.time()
         json_data = get_https_response(
             host=self.service_url, url=url, bearer_token=self.token
-        )
-        logger.info(
-            "TicketSocket event list fetched ticket_socket_id=%s category=%s "
-            "raw_events=%s duration=%.2fs",
-            self.ticket_socket_id,
-            event_category_id,
-            len(json_data) if json_data is not None else 0,
-            time.time() - events_timer,
         )
 
         self.events = []
         if json_data is not None:
-            parse_timer = time.time()
             for item in json_data:
                 # basic info
                 event_id: int = 0
@@ -209,23 +199,25 @@ class TicketSocketService:
                 event.event_id = event_id
                 event.title = title
 
-                categories = []
+                # build list of categories for deep copy later
+                # if there are no valid categories, skip this event
+                categories: list[int] = []
                 if "categories" in item:
-                    categories = item["categories"]
+                    for category in item["categories"]:
+                        raw_category_id = (
+                            category.get("id")
+                            if isinstance(category, dict)
+                            else category
+                        )
+                        try:
+                            category_id = int(raw_category_id)
+                        except (TypeError, ValueError):
+                            continue
+                        if category_id > 0:
+                            categories.append(category_id)
 
                 if len(categories) <= 0:
                     continue
-
-                category = categories[0]
-
-                category_id: int = 0
-                if "id" in category:
-                    category_id = get_override_int_value_or_default(category["id"])
-
-                if category_id <= 0:
-                    continue
-
-                event.event_category_id = category_id
 
                 thumbnail: str = None
                 if "smallPic" in item:
@@ -394,16 +386,17 @@ class TicketSocketService:
                 # orders
                 event.orders = self.get_orders_from_event_id(event.event_id)
 
-                self.events.append(event)
-            logger.info(
-                "TicketSocket events parsed ticket_socket_id=%s category=%s "
-                "events=%s orders=%s duration=%.2fs",
-                self.ticket_socket_id,
-                event_category_id,
-                len(self.events),
-                sum(len(event.orders) for event in self.events),
-                time.time() - parse_timer,
-            )
+                # append a copy of the event for each category, unless we're filtering
+                # by category in which case only append if it matches the filter
+                for category_id in categories:
+                    if (
+                        event_category_id is not None
+                        and category_id != event_category_id
+                    ):
+                        continue
+                    event_copy = copy.deepcopy(event)
+                    event_copy.event_category_id = category_id
+                    self.events.append(event_copy)
 
         return self.events
 

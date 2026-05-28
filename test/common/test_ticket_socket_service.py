@@ -177,7 +177,7 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
             {
                 "id": 50,
                 "title": "VIP Night",
-                "categories": [{"id": 3}],
+                "categories": [{"id": "bad"}, {"id": "3"}, None],
                 "smallPic": "small.jpg",
                 "sefUrl": "vip-night",
                 "venue": "Arena",
@@ -204,6 +204,11 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
                 "title": "Ignored",
                 "categories": [{"id": 3}],
             },
+            {
+                "id": 51,
+                "title": "Invalid Category Event",
+                "categories": [{"id": "bad"}, {"id": None}, 0],
+            },
         ],
     )
     monkeypatch.setattr(
@@ -229,6 +234,7 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
     assert events[0].event_id == 50
     assert events[0].title == "VIP Night"
     assert events[0].event_category_id == 3
+    assert isinstance(events[0].event_category_id, int)
     assert events[0].thumbnail == "small.jpg"
     assert events[0].ticket_socket_url == "https://api.tickets.test/event/vip-night"
     assert events[0].event_date == "2026-05-01"
@@ -241,6 +247,55 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
     assert events[0].ticket_types[0].ticket_type_name == "VIP"
     assert events[0].ticket_types[0].is_active is True
     assert events[0].orders == ["order-1"]
+
+
+def test_get_events_and_orders_appends_distinct_event_copy_per_category(monkeypatch):
+    """
+    Test that multi-category events are appended as distinct deep-copied objects.
+    """
+    service = create_service(monkeypatch)
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_country_from_country_name",
+        lambda country_name, state, zip_code: Country(1, country_name, "US"),
+    )
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_https_response",
+        lambda host, url, bearer_token: [
+            {
+                "id": 52,
+                "title": "Multi Category Night",
+                "categories": [{"id": "3"}, {"id": 4}],
+                "venue": "Arena",
+                "venueCountry": "USA",
+                "displayStartDate": "05/01/2026",
+                "ticketTypes": [
+                    {
+                        "id": 9,
+                        "name": "GA",
+                        "eventId": 52,
+                        "quantity": 10,
+                        "deleted": False,
+                    }
+                ],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        ticket_socket_service.TicketSocketService,
+        "get_orders_from_event_id",
+        lambda self, event_id: [{"order_id": event_id}],
+    )
+
+    events = service.get_events_and_orders(unix_start=100)
+
+    assert [event.event_category_id for event in events] == [3, 4]
+    assert events[0] is not events[1]
+    assert events[0].ticket_types is not events[1].ticket_types
+    assert events[0].ticket_types[0] is not events[1].ticket_types[0]
+    assert events[0].orders is not events[1].orders
+    assert events[0].orders[0] is not events[1].orders[0]
 
 
 def test_get_events_and_orders_uses_required_start_and_timestamp_fallback(
