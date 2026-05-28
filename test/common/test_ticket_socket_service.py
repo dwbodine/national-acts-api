@@ -243,15 +243,14 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
     assert events[0].orders == ["order-1"]
 
 
-def test_get_events_and_orders_uses_default_start_and_timestamp_fallback(
+def test_get_events_and_orders_uses_required_start_and_timestamp_fallback(
     monkeypatch,
 ):
     """
-    Test that get_events_and_orders uses the default start time and timestamp fallback.
+    Test that get_events_and_orders uses the required start time and timestamp fallback.
     """
     calls = []
     service = create_service(monkeypatch, utc_offset_hours=1)
-    monkeypatch.setattr(ticket_socket_service.time, "time", lambda: 5000)
     monkeypatch.setattr(
         ticket_socket_service,
         "get_country_from_country_name",
@@ -286,7 +285,7 @@ def test_get_events_and_orders_uses_default_start_and_timestamp_fallback(
         lambda self, event_id: [],
     )
 
-    events = service.get_events_and_orders()
+    events = service.get_events_and_orders(unix_start=5000)
 
     assert len(events) == 1
     assert calls[0][1].endswith("&startsAfter=5000")
@@ -599,7 +598,7 @@ def test_get_events_and_orders_returns_empty_without_credentials(monkeypatch):
         ),
     )
 
-    events = service.get_events_and_orders()
+    events = service.get_events_and_orders(unix_start=100)
 
     assert not events
     assert logged_errors == [
@@ -619,10 +618,10 @@ def test_get_events_and_orders_returns_empty_when_payload_is_missing(monkeypatch
         lambda host, url, bearer_token: calls.append((host, url, bearer_token)) or None,
     )
 
-    events = service.get_events_and_orders(unix_end=200)
+    events = service.get_events_and_orders(unix_start=100, unix_end=200)
 
     assert not events
-    assert calls[0][1].endswith("&startsBefore=200")
+    assert calls[0][1].endswith("&startsAfter=100&startsBefore=200")
 
 
 def test_get_events_and_orders_skips_invalid_rows_and_uses_custom_field_fallbacks(

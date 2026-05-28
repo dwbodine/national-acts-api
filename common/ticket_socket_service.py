@@ -150,9 +150,9 @@ class TicketSocketService:
 
     def get_events_and_orders(
         self,
-        event_category_id: int = None,
-        unix_start: int = None,
+        unix_start: int,
         unix_end: int = None,
+        event_category_id: int = None,
     ):
         """
         Get all TS data for the specified category and time period

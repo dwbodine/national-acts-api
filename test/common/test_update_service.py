@@ -128,11 +128,16 @@ class FakeDataRefreshService:
         self.calls = []
         FakeDataRefreshService.instances.append(self)
 
-    def refresh_database_from_ticket_socket(self, start=None, end=None):
+    def refresh_database_from_ticket_socket(
+        self,
+        start,
+        end=None,
+        seller_id=None,
+    ):
         """
         Return the configured refresh result or raise a configured error.
         """
-        self.calls.append((start, end))
+        self.calls.append((start, end, seller_id))
         if FakeDataRefreshService.error_to_raise is not None:
             raise FakeDataRefreshService.error_to_raise
         return FakeDataRefreshService.result_to_return
@@ -290,9 +295,16 @@ def test_update_all_events_from_ticket_socket_runs_daily_rollup_on_success(
         "2026-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
     ).timestamp()
     expected_end = FixedDateTime(2026, 4, 23).timestamp()
+    expected_refresh_start = int(
+        FixedDateTime.now(
+            update_service.pytz.timezone("America/Los_Angeles")
+        ).timestamp()
+    )
 
     assert result == "[2026-04-23 12:00:00] - Auto events update succeeded\r\n"
-    assert FakeDataRefreshService.instances[0].calls == [(None, None)]
+    assert FakeDataRefreshService.instances[0].calls == [
+        (expected_refresh_start, None, None)
+    ]
     assert FakeOrderService.instances[0].calls == [(expected_start, expected_end)]
     assert FakeDailyOrderService.instances[0].calls == [
         (["order-1", "order-2"], expected_start, expected_end, refresh_history)
@@ -394,7 +406,7 @@ def test_update_historical_events_from_ticket_socket_runs_daily_rollup(monkeypat
     )
 
     assert result is final_history
-    assert FakeDataRefreshService.instances[-1].calls == [(10, 20)]
+    assert FakeDataRefreshService.instances[-1].calls == [(10, 20, None)]
     assert FakeOrderService.instances[-1].calls == [(10, 20)]
     assert FakeDailyOrderService.instances[-1].calls == [
         (["order-1"], 10, 20, refresh_history)

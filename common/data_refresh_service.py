@@ -2,6 +2,8 @@
 Data Refresh Service
 """
 
+# pylint: disable=too-many-lines
+
 import os
 import time
 import logging
@@ -51,7 +53,10 @@ class DataRefreshService:
     """
 
     def retrieve_ticket_socket_events_for_update(
-        self, seller_id: int = None, start: int = None, end: int = None
+        self,
+        start: int,
+        end: int = None,
+        seller_id: int = None,
     ):
         """
         Call TS API to retrieve updated event/order/ticket/ticket type data
@@ -87,7 +92,9 @@ class DataRefreshService:
                 else:
                     return []
 
-            events = tss.get_events_and_orders(event_category_id, start, end)
+            events = tss.get_events_and_orders(
+                unix_start=start, unix_end=end, event_category_id=event_category_id
+            )
 
             ticket_socket_events: list[VipEvent] = []
             if len(events) > 0:
@@ -153,9 +160,9 @@ class DataRefreshService:
 
     def refresh_database_from_ticket_socket(
         self,
-        seller_id: int = None,
-        start: int = None,
+        start: int,
         end: int = None,
+        seller_id: int = None,
         user_id: int = 0,
     ):
         """
@@ -193,7 +200,9 @@ class DataRefreshService:
             )
             service_timer = time.time()
             all_events = self.retrieve_ticket_socket_events_for_update(
-                seller_id, start, end
+                start=start,
+                end=end,
+                seller_id=seller_id,
             )
             logger.info(
                 "refresh_database_from_ticket_socket - TicketSocket fetch complete "

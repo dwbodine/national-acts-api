@@ -180,12 +180,14 @@ def refresh_events_from_service(seller_id: int = None):
     start: int = get_override_int_value_or_default(
         request.args.get("start"), default=None
     )
+    if start is None:
+        start = int(datetime.now(pacific_tz).timestamp())
     end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
     user_id: int = user.user_id
 
     if seller_id is not None and seller_id > 0:
         results = service.refresh_database_from_ticket_socket(
-            seller_id, start, end, user_id
+            start=start, end=end, seller_id=seller_id, user_id=user_id
         )
 
         if results is not None and results.succeeded is True:
