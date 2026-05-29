@@ -78,7 +78,12 @@ class UpdateService:
         results: TicketSocketRefreshHistory = None
         try:
             logger.info("Starting refresh_database_from_ticket_socket")
-            results = service.refresh_database_from_ticket_socket()
+            refresh_start = int(datetime.now(pacific_tz).timestamp())
+            results = service.refresh_database_from_ticket_socket(
+                start=refresh_start,
+                end=None,
+                seller_id=None,
+            )
             logger.info("refresh_database_from_ticket_socket complete")
 
             if results is not None and results.succeeded is True:
@@ -121,7 +126,9 @@ class UpdateService:
         Update all upcoming events/orders/tickets/ticket types from TS
         """
         service = DataRefreshService()
-        results = service.refresh_database_from_ticket_socket(start=start, end=end)
+        results = service.refresh_database_from_ticket_socket(
+            start=start, end=end, seller_id=None
+        )
         if results is not None and results.succeeded is True:
             order_service = OrderService()
             orders = order_service.get_orders(start=start, end=end)

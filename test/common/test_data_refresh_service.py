@@ -21,11 +21,11 @@ class FakeTicketSocketService:
         self.calls = []
         FakeTicketSocketService.instances.append(self)
 
-    def get_events_and_orders(self, event_category_id, start, end):
+    def get_events_and_orders(self, unix_start, unix_end=None, event_category_id=None):
         """
         Record query arguments and return configured events.
         """
-        self.calls.append((event_category_id, start, end))
+        self.calls.append((event_category_id, unix_start, unix_end))
         return FakeTicketSocketService.events_by_id.get(self.ticket_socket_id, [])
 
 
@@ -450,11 +450,11 @@ def test_retrieve_ticket_socket_events_for_update_skips_empty_and_unmapped_event
         FakeSellerEventCategory,
     )
 
-    events = DataRefreshService().retrieve_ticket_socket_events_for_update()
+    events = DataRefreshService().retrieve_ticket_socket_events_for_update(start=10)
 
     assert not events
-    assert FakeTicketSocketService.instances[0].calls == [(None, None, None)]
-    assert FakeTicketSocketService.instances[1].calls == [(None, None, None)]
+    assert FakeTicketSocketService.instances[0].calls == [(None, 10, None)]
+    assert FakeTicketSocketService.instances[1].calls == [(None, 10, None)]
     assert not FakeSellerEventCategory.calls
 
 
@@ -521,7 +521,10 @@ def test_refresh_database_from_ticket_socket_sets_username_for_user_id(monkeypat
     )
     monkeypatch.setattr("common.data_refresh_service.UserService", FakeUserService)
 
-    results = DataRefreshService().refresh_database_from_ticket_socket(user_id=12)
+    results = DataRefreshService().refresh_database_from_ticket_socket(
+        start=10,
+        user_id=12,
+    )
 
     assert results.username == "Ada Lovelace (ada@example.com)"
     assert FakeUserService.instances
@@ -543,7 +546,7 @@ def test_refresh_database_from_ticket_socket_sends_email_when_refresh_raises(
         "common.data_refresh_service.MessagingService", FakeMessagingService
     )
 
-    results = DataRefreshService().refresh_database_from_ticket_socket()
+    results = DataRefreshService().refresh_database_from_ticket_socket(start=10)
 
     assert results is None
     assert FakeMessagingService.instances
@@ -893,7 +896,7 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
         lambda phone, region: (_ for _ in ()).throw(ValueError("bad phone")),
     )
 
-    results = DataRefreshService().refresh_database_from_ticket_socket()
+    results = DataRefreshService().refresh_database_from_ticket_socket(start=10)
 
     assert results is FakeRefreshHistory.instances[0]
     assert results.succeeded is False
@@ -1075,7 +1078,7 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
         lambda parsed, fmt: f"{parsed['region']}-{fmt}",
     )
 
-    results = DataRefreshService().refresh_database_from_ticket_socket()
+    results = DataRefreshService().refresh_database_from_ticket_socket(start=10)
 
     assert results.succeeded is True
     assert results.order_data_rows_removed == 0
@@ -1114,7 +1117,10 @@ def test_refresh_database_from_ticket_socket_leaves_username_blank_when_user_is_
     )
     monkeypatch.setattr("common.data_refresh_service.UserService", FakeUserService)
 
-    results = DataRefreshService().refresh_database_from_ticket_socket(user_id=9)
+    results = DataRefreshService().refresh_database_from_ticket_socket(
+        start=10,
+        user_id=9,
+    )
 
     assert results.username is None
     assert fake_connection.closed is False
