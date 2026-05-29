@@ -16,10 +16,7 @@
                 "FLASK_ENV": "development"
             },
             "autoReload": {
-                "enable": true,
-                "pattern": [
-                    "**/*.py"
-                ]
+                "enable": false
             },
             "args": [
                 "run",
