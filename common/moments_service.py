@@ -6,7 +6,6 @@ import mimetypes
 import os
 import logging
 import traceback
-from typing import Any
 
 import boto3
 
@@ -37,58 +36,54 @@ class MomentsService:
         seller_names_by_id: dict[int, str] = {}
         event_details_by_id: dict[int, tuple[str, str]] = {}
         event_service = EventService()
-        
+
         current_fm_key: FanMomentKey = None
-        
+        current_moment: FanMoment = None
+
         for s3_key in s3_keys:
-            fm_key = self._parse_fan_moment_key(s3_key)
+            fm_key: FanMomentKey | None = self._parse_fan_moment_key(s3_key)
             if fm_key is None or not self._is_parsed_moment_match(
                 fm_key, moment_date, seller_id, event_id
             ):
                 continue
-            
-            if current_fm_key is None:
-                current_fm_key = fm_key
-            elif current_fm_key.str() != fm_key.str():
-                
-                
 
-            seller_name: str = None
-            if seller_id_parsed is not None:
-                if seller_id_parsed not in seller_names_by_id:
-                    seller = Seller(seller_id_parsed, get_event_categories=False)
-                    seller_names_by_id[seller_id_parsed] = (
-                        seller.name if seller is not None else None
-                    )
-                seller_name = seller_names_by_id[seller_id_parsed]
-            
-            event_title: str = None
-            event_location: str = None
-            if event_id_parsed is not None:
-                if event_id_parsed not in event_details_by_id:
-                    evt_list = event_service.get_events_and_orders(
-                        event_id=event_id_parsed, get_orders=False, is_public=True
-                    )
-                    if evt_list is not None and len(evt_list) > 0:
-                        event_details_by_id[event_id_parsed] = (
-                            evt_list[0].title,
-                            event_service.get_location_from_event(evt_list[0]),
+            if current_fm_key is None or str(current_fm_key) != str(fm_key):
+                if current_moment is not None:
+                    moments.append(current_moment)
+
+                seller_name: str = None
+                if fm_key.seller_id is not None:
+                    if fm_key.seller_id not in seller_names_by_id:
+                        seller = Seller(fm_key.seller_id, get_event_categories=False)
+                        seller_names_by_id[fm_key.seller_id] = (
+                            seller.name if seller is not None else None
                         )
-                    else:
-                        event_details_by_id[event_id_parsed] = (None, None)
-                event_title, event_location = event_details_by_id[event_id_parsed]
+                    seller_name = seller_names_by_id[fm_key.seller_id]
 
-            moments.append(
-                FanMoment(
-                    moment_date=moment_date_parsed,
-                    seller_id=seller_id_parsed,
-                    seller_name=seller_name,
-                    event_id=event_id_parsed,
-                    event_title=event_title,
-                    event_location=event_location,
-                    url=f"{os.getenv("S3_BUCKET_MOMENTS")}/{key}",
-                )
-            )
+                event_title: str = None
+                event_location: str = None
+                if fm_key.event_id is not None:
+                    if fm_key.event_id not in event_details_by_id:
+                        evt_list = event_service.get_events_and_orders(
+                            event_id=fm_key.event_id, get_orders=False, is_public=True
+                        )
+                        if evt_list is not None and len(evt_list) > 0:
+                            event_details_by_id[fm_key.event_id] = (
+                                evt_list[0].title,
+                                event_service.get_location_from_event(evt_list[0]),
+                            )
+                        else:
+                            event_details_by_id[fm_key.event_id] = (None, None)
+                    event_title, event_location = event_details_by_id[fm_key.event_id]
+
+                fm_key.seller_name = seller_name
+                fm_key.event_title = event_title
+                fm_key.event_location = event_location
+
+                current_moment = FanMoment(key=fm_key, images=[fm_key.filename])
+                current_fm_key = fm_key
+            else:
+                current_moment.images.append(fm_key.filename)
 
         return sorted(
             moments,
@@ -102,9 +97,7 @@ class MomentsService:
             ),
         )
 
-    def add_moments(
-        self, moment_date: str, seller_id: int, event_id: int, filenames: list[str]
-    ) -> list[str]:
+    def add_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
         """
         Add photos to the moments S3 bucket.
         """
@@ -116,7 +109,9 @@ class MomentsService:
         if bucket_name is None:
             return uploaded_keys
 
-        prefix = self._build_event_prefix(moment_date, seller_id, event_id)
+        prefix = self._build_event_prefix(
+            fm_key.moment_date, fm_key.seller_id, fm_key.event_id
+        )
         s3_client = boto3.client("s3")
 
         for filename in filenames:
@@ -140,9 +135,7 @@ class MomentsService:
 
         return uploaded_keys
 
-    def delete_moments(
-        self, moment_date: str, seller_id: int, event_id: int, filenames: list[str]
-    ) -> list[str]:
+    def delete_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
         """
         Delete photos from the moments S3 bucket.
         """
@@ -154,7 +147,9 @@ class MomentsService:
         if bucket_name is None:
             return deleted_keys
 
-        prefix = self._build_event_prefix(moment_date, seller_id, event_id)
+        prefix = self._build_event_prefix(
+            fm_key.moment_date, fm_key.seller_id, fm_key.event_id
+        )
         objects = [
             {"Key": f"{prefix}{os.path.basename(filename)}"} for filename in filenames
         ]
@@ -189,9 +184,9 @@ class MomentsService:
 
         dates = set()
         for key in self._list_keys():
-            parsed = self._parse_moment_key(key)
-            if parsed is not None and parsed["seller_id"] == seller_id:
-                dates.add(parsed["moment_date"])
+            fm_key = self._parse_fan_moment_key(key)
+            if fm_key is not None and fm_key.seller_id == seller_id:
+                dates.add(fm_key.moment_date)
 
         return sorted(dates)
 
@@ -208,9 +203,9 @@ class MomentsService:
             return self._get_sellers_from_ids(seller_ids)
 
         for key in self._list_keys():
-            parsed = self._parse_moment_key(key)
-            if parsed is not None:
-                seller_ids.add(parsed["seller_id"])
+            fm_key = self._parse_fan_moment_key(key)
+            if fm_key is not None:
+                seller_ids.add(fm_key.seller_id)
 
         return self._get_sellers_from_ids(seller_ids)
 
@@ -231,12 +226,12 @@ class MomentsService:
 
         keys = self._list_keys(f"{moment_date}/" if moment_date is not None else "")
         for key in keys:
-            parsed = self._parse_moment_key(key)
-            if parsed is None:
+            fm_key = self._parse_fan_moment_key(key)
+            if fm_key is None:
                 continue
-            if seller_id is not None and parsed["seller_id"] != seller_id:
+            if seller_id is not None and fm_key.seller_id != seller_id:
                 continue
-            event_ids.add(parsed["event_id"])
+            event_ids.add(fm_key.event_id)
 
         return self._get_events_from_ids(event_ids)
 
@@ -399,10 +394,10 @@ class MomentsService:
         """
         Determine whether a key matches the supplied filters.
         """
-        parsed = self._parse_moment_key(key)
-        if parsed is None:
+        fm_key = self._parse_fan_moment_key(key)
+        if fm_key is None:
             return False
-        return self._is_parsed_moment_match(parsed, moment_date, seller_id, event_id)
+        return self._is_parsed_moment_match(fm_key, moment_date, seller_id, event_id)
 
     def _is_parsed_moment_match(
         self,
