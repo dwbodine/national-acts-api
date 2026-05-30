@@ -85,6 +85,9 @@ class MomentsService:
             else:
                 current_moment.images.append(fm_key.filename)
 
+        if current_moment is not None:
+            moments.append(current_moment)
+
         return sorted(
             moments,
             key=lambda moment: (

@@ -201,3 +201,45 @@ class FanMoment:
     ):
         self.key = key
         self.images = images
+
+    @property
+    def moment_date(self) -> str:
+        """
+        Moment date from the grouped S3 key.
+        """
+        return self.key.moment_date if self.key is not None else None
+
+    @property
+    def seller_id(self) -> int:
+        """
+        Seller id from the grouped S3 key.
+        """
+        return self.key.seller_id if self.key is not None else None
+
+    @property
+    def event_id(self) -> int:
+        """
+        Event id from the grouped S3 key.
+        """
+        return self.key.event_id if self.key is not None else None
+
+    @property
+    def seller_name(self) -> str:
+        """
+        Seller display name from the grouped S3 key.
+        """
+        return self.key.seller_name if self.key is not None else None
+
+    @property
+    def event_title(self) -> str:
+        """
+        Event title from the grouped S3 key.
+        """
+        return self.key.event_title if self.key is not None else None
+
+    @property
+    def event_location(self) -> str:
+        """
+        Event location from the grouped S3 key.
+        """
+        return self.key.event_location if self.key is not None else None

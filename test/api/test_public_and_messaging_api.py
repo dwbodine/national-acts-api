@@ -303,7 +303,7 @@ def test_public_moment_routes_forward_filters_and_return_results(
         headers={"x-api-key": "public-key"},
     )
     filter_response = client.get(
-        "/public/filterMomentEvents?date=2026-05-01&sellerId=20&eventId=300",
+        "/public/fan-moments/filter?date=2026-05-01&sellerId=20&eventId=300",
         headers={"x-api-key": "public-key"},
     )
 
@@ -758,7 +758,7 @@ def test_messaging_validate_token_returns_service_result(
         ("/public/getAllMomentDates", "get", None),
         ("/public/getAllMomentSellers", "get", None),
         ("/public/getAllMomentEvents", "get", None),
-        ("/public/filterMomentEvents", "get", None),
+        ("/public/fan-moments/filter", "get", None),
     ],
 )
 def test_public_routes_require_api_key(client, route, method, form_data):

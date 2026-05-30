@@ -1555,18 +1555,18 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
         Fake moments service for admin route tests.
         """
 
-        def add_moments(self, moment_date, seller_id, event_id, filenames):
+        def add_moments(self, fm_key, filenames):
             """
             Record add moment arguments.
             """
-            captured["add"] = (moment_date, seller_id, event_id, filenames)
+            captured["add"] = (fm_key, filenames)
             return ["2026-05-01/20/300/a.jpg"]
 
-        def delete_moments(self, moment_date, seller_id, event_id, filenames):
+        def delete_moments(self, fm_key, filenames):
             """
             Record delete moment arguments.
             """
-            captured["delete"] = (moment_date, seller_id, event_id, filenames)
+            captured["delete"] = (fm_key, filenames)
             return ["2026-05-01/20/300/a.jpg"]
 
     monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
@@ -1593,8 +1593,20 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
     assert parse_json_response(add_response) == ["2026-05-01/20/300/a.jpg"]
     assert delete_response.status_code == 200
     assert parse_json_response(delete_response) == ["2026-05-01/20/300/a.jpg"]
-    assert captured["add"] == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
-    assert captured["delete"] == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
+    add_key, add_filenames = captured["add"]
+    delete_key, delete_filenames = captured["delete"]
+    assert (
+        add_key.moment_date,
+        add_key.seller_id,
+        add_key.event_id,
+        add_filenames,
+    ) == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
+    assert (
+        delete_key.moment_date,
+        delete_key.seller_id,
+        delete_key.event_id,
+        delete_filenames,
+    ) == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
 
 
 def test_admin_update_tour_rejects_missing_converted_tour(

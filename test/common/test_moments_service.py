@@ -5,6 +5,7 @@ Unit tests for common.moments_service helpers.
 from types import SimpleNamespace
 
 from common import moments_service
+from common.models.admin import FanMomentKey
 
 
 class FakeS3Client:
@@ -162,6 +163,13 @@ def build_fake_s3(monkeypatch):
     return fake_s3
 
 
+def create_fan_moment_key(moment_date="2026-05-10", seller_id=33, event_id=44):
+    """
+    Create a FanMomentKey for upload and delete tests.
+    """
+    return FanMomentKey(moment_date, seller_id, event_id)
+
+
 def test_get_available_moment_dates_returns_sorted_date_folders(monkeypatch):
     """
     Test that date folders are read from the bucket root and sorted ascending.
@@ -306,9 +314,9 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
 
     moments = moments_service.MomentsService().filter_moments(seller_id=20)
 
-    assert [(m.moment_date, m.seller_id, m.event_id, m.url) for m in moments] == [
-        ("2026-05-01", 20, 300, "moments-bucket/2026-05-01/20/300/b.jpg"),
-        ("2026-05-02", 20, 400, "moments-bucket/2026-05-02/20/400/d.jpg"),
+    assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
+        ("2026-05-01", 20, 300, ["b.jpg"]),
+        ("2026-05-02", 20, 400, ["d.jpg"]),
     ]
     assert moments[0].seller_name is None
     assert moments[0].event_title is None
@@ -359,10 +367,11 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
 
     assert seller_calls == [(20, False)]
     assert event_calls == [(300, False, True), (301, False, True)]
-    assert [(m.seller_name, m.event_title, m.event_location) for m in moments] == [
-        ("Seller 20", "Event 300", "Event 300 Location"),
-        ("Seller 20", "Event 300", "Event 300 Location"),
-        ("Seller 20", "Event 301", "Event 301 Location"),
+    assert [
+        (m.seller_name, m.event_title, m.event_location, m.images) for m in moments
+    ] == [
+        ("Seller 20", "Event 300", "Event 300 Location", ["a.jpg", "b.jpg"]),
+        ("Seller 20", "Event 301", "Event 301 Location", ["c.jpg"]),
     ]
 
 
@@ -406,30 +415,32 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
 
     moments = moments_service.MomentsService().filter_moments()
 
-    assert [(m.moment_date, m.seller_name, m.event_title, m.url) for m in moments] == [
+    assert [
+        (m.moment_date, m.seller_name, m.event_title, m.images) for m in moments
+    ] == [
         (
             "2026-05-01",
             "Alpha Presents",
             "Alpha Event",
-            "moments-bucket/2026-05-01/20/300/early-alpha-alpha.jpg",
+            ["early-alpha-alpha.jpg"],
         ),
         (
             "2026-05-01",
             "Alpha Presents",
             "Bravo Event",
-            "moments-bucket/2026-05-01/20/301/early-alpha-bravo.jpg",
+            ["early-alpha-bravo.jpg"],
         ),
         (
             "2026-05-01",
             "Zephyr Shows",
             "Alpha Event",
-            "moments-bucket/2026-05-01/10/300/early-zephyr.jpg",
+            ["early-zephyr.jpg"],
         ),
         (
             "2026-05-02",
             "Alpha Presents",
             "Alpha Event",
-            "moments-bucket/2026-05-02/20/300/later-alpha.jpg",
+            ["later-alpha.jpg"],
         ),
     ]
 
@@ -443,12 +454,9 @@ def test_filter_moments_handles_missing_parsed_ids(monkeypatch):
     service._list_keys = lambda prefix: [
         "synthetic-key"
     ]  # pylint: disable=protected-access
-    service._parse_moment_key = lambda key: {  # pylint: disable=protected-access
-        "moment_date": "2026-05-01",
-        "seller_id": None,
-        "event_id": None,
-        "filename": "synthetic-key",
-    }
+    service._parse_fan_moment_key = lambda key: FanMomentKey(  # pylint: disable=protected-access
+        "2026-05-01", None, None, "synthetic-key"
+    )
 
     moments = service.filter_moments()
 
@@ -457,6 +465,7 @@ def test_filter_moments_handles_missing_parsed_ids(monkeypatch):
     assert moments[0].seller_name is None
     assert moments[0].event_id is None
     assert moments[0].event_title is None
+    assert moments[0].images == ["synthetic-key"]
 
 
 def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_path):
@@ -470,7 +479,7 @@ def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_pa
     (tmp_dir / "fan.jpg").write_text("photo", encoding="utf-8")
 
     uploaded = moments_service.MomentsService().add_moments(
-        "2026-05-10", 33, 44, ["fan.jpg"]
+        create_fan_moment_key(), ["fan.jpg"]
     )
 
     assert uploaded == ["2026-05-10/33/44/fan.jpg"]
@@ -492,10 +501,12 @@ def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
     """
     service = moments_service.MomentsService()
 
-    assert service.add_moments("2026-05-10", 33, 44, None) == []
+    fm_key = create_fan_moment_key()
+
+    assert service.add_moments(fm_key, None) == []
 
     monkeypatch.delenv("S3_BUCKET_MOMENTS", raising=False)
-    assert service.add_moments("2026-05-10", 33, 44, ["fan.jpg"]) == []
+    assert service.add_moments(fm_key, ["fan.jpg"]) == []
     assert service._get_bucket_name() is None  # pylint: disable=protected-access
     assert service._list_keys() == []  # pylint: disable=protected-access
     assert service._list_common_prefixes() == []  # pylint: disable=protected-access
@@ -503,7 +514,7 @@ def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
     fake_s3 = FakeS3Client()
     monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
-    assert service.add_moments("2026-05-10", 33, 44, ["missing.jpg"]) == []
+    assert service.add_moments(fm_key, ["missing.jpg"]) == []
     assert not fake_s3.uploads
 
     monkeypatch.setenv("API_FILE_PATH", str(workspace_tmp_path))
@@ -516,7 +527,7 @@ def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
         lambda service_name: RaisingS3Client(fail_upload=True),
     )
 
-    assert service.add_moments("2026-05-10", 33, 44, ["fan.jpg"]) == []
+    assert service.add_moments(fm_key, ["fan.jpg"]) == []
 
 
 def test_delete_moments_removes_files_from_event_prefix(monkeypatch):
@@ -526,7 +537,7 @@ def test_delete_moments_removes_files_from_event_prefix(monkeypatch):
     fake_s3 = build_fake_s3(monkeypatch)
 
     deleted = moments_service.MomentsService().delete_moments(
-        "2026-05-10", 33, 44, ["fan.jpg", "nested/other.png"]
+        create_fan_moment_key(), ["fan.jpg", "nested/other.png"]
     )
 
     assert deleted == [
@@ -553,10 +564,12 @@ def test_delete_moments_handles_none_missing_bucket_and_delete_errors(monkeypatc
     """
     service = moments_service.MomentsService()
 
-    assert service.delete_moments("2026-05-10", 33, 44, None) == []
+    fm_key = create_fan_moment_key()
+
+    assert service.delete_moments(fm_key, None) == []
 
     monkeypatch.delenv("S3_BUCKET_MOMENTS", raising=False)
-    assert service.delete_moments("2026-05-10", 33, 44, ["fan.jpg"]) == []
+    assert service.delete_moments(fm_key, ["fan.jpg"]) == []
 
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
     monkeypatch.setattr(
@@ -565,7 +578,7 @@ def test_delete_moments_handles_none_missing_bucket_and_delete_errors(monkeypatc
         lambda service_name: RaisingS3Client(fail_delete=True),
     )
 
-    assert service.delete_moments("2026-05-10", 33, 44, ["fan.jpg"]) == []
+    assert service.delete_moments(fm_key, ["fan.jpg"]) == []
 
 
 def test_moment_listing_helpers_handle_pagination_and_errors(monkeypatch):
@@ -624,13 +637,13 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
         "ContentType": "application/octet-stream"
     }
     assert (
-        service._parse_moment_key("2026-05-01/20/300") is None
+        service._parse_fan_moment_key("2026-05-01/20/300") is None
     )  # pylint: disable=protected-access
     assert (
-        service._parse_moment_key("2026-05-01/20/300/") is None
+        service._parse_fan_moment_key("2026-05-01/20/300/") is None
     )  # pylint: disable=protected-access
     assert (
-        service._parse_moment_key("bad-date/20/300/a.jpg") is None
+        service._parse_fan_moment_key("bad-date/20/300/a.jpg") is None
     )  # pylint: disable=protected-access
     assert (
         service._is_moment_key_match("bad-key") is False
@@ -643,21 +656,21 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            {"moment_date": "2026-05-01", "seller_id": 20, "event_id": 300},
+            FanMomentKey("2026-05-01", 20, 300),
             moment_date="2026-05-02",
         )
         is False
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            {"moment_date": "2026-05-01", "seller_id": 20, "event_id": 300},
+            FanMomentKey("2026-05-01", 20, 300),
             seller_id=21,
         )
         is False
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            {"moment_date": "2026-05-01", "seller_id": 20, "event_id": 300},
+            FanMomentKey("2026-05-01", 20, 300),
             event_id=301,
         )
         is False

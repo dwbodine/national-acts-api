@@ -14,6 +14,7 @@ from common.faq_service import FaqService
 from common.models.admin import (
     ExternalVenue,
     Faq,
+    FanMomentKey,
     FeaturedArtist,
     Page,
     SiteSetting,
@@ -925,7 +926,9 @@ def add_fan_moments():
         return {"msg": "Bad Request"}, 400
 
     service = MomentsService()
-    success = service.add_moments(moment_date, seller_id, event_id, filenames)
+    success = service.add_moments(
+        FanMomentKey(moment_date, seller_id, event_id), filenames
+    )
     return convert_to_json(success)
 
 
@@ -966,5 +969,7 @@ def delete_fan_moments():
         return {"msg": "Bad Request"}, 400
 
     service = MomentsService()
-    success = service.delete_moments(moment_date, seller_id, event_id, filenames)
+    success = service.delete_moments(
+        FanMomentKey(moment_date, seller_id, event_id), filenames
+    )
     return convert_to_json(success)
