@@ -273,11 +273,13 @@ def test_public_moment_routes_forward_filters_and_return_results(
                 )
             ]
 
-        def filter_moments(self, moment_date=None, seller_id=None, event_id=None):
+        def filter_moments(
+            self, start_date=None, end_date=None, seller_id=None, event_id=None
+        ):
             """
             Record fan moment filters.
             """
-            captured["filter"] = (moment_date, seller_id, event_id)
+            captured["filter"] = (start_date, end_date, seller_id, event_id)
             return [
                 SimpleNamespace(
                     moment_date="2026-05-01",
@@ -303,7 +305,10 @@ def test_public_moment_routes_forward_filters_and_return_results(
         headers={"x-api-key": "public-key"},
     )
     filter_response = client.get(
-        "/public/fan-moments/filter?date=2026-05-01&sellerId=20&eventId=300",
+        (
+            "/public/fan-moments/filter?startDate=2026-05-01"
+            "&endDate=2026-05-02&sellerId=20&eventId=300"
+        ),
         headers={"x-api-key": "public-key"},
     )
 
@@ -333,7 +338,7 @@ def test_public_moment_routes_forward_filters_and_return_results(
     assert captured["dates"] == 20
     assert captured["sellers"] == "2026-05-01"
     assert captured["events"] == ("2026-05-01", 20)
-    assert captured["filter"] == ("2026-05-01", 20, 300)
+    assert captured["filter"] == ("2026-05-01", "2026-05-02", 20, 300)
 
 
 def test_public_page_by_route_requires_non_empty_route(client):

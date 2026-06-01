@@ -426,7 +426,10 @@ def get_filtered_moment_events():
     if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    moment_date: str = get_override_string_value_or_default(request.args.get("date"))
+    start_date: str = get_override_string_value_or_default(
+        request.args.get("startDate")
+    )
+    end_date: str = get_override_string_value_or_default(request.args.get("endDate"))
 
     seller_id: int = get_override_int_value_or_default(
         request.args.get("sellerId"), default=None
@@ -437,5 +440,10 @@ def get_filtered_moment_events():
     )
 
     moments_service = MomentsService()
-    fan_moments = moments_service.filter_moments(moment_date, seller_id, event_id)
+    fan_moments = moments_service.filter_moments(
+        start_date=start_date,
+        end_date=end_date,
+        seller_id=seller_id,
+        event_id=event_id,
+    )
     return convert_to_json(fan_moments)

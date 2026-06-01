@@ -334,6 +334,26 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
     assert moments[0].event_location is None
 
 
+def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
+    """
+    Test that filter_moments matches moments between optional start and end dates.
+    """
+    build_fake_s3(monkeypatch)
+    monkeypatch.setattr(moments_service, "Seller", FakeSeller)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
+
+    moments = moments_service.MomentsService().filter_moments(
+        start_date="2026-05-01",
+        end_date="2026-05-02",
+    )
+
+    assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
+        ("2026-05-01", 20, 300, ["b.jpg"]),
+        ("2026-05-01", 10, 200, ["a.jpg"]),
+        ("2026-05-02", 20, 400, ["d.jpg"]),
+    ]
+
+
 def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
     """
     Test that repeated seller and event ids are looked up once per filter call.
@@ -374,7 +394,11 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
     monkeypatch.setattr(moments_service, "EventService", FakeEventService)
 
-    moments = moments_service.MomentsService().filter_moments("2026-05-01", 20)
+    moments = moments_service.MomentsService().filter_moments(
+        start_date="2026-05-01",
+        end_date="2026-05-01",
+        seller_id=20,
+    )
 
     assert seller_calls == [(20, False)]
     assert event_calls == [(300, False, True), (301, False, True)]
@@ -636,10 +660,14 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
     assert (
-        service._build_filter_prefix("2026-05-01") == "2026-05-01/"
+        service._build_filter_prefix("2026-05-01", "2026-05-01") == "2026-05-01/"
     )  # pylint: disable=protected-access
     assert (  # pylint: disable=protected-access
-        service._build_filter_prefix("2026-05-01", 20, 300) == "2026-05-01/300/"
+        service._build_filter_prefix("2026-05-01", "2026-05-01", 20, 300)
+        == "2026-05-01/300/"
+    )
+    assert (
+        service._build_filter_prefix("2026-05-01", "2026-05-02") == ""
     )
     assert service._get_upload_path(None) is None  # pylint: disable=protected-access
     monkeypatch.delenv("API_FILE_PATH", raising=False)
@@ -665,14 +693,22 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     )  # pylint: disable=protected-access
     assert service._is_moment_key_match(  # pylint: disable=protected-access
         "2026-05-01/300/a.jpg",
-        moment_date="2026-05-01",
+        start_date="2026-05-01",
+        end_date="2026-05-02",
         seller_id=20,
         event_id=300,
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
             FanMomentKey("2026-05-01", 20, 300),
-            moment_date="2026-05-02",
+            start_date="2026-05-02",
+        )
+        is False
+    )
+    assert (
+        service._is_parsed_moment_match(  # pylint: disable=protected-access
+            FanMomentKey("2026-05-03", 20, 300),
+            end_date="2026-05-02",
         )
         is False
     )
