@@ -116,11 +116,11 @@ class PaginatedS3Client:
                 "NextContinuationToken": "page-2",
             }
         if is_second_page:
-            return {"Contents": [{"Key": "2026-05-02/20/400/b.jpg"}]}
+            return {"Contents": [{"Key": "2026-05-02/400/b.jpg"}]}
         return {
             "Contents": [
-                {"Key": "2026-05-01/20/300/"},
-                {"Key": "2026-05-01/20/300/a.jpg"},
+                {"Key": "2026-05-01/300/"},
+                {"Key": "2026-05-01/300/a.jpg"},
             ],
             "IsTruncated": True,
             "NextContinuationToken": "page-2",
@@ -143,19 +143,53 @@ class FakeSeller:
         self.get_event_categories = get_event_categories
 
 
+class FakeMomentEventService:
+    """
+    Test event lookup with deterministic sellers, dates, and titles.
+    """
+
+    EVENTS = {
+        100: (10, "2026-04-30", "Delta Event"),
+        200: (10, "2026-05-01", "Zephyr Event"),
+        300: (20, "2026-05-01", "Alpha Event"),
+        400: (20, "2026-05-02", "Bravo Event"),
+    }
+
+    def get_events_and_orders(self, get_orders=False, event_id=None, is_public=False):
+        """
+        Return the configured event for the requested event id.
+        """
+        seller_id, event_date, title = self.EVENTS[event_id]
+        return [
+            SimpleNamespace(
+                external_event_id=event_id,
+                seller_id=seller_id,
+                event_date=event_date,
+                title=title,
+                get_orders=get_orders,
+                is_public=is_public,
+            )
+        ]
+
+    def get_location_from_event(self, evt):
+        """
+        Return a deterministic event location.
+        """
+        return f"{evt.title} Location"
+
+
 def build_fake_s3(monkeypatch):
     """
     Patch boto3 with a fake client loaded with moment keys.
     """
     fake_s3 = FakeS3Client(
         [
-            "2026-05-01/20/300/b.jpg",
-            "2026-05-01/10/200/a.jpg",
-            "2026-04-30/10/100/c.png",
-            "2026-05-02/20/400/d.jpg",
+            "2026-05-01/300/b.jpg",
+            "2026-05-01/200/a.jpg",
+            "2026-04-30/100/c.png",
+            "2026-05-02/400/d.jpg",
             "not-a-moment.txt",
-            "2026-05-03/not-int/500/e.jpg",
-            "2026-05-03/20/not-int/f.jpg",
+            "2026-05-03/not-int/e.jpg",
         ]
     )
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
@@ -186,6 +220,7 @@ def test_get_available_moment_dates_can_filter_by_seller(monkeypatch):
     Test that date folders can be filtered by seller id.
     """
     build_fake_s3(monkeypatch)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
     dates = moments_service.MomentsService().get_available_moment_dates(seller_id=20)
 
@@ -200,6 +235,7 @@ def test_get_available_moment_sellers_returns_distinct_sellers_sorted_by_name(
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
     sellers = moments_service.MomentsService().get_available_moment_sellers()
 
@@ -217,6 +253,7 @@ def test_get_available_moment_sellers_can_filter_by_date_and_sort_by_name(
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
     sellers = moments_service.MomentsService().get_available_moment_sellers(
         "2026-05-01"
@@ -235,34 +272,7 @@ def test_get_available_moment_events_returns_distinct_events_sorted_by_date_and_
     Test that events are collected distinctly and sorted by date and title.
     """
     build_fake_s3(monkeypatch)
-
-    class FakeEventService:
-        """
-        Test event lookup with deterministic dates and titles.
-        """
-
-        EVENTS = {
-            100: ("2026-04-30", "Delta Event"),
-            200: ("2026-05-01", "Zephyr Event"),
-            300: ("2026-05-01", "Alpha Event"),
-            400: ("2026-05-02", "Bravo Event"),
-        }
-
-        def get_events_and_orders(
-            self, get_orders=False, event_id=None, is_public=False
-        ):
-            event_date, title = self.EVENTS[event_id]
-            return [
-                SimpleNamespace(
-                    external_event_id=event_id,
-                    event_date=event_date,
-                    title=title,
-                    get_orders=get_orders,
-                    is_public=is_public,
-                )
-            ]
-
-    monkeypatch.setattr(moments_service, "EventService", FakeEventService)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
     service = moments_service.MomentsService()
 
     assert [
@@ -300,11 +310,12 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
 
     class EmptyEventService:
         """
-        Test event service with no loaded events.
+        Test event service with no loaded event details.
         """
 
         def get_events_and_orders(self, event_id, get_orders=False, is_public=False):
-            return []
+            seller_id = {100: 10, 200: 10, 300: 20, 400: 20}[event_id]
+            return [SimpleNamespace(seller_id=seller_id, title=None)]
 
         def get_location_from_event(self, evt):
             return None
@@ -329,9 +340,9 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
     """
     fake_s3 = FakeS3Client(
         [
-            "2026-05-01/20/300/a.jpg",
-            "2026-05-01/20/300/b.jpg",
-            "2026-05-01/20/301/c.jpg",
+            "2026-05-01/300/a.jpg",
+            "2026-05-01/300/b.jpg",
+            "2026-05-01/301/c.jpg",
         ]
     )
     seller_calls = []
@@ -353,7 +364,7 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
 
         def get_events_and_orders(self, event_id, get_orders=False, is_public=False):
             event_calls.append((event_id, get_orders, is_public))
-            return [SimpleNamespace(title=f"Event {event_id}")]
+            return [SimpleNamespace(seller_id=20, title=f"Event {event_id}")]
 
         def get_location_from_event(self, evt):
             return f"{evt.title} Location"
@@ -381,10 +392,10 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
     """
     fake_s3 = FakeS3Client(
         [
-            "2026-05-02/20/300/later-alpha.jpg",
-            "2026-05-01/10/300/early-zephyr.jpg",
-            "2026-05-01/20/301/early-alpha-bravo.jpg",
-            "2026-05-01/20/300/early-alpha-alpha.jpg",
+            "2026-05-02/300/later-alpha.jpg",
+            "2026-05-01/302/early-zephyr.jpg",
+            "2026-05-01/301/early-alpha-bravo.jpg",
+            "2026-05-01/300/early-alpha-alpha.jpg",
         ]
     )
 
@@ -402,8 +413,11 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
         """
 
         def get_events_and_orders(self, event_id, get_orders=False, is_public=False):
-            title = {300: "Alpha Event", 301: "Bravo Event"}[event_id]
-            return [SimpleNamespace(title=title)]
+            seller_id = {300: 20, 301: 20, 302: 10}[event_id]
+            title = {300: "Alpha Event", 301: "Bravo Event", 302: "Alpha Event"}[
+                event_id
+            ]
+            return [SimpleNamespace(seller_id=seller_id, title=title)]
 
         def get_location_from_event(self, evt):
             return None
@@ -482,12 +496,12 @@ def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_pa
         create_fan_moment_key(), ["fan.jpg"]
     )
 
-    assert uploaded == ["2026-05-10/33/44/fan.jpg"]
+    assert uploaded == ["2026-05-10/44/fan.jpg"]
     assert fake_s3.uploads == [
         (
             str(tmp_dir / "fan.jpg"),
             "moments-bucket",
-            "2026-05-10/33/44/fan.jpg",
+            "2026-05-10/44/fan.jpg",
             {"ContentType": "image/jpeg"},
         )
     ]
@@ -541,16 +555,16 @@ def test_delete_moments_removes_files_from_event_prefix(monkeypatch):
     )
 
     assert deleted == [
-        "2026-05-10/33/44/fan.jpg",
-        "2026-05-10/33/44/other.png",
+        "2026-05-10/44/fan.jpg",
+        "2026-05-10/44/other.png",
     ]
     assert fake_s3.deletes == [
         (
             "moments-bucket",
             {
                 "Objects": [
-                    {"Key": "2026-05-10/33/44/fan.jpg"},
-                    {"Key": "2026-05-10/33/44/other.png"},
+                    {"Key": "2026-05-10/44/fan.jpg"},
+                    {"Key": "2026-05-10/44/other.png"},
                 ],
                 "Quiet": True,
             },
@@ -593,8 +607,8 @@ def test_moment_listing_helpers_handle_pagination_and_errors(monkeypatch):
     )
 
     assert service._list_keys("2026-05") == [  # pylint: disable=protected-access
-        "2026-05-01/20/300/a.jpg",
-        "2026-05-02/20/400/b.jpg",
+        "2026-05-01/300/a.jpg",
+        "2026-05-02/400/b.jpg",
     ]
     assert paginated_s3.calls[1]["ContinuationToken"] == "page-2"
 
@@ -619,12 +633,13 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     Test small helper branches not naturally covered by route-level behavior.
     """
     service = moments_service.MomentsService()
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
     assert (
         service._build_filter_prefix("2026-05-01") == "2026-05-01/"
     )  # pylint: disable=protected-access
     assert (  # pylint: disable=protected-access
-        service._build_filter_prefix("2026-05-01", 20, 300) == "2026-05-01/20/300/"
+        service._build_filter_prefix("2026-05-01", 20, 300) == "2026-05-01/300/"
     )
     assert service._get_upload_path(None) is None  # pylint: disable=protected-access
     monkeypatch.delenv("API_FILE_PATH", raising=False)
@@ -637,19 +652,19 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
         "ContentType": "application/octet-stream"
     }
     assert (
-        service._parse_fan_moment_key("2026-05-01/20/300") is None
+        service._parse_fan_moment_key("2026-05-01/300") is None
     )  # pylint: disable=protected-access
     assert (
-        service._parse_fan_moment_key("2026-05-01/20/300/") is None
+        service._parse_fan_moment_key("2026-05-01/300/") is None
     )  # pylint: disable=protected-access
     assert (
-        service._parse_fan_moment_key("bad-date/20/300/a.jpg") is None
+        service._parse_fan_moment_key("bad-date/300/a.jpg") is None
     )  # pylint: disable=protected-access
     assert (
         service._is_moment_key_match("bad-key") is False
     )  # pylint: disable=protected-access
     assert service._is_moment_key_match(  # pylint: disable=protected-access
-        "2026-05-01/20/300/a.jpg",
+        "2026-05-01/300/a.jpg",
         moment_date="2026-05-01",
         seller_id=20,
         event_id=300,
@@ -700,15 +715,19 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     )  # pylint: disable=protected-access
 
 
-def test_available_seller_and_event_helpers_skip_invalid_prefixes(monkeypatch):
+def test_available_seller_and_event_helpers_skip_invalid_keys(monkeypatch):
     """
-    Test date-filtered seller/event helpers ignore non-integer child prefixes.
+    Test date-filtered seller/event helpers ignore non-integer event keys.
     """
     service = moments_service.MomentsService()
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
     monkeypatch.setattr(
         service,
-        "_list_common_prefixes",
-        lambda prefix="": ["2026-05-01/not-int/", "2026-05-01/20/"],
+        "_list_keys",
+        lambda prefix="": [
+            "2026-05-01/not-int/a.jpg",
+            "2026-05-01/300/a.jpg",
+        ],
     )
     monkeypatch.setattr(
         service,
@@ -718,11 +737,6 @@ def test_available_seller_and_event_helpers_skip_invalid_prefixes(monkeypatch):
 
     assert service.get_available_moment_sellers("2026-05-01") == [20]
 
-    monkeypatch.setattr(
-        service,
-        "_list_common_prefixes",
-        lambda prefix="": ["2026-05-01/20/not-int/", "2026-05-01/20/300/"],
-    )
     monkeypatch.setattr(
         service, "_get_events_from_ids", lambda event_ids: sorted(event_ids)
     )

@@ -34,7 +34,7 @@ class MomentsService:
 
         moments: list[FanMoment] = []
         seller_names_by_id: dict[int, str] = {}
-        event_details_by_id: dict[int, tuple[str, str]] = {}
+        event_details_by_id: dict[int, tuple[int, str, str]] = {}
         event_service = EventService()
 
         current_fm_key: FanMomentKey = None
@@ -42,7 +42,15 @@ class MomentsService:
 
         for s3_key in s3_keys:
             fm_key: FanMomentKey | None = self._parse_fan_moment_key(s3_key)
-            if fm_key is None or not self._is_parsed_moment_match(
+            if fm_key is None:
+                continue
+
+            event_seller_id, event_title, event_location = self._get_event_details(
+                fm_key.event_id, event_service, event_details_by_id
+            )
+            fm_key.seller_id = event_seller_id
+
+            if not self._is_parsed_moment_match(
                 fm_key, moment_date, seller_id, event_id
             ):
                 continue
@@ -59,22 +67,6 @@ class MomentsService:
                             seller.name if seller is not None else None
                         )
                     seller_name = seller_names_by_id[fm_key.seller_id]
-
-                event_title: str = None
-                event_location: str = None
-                if fm_key.event_id is not None:
-                    if fm_key.event_id not in event_details_by_id:
-                        evt_list = event_service.get_events_and_orders(
-                            event_id=fm_key.event_id, get_orders=False, is_public=True
-                        )
-                        if evt_list is not None and len(evt_list) > 0:
-                            event_details_by_id[fm_key.event_id] = (
-                                evt_list[0].title,
-                                event_service.get_location_from_event(evt_list[0]),
-                            )
-                        else:
-                            event_details_by_id[fm_key.event_id] = (None, None)
-                    event_title, event_location = event_details_by_id[fm_key.event_id]
 
                 fm_key.seller_name = seller_name
                 fm_key.event_title = event_title
@@ -186,9 +178,16 @@ class MomentsService:
             return sorted(dates)
 
         dates = set()
+        event_details_by_id: dict[int, tuple[int, str, str]] = {}
+        event_service = EventService()
         for key in self._list_keys():
             fm_key = self._parse_fan_moment_key(key)
-            if fm_key is not None and fm_key.seller_id == seller_id:
+            if fm_key is None:
+                continue
+            event_seller_id, _event_title, _event_location = self._get_event_details(
+                fm_key.event_id, event_service, event_details_by_id
+            )
+            if event_seller_id == seller_id:
                 dates.add(fm_key.moment_date)
 
         return sorted(dates)
@@ -198,17 +197,20 @@ class MomentsService:
         Get all available moment sellers, possibly filtered by date
         """
         seller_ids = set()
-        if moment_date is not None:
-            for prefix in self._list_common_prefixes(f"{moment_date}/"):
-                seller_id = self._try_parse_int(self._last_prefix_segment(prefix))
-                if seller_id is not None:
-                    seller_ids.add(seller_id)
-            return self._get_sellers_from_ids(seller_ids)
-
-        for key in self._list_keys():
+        event_details_by_id: dict[int, tuple[int, str, str]] = {}
+        event_service = EventService()
+        for key in self._list_keys(
+            f"{moment_date}/" if moment_date is not None else ""
+        ):
             fm_key = self._parse_fan_moment_key(key)
             if fm_key is not None:
-                seller_ids.add(fm_key.seller_id)
+                event_seller_id, _event_title, _event_location = (
+                    self._get_event_details(
+                        fm_key.event_id, event_service, event_details_by_id
+                    )
+                )
+                if event_seller_id is not None:
+                    seller_ids.add(event_seller_id)
 
         return self._get_sellers_from_ids(seller_ids)
 
@@ -219,20 +221,17 @@ class MomentsService:
         Get all available moment events, possibly filtered by date and/or seller id
         """
         event_ids = set()
-        if moment_date is not None and seller_id is not None:
-            prefix = f"{moment_date}/{seller_id}/"
-            for common_prefix in self._list_common_prefixes(prefix):
-                event_id = self._try_parse_int(self._last_prefix_segment(common_prefix))
-                if event_id is not None:
-                    event_ids.add(event_id)
-            return self._get_events_from_ids(event_ids)
-
         keys = self._list_keys(f"{moment_date}/" if moment_date is not None else "")
+        event_details_by_id: dict[int, tuple[int, str, str]] = {}
+        event_service = EventService()
         for key in keys:
             fm_key = self._parse_fan_moment_key(key)
             if fm_key is None:
                 continue
-            if seller_id is not None and fm_key.seller_id != seller_id:
+            event_seller_id, _event_title, _event_location = self._get_event_details(
+                fm_key.event_id, event_service, event_details_by_id
+            )
+            if seller_id is not None and event_seller_id != seller_id:
                 continue
             event_ids.add(fm_key.event_id)
 
@@ -254,7 +253,8 @@ class MomentsService:
         """
         Build the S3 prefix for one moment event.
         """
-        return f"{moment_date}/{seller_id}/{event_id}/"
+        _ = seller_id
+        return f"{moment_date}/{event_id}/"
 
     def _build_filter_prefix(
         self, moment_date: str = None, seller_id: int = None, event_id: int = None
@@ -264,10 +264,8 @@ class MomentsService:
         """
         if moment_date is None:
             return ""
-        if seller_id is None:
-            return f"{moment_date}/"
         if event_id is None:
-            return f"{moment_date}/{seller_id}/"
+            return f"{moment_date}/"
         return self._build_event_prefix(moment_date, seller_id, event_id)
 
     def _list_keys(self, prefix: str = "") -> list[str]:
@@ -368,23 +366,18 @@ class MomentsService:
         Parse a moment S3 object key into its folder components.
         """
         segments = key.split("/")
-        if len(segments) < 4 or len(segments[3]) == 0:
+        if len(segments) < 3 or len(segments[2]) == 0:
             return None
 
-        seller_id = self._try_parse_int(segments[1])
-        event_id = self._try_parse_int(segments[2])
-        if (
-            not self._is_valid_date_folder(segments[0])
-            or seller_id is None
-            or event_id is None
-        ):
+        event_id = self._try_parse_int(segments[1])
+        if not self._is_valid_date_folder(segments[0]) or event_id is None:
             return None
 
         return FanMomentKey(
             moment_date=segments[0],
-            seller_id=seller_id,
+            seller_id=None,
             event_id=event_id,
-            filename="/".join(segments[3:]),
+            filename="/".join(segments[2:]),
         )
 
     def _is_moment_key_match(
@@ -400,6 +393,11 @@ class MomentsService:
         fm_key = self._parse_fan_moment_key(key)
         if fm_key is None:
             return False
+        if seller_id is not None:
+            event_seller_id, _event_title, _event_location = self._get_event_details(
+                fm_key.event_id, EventService(), {}
+            )
+            fm_key.seller_id = event_seller_id
         return self._is_parsed_moment_match(fm_key, moment_date, seller_id, event_id)
 
     def _is_parsed_moment_match(
@@ -442,6 +440,32 @@ class MomentsService:
         Get the last folder segment from an S3 common prefix.
         """
         return prefix.strip("/").split("/")[-1]
+
+    def _get_event_details(
+        self,
+        event_id: int,
+        event_service: EventService,
+        event_details_by_id: dict[int, tuple[int, str, str]],
+    ) -> tuple[int, str, str]:
+        """
+        Get seller id, title, and location for an event, cached by event id.
+        """
+        if event_id is None:
+            return (None, None, None)
+        if event_id not in event_details_by_id:
+            evt_list = event_service.get_events_and_orders(
+                event_id=event_id, get_orders=False, is_public=True
+            )
+            if evt_list is not None and len(evt_list) > 0:
+                evt = evt_list[0]
+                event_details_by_id[event_id] = (
+                    getattr(evt, "seller_id", None),
+                    getattr(evt, "title", None),
+                    event_service.get_location_from_event(evt),
+                )
+            else:
+                event_details_by_id[event_id] = (None, None, None)
+        return event_details_by_id[event_id]
 
     def _get_sellers_from_ids(self, seller_ids: set[int]) -> list[Seller]:
         """
