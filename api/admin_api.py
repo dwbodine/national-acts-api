@@ -889,7 +889,7 @@ def delete_venue():
     return convert_to_json(success)
 
 
-@admin_api.route("/admin/moments/add", methods=["POST"])
+@admin_api.route("/admin/fan-moments/add", methods=["POST"])
 @jwt_required()
 def add_fan_moments():
     """
@@ -932,7 +932,7 @@ def add_fan_moments():
     return convert_to_json(success)
 
 
-@admin_api.route("/admin/moments/delete", methods=["POST"])
+@admin_api.route("/admin/fan-moments/delete", methods=["POST"])
 @jwt_required()
 def delete_fan_moments():
     """
