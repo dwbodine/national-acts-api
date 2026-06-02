@@ -323,7 +323,10 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
     monkeypatch.setattr(moments_service, "Seller", EmptySeller)
     monkeypatch.setattr(moments_service, "EventService", EmptyEventService)
 
-    moments = moments_service.MomentsService().filter_moments(seller_id=20)
+    moments = moments_service.MomentsService().filter_moments(
+        start_date="2026-05-01",
+        seller_id=20,
+    )
 
     assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
         ("2026-05-01", 20, 300, ["b.jpg"]),
@@ -351,6 +354,26 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
         ("2026-05-01", 20, 300, ["b.jpg"]),
         ("2026-05-01", 10, 200, ["a.jpg"]),
         ("2026-05-02", 20, 400, ["d.jpg"]),
+    ]
+
+
+def test_filter_moments_event_id_overrides_other_filters(monkeypatch):
+    """
+    Test that event_id matches across dates and ignores date and seller filters.
+    """
+    build_fake_s3(monkeypatch)
+    monkeypatch.setattr(moments_service, "Seller", FakeSeller)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
+
+    moments = moments_service.MomentsService().filter_moments(
+        start_date="2026-06-01",
+        end_date="2026-06-01",
+        seller_id=999,
+        event_id=300,
+    )
+
+    assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
+        ("2026-05-01", 20, 300, ["b.jpg"]),
     ]
 
 
@@ -451,7 +474,7 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
     monkeypatch.setattr(moments_service, "Seller", SortSeller)
     monkeypatch.setattr(moments_service, "EventService", SortEventService)
 
-    moments = moments_service.MomentsService().filter_moments()
+    moments = moments_service.MomentsService().filter_moments("2026-05-01")
 
     assert [
         (m.moment_date, m.seller_name, m.event_title, m.images) for m in moments
@@ -496,7 +519,7 @@ def test_filter_moments_handles_missing_parsed_ids(monkeypatch):
         "2026-05-01", None, None, "synthetic-key"
     )
 
-    moments = service.filter_moments()
+    moments = service.filter_moments("2026-05-01")
 
     assert len(moments) == 1
     assert moments[0].seller_id is None
@@ -663,12 +686,12 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
         service._build_filter_prefix("2026-05-01", "2026-05-01") == "2026-05-01/"
     )  # pylint: disable=protected-access
     assert (  # pylint: disable=protected-access
-        service._build_filter_prefix("2026-05-01", "2026-05-01", 20, 300)
-        == "2026-05-01/300/"
+        service._build_filter_prefix("2026-05-01", "2026-05-01", 300) == ""
     )
     assert (
         service._build_filter_prefix("2026-05-01", "2026-05-02") == ""
     )
+    assert service._build_filter_prefix(event_id=300) == ""
     assert service._get_upload_path(None) is None  # pylint: disable=protected-access
     monkeypatch.delenv("API_FILE_PATH", raising=False)
     assert (
@@ -725,6 +748,13 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
             event_id=301,
         )
         is False
+    )
+    assert service._is_parsed_moment_match(  # pylint: disable=protected-access
+        FanMomentKey("2026-05-01", 20, 300),
+        start_date="2026-05-02",
+        end_date="2026-05-02",
+        seller_id=21,
+        event_id=300,
     )
     assert (
         service._is_valid_date_folder(None) is False

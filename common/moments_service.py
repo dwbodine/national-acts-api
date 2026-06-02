@@ -24,7 +24,7 @@ class MomentsService:
 
     def filter_moments(
         self,
-        start_date: str = None,
+        start_date: str,
         end_date: str = None,
         seller_id: int = None,
         event_id: int = None,
@@ -33,7 +33,7 @@ class MomentsService:
         Get fan moment photo objects from the moments S3 bucket by filter criteria.
         """
         s3_keys = self._list_keys(
-            self._build_filter_prefix(start_date, end_date, seller_id, event_id)
+            self._build_filter_prefix(start_date, end_date, event_id)
         )
 
         moments: list[FanMoment] = []
@@ -109,7 +109,7 @@ class MomentsService:
             return uploaded_keys
 
         prefix = self._build_event_prefix(
-            fm_key.moment_date, fm_key.seller_id, fm_key.event_id
+            fm_key.moment_date, fm_key.event_id
         )
         s3_client = boto3.client("s3")
 
@@ -147,7 +147,7 @@ class MomentsService:
             return deleted_keys
 
         prefix = self._build_event_prefix(
-            fm_key.moment_date, fm_key.seller_id, fm_key.event_id
+            fm_key.moment_date, fm_key.event_id
         )
         objects = [
             {"Key": f"{prefix}{os.path.basename(filename)}"} for filename in filenames
@@ -252,29 +252,27 @@ class MomentsService:
         return bucket_name.strip()
 
     def _build_event_prefix(
-        self, moment_date: str, seller_id: int, event_id: int
+        self, moment_date: str, event_id: int
     ) -> str:
         """
         Build the S3 prefix for one moment event.
         """
-        _ = seller_id
         return f"{moment_date}/{event_id}/"
 
     def _build_filter_prefix(
         self,
         start_date: str = None,
         end_date: str = None,
-        seller_id: int = None,
         event_id: int = None,
     ) -> str:
         """
         Build the narrowest contiguous S3 prefix available from the filter values.
         """
+        if event_id is not None:
+            return ""
         if start_date is None or start_date != end_date:
             return ""
-        if event_id is None:
-            return f"{start_date}/"
-        return self._build_event_prefix(start_date, seller_id, event_id)
+        return f"{start_date}/"
 
     def _list_keys(self, prefix: str = "") -> list[str]:
         """
@@ -402,7 +400,7 @@ class MomentsService:
         fm_key = self._parse_fan_moment_key(key)
         if fm_key is None:
             return False
-        if seller_id is not None:
+        if seller_id is not None and event_id is None:
             event_seller_id, _event_title, _event_location = self._get_event_details(
                 fm_key.event_id, EventService(), {}
             )
@@ -422,6 +420,8 @@ class MomentsService:
         """
         Determine whether parsed moment key data matches the supplied filters.
         """
+        if event_id is not None:
+            return key.event_id == event_id
         if start_date is not None and (
             key.moment_date is None or key.moment_date < start_date
         ):

@@ -341,6 +341,56 @@ def test_public_moment_routes_forward_filters_and_return_results(
     assert captured["filter"] == ("2026-05-01", "2026-05-02", 20, 300)
 
 
+def test_public_moment_filter_requires_start_date_without_event_id(monkeypatch, client):
+    """
+    Return 400 when fan moments are requested without startDate or eventId.
+    """
+    monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
+
+    response = client.get(
+        "/public/fan-moments/filter?sellerId=20",
+        headers={"x-api-key": "public-key"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {"msg": "Bad Request"}
+
+
+def test_public_moment_filter_allows_event_id_without_start_date(
+    monkeypatch, client, parse_json_response
+):
+    """
+    Allow eventId-only fan moment requests because event id overrides date filters.
+    """
+    captured = {}
+
+    class FakeMomentsService:
+        """
+        Fake moments service for event-only moment filter tests.
+        """
+
+        def filter_moments(
+            self, start_date=None, end_date=None, seller_id=None, event_id=None
+        ):
+            """
+            Record fan moment filters.
+            """
+            captured["filter"] = (start_date, end_date, seller_id, event_id)
+            return []
+
+    monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
+    monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
+
+    response = client.get(
+        "/public/fan-moments/filter?eventId=300&sellerId=20",
+        headers={"x-api-key": "public-key"},
+    )
+
+    assert response.status_code == 200
+    assert parse_json_response(response) == []
+    assert captured["filter"] == (None, None, 20, 300)
+
+
 def test_public_page_by_route_requires_non_empty_route(client):
     """
     Return 404 when the page-by-route endpoint is requested without a route.

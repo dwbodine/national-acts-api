@@ -1370,7 +1370,7 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
         ("/admin/faq/moveup", "post", {"faqId": "1"}),
         ("/admin/faq/update", "post", {"faqId": 1}),
         (
-            "/admin/moments/add",
+            "/admin/fan-moments/add",
             "post",
             {
                 "date": "2026-05-01",
@@ -1380,7 +1380,7 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
             },
         ),
         (
-            "/admin/moments/delete",
+            "/admin/fan-moments/delete",
             "post",
             {
                 "date": "2026-05-01",
@@ -1445,7 +1445,7 @@ def test_admin_routes_require_admin_auth(
         ("/admin/orders/refund", {"orderId": 0}),
         ("/admin/featured-artists/order", []),
         (
-            "/admin/moments/add",
+            "/admin/fan-moments/add",
             {
                 "date": "",
                 "sellerId": 20,
@@ -1454,7 +1454,7 @@ def test_admin_routes_require_admin_auth(
             },
         ),
         (
-            "/admin/moments/delete",
+            "/admin/fan-moments/delete",
             {
                 "date": "2026-05-01",
                 "sellerId": 0,
@@ -1579,12 +1579,12 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
         "filenames": ["a.jpg", "b.jpg"],
     }
     add_response = client.post(
-        "/admin/moments/add",
+        "/admin/fan-moments/add",
         headers=auth_headers(),
         json=payload,
     )
     delete_response = client.post(
-        "/admin/moments/delete",
+        "/admin/fan-moments/delete",
         headers=auth_headers(),
         json=payload,
     )
