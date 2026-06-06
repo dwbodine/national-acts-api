@@ -3,6 +3,9 @@ Admin service module
 """
 
 import os
+
+from datetime import datetime
+import pytz
 from common.constants import ImageType
 from common.dashboard_service import DashboardService
 from common.db import db_delete, db_query_all, db_insert, db_query_one, db_update
@@ -482,14 +485,18 @@ class AdminService:
         Marks event as cancelled or not
         """
         success: bool = True
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         if len(event_ids) > 0:
             for event_id in event_ids:
-                data = {"event_id": event_id}
+                data = {
+                    "event_id": event_id,
+                    "cancelled_date": datetime.now(pacific_tz).strftime("%Y-%m-%d"),
+                }
                 sql = ""
                 if is_cancelled is True:
                     sql = """UPDATE ExternalEvents
                                 SET IsCancelled=1,
-                                CancelledDate=CURRENT_TIMESTAMP,
+                                CancelledDate=%(cancelled_date)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE EventId=%(event_id)s"""
                 else:

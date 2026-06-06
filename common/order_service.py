@@ -683,20 +683,24 @@ class OrderService:
         """
         Refunds all tickets in an order
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         ticket_sql = """UPDATE TicketSocketOrderTickets
                 SET LastUpdate=CURRENT_TIMESTAMP"""
         if mark_chargeback is True:
             ticket_sql += """, IsChargedBack=1, IsRefunded=0,
-                            ChargebackDate=CURRENT_TIMESTAMP,
+                            ChargebackDate=%(refund_date)s,
                             RefundDate=NULL"""
         else:
             ticket_sql += """, IsRefunded=1, IsChargedBack=0,
-                            RefundDate=CURRENT_TIMESTAMP,
+                            RefundDate=%(refund_date)s,
                             ChargebackDate=NULL"""
         if refund_service_fees is True or mark_chargeback is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE TicketSocketOrderId=%(ticket_socket_order_id)s"""
-        ticket_data = {"ticket_socket_order_id": ticket_socket_order_id}
+        ticket_data = {
+            "ticket_socket_order_id": ticket_socket_order_id,
+            "refund_date": datetime.now(pacific_tz).strftime("%Y-%m-%d"),
+        }
         success = db_update(ticket_sql, ticket_data)
 
         if success is True:
@@ -710,15 +714,19 @@ class OrderService:
         """
         Refunds a single ticket
         """
+        pacific_tz = pytz.timezone("America/Los_Angeles")
         ticket_sql = """UPDATE TicketSocketOrderTickets
                     SET LastUpdate=CURRENT_TIMESTAMP,
                     IsRefunded=1, IsChargedBack=0,
-                    RefundDate=CURRENT_TIMESTAMP,
+                    RefundDate=%(refund_date)s,
                     ChargebackDate=NULL"""
         if refund_service_fees is True:
             ticket_sql += """, IsServiceFeeRefunded=1"""
         ticket_sql += """ WHERE Id=%(ticket_socket_order_ticket_id)s"""
-        ticket_data = {"ticket_socket_order_ticket_id": ticket_socket_order_ticket_id}
+        ticket_data = {
+            "ticket_socket_order_ticket_id": ticket_socket_order_ticket_id,
+            "refund_date": datetime.now(pacific_tz).strftime("%Y-%m-%d"),
+        }
         success = db_update(ticket_sql, ticket_data)
 
         if success is True:
