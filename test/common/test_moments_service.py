@@ -155,21 +155,34 @@ class FakeMomentEventService:
         400: (20, "2026-05-02", "Bravo Event"),
     }
 
-    def get_events_and_orders(self, get_orders=False, event_id=None, is_public=False):
+    def get_events_and_orders(
+        self, get_orders=False, seller_id=None, event_id=None, is_public=False
+    ):
         """
-        Return the configured event for the requested event id.
+        Return configured events for the requested seller or event id.
         """
-        seller_id, event_date, title = self.EVENTS[event_id]
-        return [
-            SimpleNamespace(
-                external_event_id=event_id,
-                seller_id=seller_id,
-                event_date=event_date,
-                title=title,
-                get_orders=get_orders,
-                is_public=is_public,
+        event_ids = [event_id]
+        if seller_id is not None:
+            event_ids = [
+                event_id
+                for event_id, event_details in self.EVENTS.items()
+                if event_details[0] == seller_id
+            ]
+
+        events = []
+        for event_id in event_ids:
+            event_seller_id, event_date, title = self.EVENTS[event_id]
+            events.append(
+                SimpleNamespace(
+                    external_event_id=event_id,
+                    seller_id=event_seller_id,
+                    event_date=event_date,
+                    title=title,
+                    get_orders=get_orders,
+                    is_public=is_public,
+                )
             )
-        ]
+        return events
 
     def get_location_from_event(self, evt):
         """
@@ -313,9 +326,26 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
         Test event service with no loaded event details.
         """
 
-        def get_events_and_orders(self, event_id, get_orders=False, is_public=False):
-            seller_id = {100: 10, 200: 10, 300: 20, 400: 20}[event_id]
-            return [SimpleNamespace(seller_id=seller_id, title=None)]
+        def get_events_and_orders(
+            self, event_id=None, seller_id=None, get_orders=False, is_public=False
+        ):
+            event_sellers_by_id = {100: 10, 200: 10, 300: 20, 400: 20}
+            event_ids = [event_id]
+            if seller_id is not None:
+                event_ids = [
+                    event_id
+                    for event_id, event_seller_id in event_sellers_by_id.items()
+                    if event_seller_id == seller_id
+                ]
+
+            return [
+                SimpleNamespace(
+                    external_event_id=event_id,
+                    seller_id=event_sellers_by_id[event_id],
+                    title=None,
+                )
+                for event_id in event_ids
+            ]
 
         def get_location_from_event(self, evt):
             return None
@@ -357,9 +387,11 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
     ]
 
 
-def test_filter_moments_event_id_overrides_other_filters(monkeypatch):
+def test_filter_moments_event_id_overrides_date_filter_and_respects_seller(
+    monkeypatch,
+):
     """
-    Test that event_id matches across dates and ignores date and seller filters.
+    Test that event_id matches across dates while staying within seller events.
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
@@ -368,12 +400,52 @@ def test_filter_moments_event_id_overrides_other_filters(monkeypatch):
     moments = moments_service.MomentsService().filter_moments(
         start_date="2026-06-01",
         end_date="2026-06-01",
-        seller_id=999,
+        seller_id=20,
         event_id=300,
     )
 
     assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
         ("2026-05-01", 20, 300, ["b.jpg"]),
+    ]
+
+    assert (
+        moments_service.MomentsService().filter_moments(
+            start_date="2026-06-01",
+            end_date="2026-06-01",
+            seller_id=10,
+            event_id=300,
+        )
+        == []
+    )
+
+
+def test_filter_moments_prefills_seller_events_before_listing_images(monkeypatch):
+    """
+    Test seller filters only list images for prefixes with seller event ids.
+    """
+    build_fake_s3(monkeypatch)
+    monkeypatch.setattr(moments_service, "Seller", FakeSeller)
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
+    service = moments_service.MomentsService()
+    listed_image_prefixes = []
+    original_list_moment_images = (
+        service._list_moment_images  # pylint: disable=protected-access
+    )
+
+    def list_moment_images(event_prefix):
+        listed_image_prefixes.append(event_prefix)
+        return original_list_moment_images(event_prefix)
+
+    service._list_moment_images = list_moment_images  # pylint: disable=protected-access
+
+    moments = service.filter_moments(start_date="2026-05-01", seller_id=20)
+
+    assert listed_image_prefixes == ["2026-05-01/300/", "2026-05-02/400/"]
+    assert [
+        (moment.moment_date, moment.seller_id, moment.event_id) for moment in moments
+    ] == [
+        ("2026-05-01", 20, 300),
+        ("2026-05-02", 20, 400),
     ]
 
 
@@ -405,9 +477,21 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
         Test event service lookup.
         """
 
-        def get_events_and_orders(self, event_id, get_orders=False, is_public=False):
-            event_calls.append((event_id, get_orders, is_public))
-            return [SimpleNamespace(seller_id=20, title=f"Event {event_id}")]
+        def get_events_and_orders(
+            self, event_id=None, seller_id=None, get_orders=False, is_public=False
+        ):
+            event_calls.append((event_id, seller_id, get_orders, is_public))
+            event_ids = [event_id]
+            if seller_id is not None:
+                event_ids = [300, 301]
+            return [
+                SimpleNamespace(
+                    external_event_id=event_id,
+                    seller_id=20,
+                    title=f"Event {event_id}",
+                )
+                for event_id in event_ids
+            ]
 
         def get_location_from_event(self, evt):
             return f"{evt.title} Location"
@@ -424,7 +508,7 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
     )
 
     assert seller_calls == [(20, False)]
-    assert event_calls == [(300, False, True), (301, False, True)]
+    assert event_calls == [(None, 20, False, True)]
     assert [
         (m.seller_name, m.event_title, m.event_location, m.images) for m in moments
     ] == [
@@ -506,27 +590,24 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
     ]
 
 
-def test_filter_moments_handles_missing_parsed_ids(monkeypatch):
+def test_filter_moments_skips_invalid_prefixes_and_empty_image_folders(monkeypatch):
     """
-    Test filter_moments branches for parsed moments without seller or event ids.
+    Test filter_moments skips invalid event prefixes and folders with no images.
     """
     service = moments_service.MomentsService()
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
-    service._list_keys = lambda prefix: [
-        "synthetic-key"
-    ]  # pylint: disable=protected-access
-    service._parse_fan_moment_key = lambda key: FanMomentKey(  # pylint: disable=protected-access
-        "2026-05-01", None, None, "synthetic-key"
+    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
+    service._list_matching_event_prefixes = (  # pylint: disable=protected-access
+        lambda *args: [
+            "2026-05-01/not-int/",
+            "2026-05-01/300/",
+        ]
     )
+    service._list_moment_images = lambda prefix: []  # pylint: disable=protected-access
 
     moments = service.filter_moments("2026-05-01")
 
-    assert len(moments) == 1
-    assert moments[0].seller_id is None
-    assert moments[0].seller_name is None
-    assert moments[0].event_id is None
-    assert moments[0].event_title is None
-    assert moments[0].images == ["synthetic-key"]
+    assert moments == []
 
 
 def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_path):

@@ -24,7 +24,7 @@ class MomentsService:
 
     def filter_moments(
         self,
-        start_date: str,
+        start_date: str = None,
         end_date: str = None,
         seller_id: int = None,
         event_id: int = None,
@@ -32,20 +32,26 @@ class MomentsService:
         """
         Get fan moment photo objects from the moments S3 bucket by filter criteria.
         """
-        s3_keys = self._list_keys(
-            self._build_filter_prefix(start_date, end_date, event_id)
-        )
-
         moments: list[FanMoment] = []
         seller_names_by_id: dict[int, str] = {}
         event_details_by_id: dict[int, tuple[int, str, str]] = {}
         event_service = EventService()
 
-        current_fm_key: FanMomentKey = None
-        current_moment: FanMoment = None
+        if seller_id is not None:
+            self._prefill_event_details_by_seller(
+                seller_id, event_service, event_details_by_id
+            )
 
-        for s3_key in s3_keys:
-            fm_key: FanMomentKey | None = self._parse_fan_moment_key(s3_key)
+        matching_prefixes = self._list_matching_event_prefixes(
+            start_date, end_date, event_id
+        )
+        if seller_id is not None:
+            matching_prefixes = self._filter_event_prefixes_to_known_events(
+                matching_prefixes, event_details_by_id
+            )
+
+        for event_prefix in matching_prefixes:
+            fm_key = self._parse_fan_moment_prefix(event_prefix)
             if fm_key is None:
                 continue
 
@@ -59,30 +65,23 @@ class MomentsService:
             ):
                 continue
 
-            if current_fm_key is None or str(current_fm_key) != str(fm_key):
-                if current_moment is not None:
-                    moments.append(current_moment)
+            images = self._list_moment_images(event_prefix)
+            if len(images) == 0:
+                continue
 
-                seller_name: str = None
-                if fm_key.seller_id is not None:
-                    if fm_key.seller_id not in seller_names_by_id:
-                        seller = Seller(fm_key.seller_id, get_event_categories=False)
-                        seller_names_by_id[fm_key.seller_id] = (
-                            seller.name if seller is not None else None
-                        )
-                    seller_name = seller_names_by_id[fm_key.seller_id]
+            seller_name: str = None
+            if fm_key.seller_id is not None:
+                if fm_key.seller_id not in seller_names_by_id:
+                    seller = Seller(fm_key.seller_id, get_event_categories=False)
+                    seller_names_by_id[fm_key.seller_id] = (
+                        seller.name if seller is not None else None
+                    )
+                seller_name = seller_names_by_id[fm_key.seller_id]
 
-                fm_key.seller_name = seller_name
-                fm_key.event_title = event_title
-                fm_key.event_location = event_location
-
-                current_moment = FanMoment(key=fm_key, images=[fm_key.filename])
-                current_fm_key = fm_key
-            else:
-                current_moment.images.append(fm_key.filename)
-
-        if current_moment is not None:
-            moments.append(current_moment)
+            fm_key.seller_name = seller_name
+            fm_key.event_title = event_title
+            fm_key.event_location = event_location
+            moments.append(FanMoment(key=fm_key, images=images))
 
         return sorted(
             moments,
@@ -108,9 +107,7 @@ class MomentsService:
         if bucket_name is None:
             return uploaded_keys
 
-        prefix = self._build_event_prefix(
-            fm_key.moment_date, fm_key.event_id
-        )
+        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
         s3_client = boto3.client("s3")
 
         for filename in filenames:
@@ -146,9 +143,7 @@ class MomentsService:
         if bucket_name is None:
             return deleted_keys
 
-        prefix = self._build_event_prefix(
-            fm_key.moment_date, fm_key.event_id
-        )
+        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
         objects = [
             {"Key": f"{prefix}{os.path.basename(filename)}"} for filename in filenames
         ]
@@ -251,9 +246,7 @@ class MomentsService:
             return None
         return bucket_name.strip()
 
-    def _build_event_prefix(
-        self, moment_date: str, event_id: int
-    ) -> str:
+    def _build_event_prefix(self, moment_date: str, event_id: int) -> str:
         """
         Build the S3 prefix for one moment event.
         """
@@ -338,6 +331,53 @@ class MomentsService:
 
         return sorted(prefixes)
 
+    def _list_matching_event_prefixes(
+        self, start_date: str = None, end_date: str = None, event_id: int = None
+    ) -> list[str]:
+        """
+        List event-level prefixes that can satisfy the supplied date/event filters.
+        """
+        date_prefixes = self._list_candidate_date_prefixes(
+            start_date, end_date, event_id
+        )
+        event_prefixes: list[str] = []
+
+        for date_prefix in date_prefixes:
+            moment_date = date_prefix.strip("/")
+            if not self._is_valid_date_folder(moment_date):
+                continue
+            if event_id is None and not self._is_moment_date_match(
+                moment_date, start_date, end_date
+            ):
+                continue
+            if event_id is not None:
+                event_prefixes.append(self._build_event_prefix(moment_date, event_id))
+                continue
+            event_prefixes.extend(self._list_common_prefixes(date_prefix))
+
+        return sorted(event_prefixes)
+
+    def _list_candidate_date_prefixes(
+        self, start_date: str = None, end_date: str = None, event_id: int = None
+    ) -> list[str]:
+        """
+        List date-level prefixes worth inspecting for the supplied filters.
+        """
+        if event_id is None and start_date is not None and start_date == end_date:
+            return [f"{start_date}/"]
+        return self._list_common_prefixes()
+
+    def _list_moment_images(self, event_prefix: str) -> list[str]:
+        """
+        List image filenames inside an event-level moment prefix.
+        """
+        images: list[str] = []
+        for s3_key in self._list_keys(event_prefix):
+            fm_key = self._parse_fan_moment_key(s3_key)
+            if fm_key is not None:
+                images.append(fm_key.filename)
+        return images
+
     def _get_upload_path(self, filename: str) -> str:
         """
         Resolve a filename to a local upload path.
@@ -385,6 +425,20 @@ class MomentsService:
             event_id=event_id,
             filename="/".join(segments[2:]),
         )
+
+    def _parse_fan_moment_prefix(self, prefix: str) -> FanMomentKey | None:
+        """
+        Parse a moment S3 event prefix into its date and event folder components.
+        """
+        segments = prefix.strip("/").split("/")
+        if len(segments) != 2:
+            return None
+
+        event_id = self._try_parse_int(segments[1])
+        if not self._is_valid_date_folder(segments[0]) or event_id is None:
+            return None
+
+        return FanMomentKey(moment_date=segments[0], seller_id=None, event_id=event_id)
 
     def _is_moment_key_match(
         self,
@@ -444,6 +498,18 @@ class MomentsService:
             return False
         return folder[4] == "-" and folder[7] == "-"
 
+    def _is_moment_date_match(
+        self, moment_date: str, start_date: str = None, end_date: str = None
+    ) -> bool:
+        """
+        Determine whether a moment date folder matches the supplied date range.
+        """
+        if start_date is not None and (moment_date is None or moment_date < start_date):
+            return False
+        if end_date is not None and (moment_date is None or moment_date > end_date):
+            return False
+        return True
+
     def _try_parse_int(self, value: str) -> int:
         """
         Parse an int value, returning None for invalid input.
@@ -472,7 +538,7 @@ class MomentsService:
             return (None, None, None)
         if event_id not in event_details_by_id:
             evt_list = event_service.get_events_and_orders(
-                event_id=event_id, get_orders=False, is_public=True
+                event_id=event_id, get_orders=False, is_public=False
             )
             if evt_list is not None and len(evt_list) > 0:
                 evt = evt_list[0]
@@ -484,6 +550,51 @@ class MomentsService:
             else:
                 event_details_by_id[event_id] = (None, None, None)
         return event_details_by_id[event_id]
+
+    def _prefill_event_details_by_seller(
+        self,
+        seller_id: int,
+        event_service: EventService,
+        event_details_by_id: dict[int, tuple[int, str, str]],
+    ) -> None:
+        """
+        Cache seller event details before filtering S3 event prefixes.
+        """
+        events = event_service.get_events_and_orders(
+            seller_id=seller_id, get_orders=False, is_public=False
+        )
+        if events is None:
+            return
+
+        for evt in events:
+            event_id = getattr(evt, "external_event_id", None)
+            if event_id is None:
+                event_id = getattr(evt, "event_id", None)
+            if event_id is None:
+                event_id = getattr(evt, "id", None)
+            if event_id is None:
+                continue
+
+            event_details_by_id[event_id] = (
+                getattr(evt, "seller_id", None),
+                getattr(evt, "title", None),
+                event_service.get_location_from_event(evt),
+            )
+
+    def _filter_event_prefixes_to_known_events(
+        self,
+        event_prefixes: list[str],
+        event_details_by_id: dict[int, tuple[int, str, str]],
+    ) -> list[str]:
+        """
+        Keep only event prefixes whose event id is already cached.
+        """
+        matching_prefixes: list[str] = []
+        for event_prefix in event_prefixes:
+            fm_key = self._parse_fan_moment_prefix(event_prefix)
+            if fm_key is not None and fm_key.event_id in event_details_by_id:
+                matching_prefixes.append(event_prefix)
+        return matching_prefixes
 
     def _get_sellers_from_ids(self, seller_ids: set[int]) -> list[Seller]:
         """

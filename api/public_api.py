@@ -439,7 +439,7 @@ def get_filtered_moment_events():
         request.args.get("eventId"), default=None
     )
 
-    if event_id is None and start_date is None:
+    if event_id is None and seller_id is None and start_date is None:
         return {"msg": "Bad Request"}, 400
 
     moments_service = MomentsService()

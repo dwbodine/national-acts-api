@@ -744,6 +744,6 @@ class EventService:
             and venue.country.country_name is not None
             and venue.country.country_code != DEFAULT_COUNTRY_ID
         ):
-            location += f", ${venue.country.countryName}"
+            location += f", {venue.country.country_name}"
 
         return location
