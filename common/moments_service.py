@@ -37,6 +37,10 @@ class MomentsService:
         event_details_by_id: dict[int, tuple[int, str, str]] = {}
         event_service = EventService()
 
+        if event_id is not None:
+            start_date = None
+            end_date = None
+
         if seller_id is not None:
             self._prefill_event_details_by_seller(
                 seller_id, event_service, event_details_by_id
@@ -476,6 +480,8 @@ class MomentsService:
         """
         if event_id is not None:
             return key.event_id == event_id
+        if seller_id is not None:
+            return key.seller_id == seller_id
         if start_date is not None and (
             key.moment_date is None or key.moment_date < start_date
         ):
@@ -483,10 +489,6 @@ class MomentsService:
         if end_date is not None and (
             key.moment_date is None or key.moment_date > end_date
         ):
-            return False
-        if seller_id is not None and key.seller_id != seller_id:
-            return False
-        if event_id is not None and key.event_id != event_id:
             return False
         return True
 
@@ -561,7 +563,7 @@ class MomentsService:
         Cache seller event details before filtering S3 event prefixes.
         """
         events = event_service.get_events_and_orders(
-            seller_id=seller_id, get_orders=False, is_public=False
+            seller_id=seller_id, get_orders=False, is_public=False, ignore_flags=True
         )
         if events is None:
             return

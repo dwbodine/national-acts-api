@@ -387,11 +387,9 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
     ]
 
 
-def test_filter_moments_event_id_overrides_date_filter_and_respects_seller(
-    monkeypatch,
-):
+def test_filter_moments_event_id_overrides_seller_and_date_filters(monkeypatch):
     """
-    Test that event_id matches across dates while staying within seller events.
+    Test that event_id matches across dates and ignores lower-precedence filters.
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
@@ -400,7 +398,7 @@ def test_filter_moments_event_id_overrides_date_filter_and_respects_seller(
     moments = moments_service.MomentsService().filter_moments(
         start_date="2026-06-01",
         end_date="2026-06-01",
-        seller_id=20,
+        seller_id=999,
         event_id=300,
     )
 
@@ -408,20 +406,10 @@ def test_filter_moments_event_id_overrides_date_filter_and_respects_seller(
         ("2026-05-01", 20, 300, ["b.jpg"]),
     ]
 
-    assert (
-        moments_service.MomentsService().filter_moments(
-            start_date="2026-06-01",
-            end_date="2026-06-01",
-            seller_id=10,
-            event_id=300,
-        )
-        == []
-    )
-
 
 def test_filter_moments_prefills_seller_events_before_listing_images(monkeypatch):
     """
-    Test seller filters only list images for prefixes with seller event ids.
+    Test seller filters ignore dates and only list seller event image prefixes.
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
@@ -438,7 +426,7 @@ def test_filter_moments_prefills_seller_events_before_listing_images(monkeypatch
 
     service._list_moment_images = list_moment_images  # pylint: disable=protected-access
 
-    moments = service.filter_moments(start_date="2026-05-01", seller_id=20)
+    moments = service.filter_moments(start_date="2026-06-01", seller_id=20)
 
     assert listed_image_prefixes == ["2026-05-01/300/", "2026-05-02/400/"]
     assert [
@@ -508,7 +496,7 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
     )
 
     assert seller_calls == [(20, False)]
-    assert event_calls == [(None, 20, False, True)]
+    assert event_calls == [(None, 20, False, False)]
     assert [
         (m.seller_name, m.event_title, m.event_location, m.images) for m in moments
     ] == [
@@ -822,6 +810,11 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
             seller_id=21,
         )
         is False
+    )
+    assert service._is_parsed_moment_match(  # pylint: disable=protected-access
+        FanMomentKey("2026-05-01", 20, 300),
+        start_date="2026-06-01",
+        seller_id=20,
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access

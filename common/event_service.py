@@ -742,7 +742,7 @@ class EventService:
         if (
             venue.country is not None
             and venue.country.country_name is not None
-            and venue.country.country_code != DEFAULT_COUNTRY_ID
+            and venue.country.country_id != DEFAULT_COUNTRY_ID
         ):
             location += f", {venue.country.country_name}"
 
