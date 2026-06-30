@@ -40,6 +40,10 @@ class MomentsService:
         if event_id is not None:
             start_date = None
             end_date = None
+            seller_id = None
+        elif seller_id is not None:
+            start_date = None
+            end_date = None
 
         if seller_id is not None:
             self._prefill_event_details_by_seller(
@@ -85,7 +89,10 @@ class MomentsService:
             fm_key.seller_name = seller_name
             fm_key.event_title = event_title
             fm_key.event_location = event_location
-            moments.append(FanMoment(key=fm_key, images=images))
+            moment = FanMoment()
+            moment.key = fm_key
+            moment.images = images
+            moments.append(moment)
 
         return sorted(
             moments,
@@ -134,6 +141,55 @@ class MomentsService:
                 logger.error("%s", error_message)
 
         return uploaded_keys
+
+    def moment_exists(self, moment_date: str, event_id: int, filename: str) -> bool:
+        """
+        Check whether a moment photo exists in S3.
+        """
+        event_prefix = self._build_event_prefix(moment_date, event_id)
+        expected_key = f"{event_prefix}{filename}"
+        keys = self._list_keys(event_prefix)
+        return expected_key in keys
+
+    def update_moment(self, fm: FanMoment) -> bool:
+        """
+        Delete unused moment photos in the moments S3 bucket on finalize
+        """
+        if fm is None or fm.key is None or fm.images is None or len(fm.images) == 0:
+            return None
+
+        fm_key = fm.key
+        filenames = fm.images
+
+        if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
+            return None
+
+        existing_moment = self.get_moment(fm_key)
+        if existing_moment is None or existing_moment.images is None:
+            return None
+
+        delete_filenames: list[str] = []
+        for filename in existing_moment.images:
+            if filename not in filenames:
+                delete_filenames.append(filename)
+
+        if len(delete_filenames) > 0:
+            self.delete_moments(fm_key, delete_filenames)
+
+        return True
+
+    def get_moment(self, fm_key: FanMomentKey) -> FanMoment | None:
+        """
+        Get a single fan moment photo object from the moments S3 bucket.
+        """
+        if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
+            return None
+
+        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
+        moment = FanMoment()
+        moment.key = fm_key
+        moment.images = self._list_moment_images(prefix)
+        return moment
 
     def delete_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
         """
@@ -423,12 +479,12 @@ class MomentsService:
         if not self._is_valid_date_folder(segments[0]) or event_id is None:
             return None
 
-        return FanMomentKey(
-            moment_date=segments[0],
-            seller_id=None,
-            event_id=event_id,
-            filename="/".join(segments[2:]),
-        )
+        fm_key = FanMomentKey()
+        fm_key.moment_date = segments[0]
+        fm_key.seller_id = None
+        fm_key.event_id = event_id
+        fm_key.filename = "/".join(segments[2:])
+        return fm_key
 
     def _parse_fan_moment_prefix(self, prefix: str) -> FanMomentKey | None:
         """
@@ -442,7 +498,11 @@ class MomentsService:
         if not self._is_valid_date_folder(segments[0]) or event_id is None:
             return None
 
-        return FanMomentKey(moment_date=segments[0], seller_id=None, event_id=event_id)
+        fm_key = FanMomentKey()
+        fm_key.moment_date = segments[0]
+        fm_key.seller_id = None
+        fm_key.event_id = event_id
+        return fm_key
 
     def _is_moment_key_match(
         self,

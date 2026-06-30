@@ -13,6 +13,7 @@ from common.common_api import is_admin_logged_in
 from common.faq_service import FaqService
 from common.models.admin import (
     ExternalVenue,
+    FanMoment,
     Faq,
     FanMomentKey,
     FeaturedArtist,
@@ -42,6 +43,19 @@ from common.models.national_acts import (
 from common.models.user import User, Role
 
 admin_api = Blueprint("admin_api", __name__)
+
+
+def _build_fan_moment_key(
+    moment_date: str, seller_id: int, event_id: int
+) -> FanMomentKey:
+    """
+    Build a fan moment key object without requiring a model constructor.
+    """
+    fm_key = FanMomentKey()
+    fm_key.moment_date = moment_date
+    fm_key.seller_id = seller_id
+    fm_key.event_id = event_id
+    return fm_key
 
 
 @admin_api.route("/admin/countries")
@@ -889,7 +903,7 @@ def delete_venue():
     return convert_to_json(success)
 
 
-@admin_api.route("/admin/fan-moments/add", methods=["POST"])
+@admin_api.route("/admin/moments/add", methods=["POST"])
 @jwt_required()
 def add_fan_moments():
     """
@@ -927,12 +941,28 @@ def add_fan_moments():
 
     service = MomentsService()
     success = service.add_moments(
-        FanMomentKey(moment_date, seller_id, event_id), filenames
+        _build_fan_moment_key(moment_date, seller_id, event_id), filenames
     )
     return convert_to_json(success)
 
+@admin_api.route("/admin/moments/update", methods=["POST"])
+@jwt_required()
+def update_moment():
+    """
+    API method to update moment
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
 
-@admin_api.route("/admin/fan-moments/delete", methods=["POST"])
+    moment = convert_json_to_snake_case_object(request.get_json(), FanMoment())
+
+    service = MomentsService()
+    success = service.update_moment(moment)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/moments/delete", methods=["POST"])
 @jwt_required()
 def delete_fan_moments():
     """
@@ -970,6 +1000,6 @@ def delete_fan_moments():
 
     service = MomentsService()
     success = service.delete_moments(
-        FanMomentKey(moment_date, seller_id, event_id), filenames
+        _build_fan_moment_key(moment_date, seller_id, event_id), filenames
     )
     return convert_to_json(success)

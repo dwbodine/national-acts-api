@@ -156,7 +156,12 @@ class FakeMomentEventService:
     }
 
     def get_events_and_orders(
-        self, get_orders=False, seller_id=None, event_id=None, is_public=False
+        self,
+        get_orders=False,
+        seller_id=None,
+        event_id=None,
+        is_public=False,
+        ignore_flags=False,
     ):
         """
         Return configured events for the requested seller or event id.
@@ -214,7 +219,11 @@ def create_fan_moment_key(moment_date="2026-05-10", seller_id=33, event_id=44):
     """
     Create a FanMomentKey for upload and delete tests.
     """
-    return FanMomentKey(moment_date, seller_id, event_id)
+    fm_key = FanMomentKey()
+    fm_key.moment_date = moment_date
+    fm_key.seller_id = seller_id
+    fm_key.event_id = event_id
+    return fm_key
 
 
 def test_get_available_moment_dates_returns_sorted_date_folders(monkeypatch):
@@ -327,7 +336,12 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
         """
 
         def get_events_and_orders(
-            self, event_id=None, seller_id=None, get_orders=False, is_public=False
+            self,
+            event_id=None,
+            seller_id=None,
+            get_orders=False,
+            is_public=False,
+            ignore_flags=False,
         ):
             event_sellers_by_id = {100: 10, 200: 10, 300: 20, 400: 20}
             event_ids = [event_id]
@@ -466,7 +480,12 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
         """
 
         def get_events_and_orders(
-            self, event_id=None, seller_id=None, get_orders=False, is_public=False
+            self,
+            event_id=None,
+            seller_id=None,
+            get_orders=False,
+            is_public=False,
+            ignore_flags=False,
         ):
             event_calls.append((event_id, seller_id, get_orders, is_public))
             event_ids = [event_id]
@@ -621,6 +640,40 @@ def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_pa
             {"ContentType": "image/jpeg"},
         )
     ]
+
+
+def test_get_moment_lists_image_names_from_event_prefix(monkeypatch):
+    """
+    Test that get_moment returns all image names under the matching event folder.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-10/44/fan.jpg",
+            "2026-05-10/44/nested/other.png",
+            "2026-05-10/45/other-event.jpg",
+            "2026-05-11/44/other-date.jpg",
+        ]
+    )
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    fm_key = create_fan_moment_key()
+
+    moment = moments_service.MomentsService().get_moment(fm_key)
+
+    assert moment.key is fm_key
+    assert moment.images == ["fan.jpg", "nested/other.png"]
+
+
+def test_get_moment_returns_none_without_required_key_fields():
+    """
+    Test that get_moment validates the supplied fan moment key.
+    """
+    service = moments_service.MomentsService()
+    fm_key = create_fan_moment_key()
+    fm_key.event_id = None
+
+    assert service.get_moment(None) is None
+    assert service.get_moment(fm_key) is None
 
 
 def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
@@ -792,39 +845,39 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            FanMomentKey("2026-05-01", 20, 300),
+            create_fan_moment_key("2026-05-01", 20, 300),
             start_date="2026-05-02",
         )
         is False
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            FanMomentKey("2026-05-03", 20, 300),
+            create_fan_moment_key("2026-05-03", 20, 300),
             end_date="2026-05-02",
         )
         is False
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            FanMomentKey("2026-05-01", 20, 300),
+            create_fan_moment_key("2026-05-01", 20, 300),
             seller_id=21,
         )
         is False
     )
     assert service._is_parsed_moment_match(  # pylint: disable=protected-access
-        FanMomentKey("2026-05-01", 20, 300),
+        create_fan_moment_key("2026-05-01", 20, 300),
         start_date="2026-06-01",
         seller_id=20,
     )
     assert (
         service._is_parsed_moment_match(  # pylint: disable=protected-access
-            FanMomentKey("2026-05-01", 20, 300),
+            create_fan_moment_key("2026-05-01", 20, 300),
             event_id=301,
         )
         is False
     )
     assert service._is_parsed_moment_match(  # pylint: disable=protected-access
-        FanMomentKey("2026-05-01", 20, 300),
+        create_fan_moment_key("2026-05-01", 20, 300),
         start_date="2026-05-02",
         end_date="2026-05-02",
         seller_id=21,

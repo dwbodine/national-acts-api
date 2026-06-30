@@ -73,6 +73,7 @@ class ImageType(StrEnum):
     THUMBNAILS = "thumbnails"
     EVENT_THUMBNAILS = "event_thumbnails"
     FEATURED_ARTISTS = "featured-artist"
+    FAN_MOMENTS = "fan-moments"
 
 
 HEADER_IMAGE_WIDTH: int = 1600
@@ -82,4 +83,5 @@ PREVIEW_IMAGE_WIDTH: int = 400
 THUMBNAIL_IMAGE_WIDTH: int = 400
 EVENT_THUMBNAIL_IMAGE_WIDTH: int = 100
 FEATURED_ARTIST_IMAGE_WIDTH: int = 260
+FAN_MOMENT_IMAGE_WIDTH: int = 1200
 DEFAULT_COUNTRY_ID: int = 235

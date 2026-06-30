@@ -288,9 +288,14 @@ def upload_image(image_type_str: str):
 
     bucket_name = get_bucket_name_from_image_type(image_type)
     max_width = get_image_width_from_image_type(image_type)
+    subfolder: str = get_override_string_value_or_default(
+        request.args.get("subfolder")
+    )
 
     service = PublicService()
-    filename: str = service.upload_image_to_bucket(request, bucket_name, max_width)
+    filename: str = service.upload_image_to_bucket(
+        request, bucket_name, max_width, subfolder
+    )
     return convert_to_json(filename)
 
 

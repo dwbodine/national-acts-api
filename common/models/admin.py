@@ -175,15 +175,13 @@ class FanMomentKey:
     Model for fan moment keys
     """
 
+    moment_date: str = None
+    seller_id: int = None
+    event_id: int = None
+    filename: str = None
     seller_name: str = None
     event_title: str = None
     event_location: str = None
-
-    def __init__(self, moment_date: str, seller_id: int, event_id: int, filename: str = None):
-        self.moment_date = moment_date
-        self.seller_id = seller_id
-        self.event_id = event_id
-        self.filename = filename
 
     def __str__(self) -> str:
         return f"{self.moment_date}_{self.seller_id}_{self.event_id}"
@@ -194,13 +192,8 @@ class FanMoment:
     Model for fan moments
     """
 
-    def __init__(
-        self,
-        key: FanMomentKey,
-        images: list[str] = None,
-    ):
-        self.key = key
-        self.images = images
+    key: FanMomentKey
+    images: list[str] = None
 
     @property
     def moment_date(self) -> str:
