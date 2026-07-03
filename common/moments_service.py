@@ -192,20 +192,28 @@ class MomentsService:
         moment.images = self._list_moment_images(prefix)
         return moment
 
-    def delete_moments(self, fm_key: FanMomentKey) -> list[str]:
+    def delete_moments(self, fm_key: FanMomentKey) -> bool:
         """
         Delete the moment folder from the S3 bucket.
         """
         if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
-            return []
+            return False
 
         prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
         keys = self._list_keys(prefix, include_folder_markers=True)
-        return self._delete_keys(keys)
+        if self._delete_keys(keys) is False:
+            return False
 
-    def _delete_moment_images(
-        self, fm_key: FanMomentKey, filenames: list[str]
-    ) -> list[str]:
+        date_prefix = f"{fm_key.moment_date}/"
+        remaining_date_keys = self._list_keys(
+            date_prefix, include_folder_markers=True
+        )
+        if remaining_date_keys == [date_prefix]:
+            return self._delete_keys([date_prefix])
+
+        return True
+
+    def _delete_moment_images(self, fm_key: FanMomentKey, filenames: list[str]) -> bool:
         """
         Delete selected image keys from one moment event prefix.
         """

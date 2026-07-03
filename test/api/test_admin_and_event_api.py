@@ -1565,7 +1565,7 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
             Record delete moment arguments.
             """
             captured["delete"] = fm_key
-            return ["2026-05-01/20/300/a.jpg"]
+            return True
 
     monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
     monkeypatch.setattr(admin_api, "MomentsService", FakeMomentsService)
@@ -1590,7 +1590,7 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
     assert add_response.status_code == 200
     assert parse_json_response(add_response) == ["2026-05-01/20/300/a.jpg"]
     assert delete_response.status_code == 200
-    assert parse_json_response(delete_response) == ["2026-05-01/20/300/a.jpg"]
+    assert parse_json_response(delete_response) is True
     add_key, add_filenames = captured["add"]
     delete_key = captured["delete"]
     assert (
