@@ -713,27 +713,37 @@ def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
     assert service.add_moments(fm_key, ["fan.jpg"]) == []
 
 
-def test_delete_moments_removes_files_from_event_prefix(monkeypatch):
+def test_delete_moments_removes_all_objects_under_event_prefix(monkeypatch):
     """
-    Test that delete_moments deletes keys beneath the event prefix.
+    Test that delete_moments deletes every key beneath the event prefix.
     """
-    fake_s3 = build_fake_s3(monkeypatch)
-
-    deleted = moments_service.MomentsService().delete_moments(
-        create_fan_moment_key(), ["fan.jpg", "nested/other.png"]
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-10/44/",
+            "2026-05-10/44/fan.jpg",
+            "2026-05-10/44/nested/other.png",
+            "2026-05-10/45/other-event.jpg",
+            "2026-05-11/44/other-date.jpg",
+        ]
     )
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+
+    deleted = moments_service.MomentsService().delete_moments(create_fan_moment_key())
 
     assert deleted == [
+        "2026-05-10/44/",
         "2026-05-10/44/fan.jpg",
-        "2026-05-10/44/other.png",
+        "2026-05-10/44/nested/other.png",
     ]
     assert fake_s3.deletes == [
         (
             "moments-bucket",
             {
                 "Objects": [
+                    {"Key": "2026-05-10/44/"},
                     {"Key": "2026-05-10/44/fan.jpg"},
-                    {"Key": "2026-05-10/44/other.png"},
+                    {"Key": "2026-05-10/44/nested/other.png"},
                 ],
                 "Quiet": True,
             },
@@ -749,19 +759,25 @@ def test_delete_moments_handles_none_missing_bucket_and_delete_errors(monkeypatc
 
     fm_key = create_fan_moment_key()
 
-    assert service.delete_moments(fm_key, None) == []
+    assert service.delete_moments(None) == []
+    fm_key.event_id = None
+    assert service.delete_moments(fm_key) == []
+    fm_key = create_fan_moment_key()
 
     monkeypatch.delenv("S3_BUCKET_MOMENTS", raising=False)
-    assert service.delete_moments(fm_key, ["fan.jpg"]) == []
+    assert service.delete_moments(fm_key) == []
 
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    service._list_keys = (  # pylint: disable=protected-access
+        lambda prefix="", include_folder_markers=False: ["2026-05-10/44/fan.jpg"]
+    )
     monkeypatch.setattr(
         moments_service.boto3,
         "client",
         lambda service_name: RaisingS3Client(fail_delete=True),
     )
 
-    assert service.delete_moments(fm_key, ["fan.jpg"]) == []
+    assert service.delete_moments(fm_key) == []
 
 
 def test_moment_listing_helpers_handle_pagination_and_errors(monkeypatch):

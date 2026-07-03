@@ -173,10 +173,11 @@ class MomentsService:
             if filename not in filenames:
                 delete_filenames.append(filename)
 
+        success = True
         if len(delete_filenames) > 0:
-            self.delete_moments(fm_key, delete_filenames)
+            success = self._delete_moment_images(fm_key, delete_filenames)
 
-        return True
+        return success
 
     def get_moment(self, fm_key: FanMomentKey) -> FanMoment | None:
         """
@@ -191,24 +192,56 @@ class MomentsService:
         moment.images = self._list_moment_images(prefix)
         return moment
 
-    def delete_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
+    def delete_moments(self, fm_key: FanMomentKey) -> list[str]:
         """
-        Delete photos from the moments S3 bucket.
+        Delete the moment folder from the S3 bucket.
         """
-        if filenames is None:
+        if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
             return []
 
-        deleted_keys: list[str] = []
-        bucket_name = self._get_bucket_name()
-        if bucket_name is None:
-            return deleted_keys
+        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
+        keys = self._list_keys(prefix, include_folder_markers=True)
+        return self._delete_keys(keys)
+
+    def _delete_moment_images(
+        self, fm_key: FanMomentKey, filenames: list[str]
+    ) -> list[str]:
+        """
+        Delete selected image keys from one moment event prefix.
+        """
+        if (
+            fm_key is None
+            or fm_key.moment_date is None
+            or fm_key.event_id is None
+            or filenames is None
+        ):
+            return []
 
         prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
-        objects = [
-            {"Key": f"{prefix}{os.path.basename(filename)}"} for filename in filenames
-        ]
-        s3_client = boto3.client("s3")
+        keys: list[str] = []
+        for filename in filenames:
+            if filename is None or len(str(filename).strip()) == 0:
+                continue
+            normalized_filename = str(filename).replace("\\", "/").lstrip("/")
+            keys.append(f"{prefix}{normalized_filename}")
+        return self._delete_keys(keys)
 
+    def _delete_keys(self, keys: list[str]) -> bool:
+        """
+        Delete S3 object keys from the moments bucket in batches.
+        """
+        deleted_keys: list[str] = []
+        if keys is None or len(keys) == 0:
+            return False
+
+        bucket_name = self._get_bucket_name()
+        if bucket_name is None:
+            return False
+
+        s3_client = boto3.client("s3")
+        objects = [{"Key": key} for key in keys]
+
+        success = True
         for index in range(0, len(objects), 1000):
             batch = objects[index : index + 1000]
             try:
@@ -221,8 +254,10 @@ class MomentsService:
             except Exception as error:  # pylint: disable=broad-exception-caught
                 error_message: str = str(error) + "\n" + traceback.format_exc()
                 logger.error("%s", error_message)
+                success = False
+                break
 
-        return deleted_keys
+        return success
 
     def get_available_moment_dates(self, seller_id: int = None) -> list[str]:
         """
@@ -327,7 +362,9 @@ class MomentsService:
             return ""
         return f"{start_date}/"
 
-    def _list_keys(self, prefix: str = "") -> list[str]:
+    def _list_keys(
+        self, prefix: str = "", include_folder_markers: bool = False
+    ) -> list[str]:
         """
         List all S3 object keys under a prefix.
         """
@@ -346,7 +383,7 @@ class MomentsService:
                     [
                         obj["Key"]
                         for obj in response.get("Contents", [])
-                        if not obj["Key"].endswith("/")
+                        if include_folder_markers or not obj["Key"].endswith("/")
                     ]
                 )
                 if response.get("IsTruncated") is not True:

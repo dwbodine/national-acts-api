@@ -1370,7 +1370,7 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
         ("/admin/faq/moveup", "post", {"faqId": "1"}),
         ("/admin/faq/update", "post", {"faqId": 1}),
         (
-            "/admin/fan-moments/add",
+            "/admin/moments/add",
             "post",
             {
                 "date": "2026-05-01",
@@ -1380,13 +1380,12 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
             },
         ),
         (
-            "/admin/fan-moments/delete",
+            "/admin/moments/delete",
             "post",
             {
                 "date": "2026-05-01",
                 "sellerId": 20,
                 "eventId": 300,
-                "filenames": ["a.jpg"],
             },
         ),
         ("/admin/notes/add", "post", {"note": "Hello", "eventId": 1}),
@@ -1445,7 +1444,7 @@ def test_admin_routes_require_admin_auth(
         ("/admin/orders/refund", {"orderId": 0}),
         ("/admin/featured-artists/order", []),
         (
-            "/admin/fan-moments/add",
+            "/admin/moments/add",
             {
                 "date": "",
                 "sellerId": 20,
@@ -1454,12 +1453,11 @@ def test_admin_routes_require_admin_auth(
             },
         ),
         (
-            "/admin/fan-moments/delete",
+            "/admin/moments/delete",
             {
                 "date": "2026-05-01",
                 "sellerId": 0,
                 "eventId": 300,
-                "filenames": ["a.jpg"],
             },
         ),
         ("/admin/pages/order", []),
@@ -1562,11 +1560,11 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
             captured["add"] = (fm_key, filenames)
             return ["2026-05-01/20/300/a.jpg"]
 
-        def delete_moments(self, fm_key, filenames):
+        def delete_moments(self, fm_key):
             """
             Record delete moment arguments.
             """
-            captured["delete"] = (fm_key, filenames)
+            captured["delete"] = fm_key
             return ["2026-05-01/20/300/a.jpg"]
 
     monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
@@ -1579,12 +1577,12 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
         "filenames": ["a.jpg", "b.jpg"],
     }
     add_response = client.post(
-        "/admin/fan-moments/add",
+        "/admin/moments/add",
         headers=auth_headers(),
         json=payload,
     )
     delete_response = client.post(
-        "/admin/fan-moments/delete",
+        "/admin/moments/delete",
         headers=auth_headers(),
         json=payload,
     )
@@ -1594,7 +1592,7 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
     assert delete_response.status_code == 200
     assert parse_json_response(delete_response) == ["2026-05-01/20/300/a.jpg"]
     add_key, add_filenames = captured["add"]
-    delete_key, delete_filenames = captured["delete"]
+    delete_key = captured["delete"]
     assert (
         add_key.moment_date,
         add_key.seller_id,
@@ -1605,8 +1603,7 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
         delete_key.moment_date,
         delete_key.seller_id,
         delete_key.event_id,
-        delete_filenames,
-    ) == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
+    ) == ("2026-05-01", 20, 300)
 
 
 def test_admin_update_tour_rejects_missing_converted_tour(

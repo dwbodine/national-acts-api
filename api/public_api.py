@@ -419,7 +419,7 @@ def get_all_moment_events():
     return convert_to_json(moment_events)
 
 
-@public_api.route("/public/fan-moments/filter")
+@public_api.route("/public/moments/filter")
 def get_filtered_moment_events():
     """
     API method to fetch fan moments by filter

@@ -945,6 +945,7 @@ def add_fan_moments():
     )
     return convert_to_json(success)
 
+
 @admin_api.route("/admin/moments/update", methods=["POST"])
 @jwt_required()
 def update_moment():
@@ -973,7 +974,7 @@ def delete_fan_moments():
         return {"msg": "Unauthorized"}, 401
 
     moment_date: str = get_override_string_value_or_default(
-        request.json.get("date", None), default=None
+        request.json.get("momentDate", None), default=None
     )
 
     seller_id: int = get_override_int_value_or_default(
@@ -984,8 +985,6 @@ def delete_fan_moments():
         request.json.get("eventId", None), default=None
     )
 
-    filenames: list[str] = request.json.get("filenames", [])
-
     if (
         seller_id is None
         or seller_id <= 0
@@ -993,13 +992,11 @@ def delete_fan_moments():
         or event_id <= 0
         or moment_date is None
         or len(moment_date) == 0
-        or filenames is None
-        or len(filenames) == 0
     ):
         return {"msg": "Bad Request"}, 400
 
     service = MomentsService()
     success = service.delete_moments(
-        _build_fan_moment_key(moment_date, seller_id, event_id), filenames
+        _build_fan_moment_key(moment_date, seller_id, event_id)
     )
     return convert_to_json(success)
