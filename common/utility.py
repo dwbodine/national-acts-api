@@ -18,6 +18,7 @@ from PIL import Image
 
 from common.constants import (
     EVENT_THUMBNAIL_IMAGE_WIDTH,
+    FAN_MOMENT_IMAGE_WIDTH,
     FEATURED_ARTIST_IMAGE_WIDTH,
     HEADER_IMAGE_WIDTH,
     HOMEBANNER_IMAGE_WIDTH,
@@ -95,7 +96,11 @@ def convert_json_to_snake_case_object(request_json: any, typed_object: any):
 
 
 def resize_and_move_temp_file_to_s3(
-    temp_filename: str, bucket_name: str, max_width: int, is_png: bool = False
+    temp_filename: str,
+    bucket_name: str,
+    max_width: int,
+    is_png: bool = False,
+    subfolder: str = None,
 ) -> str:
     """
     Move a file from the API /tmp directory to an AWS S3 bucket
@@ -116,7 +121,7 @@ def resize_and_move_temp_file_to_s3(
     image_file = resize_tmp_image(temp_filename, max_width)
 
     if image_file is not None:
-        filename = image_file
+        filename = get_s3_file_key(image_file, subfolder)
         origin_file = os.path.join(temp_dir, image_file)
 
         # only attempt upload if we can find the resized temp file
@@ -130,7 +135,7 @@ def resize_and_move_temp_file_to_s3(
             try:
                 # upload to s3
                 s3_client.upload_file(
-                    origin_file, bucket_name, image_file, ExtraArgs=extra_args
+                    origin_file, bucket_name, filename, ExtraArgs=extra_args
                 )
                 # delete the temp file
                 os.remove(origin_file)
@@ -139,7 +144,21 @@ def resize_and_move_temp_file_to_s3(
                 error_message: str = str(error) + "\n" + traceback.format_exc()
                 logger.error("%s", error_message)
 
-    return filename
+    return image_file
+
+
+def get_s3_file_key(filename: str, subfolder: str = None) -> str:
+    """
+    Build a S3 object key, using a slash-delimited prefix when provided.
+    """
+    if subfolder is None or len(subfolder.strip()) == 0:
+        return filename
+
+    subfolder_parts = [part.strip() for part in subfolder.split("/") if part.strip()]
+    if len(subfolder_parts) == 0:
+        return filename
+
+    return "/".join([*subfolder_parts, filename])
 
 
 def list_s3_images(bucket_name: str):
@@ -626,6 +645,8 @@ def get_bucket_name_from_image_type(  # pylint: disable=too-many-return-statemen
             return os.getenv("S3_BUCKET_THUMBNAILS")
         case ImageType.FEATURED_ARTISTS:
             return os.getenv("S3_BUCKET_FEATURED_ARTISTS")
+        case ImageType.FAN_MOMENTS:
+            return os.getenv("S3_BUCKET_MOMENTS")
         case _:
             return None
 
@@ -651,6 +672,8 @@ def get_image_width_from_image_type(  # pylint: disable=too-many-return-statemen
             return EVENT_THUMBNAIL_IMAGE_WIDTH
         case ImageType.FEATURED_ARTISTS:
             return FEATURED_ARTIST_IMAGE_WIDTH
+        case ImageType.FAN_MOMENTS:
+            return FAN_MOMENT_IMAGE_WIDTH
         case _:
             return 0
 

@@ -120,6 +120,108 @@ def test_admin_update_page_order_converts_payload_to_pages(
     assert captured["pages"][0].page_order == 3
 
 
+def test_admin_featured_artist_routes_forward_service_requests(
+    monkeypatch, client, auth_headers, parse_json_response
+):
+    """
+    Map featured artist payloads and return featured artist service data.
+    """
+    captured = {}
+
+    class FakePageService:
+        """
+        Fake page service for featured artist admin routes.
+        """
+
+        def update_featured_artist_order(self, featured_artists):
+            """
+            Record featured artist order updates.
+            """
+            captured["order"] = featured_artists
+            return True
+
+        def get_page_sellers(self):
+            """
+            Return page sellers available for featured artists.
+            """
+            return [{"pageSellerId": 12, "displayName": "VIP Seller"}]
+
+        def update_featured_artist(self, featured_artist):
+            """
+            Record a featured artist update.
+            """
+            captured["artist"] = featured_artist
+            return {"featuredArtistId": featured_artist.featured_artist_id}
+
+    monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
+    monkeypatch.setattr(admin_api, "PageService", FakePageService)
+
+    order_response = client.post(
+        "/admin/featured-artists/order",
+        headers=auth_headers(),
+        json=[
+            {
+                "featuredArtistId": 3,
+                "featuredArtistOrder": 2,
+                "pageSellerId": 12,
+                "title": "Ada Beats",
+            }
+        ],
+    )
+    sellers_response = client.get(
+        "/admin/featured-artists/page-sellers",
+        headers=auth_headers(),
+    )
+    update_response = client.post(
+        "/admin/featured-artists/update",
+        headers=auth_headers(),
+        json={
+            "featuredArtistId": 3,
+            "featuredArtistOrder": 4,
+            "pageSellerId": 12,
+            "title": "Ada Beats",
+        },
+    )
+
+    assert order_response.status_code == 200
+    assert parse_json_response(order_response) is True
+    assert captured["order"][0].featured_artist_id == 3
+    assert captured["order"][0].featured_artist_order == 2
+    assert captured["order"][0].page_seller_id == 12
+    assert captured["order"][0].title == "Ada Beats"
+    assert sellers_response.status_code == 200
+    assert parse_json_response(sellers_response) == [
+        {"pageSellerId": 12, "displayName": "VIP Seller"}
+    ]
+    assert update_response.status_code == 200
+    assert parse_json_response(update_response) == {"featuredArtistId": 3}
+    assert captured["artist"].featured_artist_id == 3
+    assert captured["artist"].featured_artist_order == 4
+
+
+def test_admin_featured_artist_order_returns_false_when_no_artists_are_mapped(
+    monkeypatch, client, auth_headers, parse_json_response
+):
+    """
+    Return false when no featured artist order payloads can be converted.
+    """
+    monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
+    monkeypatch.setattr(
+        admin_api,
+        "convert_json_to_snake_case_object",
+        lambda item, model: None,
+    )
+
+    response = client.post(
+        "/admin/featured-artists/order",
+        headers=auth_headers(),
+        json=[{"featuredArtistId": 3}],
+    )
+
+    assert response.status_code == 200
+    assert parse_json_response(response) is False
+
+
 def test_admin_update_tour_uses_add_for_new_tour(
     monkeypatch, client, auth_headers, parse_json_response
 ):
@@ -1252,10 +1354,40 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
         ("/admin/events/sendListToBand", "post", {"eventId": 1}),
         ("/admin/events/ticketSocketOnly?sellerId=1", "get", None),
         ("/admin/events/update", "post", {"ticketSocketEventId": 1}),
+        (
+            "/admin/featured-artists/order",
+            "post",
+            [{"featuredArtistId": 1}],
+        ),
+        ("/admin/featured-artists/page-sellers", "get", None),
+        (
+            "/admin/featured-artists/update",
+            "post",
+            {"featuredArtistId": 1},
+        ),
         ("/admin/faq/delete", "post", {"faqId": "1"}),
         ("/admin/faq/movedown", "post", {"faqId": "1"}),
         ("/admin/faq/moveup", "post", {"faqId": "1"}),
         ("/admin/faq/update", "post", {"faqId": 1}),
+        (
+            "/admin/moments/add",
+            "post",
+            {
+                "date": "2026-05-01",
+                "sellerId": 20,
+                "eventId": 300,
+                "filenames": ["a.jpg"],
+            },
+        ),
+        (
+            "/admin/moments/delete",
+            "post",
+            {
+                "date": "2026-05-01",
+                "sellerId": 20,
+                "eventId": 300,
+            },
+        ),
         ("/admin/notes/add", "post", {"note": "Hello", "eventId": 1}),
         ("/admin/notes/calendar?start=1&end=2", "get", None),
         ("/admin/notes/delete", "post", {"noteId": 1}),
@@ -1310,6 +1442,24 @@ def test_admin_routes_require_admin_auth(
         ("/admin/notes/add", {"calendarDate": "2026-04-24"}),
         ("/admin/notes/delete", {"noteId": 0}),
         ("/admin/orders/refund", {"orderId": 0}),
+        ("/admin/featured-artists/order", []),
+        (
+            "/admin/moments/add",
+            {
+                "date": "",
+                "sellerId": 20,
+                "eventId": 300,
+                "filenames": ["a.jpg"],
+            },
+        ),
+        (
+            "/admin/moments/delete",
+            {
+                "date": "2026-05-01",
+                "sellerId": 0,
+                "eventId": 300,
+            },
+        ),
         ("/admin/pages/order", []),
         ("/admin/settings/update", []),
     ],
@@ -1388,6 +1538,72 @@ def test_admin_update_page_order_returns_false_when_no_pages_are_mapped(
 
     assert response.status_code == 200
     assert parse_json_response(response) is False
+
+
+def test_admin_moments_add_and_delete_forward_valid_payloads(
+    monkeypatch, client, auth_headers, parse_json_response
+):
+    """
+    Validate fan moment payloads and forward add/delete requests to the service.
+    """
+    captured = {}
+
+    class FakeMomentsService:
+        """
+        Fake moments service for admin route tests.
+        """
+
+        def add_moments(self, fm_key, filenames):
+            """
+            Record add moment arguments.
+            """
+            captured["add"] = (fm_key, filenames)
+            return ["2026-05-01/20/300/a.jpg"]
+
+        def delete_moments(self, fm_key):
+            """
+            Record delete moment arguments.
+            """
+            captured["delete"] = fm_key
+            return True
+
+    monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
+    monkeypatch.setattr(admin_api, "MomentsService", FakeMomentsService)
+
+    payload = {
+        "date": "2026-05-01",
+        "sellerId": "20",
+        "eventId": "300",
+        "filenames": ["a.jpg", "b.jpg"],
+    }
+    add_response = client.post(
+        "/admin/moments/add",
+        headers=auth_headers(),
+        json=payload,
+    )
+    delete_response = client.post(
+        "/admin/moments/delete",
+        headers=auth_headers(),
+        json=payload,
+    )
+
+    assert add_response.status_code == 200
+    assert parse_json_response(add_response) == ["2026-05-01/20/300/a.jpg"]
+    assert delete_response.status_code == 200
+    assert parse_json_response(delete_response) is True
+    add_key, add_filenames = captured["add"]
+    delete_key = captured["delete"]
+    assert (
+        add_key.moment_date,
+        add_key.seller_id,
+        add_key.event_id,
+        add_filenames,
+    ) == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
+    assert (
+        delete_key.moment_date,
+        delete_key.seller_id,
+        delete_key.event_id,
+    ) == ("2026-05-01", 20, 300)
 
 
 def test_admin_update_tour_rejects_missing_converted_tour(

@@ -6,6 +6,7 @@ from datetime import datetime
 import pytz
 
 from common.calendar_service import CalendarService
+from common.constants import DEFAULT_COUNTRY_ID
 from common.dashboard_service import DashboardService
 from common.db import (
     db_insert,
@@ -725,3 +726,24 @@ class EventService:
             recent_tours.append(tour)
 
         return recent_tours
+
+    def get_location_from_event(self, evt: VipEvent) -> str:
+        """
+        Returns a string location including venue name from a VipEvent object
+        """
+        if evt is None or evt.venue is None:
+            return None
+
+        venue = evt.venue
+        location = f"{venue.name}, {venue.city}"
+        if venue.state is not None:
+            location += f", {venue.state}"
+
+        if (
+            venue.country is not None
+            and venue.country.country_name is not None
+            and venue.country.country_id != DEFAULT_COUNTRY_ID
+        ):
+            location += f", {venue.country.country_name}"
+
+        return location

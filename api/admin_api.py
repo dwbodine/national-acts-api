@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """
 Admin API routes
 """
@@ -13,11 +14,14 @@ from common.common_api import is_admin_logged_in
 from common.faq_service import FaqService
 from common.models.admin import (
     ExternalVenue,
+    FanMoment,
     Faq,
+    FanMomentKey,
     FeaturedArtist,
     Page,
     SiteSetting,
 )
+from common.moments_service import MomentsService
 from common.order_service import OrderService
 from common.page_service import PageService
 from common.role_service import RoleService
@@ -40,6 +44,19 @@ from common.models.national_acts import (
 from common.models.user import User, Role
 
 admin_api = Blueprint("admin_api", __name__)
+
+
+def _build_fan_moment_key(
+    moment_date: str, seller_id: int, event_id: int
+) -> FanMomentKey:
+    """
+    Build a fan moment key object without requiring a model constructor.
+    """
+    fm_key = FanMomentKey()
+    fm_key.moment_date = moment_date
+    fm_key.seller_id = seller_id
+    fm_key.event_id = event_id
+    return fm_key
 
 
 @admin_api.route("/admin/countries")
@@ -884,4 +901,103 @@ def delete_venue():
 
     service = AdminService()
     success = service.delete_external_venue(venue_id)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/moments/add", methods=["POST"])
+@jwt_required()
+def add_fan_moments():
+    """
+    API method to add fan moments
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    moment_date: str = get_override_string_value_or_default(
+        request.json.get("date", None), default=None
+    )
+
+    seller_id: int = get_override_int_value_or_default(
+        request.json.get("sellerId", None), default=None
+    )
+
+    event_id: int = get_override_int_value_or_default(
+        request.json.get("eventId", None), default=None
+    )
+
+    filenames: list[str] = request.json.get("filenames", [])
+
+    if (
+        seller_id is None
+        or seller_id <= 0
+        or event_id is None
+        or event_id <= 0
+        or moment_date is None
+        or len(moment_date) == 0
+        or filenames is None
+        or len(filenames) == 0
+    ):
+        return {"msg": "Bad Request"}, 400
+
+    service = MomentsService()
+    success = service.add_moments(
+        _build_fan_moment_key(moment_date, seller_id, event_id), filenames
+    )
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/moments/update", methods=["POST"])
+@jwt_required()
+def update_moment():
+    """
+    API method to update moment
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    moment = convert_json_to_snake_case_object(request.get_json(), FanMoment())
+
+    service = MomentsService()
+    success = service.update_moment(moment)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/moments/delete", methods=["POST"])
+@jwt_required()
+def delete_fan_moments():
+    """
+    API method to delete fan moments
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    moment_date: str = get_override_string_value_or_default(
+        request.json.get("momentDate", None), default=None
+    )
+
+    seller_id: int = get_override_int_value_or_default(
+        request.json.get("sellerId", None), default=None
+    )
+
+    event_id: int = get_override_int_value_or_default(
+        request.json.get("eventId", None), default=None
+    )
+
+    if (
+        seller_id is None
+        or seller_id <= 0
+        or event_id is None
+        or event_id <= 0
+        or moment_date is None
+        or len(moment_date) == 0
+    ):
+        return {"msg": "Bad Request"}, 400
+
+    service = MomentsService()
+    success = service.delete_moments(
+        _build_fan_moment_key(moment_date, seller_id, event_id)
+    )
     return convert_to_json(success)

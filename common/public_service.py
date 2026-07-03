@@ -24,7 +24,7 @@ class PublicService:
     """
 
     def upload_image_to_bucket(
-        self, request: Request, bucket_name: str, max_width: int
+        self, request: Request, bucket_name: str, max_width: int, subfolder: str = None
     ) -> str:
         """
         Uploads a file to the specified S3 bucket
@@ -54,7 +54,7 @@ class PublicService:
             is_png = temp_filename.endswith(".png")
 
             filename = resize_and_move_temp_file_to_s3(
-                temp_filename, bucket_name, max_width, is_png
+                temp_filename, bucket_name, max_width, is_png, subfolder
             )
 
         except Exception as error:  # pylint: disable=broad-exception-caught

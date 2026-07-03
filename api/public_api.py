@@ -9,6 +9,7 @@ from common.admin_service import AdminService
 from common.constants import ImageType
 from common.event_service import EventService
 from common.faq_service import FaqService
+from common.moments_service import MomentsService
 from common.page_service import PageService
 from common.public_service import PublicService
 from common.seller_service import SellerService
@@ -287,9 +288,12 @@ def upload_image(image_type_str: str):
 
     bucket_name = get_bucket_name_from_image_type(image_type)
     max_width = get_image_width_from_image_type(image_type)
+    subfolder: str = get_override_string_value_or_default(request.args.get("subfolder"))
 
     service = PublicService()
-    filename: str = service.upload_image_to_bucket(request, bucket_name, max_width)
+    filename: str = service.upload_image_to_bucket(
+        request, bucket_name, max_width, subfolder
+    )
     return convert_to_json(filename)
 
 
@@ -348,3 +352,104 @@ def add_or_confirm_subscriber():
     sender_service = SenderApiService()
     subscriber_id = sender_service.add_subscriber_from_email(email)
     return convert_to_json(subscriber_id)
+
+
+@public_api.route("/public/getAllMomentDates")
+def get_all_moment_dates():
+    """
+    API method to fetch all moment dates
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    seller_id: int = get_override_int_value_or_default(
+        request.args.get("seller_id"), default=None
+    )
+
+    moments_service = MomentsService()
+    moment_dates = moments_service.get_available_moment_dates(seller_id)
+    return convert_to_json(moment_dates)
+
+
+@public_api.route("/public/getAllMomentSellers")
+def get_all_moment_sellers():
+    """
+    API method to fetch all moment sellers
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    moment_date: str = get_override_string_value_or_default(request.args.get("date"))
+
+    moments_service = MomentsService()
+    moment_sellers = moments_service.get_available_moment_sellers(moment_date)
+    return convert_to_json(moment_sellers)
+
+
+@public_api.route("/public/getAllMomentEvents")
+def get_all_moment_events():
+    """
+    API method to fetch all moment events
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    moment_date: str = get_override_string_value_or_default(request.args.get("date"))
+
+    seller_id: int = get_override_int_value_or_default(
+        request.args.get("sellerId"), default=None
+    )
+
+    moments_service = MomentsService()
+    moment_events = moments_service.get_available_moment_events(moment_date, seller_id)
+    return convert_to_json(moment_events)
+
+
+@public_api.route("/public/moments/filter")
+def get_filtered_moment_events():
+    """
+    API method to fetch fan moments by filter
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    start_date: str = get_override_string_value_or_default(
+        request.args.get("startDate")
+    )
+    end_date: str = get_override_string_value_or_default(request.args.get("endDate"))
+
+    seller_id: int = get_override_int_value_or_default(
+        request.args.get("sellerId"), default=None
+    )
+
+    event_id: int = get_override_int_value_or_default(
+        request.args.get("eventId"), default=None
+    )
+
+    if event_id is None and seller_id is None and start_date is None:
+        return {"msg": "Bad Request"}, 400
+
+    moments_service = MomentsService()
+    fan_moments = moments_service.filter_moments(
+        start_date=start_date,
+        end_date=end_date,
+        seller_id=seller_id,
+        event_id=event_id,
+    )
+    return convert_to_json(fan_moments)
