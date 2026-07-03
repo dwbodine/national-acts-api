@@ -870,9 +870,7 @@ def test_moment_helper_branches(monkeypatch, workspace_tmp_path):
     assert (  # pylint: disable=protected-access
         service._build_filter_prefix("2026-05-01", "2026-05-01", 300) == ""
     )
-    assert (
-        service._build_filter_prefix("2026-05-01", "2026-05-02") == ""
-    )
+    assert service._build_filter_prefix("2026-05-01", "2026-05-02") == ""
     assert service._build_filter_prefix(event_id=300) == ""
     assert service._get_upload_path(None) is None  # pylint: disable=protected-access
     monkeypatch.delenv("API_FILE_PATH", raising=False)

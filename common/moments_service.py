@@ -205,9 +205,7 @@ class MomentsService:
             return False
 
         date_prefix = f"{fm_key.moment_date}/"
-        remaining_date_keys = self._list_keys(
-            date_prefix, include_folder_markers=True
-        )
+        remaining_date_keys = self._list_keys(date_prefix, include_folder_markers=True)
         if remaining_date_keys == [date_prefix]:
             return self._delete_keys([date_prefix])
 
