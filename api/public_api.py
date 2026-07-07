@@ -3,6 +3,7 @@ Public API routes
 """
 
 import os
+from datetime import datetime, timedelta
 from flask import Blueprint, request
 
 from common.admin_service import AdminService
@@ -433,6 +434,10 @@ def get_filtered_moment_events():
         request.args.get("startDate")
     )
     end_date: str = get_override_string_value_or_default(request.args.get("endDate"))
+    if start_date is not None and end_date is None:
+        end_date = (
+            datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=1)
+        ).strftime("%Y-%m-%d")
 
     seller_id: int = get_override_int_value_or_default(
         request.args.get("sellerId"), default=None
@@ -441,9 +446,6 @@ def get_filtered_moment_events():
     event_id: int = get_override_int_value_or_default(
         request.args.get("eventId"), default=None
     )
-
-    if event_id is None and seller_id is None and start_date is None:
-        return {"msg": "Bad Request"}, 400
 
     moments_service = MomentsService()
     fan_moments = moments_service.filter_moments(

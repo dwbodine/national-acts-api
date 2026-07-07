@@ -265,13 +265,7 @@ def test_public_moment_routes_forward_filters_and_return_results(
             Record the date and seller filters for available events.
             """
             captured["events"] = (moment_date, seller_id)
-            return [
-                SimpleNamespace(
-                    external_event_id=300,
-                    event_date="2026-05-01",
-                    title="VIP Night",
-                )
-            ]
+            return [SimpleNamespace(event_id=300, location="VIP Night Location")]
 
         def filter_moments(
             self, start_date=None, end_date=None, seller_id=None, event_id=None
@@ -320,11 +314,7 @@ def test_public_moment_routes_forward_filters_and_return_results(
     ]
     assert events_response.status_code == 200
     assert parse_json_response(events_response) == [
-        {
-            "externalEventId": 300,
-            "eventDate": "2026-05-01",
-            "title": "VIP Night",
-        }
+        {"eventId": 300, "location": "VIP Night Location"}
     ]
     assert filter_response.status_code == 200
     assert parse_json_response(filter_response) == [
@@ -354,6 +344,41 @@ def test_public_moment_filter_requires_start_date_without_event_id(monkeypatch, 
 
     assert response.status_code == 400
     assert response.get_json() == {"msg": "Bad Request"}
+
+
+def test_public_moment_filter_defaults_end_date_to_next_day(
+    monkeypatch, client, parse_json_response
+):
+    """
+    Default endDate to 24 hours after startDate when omitted.
+    """
+    captured = {}
+
+    class FakeMomentsService:
+        """
+        Fake moments service for default end-date route tests.
+        """
+
+        def filter_moments(
+            self, start_date=None, end_date=None, seller_id=None, event_id=None
+        ):
+            """
+            Record fan moment filters.
+            """
+            captured["filter"] = (start_date, end_date, seller_id, event_id)
+            return []
+
+    monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
+    monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
+
+    response = client.get(
+        "/public/moments/filter?startDate=2026-05-01&sellerId=20",
+        headers={"x-api-key": "public-key"},
+    )
+
+    assert response.status_code == 200
+    assert parse_json_response(response) == []
+    assert captured["filter"] == ("2026-05-01", "2026-05-02", 20, None)
 
 
 def test_public_moment_filter_allows_event_id_without_start_date(

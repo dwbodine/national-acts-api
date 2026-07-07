@@ -289,33 +289,68 @@ def test_get_available_moment_sellers_can_filter_by_date_and_sort_by_name(
     ]
 
 
-def test_get_available_moment_events_returns_distinct_events_sorted_by_date_and_title(
+def test_get_available_moment_events_returns_distinct_events_sorted_by_id(
     monkeypatch,
 ):
     """
-    Test that events are collected distinctly and sorted by date and title.
+    Test that event options are collected distinctly from S3 keys and sorted by id.
     """
     build_fake_s3(monkeypatch)
     monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
     service = moments_service.MomentsService()
 
     assert [
-        (evt.external_event_id, evt.event_date, evt.title)
-        for evt in service.get_available_moment_events()
+        (event.event_id, event.location)
+        for event in service.get_available_moment_events()
     ] == [
-        (100, "2026-04-30", "Delta Event"),
-        (300, "2026-05-01", "Alpha Event"),
-        (200, "2026-05-01", "Zephyr Event"),
-        (400, "2026-05-02", "Bravo Event"),
+        (100, "Delta Event Location"),
+        (200, "Zephyr Event Location"),
+        (300, "Alpha Event Location"),
+        (400, "Bravo Event Location"),
     ]
     assert [
-        evt.external_event_id
-        for evt in service.get_available_moment_events(seller_id=20)
-    ] == [300, 400]
+        (event.event_id, event.location)
+        for event in service.get_available_moment_events(seller_id=20)
+    ] == [
+        (300, "Alpha Event Location"),
+        (400, "Bravo Event Location"),
+    ]
     assert [
-        evt.external_event_id
-        for evt in service.get_available_moment_events("2026-05-01", 20)
-    ] == [300]
+        (event.event_id, event.location)
+        for event in service.get_available_moment_events("2026-05-01", 20)
+    ] == [(300, "Alpha Event Location")]
+
+
+def test_get_available_moment_events_keeps_ids_with_missing_event_details(monkeypatch):
+    """
+    Test unfiltered event discovery keeps S3 ids when details are missing.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-01/999/a.jpg",
+            "2026-05-01/300/b.jpg",
+            "2026-05-02/999/c.jpg",
+        ]
+    )
+
+    class MissingEventService:
+        """
+        Return no event details for S3 event ids.
+        """
+
+        def get_events_and_orders(
+            self, event_id=None, get_orders=False, is_public=False
+        ):
+            return []
+
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    monkeypatch.setattr(moments_service, "EventService", MissingEventService)
+
+    assert [
+        (event.event_id, event.location)
+        for event in moments_service.MomentsService().get_available_moment_events()
+    ] == [(300, None), (999, None)]
 
 
 def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
@@ -400,6 +435,63 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
         ("2026-05-01", 20, 300, ["b.jpg"]),
         ("2026-05-01", 10, 200, ["a.jpg"]),
         ("2026-05-02", 20, 400, ["d.jpg"]),
+    ]
+
+
+def test_filter_moments_without_filters_returns_eight_most_recent(monkeypatch):
+    """
+    Test unfiltered fan moments return only the eight newest event groups.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            f"2026-05-{day:02d}/{100 + day}/fan.jpg"
+            for day in range(1, 11)
+        ]
+    )
+
+    class RecentSeller:
+        """
+        Test seller lookup for recent moment sorting.
+        """
+
+        def __init__(self, seller_id, get_event_categories=True):
+            self.name = f"Seller {seller_id}"
+
+    class RecentEventService:
+        """
+        Test event details for recent moment sorting.
+        """
+
+        def get_events_and_orders(
+            self, event_id=None, get_orders=False, is_public=False
+        ):
+            return [
+                SimpleNamespace(
+                    external_event_id=event_id,
+                    seller_id=20,
+                    title=f"Event {event_id}",
+                )
+            ]
+
+        def get_location_from_event(self, evt):
+            return None
+
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    monkeypatch.setattr(moments_service, "Seller", RecentSeller)
+    monkeypatch.setattr(moments_service, "EventService", RecentEventService)
+
+    moments = moments_service.MomentsService().filter_moments()
+
+    assert [(m.moment_date, m.event_id) for m in moments] == [
+        ("2026-05-10", 110),
+        ("2026-05-09", 109),
+        ("2026-05-08", 108),
+        ("2026-05-07", 107),
+        ("2026-05-06", 106),
+        ("2026-05-05", 105),
+        ("2026-05-04", 104),
+        ("2026-05-03", 103),
     ]
 
 
@@ -988,11 +1080,10 @@ def test_available_seller_and_event_helpers_skip_invalid_keys(monkeypatch):
 
     assert service.get_available_moment_sellers("2026-05-01") == [20]
 
-    monkeypatch.setattr(
-        service, "_get_events_from_ids", lambda event_ids: sorted(event_ids)
-    )
-
-    assert service.get_available_moment_events("2026-05-01", 20) == [300]
+    events = service.get_available_moment_events("2026-05-01", 20)
+    assert [(event.event_id, event.location) for event in events] == [
+        (300, "Alpha Event Location")
+    ]
 
 
 def test_get_events_from_ids_skips_missing_events_and_sorts_none_values(monkeypatch):

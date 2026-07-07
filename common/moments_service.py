@@ -10,7 +10,7 @@ import traceback
 import boto3
 
 from common.event_service import EventService
-from common.models.admin import FanMoment, FanMomentKey
+from common.models.admin import FanMoment, FanMomentEvent, FanMomentKey
 from common.models.national_acts import Seller, VipEvent
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,12 @@ class MomentsService:
         """
         Get fan moment photo objects from the moments S3 bucket by filter criteria.
         """
+        is_unfiltered = (
+            start_date is None
+            and end_date is None
+            and seller_id is None
+            and event_id is None
+        )
         moments: list[FanMoment] = []
         seller_names_by_id: dict[int, str] = {}
         event_details_by_id: dict[int, tuple[int, str, str]] = {}
@@ -94,6 +100,15 @@ class MomentsService:
             moment.images = images
             moments.append(moment)
 
+        if is_unfiltered:
+            return self._sort_recent_moments(moments)[:8]
+
+        return self._sort_moments(moments)
+
+    def _sort_moments(self, moments: list[FanMoment]) -> list[FanMoment]:
+        """
+        Sort fan moments by date, seller name, and event title.
+        """
         return sorted(
             moments,
             key=lambda moment: (
@@ -104,6 +119,22 @@ class MomentsService:
                 moment.event_title is None,
                 moment.event_title.lower() if moment.event_title is not None else "",
             ),
+        )
+
+    def _sort_recent_moments(self, moments: list[FanMoment]) -> list[FanMoment]:
+        """
+        Sort fan moments from newest to oldest moment date.
+        """
+        return sorted(
+            moments,
+            key=lambda moment: (
+                moment.moment_date or "",
+                moment.seller_name is None,
+                moment.seller_name.lower() if moment.seller_name is not None else "",
+                moment.event_title is None,
+                moment.event_title.lower() if moment.event_title is not None else "",
+            ),
+            reverse=True,
         )
 
     def add_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
@@ -316,11 +347,11 @@ class MomentsService:
 
     def get_available_moment_events(
         self, moment_date: str = None, seller_id: int = None
-    ) -> list[VipEvent]:
+    ) -> list[FanMomentEvent]:
         """
-        Get all available moment events, possibly filtered by date and/or seller id
+        Get all available moment events, possibly filtered by date and/or seller id.
         """
-        event_ids = set()
+        event_ids: set[int] = set()
         keys = self._list_keys(f"{moment_date}/" if moment_date is not None else "")
         event_details_by_id: dict[int, tuple[int, str, str]] = {}
         event_service = EventService()
@@ -335,7 +366,10 @@ class MomentsService:
                 continue
             event_ids.add(fm_key.event_id)
 
-        return self._get_events_from_ids(event_ids)
+        return [
+            FanMomentEvent(event_id, event_details_by_id[event_id][2])
+            for event_id in sorted(event_ids)
+        ]
 
     def _get_bucket_name(self) -> str:
         """

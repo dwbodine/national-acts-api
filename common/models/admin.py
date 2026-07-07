@@ -236,3 +236,13 @@ class FanMoment:
         Event location from the grouped S3 key.
         """
         return self.key.event_location if self.key is not None else None
+
+
+class FanMomentEvent:
+    """
+    Model for available fan moment events.
+    """
+
+    def __init__(self, event_id: int = None, location: str = None):
+        self.event_id = event_id
+        self.location = location
