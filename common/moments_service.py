@@ -9,6 +9,15 @@ import traceback
 
 import boto3
 
+from common.constants import DEFAULT_COUNTRY_ID
+from common.db import (
+    db_convert_list_to_parameters,
+    db_delete,
+    db_insert,
+    db_query_all,
+    db_query_one,
+    db_update,
+)
 from common.event_service import EventService
 from common.models.admin import FanMoment, FanMomentEvent, FanMomentKey
 from common.models.national_acts import Seller, VipEvent
@@ -38,11 +47,6 @@ class MomentsService:
             and seller_id is None
             and event_id is None
         )
-        moments: list[FanMoment] = []
-        seller_names_by_id: dict[int, str] = {}
-        event_details_by_id: dict[int, tuple[int, str, str]] = {}
-        event_service = EventService()
-
         if event_id is not None:
             start_date = None
             end_date = None
@@ -51,75 +55,15 @@ class MomentsService:
             start_date = None
             end_date = None
 
-        if seller_id is not None:
-            self._prefill_event_details_by_seller(
-                seller_id, event_service, event_details_by_id
-            )
-
-        matching_prefixes = self._list_matching_event_prefixes(
-            start_date, end_date, event_id
+        moments = self._list_matching_fan_moments(
+            start_date,
+            end_date,
+            seller_id,
+            event_id,
+            limit=8 if is_unfiltered else None,
         )
-        if seller_id is not None:
-            matching_prefixes = self._filter_event_prefixes_to_known_events(
-                matching_prefixes, event_details_by_id
-            )
 
-        for event_prefix in matching_prefixes:
-            fm_key = self._parse_fan_moment_prefix(event_prefix)
-            if fm_key is None:
-                continue
-
-            event_seller_id, event_title, event_location = self._get_event_details(
-                fm_key.event_id, event_service, event_details_by_id
-            )
-            fm_key.seller_id = event_seller_id
-
-            if not self._is_parsed_moment_match(
-                fm_key, start_date, end_date, seller_id, event_id
-            ):
-                continue
-
-            images = self._list_moment_images(event_prefix)
-            if len(images) == 0:
-                continue
-
-            seller_name: str = None
-            if fm_key.seller_id is not None:
-                if fm_key.seller_id not in seller_names_by_id:
-                    seller = Seller(fm_key.seller_id, get_event_categories=False)
-                    seller_names_by_id[fm_key.seller_id] = (
-                        seller.name if seller is not None else None
-                    )
-                seller_name = seller_names_by_id[fm_key.seller_id]
-
-            fm_key.seller_name = seller_name
-            fm_key.event_title = event_title
-            fm_key.event_location = event_location
-            moment = FanMoment()
-            moment.key = fm_key
-            moment.images = images
-            moments.append(moment)
-
-        if is_unfiltered:
-            return self._sort_recent_moments(moments)[:8]
-
-        return self._sort_moments(moments)
-
-    def _sort_moments(self, moments: list[FanMoment]) -> list[FanMoment]:
-        """
-        Sort fan moments by date, seller name, and event title.
-        """
-        return sorted(
-            moments,
-            key=lambda moment: (
-                moment.moment_date is None,
-                moment.moment_date or "",
-                moment.seller_name is None,
-                moment.seller_name.lower() if moment.seller_name is not None else "",
-                moment.event_title is None,
-                moment.event_title.lower() if moment.event_title is not None else "",
-            ),
-        )
+        return moments
 
     def _sort_recent_moments(self, moments: list[FanMoment]) -> list[FanMoment]:
         """
@@ -137,41 +81,183 @@ class MomentsService:
             reverse=True,
         )
 
-    def add_moments(self, fm_key: FanMomentKey, filenames: list[str]) -> list[str]:
+    def _list_matching_fan_moments(
+        self,
+        start_date: str = None,
+        end_date: str = None,
+        seller_id: int = None,
+        event_id: int = None,
+        limit: int = None,
+    ) -> list[FanMoment]:
         """
-        Add photos to the moments S3 bucket.
+        List fan moments from the FanMoments database index.
         """
-        if filenames is None:
+        rows = self._list_matching_fan_moment_rows(
+            start_date, end_date, seller_id, event_id, limit
+        )
+        if len(rows) == 0:
             return []
 
-        uploaded_keys: list[str] = []
-        bucket_name = self._get_bucket_name()
-        if bucket_name is None:
-            return uploaded_keys
+        fan_moment_ids = [
+            self._try_parse_int(row.get("FanMomentId"))
+            for row in rows
+            if self._try_parse_int(row.get("FanMomentId")) is not None
+        ]
+        images_by_fan_moment_id = self._list_fan_moment_images_by_id(fan_moment_ids)
 
-        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
-        s3_client = boto3.client("s3")
-
-        for filename in filenames:
-            upload_path = self._get_upload_path(filename)
-            if upload_path is None:
-                logger.error("add_moments - file does not exist: %s", filename)
+        moments: list[FanMoment] = []
+        for row in rows:
+            fan_moment_id = self._try_parse_int(row.get("FanMomentId"))
+            images = images_by_fan_moment_id.get(fan_moment_id, [])
+            if len(images) == 0:
                 continue
 
-            object_name = os.path.basename(upload_path)
-            key = f"{prefix}{object_name}"
-            extra_args = self._get_upload_extra_args(object_name)
+            moment = FanMoment()
+            moment.key = self._build_fan_moment_key_from_row(row)
+            moment.images = images
+            moments.append(moment)
 
-            try:
-                s3_client.upload_file(
-                    upload_path, bucket_name, key, ExtraArgs=extra_args
-                )
-                uploaded_keys.append(key)
-            except Exception as error:  # pylint: disable=broad-exception-caught
-                error_message: str = str(error) + "\n" + traceback.format_exc()
-                logger.error("%s", error_message)
+        return moments
 
-        return uploaded_keys
+    def _list_matching_fan_moment_rows(
+        self,
+        start_date: str = None,
+        end_date: str = None,
+        seller_id: int = None,
+        event_id: int = None,
+        limit: int = None,
+    ) -> list[dict]:
+        """
+        List fan moment rows from the FanMoments database index.
+        """
+        data = {}
+        where_clause = ["""EXISTS (
+                SELECT 1
+                FROM FanMomentImages
+                WHERE FanMomentImages.FanMomentId = FanMoments.FanMomentId
+            )"""]
+
+        if event_id is not None:
+            where_clause.append("FanMoments.ExternalEventId = %(event_id)s")
+            data["event_id"] = event_id
+        else:
+            if seller_id is not None:
+                where_clause.append("ExternalEvents.SellerId = %(seller_id)s")
+                data["seller_id"] = seller_id
+            if start_date is not None:
+                where_clause.append("ExternalEvents.EventDate >= %(start_date)s")
+                data["start_date"] = start_date
+            if end_date is not None:
+                where_clause.append("ExternalEvents.EventDate <= %(end_date)s")
+                data["end_date"] = end_date
+
+        sql = f"""
+            SELECT
+                FanMoments.FanMomentId AS FanMomentId,
+                FanMoments.ExternalEventId AS ExternalEventId,
+                ExternalEvents.EventDate AS EventDate,
+                ExternalEvents.SellerId AS SellerId,
+                Sellers.Name AS SellerName,
+                COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS EventTitle,
+                COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
+                COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
+                COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
+                COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,
+                Country.CountryId AS CountryId
+            FROM FanMoments
+            JOIN ExternalEvents
+                ON ExternalEvents.EventId = FanMoments.ExternalEventId
+            JOIN Sellers
+                ON Sellers.SellerId = ExternalEvents.SellerId
+            LEFT JOIN TicketSocketEvents
+                ON TicketSocketEvents.Id = ExternalEvents.TicketSocketEventId
+            LEFT JOIN ExternalEventVenues
+                ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
+            LEFT JOIN Country
+                ON Country.CountryId = ExternalEventVenues.CountryId
+            WHERE {" AND ".join(where_clause)}
+            ORDER BY ExternalEvents.EventDate DESC,
+                FanMoments.LastUpdated DESC,
+                FanMoments.ExternalEventId DESC
+        """
+        if limit is not None and limit > 0:
+            sql += f" LIMIT 0, {int(limit)}"
+
+        sql = sql.replace("\n", "")
+
+        return db_query_all(sql, data)
+
+    def _list_fan_moment_images_by_id(
+        self, fan_moment_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """
+        List image names from the FanMomentImages database index.
+        """
+        if fan_moment_ids is None or len(fan_moment_ids) == 0:
+            return {}
+
+        data = {}
+        fan_moment_ids_str = db_convert_list_to_parameters(
+            fan_moment_ids, data, "fan_moment_id"
+        )
+        rows = db_query_all(
+            f"""SELECT FanMomentId, ImageName
+                FROM FanMomentImages
+                WHERE FanMomentId IN {fan_moment_ids_str}
+                ORDER BY DateUploaded ASC, FanMomentImageId ASC""",
+            data,
+        )
+
+        images_by_id: dict[int, list[str]] = {}
+        for row in rows:
+            fan_moment_id = self._try_parse_int(row.get("FanMomentId"))
+            image_name = row.get("ImageName")
+            if fan_moment_id is None or image_name is None:
+                continue
+            if fan_moment_id not in images_by_id:
+                images_by_id[fan_moment_id] = []
+            images_by_id[fan_moment_id].append(image_name)
+
+        return images_by_id
+
+    def _build_fan_moment_key_from_row(self, row: dict) -> FanMomentKey:
+        """
+        Build a fan moment key from the FanMoments database index row.
+        """
+        fm_key = FanMomentKey()
+        fm_key.moment_date = self._format_db_date(row.get("EventDate"))
+        fm_key.seller_id = self._try_parse_int(row.get("SellerId"))
+        fm_key.event_id = self._try_parse_int(row.get("ExternalEventId"))
+        fm_key.seller_name = row.get("SellerName")
+        fm_key.event_title = row.get("EventTitle")
+        fm_key.event_venue = row.get("Venue")
+        fm_key.event_location = self._format_event_location_from_row(row)
+        return fm_key
+
+    def _format_db_date(self, value: any) -> str:
+        """
+        Format a database date or datetime value as YYYY-MM-DD.
+        """
+        if value is None:
+            return None
+        return str(value)[:10]
+
+    def _format_event_location_from_row(self, row: dict) -> str:
+        """
+        Format event location from joined event and venue columns.
+        """
+        city = row.get("City")
+        location = f"{city}"
+        state = row.get("State")
+        if state is not None:
+            location += f", {state}"
+
+        country = row.get("Country")
+        country_id = self._try_parse_int(row.get("CountryId"))
+        if country is not None and country_id != DEFAULT_COUNTRY_ID:
+            location += f", {country}"
+
+        return location
 
     def moment_exists(self, moment_date: str, event_id: int, filename: str) -> bool:
         """
@@ -184,7 +270,7 @@ class MomentsService:
 
     def update_moment(self, fm: FanMoment) -> bool:
         """
-        Delete unused moment photos in the moments S3 bucket on finalize
+        Add/remove moment photos in the moments S3 bucket on finalize
         """
         if fm is None or fm.key is None or fm.images is None or len(fm.images) == 0:
             return None
@@ -207,6 +293,8 @@ class MomentsService:
         success = True
         if len(delete_filenames) > 0:
             success = self._delete_moment_images(fm_key, delete_filenames)
+            if success is True:
+                self._sync_fan_moment_index(fm_key)
 
         return success
 
@@ -217,10 +305,9 @@ class MomentsService:
         if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
             return None
 
-        prefix = self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
         moment = FanMoment()
         moment.key = fm_key
-        moment.images = self._list_moment_images(prefix)
+        moment.images = self._list_indexed_moment_images(fm_key.event_id)
         return moment
 
     def delete_moments(self, fm_key: FanMomentKey) -> bool:
@@ -238,7 +325,12 @@ class MomentsService:
         date_prefix = f"{fm_key.moment_date}/"
         remaining_date_keys = self._list_keys(date_prefix, include_folder_markers=True)
         if remaining_date_keys == [date_prefix]:
-            return self._delete_keys([date_prefix])
+            success = self._delete_keys([date_prefix])
+            if success is True:
+                self._delete_fan_moment_index(fm_key.event_id)
+            return success
+
+        self._delete_fan_moment_index(fm_key.event_id)
 
         return True
 
@@ -295,6 +387,155 @@ class MomentsService:
                 break
 
         return success
+
+    def _sync_fan_moment_index(self, fm_key: FanMomentKey) -> bool:
+        """
+        Sync FanMoments and FanMomentImages rows for an event.
+        """
+        if fm_key is None or fm_key.event_id is None or fm_key.moment_date is None:
+            return False
+
+        current_images = self._list_moment_images(
+            self._build_event_prefix(fm_key.moment_date, fm_key.event_id)
+        )
+        if len(current_images) == 0:
+            return self._delete_fan_moment_index(fm_key.event_id)
+
+        data = {"event_id": fm_key.event_id}
+
+        try:
+            existing = db_query_one(
+                """SELECT FanMomentId FROM FanMoments
+                    WHERE ExternalEventId=%(event_id)s""",
+                data,
+            )
+            fan_moment_id = None
+            if existing:
+                fan_moment_id = self._try_parse_int(existing.get("FanMomentId"))
+                db_update(
+                    """UPDATE FanMoments
+                        SET LastUpdated=CURRENT_TIMESTAMP
+                        WHERE ExternalEventId=%(event_id)s""",
+                    data,
+                )
+            else:
+                fan_moment_id = db_insert(
+                    """INSERT INTO FanMoments
+                        (ExternalEventId)
+                        VALUES (%(event_id)s)""",
+                    data,
+                )
+
+            if fan_moment_id is None or fan_moment_id <= 0:
+                return False
+
+            return self._sync_fan_moment_image_index(
+                fan_moment_id, sorted(current_images)
+            )
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            error_message: str = str(error) + "\n" + traceback.format_exc()
+            logger.error("%s", error_message)
+            return False
+
+    def _sync_fan_moment_image_index(
+        self, fan_moment_id: int, current_images: list[str]
+    ) -> bool:
+        """
+        Sync FanMomentImages rows for one fan moment.
+        """
+        data = {"fan_moment_id": fan_moment_id}
+        existing_rows = db_query_all(
+            """SELECT FanMomentImageId, ImageName
+                FROM FanMomentImages
+                WHERE FanMomentId=%(fan_moment_id)s""",
+            data,
+        )
+        existing_images_by_name = {
+            row.get("ImageName"): self._try_parse_int(row.get("FanMomentImageId"))
+            for row in existing_rows
+            if row.get("ImageName") is not None
+        }
+        current_image_set = set(current_images)
+        success = True
+
+        for image_name, fan_moment_image_id in existing_images_by_name.items():
+            if image_name not in current_image_set:
+                deleted = db_delete(
+                    """DELETE FROM FanMomentImages
+                        WHERE FanMomentImageId=%(fan_moment_image_id)s""",
+                    {"fan_moment_image_id": fan_moment_image_id},
+                )
+                if deleted is False:
+                    success = False
+
+        for image_name in current_images:
+            if image_name in existing_images_by_name:
+                continue
+            fan_moment_image_id = db_insert(
+                """INSERT INTO FanMomentImages
+                    (FanMomentId, ImageName, DateUploaded)
+                    VALUES (%(fan_moment_id)s, %(image_name)s, CURRENT_TIMESTAMP)""",
+                {"fan_moment_id": fan_moment_id, "image_name": image_name},
+            )
+            if fan_moment_image_id is None or fan_moment_image_id <= 0:
+                success = False
+
+        return success
+
+    def _delete_fan_moment_index(self, event_id: int) -> bool:
+        """
+        Delete the FanMoments and FanMomentImages index rows for an event.
+        """
+        if event_id is None:
+            return False
+
+        try:
+            existing = db_query_one(
+                """SELECT FanMomentId FROM FanMoments
+                    WHERE ExternalEventId=%(event_id)s""",
+                {"event_id": event_id},
+            )
+            if not existing:
+                return True
+
+            fan_moment_id = self._try_parse_int(existing.get("FanMomentId"))
+            if fan_moment_id is None:
+                return False
+
+            db_delete(
+                """DELETE FROM FanMomentImages
+                    WHERE FanMomentId=%(fan_moment_id)s""",
+                {"fan_moment_id": fan_moment_id},
+            )
+            db_delete(
+                """DELETE FROM FanMoments
+                    WHERE ExternalEventId=%(event_id)s""",
+                {"event_id": event_id},
+            )
+            return True
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            error_message: str = str(error) + "\n" + traceback.format_exc()
+            logger.error("%s", error_message)
+            return False
+
+    def _list_indexed_moment_images(self, event_id: int) -> list[str]:
+        """
+        List image names from FanMomentImages for one event.
+        """
+        if event_id is None:
+            return []
+
+        rows = db_query_all(
+            """SELECT FanMomentImages.ImageName AS ImageName
+                FROM FanMomentImages
+                JOIN FanMoments
+                    ON FanMoments.FanMomentId = FanMomentImages.FanMomentId
+                WHERE FanMoments.ExternalEventId=%(event_id)s
+                ORDER BY FanMomentImages.DateUploaded ASC,
+                    FanMomentImages.FanMomentImageId ASC""",
+            {"event_id": event_id},
+        )
+        return [row["ImageName"] for row in rows if row.get("ImageName") is not None]
 
     def get_available_moment_dates(self, seller_id: int = None) -> list[str]:
         """

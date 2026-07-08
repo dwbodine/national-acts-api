@@ -181,6 +181,7 @@ class FanMomentKey:
     filename: str = None
     seller_name: str = None
     event_title: str = None
+    event_venue: str = None
     event_location: str = None
 
     def __str__(self) -> str:

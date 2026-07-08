@@ -346,11 +346,11 @@ def test_public_moment_filter_requires_start_date_without_event_id(monkeypatch, 
     assert response.get_json() == {"msg": "Bad Request"}
 
 
-def test_public_moment_filter_defaults_end_date_to_next_day(
+def test_public_moment_filter_defaults_end_date_to_same_day(
     monkeypatch, client, parse_json_response
 ):
     """
-    Default endDate to 24 hours after startDate when omitted.
+    Default endDate to 23 hours and 59 minutes after startDate when omitted.
     """
     captured = {}
 
@@ -378,7 +378,7 @@ def test_public_moment_filter_defaults_end_date_to_next_day(
 
     assert response.status_code == 200
     assert parse_json_response(response) == []
-    assert captured["filter"] == ("2026-05-01", "2026-05-02", 20, None)
+    assert captured["filter"] == ("2026-05-01", "2026-05-01", 20, None)
 
 
 def test_public_moment_filter_allows_event_id_without_start_date(

@@ -50,6 +50,7 @@ class FakeS3Client:
         Record upload calls.
         """
         self.uploads.append((filename, bucket, key, ExtraArgs))
+        self.keys.append(key)
 
     def delete_objects(self, Bucket, Delete):  # pylint: disable=invalid-name
         """
@@ -217,6 +218,127 @@ def build_fake_s3(monkeypatch):
     return fake_s3
 
 
+def build_fan_moment_row(
+    event_id,
+    event_date,
+    seller_id,
+    seller_name=None,
+    event_title=None,
+    images=None,
+    venue=None,
+    city=None,
+    state=None,
+    country=None,
+    country_id=235,
+):
+    """
+    Create a FanMoments index row for service tests.
+    """
+    if images is None:
+        images = ["fan.jpg"]
+    return {
+        "FanMomentId": event_id,
+        "ExternalEventId": event_id,
+        "EventDate": event_date,
+        "SellerId": seller_id,
+        "SellerName": seller_name,
+        "EventTitle": event_title,
+        "Images": images,
+        "Venue": venue,
+        "City": city,
+        "State": state,
+        "Country": country,
+        "CountryId": country_id,
+    }
+
+
+def build_fake_fan_moment_db(monkeypatch, rows=None):
+    """
+    Patch FanMoments index reads with filter-aware in-memory rows.
+    """
+    default_images_by_event_id = {
+        100: ["c.png"],
+        200: ["a.jpg"],
+        300: ["b.jpg"],
+        400: ["d.jpg"],
+    }
+    if rows is None:
+        rows = [
+            build_fan_moment_row(
+                event_id,
+                details[1],
+                details[0],
+                FakeSeller.SELLER_NAMES.get(details[0]),
+                details[2],
+                default_images_by_event_id.get(event_id),
+            )
+            for event_id, details in FakeMomentEventService.EVENTS.items()
+        ]
+
+    def fake_db_query_all(sql, data=None):
+        data = data or {}
+        if "SELECT FanMomentId, ImageName" in sql:
+            matching_image_rows = []
+            fan_moment_ids = {
+                value for key, value in data.items() if key.startswith("fan_moment_id")
+            }
+            for row in rows:
+                if row["FanMomentId"] not in fan_moment_ids:
+                    continue
+                for image_name in row["Images"]:
+                    matching_image_rows.append(
+                        {
+                            "FanMomentId": row["FanMomentId"],
+                            "ImageName": image_name,
+                        }
+                    )
+            return matching_image_rows
+
+        if "FanMomentImages.ImageName AS ImageName" in sql:
+            event_id = data.get("event_id")
+            for row in rows:
+                if row["ExternalEventId"] == event_id:
+                    return [{"ImageName": image_name} for image_name in row["Images"]]
+            return []
+
+        matching_rows = []
+        for row in rows:
+            if len(row["Images"]) == 0:
+                continue
+            if "event_id" in data and row["ExternalEventId"] != data["event_id"]:
+                continue
+            if "seller_id" in data and row["SellerId"] != data["seller_id"]:
+                continue
+            if "start_date" in data and row["EventDate"] < data["start_date"]:
+                continue
+            if "end_date" in data and row["EventDate"] > data["end_date"]:
+                continue
+            matching_rows.append(row)
+
+        matching_rows = sorted(
+            matching_rows,
+            key=lambda row: (row["EventDate"], row["ExternalEventId"]),
+            reverse=True,
+        )
+        if "LIMIT 0," in sql:
+            limit = int(sql.split("LIMIT 0,", 1)[1].strip())
+            matching_rows = matching_rows[:limit]
+        return matching_rows
+
+    monkeypatch.setattr(moments_service, "db_query_all", fake_db_query_all)
+
+
+def patch_fan_moment_index_writes(monkeypatch):
+    """
+    Patch FanMoments index writes away for tests focused on S3 behavior.
+    """
+    monkeypatch.setattr(moments_service, "db_query_one", lambda sql, data: {})
+    monkeypatch.setattr(moments_service, "db_insert", lambda sql, data: 1)
+    monkeypatch.setattr(moments_service, "db_update", lambda sql, data: True)
+    monkeypatch.setattr(moments_service, "db_delete", lambda sql, data: True)
+    monkeypatch.setattr(moments_service, "db_query_all", lambda sql, data=None: [])
+
+
 def create_fan_moment_key(moment_date="2026-05-10", seller_id=33, event_id=44):
     """
     Create a FanMomentKey for upload and delete tests.
@@ -358,6 +480,21 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
     Test that filter_moments returns FanMoment objects matching supplied filters.
     """
     build_fake_s3(monkeypatch)
+    images_by_event_id = {
+        100: ["c.png"],
+        200: ["a.jpg"],
+        300: ["b.jpg"],
+        400: ["d.jpg"],
+    }
+    build_fake_fan_moment_db(
+        monkeypatch,
+        [
+            build_fan_moment_row(
+                event_id, details[1], details[0], images=images_by_event_id[event_id]
+            )
+            for event_id, details in FakeMomentEventService.EVENTS.items()
+        ],
+    )
 
     class EmptySeller:
         """
@@ -423,6 +560,7 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
     Test that filter_moments matches moments between optional start and end dates.
     """
     build_fake_s3(monkeypatch)
+    build_fake_fan_moment_db(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
     monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
@@ -447,6 +585,19 @@ def test_filter_moments_without_filters_returns_eight_most_recent(monkeypatch):
             f"2026-05-{day:02d}/{100 + day}/fan.jpg"
             for day in range(1, 11)
         ]
+    )
+    build_fake_fan_moment_db(
+        monkeypatch,
+        [
+            build_fan_moment_row(
+                100 + day,
+                f"2026-05-{day:02d}",
+                20,
+                "Seller 20",
+                f"Event {100 + day}",
+            )
+            for day in range(1, 11)
+        ],
     )
 
     class RecentSeller:
@@ -500,6 +651,7 @@ def test_filter_moments_event_id_overrides_seller_and_date_filters(monkeypatch):
     Test that event_id matches across dates and ignores lower-precedence filters.
     """
     build_fake_s3(monkeypatch)
+    build_fake_fan_moment_db(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
     monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
 
@@ -515,11 +667,12 @@ def test_filter_moments_event_id_overrides_seller_and_date_filters(monkeypatch):
     ]
 
 
-def test_filter_moments_prefills_seller_events_before_listing_images(monkeypatch):
+def test_filter_moments_uses_database_images_for_seller_filters(monkeypatch):
     """
-    Test seller filters ignore dates and only list seller event image prefixes.
+    Test seller filters ignore dates and use FanMomentImages rows.
     """
     build_fake_s3(monkeypatch)
+    build_fake_fan_moment_db(monkeypatch)
     monkeypatch.setattr(moments_service, "Seller", FakeSeller)
     monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
     service = moments_service.MomentsService()
@@ -536,71 +689,55 @@ def test_filter_moments_prefills_seller_events_before_listing_images(monkeypatch
 
     moments = service.filter_moments(start_date="2026-06-01", seller_id=20)
 
-    assert listed_image_prefixes == ["2026-05-01/300/", "2026-05-02/400/"]
+    assert listed_image_prefixes == []
     assert [
-        (moment.moment_date, moment.seller_id, moment.event_id) for moment in moments
+        (moment.moment_date, moment.seller_id, moment.event_id, moment.images)
+        for moment in moments
     ] == [
-        ("2026-05-01", 20, 300),
-        ("2026-05-02", 20, 400),
+        ("2026-05-01", 20, 300, ["b.jpg"]),
+        ("2026-05-02", 20, 400, ["d.jpg"]),
     ]
 
 
-def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
+def test_filter_moments_uses_database_index_before_listing_s3_images(monkeypatch):
     """
-    Test that repeated seller and event ids are looked up once per filter call.
+    Test that the FanMoments database index selects S3 event prefixes.
     """
     fake_s3 = FakeS3Client(
         [
             "2026-05-01/300/a.jpg",
             "2026-05-01/300/b.jpg",
             "2026-05-01/301/c.jpg",
+            "2026-05-01/302/d.jpg",
         ]
     )
-    seller_calls = []
-    event_calls = []
+    db_calls = []
 
-    class FakeSeller:
-        """
-        Test seller lookup.
-        """
-
-        def __init__(self, seller_id, get_event_categories=True):
-            seller_calls.append((seller_id, get_event_categories))
-            self.name = f"Seller {seller_id}"
-
-    class FakeEventService:
-        """
-        Test event service lookup.
-        """
-
-        def get_events_and_orders(
-            self,
-            event_id=None,
-            seller_id=None,
-            get_orders=False,
-            is_public=False,
-            ignore_flags=False,
-        ):
-            event_calls.append((event_id, seller_id, get_orders, is_public))
-            event_ids = [event_id]
-            if seller_id is not None:
-                event_ids = [300, 301]
+    def fake_db_query_all(sql, data=None):
+        db_calls.append((sql, data))
+        if "SELECT FanMomentId, ImageName" in sql:
             return [
-                SimpleNamespace(
-                    external_event_id=event_id,
-                    seller_id=20,
-                    title=f"Event {event_id}",
-                )
-                for event_id in event_ids
+                {"FanMomentId": 300, "ImageName": "a.jpg"},
+                {"FanMomentId": 300, "ImageName": "b.jpg"},
+                {"FanMomentId": 301, "ImageName": "c.jpg"},
             ]
-
-        def get_location_from_event(self, evt):
-            return f"{evt.title} Location"
+        return [
+            build_fan_moment_row(
+                300,
+                "2026-05-01",
+                20,
+                "Seller 20",
+                "Event 300",
+                ["a.jpg", "b.jpg"],
+            ),
+            build_fan_moment_row(
+                301, "2026-05-01", 20, "Seller 20", "Event 301", ["c.jpg"]
+            ),
+        ]
 
     monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
     monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
-    monkeypatch.setattr(moments_service, "Seller", FakeSeller)
-    monkeypatch.setattr(moments_service, "EventService", FakeEventService)
+    monkeypatch.setattr(moments_service, "db_query_all", fake_db_query_all)
 
     moments = moments_service.MomentsService().filter_moments(
         start_date="2026-05-01",
@@ -608,13 +745,14 @@ def test_filter_moments_caches_seller_and_event_lookups(monkeypatch):
         seller_id=20,
     )
 
-    assert seller_calls == [(20, False)]
-    assert event_calls == [(None, 20, False, False)]
+    assert len(db_calls) == 2
+    assert db_calls[0][1] == {"seller_id": 20}
+    assert db_calls[1][1] == {"fan_moment_id_0": 300, "fan_moment_id_1": 301}
     assert [
         (m.seller_name, m.event_title, m.event_location, m.images) for m in moments
     ] == [
-        ("Seller 20", "Event 300", "Event 300 Location", ["a.jpg", "b.jpg"]),
-        ("Seller 20", "Event 301", "Event 301 Location", ["c.jpg"]),
+        ("Seller 20", "Event 300", None, ["a.jpg", "b.jpg"]),
+        ("Seller 20", "Event 301", None, ["c.jpg"]),
     ]
 
 
@@ -624,11 +762,48 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
     """
     fake_s3 = FakeS3Client(
         [
-            "2026-05-02/300/later-alpha.jpg",
+            "2026-05-02/303/later-alpha.jpg",
             "2026-05-01/302/early-zephyr.jpg",
             "2026-05-01/301/early-alpha-bravo.jpg",
             "2026-05-01/300/early-alpha-alpha.jpg",
         ]
+    )
+    build_fake_fan_moment_db(
+        monkeypatch,
+        [
+            build_fan_moment_row(
+                303,
+                "2026-05-02",
+                20,
+                "Alpha Presents",
+                "Alpha Event",
+                ["later-alpha.jpg"],
+            ),
+            build_fan_moment_row(
+                302,
+                "2026-05-01",
+                10,
+                "Zephyr Shows",
+                "Alpha Event",
+                ["early-zephyr.jpg"],
+            ),
+            build_fan_moment_row(
+                301,
+                "2026-05-01",
+                20,
+                "Alpha Presents",
+                "Bravo Event",
+                ["early-alpha-bravo.jpg"],
+            ),
+            build_fan_moment_row(
+                300,
+                "2026-05-01",
+                20,
+                "Alpha Presents",
+                "Alpha Event",
+                ["early-alpha-alpha.jpg"],
+            ),
+        ],
     )
 
     class SortSeller:
@@ -693,63 +868,34 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
 
 def test_filter_moments_skips_invalid_prefixes_and_empty_image_folders(monkeypatch):
     """
-    Test filter_moments skips invalid event prefixes and folders with no images.
+    Test filter_moments skips FanMoments rows with no indexed images.
     """
-    service = moments_service.MomentsService()
-    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
-    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
-    service._list_matching_event_prefixes = (  # pylint: disable=protected-access
-        lambda *args: [
-            "2026-05-01/not-int/",
-            "2026-05-01/300/",
-        ]
+    build_fake_fan_moment_db(
+        monkeypatch,
+        [
+            build_fan_moment_row(
+                300, "2026-05-01", 20, "Alpha Presents", "Alpha Event", []
+            )
+        ],
     )
-    service._list_moment_images = lambda prefix: []  # pylint: disable=protected-access
 
-    moments = service.filter_moments("2026-05-01")
+    moments = moments_service.MomentsService().filter_moments("2026-05-01")
 
     assert moments == []
 
 
-def test_add_moments_uploads_files_to_event_prefix(monkeypatch, workspace_tmp_path):
+def test_get_moment_lists_image_names_from_database(monkeypatch):
     """
-    Test that add_moments uploads local temp files to the event prefix.
+    Test that get_moment returns all indexed image names for the event.
     """
-    fake_s3 = build_fake_s3(monkeypatch)
-    monkeypatch.setenv("API_FILE_PATH", str(workspace_tmp_path))
-    tmp_dir = workspace_tmp_path / "tmp"
-    tmp_dir.mkdir()
-    (tmp_dir / "fan.jpg").write_text("photo", encoding="utf-8")
-
-    uploaded = moments_service.MomentsService().add_moments(
-        create_fan_moment_key(), ["fan.jpg"]
+    monkeypatch.setattr(
+        moments_service,
+        "db_query_all",
+        lambda sql, data=None: [
+            {"ImageName": "fan.jpg"},
+            {"ImageName": "nested/other.png"},
+        ],
     )
-
-    assert uploaded == ["2026-05-10/44/fan.jpg"]
-    assert fake_s3.uploads == [
-        (
-            str(tmp_dir / "fan.jpg"),
-            "moments-bucket",
-            "2026-05-10/44/fan.jpg",
-            {"ContentType": "image/jpeg"},
-        )
-    ]
-
-
-def test_get_moment_lists_image_names_from_event_prefix(monkeypatch):
-    """
-    Test that get_moment returns all image names under the matching event folder.
-    """
-    fake_s3 = FakeS3Client(
-        [
-            "2026-05-10/44/fan.jpg",
-            "2026-05-10/44/nested/other.png",
-            "2026-05-10/45/other-event.jpg",
-            "2026-05-11/44/other-date.jpg",
-        ]
-    )
-    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
-    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
     fm_key = create_fan_moment_key()
 
     moment = moments_service.MomentsService().get_moment(fm_key)
@@ -770,47 +916,11 @@ def test_get_moment_returns_none_without_required_key_fields():
     assert service.get_moment(fm_key) is None
 
 
-def test_add_moments_handles_none_missing_bucket_missing_file_and_upload_errors(
-    monkeypatch, workspace_tmp_path
-):
-    """
-    Test add_moments validation, missing-file, and upload-error branches.
-    """
-    service = moments_service.MomentsService()
-
-    fm_key = create_fan_moment_key()
-
-    assert service.add_moments(fm_key, None) == []
-
-    monkeypatch.delenv("S3_BUCKET_MOMENTS", raising=False)
-    assert service.add_moments(fm_key, ["fan.jpg"]) == []
-    assert service._get_bucket_name() is None  # pylint: disable=protected-access
-    assert service._list_keys() == []  # pylint: disable=protected-access
-    assert service._list_common_prefixes() == []  # pylint: disable=protected-access
-
-    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
-    fake_s3 = FakeS3Client()
-    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
-    assert service.add_moments(fm_key, ["missing.jpg"]) == []
-    assert not fake_s3.uploads
-
-    monkeypatch.setenv("API_FILE_PATH", str(workspace_tmp_path))
-    tmp_dir = workspace_tmp_path / "tmp"
-    tmp_dir.mkdir()
-    (tmp_dir / "fan.jpg").write_text("photo", encoding="utf-8")
-    monkeypatch.setattr(
-        moments_service.boto3,
-        "client",
-        lambda service_name: RaisingS3Client(fail_upload=True),
-    )
-
-    assert service.add_moments(fm_key, ["fan.jpg"]) == []
-
-
 def test_delete_moments_removes_all_objects_under_event_prefix(monkeypatch):
     """
     Test that delete_moments deletes every key beneath the event prefix.
     """
+    patch_fan_moment_index_writes(monkeypatch)
     fake_s3 = FakeS3Client(
         [
             "2026-05-10/",
@@ -851,6 +961,7 @@ def test_delete_moments_removes_empty_date_folder_marker(monkeypatch):
     """
     Test that delete_moments removes the date marker when no date children remain.
     """
+    patch_fan_moment_index_writes(monkeypatch)
     fake_s3 = FakeS3Client(
         [
             "2026-05-10/",
@@ -914,6 +1025,97 @@ def test_delete_moments_handles_none_missing_bucket_and_delete_errors(monkeypatc
     )
 
     assert service.delete_moments(fm_key) is False
+
+
+def test_fan_moment_index_sync_inserts_updates_and_deletes(monkeypatch):
+    """
+    Test FanMoments and FanMomentImages sync follows the current S3 folder.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-10/44/a.jpg",
+            "2026-05-10/44/b.jpg",
+        ]
+    )
+    db_calls = []
+    existing_row = {}
+    existing_image_rows = []
+    next_image_id = 20
+
+    def fake_db_query_one(sql, data):
+        db_calls.append(("query", data.copy()))
+        return existing_row
+
+    def fake_db_query_all(sql, data=None):
+        db_calls.append(("query_all", data.copy()))
+        return existing_image_rows
+
+    def fake_db_insert(sql, data):
+        db_calls.append(("insert", data.copy()))
+        if "FanMomentImages" in sql:
+            nonlocal next_image_id
+            existing_image_rows.append(
+                {
+                    "FanMomentImageId": next_image_id,
+                    "ImageName": data["image_name"],
+                }
+            )
+            next_image_id += 1
+            return next_image_id - 1
+        return 9
+
+    def fake_db_update(sql, data):
+        db_calls.append(("update", data.copy()))
+        return True
+
+    def fake_db_delete(sql, data):
+        db_calls.append(("delete", data.copy()))
+        if "fan_moment_image_id" in data:
+            existing_image_rows[:] = [
+                row
+                for row in existing_image_rows
+                if row["FanMomentImageId"] != data["fan_moment_image_id"]
+            ]
+        elif "fan_moment_id" in data:
+            existing_image_rows.clear()
+        return True
+
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    monkeypatch.setattr(moments_service, "db_query_one", fake_db_query_one)
+    monkeypatch.setattr(moments_service, "db_query_all", fake_db_query_all)
+    monkeypatch.setattr(moments_service, "db_insert", fake_db_insert)
+    monkeypatch.setattr(moments_service, "db_update", fake_db_update)
+    monkeypatch.setattr(moments_service, "db_delete", fake_db_delete)
+
+    service = moments_service.MomentsService()
+    fm_key = create_fan_moment_key()
+
+    assert (
+        service._sync_fan_moment_index(fm_key) is True
+    )  # pylint: disable=protected-access
+    existing_row["FanMomentId"] = 9
+    assert (
+        service._sync_fan_moment_index(fm_key) is True
+    )  # pylint: disable=protected-access
+    fake_s3.keys = []
+    assert (
+        service._sync_fan_moment_index(fm_key) is True
+    )  # pylint: disable=protected-access
+
+    assert db_calls == [
+        ("query", {"event_id": 44}),
+        ("insert", {"event_id": 44}),
+        ("query_all", {"fan_moment_id": 9}),
+        ("insert", {"fan_moment_id": 9, "image_name": "a.jpg"}),
+        ("insert", {"fan_moment_id": 9, "image_name": "b.jpg"}),
+        ("query", {"event_id": 44}),
+        ("update", {"event_id": 44}),
+        ("query_all", {"fan_moment_id": 9}),
+        ("query", {"event_id": 44}),
+        ("delete", {"fan_moment_id": 9}),
+        ("delete", {"event_id": 44}),
+    ]
 
 
 def test_moment_listing_helpers_handle_pagination_and_errors(monkeypatch):

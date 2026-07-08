@@ -1553,13 +1553,6 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
         Fake moments service for admin route tests.
         """
 
-        def add_moments(self, fm_key, filenames):
-            """
-            Record add moment arguments.
-            """
-            captured["add"] = (fm_key, filenames)
-            return ["2026-05-01/20/300/a.jpg"]
-
         def delete_moments(self, fm_key):
             """
             Record delete moment arguments.
