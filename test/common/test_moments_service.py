@@ -5,7 +5,7 @@ Unit tests for common.moments_service helpers.
 from types import SimpleNamespace
 
 from common import moments_service
-from common.models.admin import FanMomentKey
+from common.models.admin import FanMoment, FanMomentKey
 
 
 class FakeS3Client:
@@ -581,10 +581,7 @@ def test_filter_moments_without_filters_returns_eight_most_recent(monkeypatch):
     Test unfiltered fan moments return only the eight newest event groups.
     """
     fake_s3 = FakeS3Client(
-        [
-            f"2026-05-{day:02d}/{100 + day}/fan.jpg"
-            for day in range(1, 11)
-        ]
+        [f"2026-05-{day:02d}/{100 + day}/fan.jpg" for day in range(1, 11)]
     )
     build_fake_fan_moment_db(
         monkeypatch,
@@ -914,6 +911,166 @@ def test_get_moment_returns_none_without_required_key_fields():
 
     assert service.get_moment(None) is None
     assert service.get_moment(fm_key) is None
+
+
+def test_update_moment_syncs_database_to_submitted_images(monkeypatch):
+    """
+    Test update_moment removes missing images and indexes newly submitted images.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-10/44/old.jpg",
+            "2026-05-10/44/keep.jpg",
+            "2026-05-10/44/new.jpg",
+            "2026-05-10/44/nested/normalized.png",
+        ]
+    )
+    child_rows = [
+        {"FanMomentImageId": 20, "ImageName": "old.jpg"},
+        {"FanMomentImageId": 21, "ImageName": "keep.jpg"},
+    ]
+    db_calls = []
+    next_image_id = 30
+
+    def fake_db_query_one(sql, data):
+        db_calls.append(("query_one", data.copy()))
+        return {"FanMomentId": 9}
+
+    def fake_db_query_all(sql, data=None):
+        db_calls.append(("query_all", data.copy()))
+        if "FanMomentImages.ImageName AS ImageName" in sql:
+            return [{"ImageName": row["ImageName"]} for row in child_rows]
+        return child_rows
+
+    def fake_db_update(sql, data):
+        db_calls.append(("update", data.copy()))
+        return True
+
+    def fake_db_delete(sql, data):
+        db_calls.append(("delete", data.copy()))
+        child_rows[:] = [
+            row
+            for row in child_rows
+            if row["FanMomentImageId"] != data["fan_moment_image_id"]
+        ]
+        return True
+
+    def fake_db_insert(sql, data):
+        db_calls.append(("insert", data.copy()))
+        nonlocal next_image_id
+        child_rows.append(
+            {
+                "FanMomentImageId": next_image_id,
+                "ImageName": data["image_name"],
+            }
+        )
+        next_image_id += 1
+        return next_image_id - 1
+
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    monkeypatch.setattr(moments_service, "db_query_one", fake_db_query_one)
+    monkeypatch.setattr(moments_service, "db_query_all", fake_db_query_all)
+    monkeypatch.setattr(moments_service, "db_update", fake_db_update)
+    monkeypatch.setattr(moments_service, "db_delete", fake_db_delete)
+    monkeypatch.setattr(moments_service, "db_insert", fake_db_insert)
+
+    fan_moment = FanMoment()
+    fan_moment.key = create_fan_moment_key()
+    fan_moment.images = [
+        "keep.jpg",
+        "new.jpg",
+        "/nested\\normalized.png",
+        "keep.jpg",
+    ]
+
+    assert moments_service.MomentsService().update_moment(fan_moment) is True
+
+    assert fake_s3.deletes == [
+        (
+            "moments-bucket",
+            {
+                "Objects": [{"Key": "2026-05-10/44/old.jpg"}],
+                "Quiet": True,
+            },
+        )
+    ]
+    assert fake_s3.keys == [
+        "2026-05-10/44/keep.jpg",
+        "2026-05-10/44/new.jpg",
+        "2026-05-10/44/nested/normalized.png",
+    ]
+    assert [row["ImageName"] for row in child_rows] == [
+        "keep.jpg",
+        "new.jpg",
+        "nested/normalized.png",
+    ]
+    assert db_calls == [
+        ("query_all", {"event_id": 44}),
+        ("query_one", {"event_id": 44}),
+        ("update", {"event_id": 44}),
+        ("query_all", {"fan_moment_id": 9}),
+        ("delete", {"fan_moment_image_id": 20}),
+        ("insert", {"fan_moment_id": 9, "image_name": "new.jpg"}),
+        ("insert", {"fan_moment_id": 9, "image_name": "nested/normalized.png"}),
+    ]
+
+
+def test_update_moment_empty_images_deletes_s3_images_and_index(monkeypatch):
+    """
+    Test update_moment treats an empty image list as removing all images.
+    """
+    fake_s3 = FakeS3Client(
+        [
+            "2026-05-10/44/old.jpg",
+            "2026-05-10/44/other.jpg",
+        ]
+    )
+    db_calls = []
+
+    def fake_db_query_one(sql, data):
+        db_calls.append(("query_one", data.copy()))
+        return {"FanMomentId": 9}
+
+    def fake_db_query_all(sql, data=None):
+        db_calls.append(("query_all", data.copy()))
+        return [{"ImageName": "old.jpg"}, {"ImageName": "other.jpg"}]
+
+    def fake_db_delete(sql, data):
+        db_calls.append(("delete", data.copy()))
+        return True
+
+    monkeypatch.setenv("S3_BUCKET_MOMENTS", "moments-bucket")
+    monkeypatch.setattr(moments_service.boto3, "client", lambda service_name: fake_s3)
+    monkeypatch.setattr(moments_service, "db_query_one", fake_db_query_one)
+    monkeypatch.setattr(moments_service, "db_query_all", fake_db_query_all)
+    monkeypatch.setattr(moments_service, "db_delete", fake_db_delete)
+
+    fan_moment = FanMoment()
+    fan_moment.key = create_fan_moment_key()
+    fan_moment.images = []
+
+    assert moments_service.MomentsService().update_moment(fan_moment) is True
+
+    assert fake_s3.deletes == [
+        (
+            "moments-bucket",
+            {
+                "Objects": [
+                    {"Key": "2026-05-10/44/old.jpg"},
+                    {"Key": "2026-05-10/44/other.jpg"},
+                ],
+                "Quiet": True,
+            },
+        )
+    ]
+    assert fake_s3.keys == []
+    assert db_calls == [
+        ("query_all", {"event_id": 44}),
+        ("query_one", {"event_id": 44}),
+        ("delete", {"fan_moment_id": 9}),
+        ("delete", {"event_id": 44}),
+    ]
 
 
 def test_delete_moments_removes_all_objects_under_event_prefix(monkeypatch):

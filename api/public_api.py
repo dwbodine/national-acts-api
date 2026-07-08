@@ -436,13 +436,11 @@ def get_filtered_moment_events():
     end_date: str = get_override_string_value_or_default(request.args.get("endDate"))
     if start_date is not None and end_date is None:
         end_date = (
-            datetime.strptime(start_date, "%Y-%m-%d")
-            + timedelta(hours=23, minutes=59)
+            datetime.strptime(start_date, "%Y-%m-%d") + timedelta(hours=23, minutes=59)
         ).strftime("%Y-%m-%d")
     elif end_date is not None:
         end_date = (
-            datetime.strptime(end_date, "%Y-%m-%d")
-            + timedelta(hours=23, minutes=59)
+            datetime.strptime(end_date, "%Y-%m-%d") + timedelta(hours=23, minutes=59)
         ).strftime("%Y-%m-%d")
 
     seller_id: int = get_override_int_value_or_default(

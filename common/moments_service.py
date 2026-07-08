@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """
 Service to manage fan moment photos in S3.
 """
@@ -270,33 +271,43 @@ class MomentsService:
 
     def update_moment(self, fm: FanMoment) -> bool:
         """
-        Add/remove moment photos in the moments S3 bucket on finalize
+        Add/remove indexed moment photos in the moments S3 bucket on finalize.
         """
-        if fm is None or fm.key is None or fm.images is None or len(fm.images) == 0:
+        if (
+            fm is None
+            or fm.key is None
+            or fm.images is None
+            or fm.key.moment_date is None
+            or fm.key.event_id is None
+        ):
             return None
 
         fm_key = fm.key
-        filenames = fm.images
-
-        if fm_key is None or fm_key.moment_date is None or fm_key.event_id is None:
-            return None
+        filenames = self._normalize_image_names(fm.images)
 
         existing_moment = self.get_moment(fm_key)
         if existing_moment is None or existing_moment.images is None:
             return None
 
+        existing_filenames = self._normalize_image_names(existing_moment.images)
         delete_filenames: list[str] = []
-        for filename in existing_moment.images:
+        for filename in existing_filenames:
             if filename not in filenames:
                 delete_filenames.append(filename)
 
-        success = True
-        if len(delete_filenames) > 0:
-            success = self._delete_moment_images(fm_key, delete_filenames)
-            if success is True:
-                self._sync_fan_moment_index(fm_key)
+        if len(delete_filenames) > 0 and (
+            self._delete_moment_images(fm_key, delete_filenames) is False
+        ):
+            return False
 
-        return success
+        if len(filenames) == 0:
+            return self._delete_fan_moment_index(fm_key.event_id)
+
+        fan_moment_id = self._ensure_fan_moment_index(fm_key.event_id)
+        if fan_moment_id is None:
+            return False
+
+        return self._sync_fan_moment_image_index(fan_moment_id, filenames)
 
     def get_moment(self, fm_key: FanMomentKey) -> FanMoment | None:
         """
@@ -388,6 +399,63 @@ class MomentsService:
 
         return success
 
+    def _normalize_image_names(self, filenames: list[str]) -> list[str]:
+        """
+        Normalize image names while preserving the caller's order.
+        """
+        if filenames is None:
+            return []
+
+        normalized_filenames: list[str] = []
+        seen_filenames: set[str] = set()
+        for filename in filenames:
+            if filename is None or len(str(filename).strip()) == 0:
+                continue
+            normalized_filename = str(filename).replace("\\", "/").lstrip("/")
+            if normalized_filename in seen_filenames:
+                continue
+            normalized_filenames.append(normalized_filename)
+            seen_filenames.add(normalized_filename)
+
+        return normalized_filenames
+
+    def _ensure_fan_moment_index(self, event_id: int) -> int | None:
+        """
+        Ensure a FanMoments parent row exists for one event.
+        """
+        if event_id is None:
+            return None
+
+        data = {"event_id": event_id}
+
+        try:
+            existing = db_query_one(
+                """SELECT FanMomentId FROM FanMoments
+                    WHERE ExternalEventId=%(event_id)s""",
+                data,
+            )
+            if existing:
+                fan_moment_id = self._try_parse_int(existing.get("FanMomentId"))
+                db_update(
+                    """UPDATE FanMoments
+                        SET LastUpdated=CURRENT_TIMESTAMP
+                        WHERE ExternalEventId=%(event_id)s""",
+                    data,
+                )
+                return fan_moment_id
+
+            fan_moment_id = db_insert(
+                """INSERT INTO FanMoments
+                    (ExternalEventId)
+                    VALUES (%(event_id)s)""",
+                data,
+            )
+            return self._try_parse_int(fan_moment_id)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            error_message: str = str(error) + "\n" + traceback.format_exc()
+            logger.error("%s", error_message)
+            return None
+
     def _sync_fan_moment_index(self, fm_key: FanMomentKey) -> bool:
         """
         Sync FanMoments and FanMomentImages rows for an event.
@@ -401,32 +469,9 @@ class MomentsService:
         if len(current_images) == 0:
             return self._delete_fan_moment_index(fm_key.event_id)
 
-        data = {"event_id": fm_key.event_id}
-
         try:
-            existing = db_query_one(
-                """SELECT FanMomentId FROM FanMoments
-                    WHERE ExternalEventId=%(event_id)s""",
-                data,
-            )
-            fan_moment_id = None
-            if existing:
-                fan_moment_id = self._try_parse_int(existing.get("FanMomentId"))
-                db_update(
-                    """UPDATE FanMoments
-                        SET LastUpdated=CURRENT_TIMESTAMP
-                        WHERE ExternalEventId=%(event_id)s""",
-                    data,
-                )
-            else:
-                fan_moment_id = db_insert(
-                    """INSERT INTO FanMoments
-                        (ExternalEventId)
-                        VALUES (%(event_id)s)""",
-                    data,
-                )
-
-            if fan_moment_id is None or fan_moment_id <= 0:
+            fan_moment_id = self._ensure_fan_moment_index(fm_key.event_id)
+            if fan_moment_id is None:
                 return False
 
             return self._sync_fan_moment_image_index(
