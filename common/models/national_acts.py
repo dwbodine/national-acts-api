@@ -629,15 +629,21 @@ class Seller:
     website: str = None
     website_display_text: str = None
     logo: str = None
+    moment_image: str = None
 
     seller_event_categories: list[SellerEventCategory] = []
 
-    def __init__(self, seller_id: int = None, get_event_categories: bool = True):
+    def __init__(
+        self,
+        seller_id: int = None,
+        get_event_categories: bool = True,
+        get_images: bool = False,
+    ):
         if seller_id is not None:
             self.seller_id = seller_id
-            self.__initialize(get_event_categories)
+            self.__initialize(get_event_categories, get_images)
 
-    def __initialize(self, get_event_categories: bool = True):
+    def __initialize(self, get_event_categories: bool = True, get_images: bool = False):
         """
         Initialize seller from database
         """
@@ -662,14 +668,29 @@ class Seller:
             Sellers.WebsiteDisplayText,
             Sellers.HideInList,
             Sellers.HideSellerRate,
-            Sellers.Inactive,
-            Pages.LogoOnly
-            FROM Sellers
-            LEFT JOIN Country ON Sellers.CountryId = Country.CountryId
-            LEFT JOIN PageSellers ON Sellers.SellerId = PageSellers.SellerId
+            Sellers.Inactive"""
+
+        if get_images is True:
+            sql += """, Pages.LogoOnly AS LogoOnly,
+                     FanMomentImages.ImageName AS FanMomentImage, 
+                     ExternalEvents.EventId, 
+                     ExternalEvents.EventDate"""
+
+        sql += """ FROM Sellers
+                    LEFT JOIN Country ON Sellers.CountryId = Country.CountryId"""
+
+        if get_images is True:
+            sql += """ LEFT JOIN PageSellers ON Sellers.SellerId = PageSellers.SellerId
             LEFT JOIN Pages ON PageSellers.PageId = Pages.PageId
-            WHERE Sellers.SellerId=%(sellerId)s
-            ORDER BY PageSellers.LastUpdate ASC LIMIT 1"""
+            LEFT JOIN ExternalEvents ON Sellers.SellerId = ExternalEvents.SellerId
+            LEFT JOIN FanMoments ON FanMoments.ExternalEventId = ExternalEvents.EventId
+            LEFT JOIN FanMomentImages ON FanMomentImages.FanMomentId = FanMoments.FanMomentId"""
+
+        sql += """ WHERE Sellers.SellerId=%(sellerId)s"""
+
+        if get_images is True:
+            sql += """ ORDER BY PageSellers.LastUpdate ASC, 
+                    FanMomentImages.DateUploaded DESC LIMIT 1"""
         data = {"sellerId": self.seller_id}
 
         row = db_query_one(sql, data)
@@ -696,13 +717,18 @@ class Seller:
             self.hide_seller_rate = get_override_bool_value_or_default(
                 row["HideSellerRate"]
             )
-            self.logo = get_override_string_value_or_default(row["LogoOnly"])
-
             country_id = get_override_int_value_or_default(row["CountryId"], None)
             country_name = get_override_string_value_or_default(row["CountryName"])
             country_code = get_override_string_value_or_default(row["CountryCode"])
             if country_id is not None:
                 self.country = Country(country_id, country_name, country_code)
+
+            if get_images is True:
+                self.logo = get_override_string_value_or_default(row["LogoOnly"])
+                event_date = get_override_string_value_or_default(row["EventDate"])
+                event_id = get_override_int_value_or_default(row["EventId"], None)
+                image = get_override_string_value_or_default(row["FanMomentImage"])
+                self.moment_image = f"{event_date}/{event_id}/{image}"
 
             if get_event_categories is True:
                 self.__get_seller_event_categories()

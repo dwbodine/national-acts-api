@@ -999,7 +999,7 @@ class MomentsService:
         Hydrate seller ids and sort them by seller name.
         """
         sellers = [
-            Seller(seller_id=seller_id, get_event_categories=False)
+            Seller(seller_id=seller_id, get_event_categories=False, get_images=True)
             for seller_id in seller_ids
         ]
         return sorted(
