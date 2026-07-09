@@ -246,13 +246,6 @@ def test_public_moment_routes_forward_filters_and_return_results(
         Fake moments service for public moment route tests.
         """
 
-        def get_available_moment_dates(self, seller_id=None):
-            """
-            Record the seller filter for available dates.
-            """
-            captured["dates"] = seller_id
-            return ["2026-05-01"]
-
         def get_available_moment_sellers(self, moment_date=None):
             """
             Record the date filter for available sellers.
@@ -296,7 +289,7 @@ def test_public_moment_routes_forward_filters_and_return_results(
     )
     filter_response = client.get(
         (
-            "/public/fan-moments/filter?startDate=2026-05-01"
+            "/public/moments/filter?startDate=2026-05-01"
             "&endDate=2026-05-02&sellerId=20&eventId=300"
         ),
         headers={"x-api-key": "public-key"},
@@ -319,7 +312,6 @@ def test_public_moment_routes_forward_filters_and_return_results(
             "url": "moments-bucket/2026-05-01/20/300/a.jpg",
         }
     ]
-    assert captured["dates"] == 20
     assert captured["sellers"] == "2026-05-01"
     assert captured["events"] == ("2026-05-01", 20)
     assert captured["filter"] == ("2026-05-01", "2026-05-02", 20, 300)
@@ -327,17 +319,34 @@ def test_public_moment_routes_forward_filters_and_return_results(
 
 def test_public_moment_filter_requires_start_date_without_event_id(monkeypatch, client):
     """
-    Return 400 when fan moments are requested without startDate or eventId.
+    Allow seller-only fan moment requests.
     """
+    captured = {}
+
+    class FakeMomentsService:
+        """
+        Fake moments service for seller-only moment filter tests.
+        """
+
+        def filter_moments(
+            self, start_date=None, end_date=None, seller_id=None, event_id=None
+        ):
+            """
+            Record fan moment filters.
+            """
+            captured["filter"] = (start_date, end_date, seller_id, event_id)
+            return []
+
     monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
+    monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
 
     response = client.get(
-        "/public/fan-moments/filter?sellerId=20",
+        "/public/moments/filter?sellerId=20",
         headers={"x-api-key": "public-key"},
     )
 
-    assert response.status_code == 400
-    assert response.get_json() == {"msg": "Bad Request"}
+    assert response.status_code == 200
+    assert captured["filter"] == (None, None, 20, None)
 
 
 def test_public_moment_filter_defaults_end_date_to_same_day(
@@ -401,7 +410,7 @@ def test_public_moment_filter_allows_event_id_without_start_date(
     monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
 
     response = client.get(
-        "/public/fan-moments/filter?eventId=300&sellerId=20",
+        "/public/moments/filter?eventId=300&sellerId=20",
         headers={"x-api-key": "public-key"},
     )
 
@@ -640,12 +649,15 @@ def test_public_upload_image_returns_uploaded_filename(
         Fake public service for image uploads.
         """
 
-        def upload_image_to_bucket(self, _request, bucket_name, max_width):
+        def upload_image_to_bucket(
+            self, _request, bucket_name, max_width, subfolder=None
+        ):
             """
             Record the upload destination and width.
             """
             captured["bucket_name"] = bucket_name
             captured["max_width"] = max_width
+            captured["subfolder"] = subfolder
             return "hero.jpg"
 
     monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
@@ -668,6 +680,7 @@ def test_public_upload_image_returns_uploaded_filename(
     assert parse_json_response(response) == "hero.jpg"
     assert captured["bucket_name"] == "bucket"
     assert captured["max_width"] == 1200
+    assert captured["subfolder"] is None
 
 
 def test_messaging_email_requires_api_key(client):
@@ -831,7 +844,7 @@ def test_messaging_validate_token_returns_service_result(
         ("/public/uploadImage/headers", "post", {}),
         ("/public/getAllMomentSellers", "get", None),
         ("/public/getAllMomentEvents", "get", None),
-        ("/public/fan-moments/filter", "get", None),
+        ("/public/moments/filter", "get", None),
     ],
 )
 def test_public_routes_require_api_key(client, route, method, form_data):

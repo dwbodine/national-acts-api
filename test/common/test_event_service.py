@@ -262,6 +262,7 @@ def test_get_location_from_event_omits_empty_state_and_appends_country():
             city="Toronto",
             state=None,
             country=SimpleNamespace(
+                country_id=37,
                 country_name="Canada",
                 country_code="CA",
                 countryName="Canada",
@@ -271,7 +272,7 @@ def test_get_location_from_event_omits_empty_state_and_appends_country():
 
     location = event_service.EventService().get_location_from_event(evt)
 
-    assert location == "The Hall, Toronto, $Canada"
+    assert location == "The Hall, Toronto, Canada"
 
 
 def test_get_events_and_orders_builds_search_and_seller_filters(monkeypatch):

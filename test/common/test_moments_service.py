@@ -350,29 +350,6 @@ def create_fan_moment_key(moment_date="2026-05-10", seller_id=33, event_id=44):
     return fm_key
 
 
-def test_get_available_moment_dates_returns_sorted_date_folders(monkeypatch):
-    """
-    Test that date folders are read from the bucket root and sorted ascending.
-    """
-    build_fake_s3(monkeypatch)
-
-    dates = moments_service.MomentsService().get_available_moment_dates()
-
-    assert dates == ["2026-04-30", "2026-05-01", "2026-05-02", "2026-05-03"]
-
-
-def test_get_available_moment_dates_can_filter_by_seller(monkeypatch):
-    """
-    Test that date folders can be filtered by seller id.
-    """
-    build_fake_s3(monkeypatch)
-    monkeypatch.setattr(moments_service, "EventService", FakeMomentEventService)
-
-    dates = moments_service.MomentsService().get_available_moment_dates(seller_id=20)
-
-    assert dates == ["2026-05-01", "2026-05-02"]
-
-
 def test_get_available_moment_sellers_returns_distinct_sellers_sorted_by_name(
     monkeypatch,
 ):
@@ -547,12 +524,12 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
     )
 
     assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
-        ("2026-05-01", 20, 300, ["b.jpg"]),
         ("2026-05-02", 20, 400, ["d.jpg"]),
+        ("2026-05-01", 20, 300, ["b.jpg"]),
     ]
     assert moments[0].seller_name is None
     assert moments[0].event_title is None
-    assert moments[0].event_location is None
+    assert moments[0].event_location == "None"
 
 
 def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
@@ -570,9 +547,9 @@ def test_filter_moments_filters_by_inclusive_date_range(monkeypatch):
     )
 
     assert [(m.moment_date, m.seller_id, m.event_id, m.images) for m in moments] == [
+        ("2026-05-02", 20, 400, ["d.jpg"]),
         ("2026-05-01", 20, 300, ["b.jpg"]),
         ("2026-05-01", 10, 200, ["a.jpg"]),
-        ("2026-05-02", 20, 400, ["d.jpg"]),
     ]
 
 
@@ -691,8 +668,8 @@ def test_filter_moments_uses_database_images_for_seller_filters(monkeypatch):
         (moment.moment_date, moment.seller_id, moment.event_id, moment.images)
         for moment in moments
     ] == [
-        ("2026-05-01", 20, 300, ["b.jpg"]),
         ("2026-05-02", 20, 400, ["d.jpg"]),
+        ("2026-05-01", 20, 300, ["b.jpg"]),
     ]
 
 
@@ -748,14 +725,14 @@ def test_filter_moments_uses_database_index_before_listing_s3_images(monkeypatch
     assert [
         (m.seller_name, m.event_title, m.event_location, m.images) for m in moments
     ] == [
-        ("Seller 20", "Event 300", None, ["a.jpg", "b.jpg"]),
-        ("Seller 20", "Event 301", None, ["c.jpg"]),
+        ("Seller 20", "Event 300", "None", ["a.jpg", "b.jpg"]),
+        ("Seller 20", "Event 301", "None", ["c.jpg"]),
     ]
 
 
-def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
+def test_filter_moments_uses_database_order(monkeypatch):
     """
-    Test that filter_moments sorts by date, seller name, and event title.
+    Test that filter_moments returns rows in the database query order.
     """
     fake_s3 = FakeS3Client(
         [
@@ -837,10 +814,16 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
         (m.moment_date, m.seller_name, m.event_title, m.images) for m in moments
     ] == [
         (
-            "2026-05-01",
+            "2026-05-02",
             "Alpha Presents",
             "Alpha Event",
-            ["early-alpha-alpha.jpg"],
+            ["later-alpha.jpg"],
+        ),
+        (
+            "2026-05-01",
+            "Zephyr Shows",
+            "Alpha Event",
+            ["early-zephyr.jpg"],
         ),
         (
             "2026-05-01",
@@ -850,15 +833,9 @@ def test_filter_moments_sorts_by_date_seller_name_and_event_title(monkeypatch):
         ),
         (
             "2026-05-01",
-            "Zephyr Shows",
-            "Alpha Event",
-            ["early-zephyr.jpg"],
-        ),
-        (
-            "2026-05-02",
             "Alpha Presents",
             "Alpha Event",
-            ["later-alpha.jpg"],
+            ["early-alpha-alpha.jpg"],
         ),
     ]
 

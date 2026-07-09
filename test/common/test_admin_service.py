@@ -811,7 +811,8 @@ def test_cancel_event_updates_each_event_id(monkeypatch):
     assert success is True
     assert len(calls) == 2
     assert "IsCancelled=1" in calls[0][0]
-    assert calls[1][1] == {"event_id": 20}
+    assert calls[1][1]["event_id"] == 20
+    assert len(calls[1][1]["cancelled_date"]) == 10
 
 
 def test_cancel_event_uses_uncancel_sql_branch(monkeypatch):

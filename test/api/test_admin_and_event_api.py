@@ -1370,20 +1370,22 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
         ("/admin/faq/moveup", "post", {"faqId": "1"}),
         ("/admin/faq/update", "post", {"faqId": 1}),
         (
-            "/admin/moments/add",
+            "/admin/moments/update",
             "post",
             {
-                "date": "2026-05-01",
-                "sellerId": 20,
-                "eventId": 300,
-                "filenames": ["a.jpg"],
+                "key": {
+                    "momentDate": "2026-05-01",
+                    "sellerId": 20,
+                    "eventId": 300,
+                },
+                "images": ["a.jpg"],
             },
         ),
         (
             "/admin/moments/delete",
             "post",
             {
-                "date": "2026-05-01",
+                "momentDate": "2026-05-01",
                 "sellerId": 20,
                 "eventId": 300,
             },
@@ -1444,18 +1446,9 @@ def test_admin_routes_require_admin_auth(
         ("/admin/orders/refund", {"orderId": 0}),
         ("/admin/featured-artists/order", []),
         (
-            "/admin/moments/add",
-            {
-                "date": "",
-                "sellerId": 20,
-                "eventId": 300,
-                "filenames": ["a.jpg"],
-            },
-        ),
-        (
             "/admin/moments/delete",
             {
-                "date": "2026-05-01",
+                "momentDate": "2026-05-01",
                 "sellerId": 0,
                 "eventId": 300,
             },
@@ -1544,7 +1537,7 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
     monkeypatch, client, auth_headers, parse_json_response
 ):
     """
-    Validate fan moment payloads and forward add/delete requests to the service.
+    Validate fan moment payloads and forward update/delete requests to the service.
     """
     captured = {}
 
@@ -1560,37 +1553,50 @@ def test_admin_moments_add_and_delete_forward_valid_payloads(
             captured["delete"] = fm_key
             return True
 
+        def update_moment(self, fan_moment):
+            """
+            Record update moment arguments.
+            """
+            captured["update"] = fan_moment
+            return True
+
     monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: True)
     monkeypatch.setattr(admin_api, "MomentsService", FakeMomentsService)
 
     payload = {
-        "date": "2026-05-01",
-        "sellerId": "20",
-        "eventId": "300",
-        "filenames": ["a.jpg", "b.jpg"],
+        "key": {
+            "momentDate": "2026-05-01",
+            "sellerId": 20,
+            "eventId": 300,
+        },
+        "images": ["a.jpg", "b.jpg"],
     }
-    add_response = client.post(
-        "/admin/moments/add",
+    update_response = client.post(
+        "/admin/moments/update",
         headers=auth_headers(),
         json=payload,
     )
     delete_response = client.post(
         "/admin/moments/delete",
         headers=auth_headers(),
-        json=payload,
+        json={
+            "momentDate": "2026-05-01",
+            "sellerId": "20",
+            "eventId": "300",
+        },
     )
 
-    assert add_response.status_code == 200
-    assert parse_json_response(add_response) == ["2026-05-01/20/300/a.jpg"]
+    assert update_response.status_code == 200
+    assert parse_json_response(update_response) is True
     assert delete_response.status_code == 200
     assert parse_json_response(delete_response) is True
-    add_key, add_filenames = captured["add"]
+    updated_moment = captured["update"]
     delete_key = captured["delete"]
     assert (
-        add_key.moment_date,
-        add_key.seller_id,
-        add_key.event_id,
-        add_filenames,
+        updated_moment.key.moment_date,
+        updated_moment.key.seller_id,
+        updated_moment.key.event_id,
+        updated_moment.images,
     ) == ("2026-05-01", 20, 300, ["a.jpg", "b.jpg"])
     assert (
         delete_key.moment_date,

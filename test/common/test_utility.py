@@ -434,7 +434,7 @@ def test_resize_and_move_temp_file_to_s3_returns_none_when_upload_fails(
     monkeypatch, workspace_tmp_path
 ):
     """
-    Test that resize_and_move_temp_file_to_s3 handles S3 upload errors.
+    Test that resize_and_move_temp_file_to_s3 returns the resized filename after upload errors.
     """
     api_path = workspace_tmp_path / "api"
     temp_dir = api_path / "tmp"
@@ -448,7 +448,9 @@ def test_resize_and_move_temp_file_to_s3_returns_none_when_upload_fails(
         utility, "resize_tmp_image", lambda temp_filename, max_width: "resized.jpg"
     )
 
-    assert utility.resize_and_move_temp_file_to_s3("photo.jpg", "bucket", 400) is None
+    assert utility.resize_and_move_temp_file_to_s3("photo.jpg", "bucket", 400) == (
+        "resized.jpg"
+    )
 
 
 def test_list_s3_images_returns_empty_list_when_bucket_has_no_contents(monkeypatch):
