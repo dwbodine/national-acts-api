@@ -286,10 +286,6 @@ def test_public_moment_routes_forward_filters_and_return_results(
     monkeypatch.setenv("PUBLIC_API_KEY", "public-key")
     monkeypatch.setattr(public_api, "MomentsService", FakeMomentsService)
 
-    dates_response = client.get(
-        "/public/getAllMomentDates?seller_id=20",
-        headers={"x-api-key": "public-key"},
-    )
     sellers_response = client.get(
         "/public/getAllMomentSellers?date=2026-05-01",
         headers={"x-api-key": "public-key"},
@@ -306,8 +302,6 @@ def test_public_moment_routes_forward_filters_and_return_results(
         headers={"x-api-key": "public-key"},
     )
 
-    assert dates_response.status_code == 200
-    assert parse_json_response(dates_response) == ["2026-05-01"]
     assert sellers_response.status_code == 200
     assert parse_json_response(sellers_response) == [
         {"sellerId": 20, "name": "Alpha Presents"}
@@ -835,7 +829,6 @@ def test_messaging_validate_token_returns_service_result(
         ("/public/settings", "get", None),
         ("/public/timezones", "get", None),
         ("/public/uploadImage/headers", "post", {}),
-        ("/public/getAllMomentDates", "get", None),
         ("/public/getAllMomentSellers", "get", None),
         ("/public/getAllMomentEvents", "get", None),
         ("/public/fan-moments/filter", "get", None),

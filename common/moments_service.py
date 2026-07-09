@@ -582,33 +582,6 @@ class MomentsService:
         )
         return [row["ImageName"] for row in rows if row.get("ImageName") is not None]
 
-    def get_available_moment_dates(self, seller_id: int = None) -> list[str]:
-        """
-        Get all available moment dates, possibly filtered by seller id
-        """
-        if seller_id is None:
-            dates = [
-                prefix.strip("/")
-                for prefix in self._list_common_prefixes()
-                if self._is_valid_date_folder(prefix.strip("/"))
-            ]
-            return sorted(dates)
-
-        dates = set()
-        event_details_by_id: dict[int, tuple[int, str, str]] = {}
-        event_service = EventService()
-        for key in self._list_keys():
-            fm_key = self._parse_fan_moment_key(key)
-            if fm_key is None:
-                continue
-            event_seller_id, _event_title, _event_location = self._get_event_details(
-                fm_key.event_id, event_service, event_details_by_id
-            )
-            if event_seller_id == seller_id:
-                dates.add(fm_key.moment_date)
-
-        return sorted(dates)
-
     def get_available_moment_sellers(self, moment_date: str = None) -> list[Seller]:
         """
         Get all available moment sellers, possibly filtered by date

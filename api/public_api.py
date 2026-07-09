@@ -355,27 +355,6 @@ def add_or_confirm_subscriber():
     return convert_to_json(subscriber_id)
 
 
-@public_api.route("/public/getAllMomentDates")
-def get_all_moment_dates():
-    """
-    API method to fetch all moment dates
-    """
-    # secured by public api key
-    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
-    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
-
-    if sender_key is None or api_key is None or sender_key != api_key:
-        return {"msg": "Unauthorized"}, 401
-
-    seller_id: int = get_override_int_value_or_default(
-        request.args.get("seller_id"), default=None
-    )
-
-    moments_service = MomentsService()
-    moment_dates = moments_service.get_available_moment_dates(seller_id)
-    return convert_to_json(moment_dates)
-
-
 @public_api.route("/public/getAllMomentSellers")
 def get_all_moment_sellers():
     """

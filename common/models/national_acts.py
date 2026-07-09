@@ -628,6 +628,7 @@ class Seller:
     spotify: str = None
     website: str = None
     website_display_text: str = None
+    logo: str = None
 
     seller_event_categories: list[SellerEventCategory] = []
 
@@ -661,10 +662,14 @@ class Seller:
             Sellers.WebsiteDisplayText,
             Sellers.HideInList,
             Sellers.HideSellerRate,
-            Sellers.Inactive
+            Sellers.Inactive,
+            Pages.LogoOnly
             FROM Sellers
             LEFT JOIN Country ON Sellers.CountryId = Country.CountryId
-            WHERE Sellers.SellerId=%(sellerId)s"""
+            LEFT JOIN PageSellers ON Sellers.SellerId = PageSellers.SellerId
+            LEFT JOIN Pages ON PageSellers.PageId = Pages.PageId
+            WHERE Sellers.SellerId=%(sellerId)s
+            ORDER BY PageSellers.LastUpdate ASC LIMIT 1"""
         data = {"sellerId": self.seller_id}
 
         row = db_query_one(sql, data)
@@ -691,6 +696,7 @@ class Seller:
             self.hide_seller_rate = get_override_bool_value_or_default(
                 row["HideSellerRate"]
             )
+            self.logo = get_override_string_value_or_default(row["LogoOnly"])
 
             country_id = get_override_int_value_or_default(row["CountryId"], None)
             country_name = get_override_string_value_or_default(row["CountryName"])
