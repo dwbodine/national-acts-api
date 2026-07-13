@@ -107,7 +107,7 @@ class SenderApiService:
         new_subscriber.email = email
         success = self.create_subscriber(new_subscriber)
         if success is True:
-            return 0  # set to temp value to indicate created
+            return 1  # set to temp value to indicate created
         return -1  # set to temp value to indicate error creating
 
     def create_subscriber(self, subscriber: Subscriber):
