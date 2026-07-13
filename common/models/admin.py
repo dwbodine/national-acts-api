@@ -119,6 +119,7 @@ class Page:
     last_update: str = None
     sellers: list[PageSeller] = []
     events: list[VipEvent] = []
+    artist_template_type_id: int = None
 
 
 class FaqCategory:

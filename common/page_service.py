@@ -5,7 +5,7 @@ Page Service
 from datetime import datetime
 import operator
 import logging
-from common.constants import PAGE_SELLER_TYPE_IDS, ImageType
+from common.constants import ARTIST_SELLER_TYPE, PAGE_SELLER_TYPE_IDS, ImageType
 from common.db import (
     db_delete,
     db_query_all,
@@ -471,6 +471,9 @@ class PageService:
             "extraHtmlBody": get_override_string_value_or_default(
                 page_to_update.extra_html_body
             ),
+            "artistTemplateTypeId": get_override_int_value_or_default(
+                page_to_update.artist_template_type_id, default=None
+            ),
         }
 
         # clean up old images
@@ -502,6 +505,7 @@ class PageService:
                 UseExcludeDates=%(useExcludeDates)s, ExcludeStart=%(excludeStart)s,
                 ExcludeEnd=%(excludeEnd)s, GoogleAnalyticsID=%(googleAnalyticsId)s,
                 ExtraHTMLHead=%(extraHtmlHead)s, ExtraHTMLBody=%(extraHtmlBody)s,
+                ArtistTemplateTypeId=%(artistTemplateTypeId)s,
                 LastUpdated=CURRENT_TIMESTAMP
                 WHERE PageID=%(pageId)s"""
             success = db_update(sql, data)
@@ -510,14 +514,15 @@ class PageService:
                 LinkPreviewImage, LogoOnly, Title1, SubTitle1, Title2, SubTitle2,
                 HTMLText, Inactive, UseIncludeDates, IncludeStart, IncludeEnd,
                 UseExcludeDates, ExcludeStart, ExcludeEnd, GoogleAnalyticsID,
-                ExtraHTMLHead, ExtraHTMLBody, LastUpdated) VALUES (%(route)s, 
+                ExtraHTMLHead, ExtraHTMLBody, ArtistTemplateTypeId, LastUpdated) 
+                VALUES (%(route)s, 
                 %(title)s, %(pageTypeId)s, %(image)s, %(thumbnail)s,
                 %(linkPreviewImage)s, %(logoOnly)s, %(title1)s, %(subtitle1)s,
                 %(title2)s, %(subtitle2)s, %(htmlText)s, %(inactive)s,
                 %(useIncludeDates)s, %(includeStart)s, %(includeEnd)s,
                 %(useExcludeDates)s, %(excludeStart)s, %(excludeEnd)s,
                 %(googleAnalyticsId)s, %(extraHtmlHead)s, %(extraHtmlBody)s,
-                CURRENT_TIMESTAMP)"""
+                %(artistTemplateTypeId)s, CURRENT_TIMESTAMP)"""
             page_id = db_insert(sql, data)
             success = page_id > 0
 
@@ -859,6 +864,11 @@ class PageService:
                 page_type.page_type_name = get_override_string_value_or_default(
                     row["PageTypeName"]
                 )
+                if page_type.page_type_id == ARTIST_SELLER_TYPE:
+                    page.artist_template_type_id = get_override_int_value_or_default(
+                        row["ArtistTemplateTypeId"]
+                    )
+
                 page.page_type = page_type
 
         return page
