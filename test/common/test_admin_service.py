@@ -162,6 +162,7 @@ def create_vip_event(external_event_id=0, ticket_socket_event_id=12):
     event.disable_vip_link_reason = None
     event.external_thumbnail = "thumb.jpg"
     event.exclude_from_dashboard = False
+    event.event_note = None
     event.is_cancelled = False
     event.ticket_types = []
     return event

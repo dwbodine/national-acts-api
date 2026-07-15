@@ -352,6 +352,7 @@ class VipEvent(TicketSocketEvent):
     external_thumbnail: str = None
     last_update: str = None
     exclude_from_dashboard: bool = False
+    event_note: str = None
 
     # collections
     notes: list[Note] = []

@@ -129,6 +129,7 @@ class EventService:
                     ExternalEvents.IsCancelled AS IsCancelled,
                     ExternalEvents.CancelledDate AS CancelledDate,   
                     ExternalEvents.ExcludeFromDashboard AS ExcludeFromDashboard,
+                    ExternalEvents.EventNote AS EventNote,
                     TicketSocketEvents.EventId AS EventId,                    
                     TicketSocketEvents.URL AS URL,
                     TicketSocketEvents.Thumbnail,                 
@@ -416,6 +417,9 @@ class EventService:
             vip_event.seller_type = get_override_int_value_or_default(row["SellerType"])
             vip_event.exclude_from_dashboard = get_override_bool_value_or_default(
                 row["ExcludeFromDashboard"]
+            )
+            vip_event.event_note = get_override_string_value_or_default(
+                row["EventNote"]
             )
 
             if vip_event.external_vip_link is not None:

@@ -710,6 +710,9 @@ class AdminService:
             "isCancelled": get_override_tinyint_value_or_default_from_bool(
                 event_to_update.is_cancelled
             ),
+            "eventNote": get_override_string_value_or_default(
+                event_to_update.event_note
+            ),
         }
 
         if existing_event is not None:
@@ -742,6 +745,7 @@ class AdminService:
                                 Thumbnail=%(thumbnail)s,
                                 ExcludeFromDashboard=%(excludeFromDashboard)s,
                                 IsCancelled=%(isCancelled)s,
+                                EventNote=%(eventNote)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                             WHERE EventId=%(event_id)s"""
 
@@ -756,7 +760,7 @@ class AdminService:
                 DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, 
                 IsDeleted, IsHidden, AnnounceDate, CheckInLocation, CheckInNotes, 
                 EmailSentToVips, TextSentToVips, Thumbnail, ExcludeFromDashboard, IsCancelled,
-                Created, LastUpdate) VALUES
+                EventNote, Created, LastUpdate) VALUES
                 (%(seller_id)s, %(title)s, %(event_date)s,%(ticket_socket_event_id)s,
                 %(event_time)s, %(meet_and_greet_time)s,%(doors_open_time)s, %(url)s,
                 %(external_event_venue_id)s, %(disable_link_button)s,
@@ -764,7 +768,7 @@ class AdminService:
                 %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isDeleted)s, 
                 %(isHidden)s, %(announceDate)s, %(checkInLocation)s, %(checkInNotes)s,
                 %(emailSentToVips)s, %(textSentToVips)s, %(thumbnail)s, %(excludeFromDashboard)s,
-                %(isCancelled)s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"""
+                %(isCancelled)s, %(eventNote)s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"""
 
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0

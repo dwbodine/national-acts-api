@@ -2,7 +2,7 @@
 Constants file
 """
 
-from enum import StrEnum
+from enum import StrEnum, IntEnum
 
 PAGE_SELLER_TYPE_IDS: list[int] = [7, 14, 15, 16, 17, 18, 19]
 ARTIST_SELLER_TYPE: int = 7
@@ -74,6 +74,15 @@ class ImageType(StrEnum):
     EVENT_THUMBNAILS = "event_thumbnails"
     FEATURED_ARTISTS = "featured-artist"
     FAN_MOMENTS = "fan-moments"
+
+
+class ArtistTitlePosition(IntEnum):
+    """
+    Enum to translate to artist title position
+    """
+
+    TOP = 0
+    BOTTOM = 1
 
 
 HEADER_IMAGE_WIDTH: int = 1600

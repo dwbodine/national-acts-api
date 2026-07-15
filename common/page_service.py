@@ -5,7 +5,12 @@ Page Service
 from datetime import datetime
 import operator
 import logging
-from common.constants import ARTIST_SELLER_TYPE, PAGE_SELLER_TYPE_IDS, ImageType
+from common.constants import (
+    ARTIST_SELLER_TYPE,
+    PAGE_SELLER_TYPE_IDS,
+    ImageType,
+    ArtistTitlePosition,
+)
 from common.db import (
     db_delete,
     db_query_all,
@@ -14,7 +19,13 @@ from common.db import (
     db_update,
 )
 from common.event_service import EventService
-from common.models.admin import FeaturedArtist, Page, PageSeller, PageType
+from common.models.admin import (
+    FeaturedArtist,
+    Page,
+    PageSeller,
+    PageType,
+    ArtistPageSettings,
+)
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import Country
 from common.utility import (
@@ -42,9 +53,17 @@ class PageService:
         pages: list[Page] = []
 
         data = {}
-        sql = """SELECT Pages.*, PageType.PageType AS PageTypeName
+        sql = """SELECT Pages.*, PageType.PageType AS PageTypeName,
+                    ArtistPageSettings.ArtistTemplateTypeId, 
+                    ArtistPageSettings.ShowTitle,
+                    ArtistPageSettings.TitlePosition,
+                    ArtistPageSettings.GradientStartColor,
+                    ArtistPageSettings.ArtistDescription,
+                    ArtistPageSettings.VipPackageContents,
+                    ArtistPageSettings.LastUpdate AS ArtistSettingsLastUpdate
                     FROM Pages 
-                    JOIN PageType ON Pages.PageTypeID = PageType.PageTypeID"""
+                    JOIN PageType ON Pages.PageTypeID = PageType.PageTypeID
+                    LEFT JOIN ArtistPageSettings ON ArtistPageSettings.PageId = Pages.PageID"""
 
         if page_type_id is not None and page_type_id > 0:
             sql += """ WHERE Pages.PageTypeID=%(page_type_id)s"""
@@ -85,9 +104,17 @@ class PageService:
         route = route.replace("'", "")
         route = route.replace(":", "")
 
-        sql = """SELECT Pages.*, PageType.PageType AS PageTypeName
+        sql = """SELECT Pages.*, PageType.PageType AS PageTypeName,
+                    ArtistPageSettings.ArtistTemplateTypeId, 
+                    ArtistPageSettings.ShowTitle,
+                    ArtistPageSettings.TitlePosition,
+                    ArtistPageSettings.GradientStartColor,
+                    ArtistPageSettings.ArtistDescription,
+                    ArtistPageSettings.VipPackageContents,
+                    ArtistPageSettings.LastUpdate AS ArtistSettingsLastUpdate
                     FROM Pages 
                     JOIN PageType ON PageType.PageTypeID = Pages.PageTypeID
+                    LEFT JOIN ArtistPageSettings ON ArtistPageSettings.PageId = Pages.PageID
                     WHERE Pages.Route=%(route)s"""
 
         if show_inactive is False:
@@ -471,9 +498,6 @@ class PageService:
             "extraHtmlBody": get_override_string_value_or_default(
                 page_to_update.extra_html_body
             ),
-            "artistTemplateTypeId": get_override_int_value_or_default(
-                page_to_update.artist_template_type_id, default=None
-            ),
         }
 
         # clean up old images
@@ -505,7 +529,6 @@ class PageService:
                 UseExcludeDates=%(useExcludeDates)s, ExcludeStart=%(excludeStart)s,
                 ExcludeEnd=%(excludeEnd)s, GoogleAnalyticsID=%(googleAnalyticsId)s,
                 ExtraHTMLHead=%(extraHtmlHead)s, ExtraHTMLBody=%(extraHtmlBody)s,
-                ArtistTemplateTypeId=%(artistTemplateTypeId)s,
                 LastUpdated=CURRENT_TIMESTAMP
                 WHERE PageID=%(pageId)s"""
             success = db_update(sql, data)
@@ -514,7 +537,7 @@ class PageService:
                 LinkPreviewImage, LogoOnly, Title1, SubTitle1, Title2, SubTitle2,
                 HTMLText, Inactive, UseIncludeDates, IncludeStart, IncludeEnd,
                 UseExcludeDates, ExcludeStart, ExcludeEnd, GoogleAnalyticsID,
-                ExtraHTMLHead, ExtraHTMLBody, ArtistTemplateTypeId, LastUpdated) 
+                ExtraHTMLHead, ExtraHTMLBody, LastUpdated) 
                 VALUES (%(route)s, 
                 %(title)s, %(pageTypeId)s, %(image)s, %(thumbnail)s,
                 %(linkPreviewImage)s, %(logoOnly)s, %(title1)s, %(subtitle1)s,
@@ -522,9 +545,78 @@ class PageService:
                 %(useIncludeDates)s, %(includeStart)s, %(includeEnd)s,
                 %(useExcludeDates)s, %(excludeStart)s, %(excludeEnd)s,
                 %(googleAnalyticsId)s, %(extraHtmlHead)s, %(extraHtmlBody)s,
-                %(artistTemplateTypeId)s, CURRENT_TIMESTAMP)"""
+                CURRENT_TIMESTAMP)"""
             page_id = db_insert(sql, data)
             success = page_id > 0
+
+        if (
+            success is True
+            and page_id > 0
+            and page_to_update.page_type is not None
+            and page_to_update.page_type.page_type_id == ARTIST_SELLER_TYPE
+            and page_to_update.artist_page_settings is not None
+        ):
+
+            existing_setting_sql = """SELECT ArtistPageSettingId 
+                                    FROM ArtistPageSettings WHERE PageId=%(pageId)s"""
+            existing_setting_data = {"pageId": page_id}
+
+            existing_settings = db_query_one(
+                existing_setting_sql, existing_setting_data
+            )
+
+            setting_data = {
+                "pageId": page_id,
+                "artistTemplateTypeId": get_override_int_value_or_default(
+                    page_to_update.artist_page_settings.artist_template_type_id
+                ),
+                "showTitle": get_override_tinyint_value_or_default_from_bool(
+                    page_to_update.artist_page_settings.show_title
+                ),
+                "titlePosition": get_override_int_value_or_default(
+                    page_to_update.artist_page_settings.title_position
+                ),
+                "vipPackageContents": get_override_string_value_or_default(
+                    page_to_update.artist_page_settings.vip_package_contents
+                ),
+                "gradientStartColor": get_override_string_value_or_default(
+                    getattr(
+                        page_to_update.artist_page_settings,
+                        "gradient_start_color",
+                        None,
+                    ),
+                    default=None,
+                ),
+                "artistDescription": get_override_string_value_or_default(
+                    getattr(
+                        page_to_update.artist_page_settings,
+                        "artist_description",
+                        None,
+                    ),
+                    default=None,
+                ),
+            }
+
+            if existing_settings and len(existing_settings) > 0:
+                setting_sql = """UPDATE ArtistPageSettings SET
+                                    ArtistTemplateTypeId=%(artistTemplateTypeId)s,
+                                    ShowTitle=%(showTitle)s,
+                                    TitlePosition=%(titlePosition)s,
+                                    VipPackageContents=%(vipPackageContents)s,
+                                    ArtistDescription=%(artistDescription)s,
+                                    GradientStartColor=%(gradientStartColor)s,
+                                    LastUpdate=CURRENT_TIMESTAMP
+                                    WHERE PageId=%(pageId)s"""
+                success = db_update(setting_sql, setting_data)
+            else:
+                setting_sql = """INSERT INTO ArtistPageSettings (PageId,
+                     ArtistTemplateTypeId, ShowTitle, TitlePosition, VipPackageContents,
+                        ArtistDescription, GradientStartColor) VALUES (
+                        %(pageId)s, %(artistTemplateTypeId)s, %(showTitle)s, 
+                        %(titlePosition)s, %(vipPackageContents)s,
+                        %(artistDescription)s, %(gradientStartColor)s)"""
+                setting_id = db_insert(setting_sql, setting_data)
+                success = setting_id > 0
 
         if (
             success is True
@@ -864,12 +956,37 @@ class PageService:
                 page_type.page_type_name = get_override_string_value_or_default(
                     row["PageTypeName"]
                 )
-                if page_type.page_type_id == ARTIST_SELLER_TYPE:
-                    page.artist_template_type_id = get_override_int_value_or_default(
-                        row["ArtistTemplateTypeId"]
-                    )
-
                 page.page_type = page_type
+
+                artist_settings = ArtistPageSettings()
+                if page_type.page_type_id == ARTIST_SELLER_TYPE:
+                    artist_settings.artist_template_type_id = (
+                        get_override_int_value_or_default(row["ArtistTemplateTypeId"])
+                    )
+                    artist_settings.show_title = get_override_bool_value_or_default(
+                        row["ShowTitle"]
+                    )
+                    title_position = get_override_int_value_or_default(
+                        row["TitlePosition"]
+                    )
+                    artist_settings.title_position = (
+                        ArtistTitlePosition(title_position)
+                        if title_position is not None
+                        else ArtistTitlePosition.BOTTOM
+                    )
+                    artist_settings.last_update = get_override_string_value_or_default(
+                        row["ArtistSettingsLastUpdate"]
+                    )
+                    artist_settings.vip_package_contents = (
+                        get_override_string_value_or_default(row["VipPackageContents"])
+                    )
+                    artist_settings.gradient_start_color = (
+                        get_override_string_value_or_default(row["GradientStartColor"])
+                    )
+                    artist_settings.artist_description = (
+                        get_override_string_value_or_default(row["ArtistDescription"])
+                    )
+                page.artist_page_settings = artist_settings
 
         return page
 

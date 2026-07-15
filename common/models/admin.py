@@ -4,6 +4,7 @@ Models specific to site or portal administration
 
 from enum import Enum
 
+from common.constants import ArtistTitlePosition
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import Country, Timezone
 
@@ -87,6 +88,20 @@ class PageSeller:
     seller_name: str = None
 
 
+class ArtistPageSettings:
+    """
+    settings for artist pages
+    """
+
+    artist_template_type_id: int
+    show_title: bool = True
+    title_position: ArtistTitlePosition = ArtistTitlePosition.BOTTOM
+    vip_package_contents: str = None
+    gradient_start_color: str = None
+    artist_description: str = None
+    last_update: str = None
+
+
 class Page:
     """
     settings for pages
@@ -119,7 +134,7 @@ class Page:
     last_update: str = None
     sellers: list[PageSeller] = []
     events: list[VipEvent] = []
-    artist_template_type_id: int = None
+    artist_page_settings: ArtistPageSettings = None
 
 
 class FaqCategory:
