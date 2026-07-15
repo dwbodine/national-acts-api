@@ -2,6 +2,8 @@
 Page Service
 """
 
+# pylint: disable=too-many-lines
+
 from datetime import datetime
 import operator
 import logging
@@ -557,8 +559,8 @@ class PageService:
             and page_to_update.artist_page_settings is not None
         ):
 
-            existing_setting_sql = """SELECT ArtistPageSettingId 
-                                    FROM ArtistPageSettings WHERE PageId=%(pageId)s"""
+            existing_setting_sql = """SELECT ArtistPageSettingId
+                                     FROM ArtistPageSettings WHERE PageId=%(pageId)s"""
             existing_setting_data = {"pageId": page_id}
 
             existing_settings = db_query_one(
