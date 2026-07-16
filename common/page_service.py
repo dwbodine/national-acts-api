@@ -59,7 +59,6 @@ class PageService:
                     ArtistPageSettings.ArtistTemplateTypeId, 
                     ArtistPageSettings.ShowTitle,
                     ArtistPageSettings.TitlePosition,
-                    ArtistPageSettings.GradientStartColor,
                     ArtistPageSettings.ArtistDescription,
                     ArtistPageSettings.VipPackageContents,
                     ArtistPageSettings.LastUpdate AS ArtistSettingsLastUpdate
@@ -110,7 +109,6 @@ class PageService:
                     ArtistPageSettings.ArtistTemplateTypeId, 
                     ArtistPageSettings.ShowTitle,
                     ArtistPageSettings.TitlePosition,
-                    ArtistPageSettings.GradientStartColor,
                     ArtistPageSettings.ArtistDescription,
                     ArtistPageSettings.VipPackageContents,
                     ArtistPageSettings.LastUpdate AS ArtistSettingsLastUpdate
@@ -500,6 +498,14 @@ class PageService:
             "extraHtmlBody": get_override_string_value_or_default(
                 page_to_update.extra_html_body
             ),
+            "gradientStartColor": get_override_string_value_or_default(
+                getattr(
+                    page_to_update,
+                    "gradient_start_color",
+                    None,
+                ),
+                default=None,
+            ),
         }
 
         # clean up old images
@@ -531,6 +537,7 @@ class PageService:
                 UseExcludeDates=%(useExcludeDates)s, ExcludeStart=%(excludeStart)s,
                 ExcludeEnd=%(excludeEnd)s, GoogleAnalyticsID=%(googleAnalyticsId)s,
                 ExtraHTMLHead=%(extraHtmlHead)s, ExtraHTMLBody=%(extraHtmlBody)s,
+                GradientStartColor=%(gradientStartColor)s,
                 LastUpdated=CURRENT_TIMESTAMP
                 WHERE PageID=%(pageId)s"""
             success = db_update(sql, data)
@@ -539,7 +546,7 @@ class PageService:
                 LinkPreviewImage, LogoOnly, Title1, SubTitle1, Title2, SubTitle2,
                 HTMLText, Inactive, UseIncludeDates, IncludeStart, IncludeEnd,
                 UseExcludeDates, ExcludeStart, ExcludeEnd, GoogleAnalyticsID,
-                ExtraHTMLHead, ExtraHTMLBody, LastUpdated) 
+                ExtraHTMLHead, ExtraHTMLBody, GradientStartColorm LastUpdated) 
                 VALUES (%(route)s, 
                 %(title)s, %(pageTypeId)s, %(image)s, %(thumbnail)s,
                 %(linkPreviewImage)s, %(logoOnly)s, %(title1)s, %(subtitle1)s,
@@ -547,7 +554,7 @@ class PageService:
                 %(useIncludeDates)s, %(includeStart)s, %(includeEnd)s,
                 %(useExcludeDates)s, %(excludeStart)s, %(excludeEnd)s,
                 %(googleAnalyticsId)s, %(extraHtmlHead)s, %(extraHtmlBody)s,
-                CURRENT_TIMESTAMP)"""
+                %(gradientStartColor)s, CURRENT_TIMESTAMP)"""
             page_id = db_insert(sql, data)
             success = page_id > 0
 
@@ -581,14 +588,6 @@ class PageService:
                 "vipPackageContents": get_override_string_value_or_default(
                     page_to_update.artist_page_settings.vip_package_contents
                 ),
-                "gradientStartColor": get_override_string_value_or_default(
-                    getattr(
-                        page_to_update.artist_page_settings,
-                        "gradient_start_color",
-                        None,
-                    ),
-                    default=None,
-                ),
                 "artistDescription": get_override_string_value_or_default(
                     getattr(
                         page_to_update.artist_page_settings,
@@ -605,18 +604,17 @@ class PageService:
                                     ShowTitle=%(showTitle)s,
                                     TitlePosition=%(titlePosition)s,
                                     VipPackageContents=%(vipPackageContents)s,
-                                    ArtistDescription=%(artistDescription)s,
-                                    GradientStartColor=%(gradientStartColor)s,
+                                    ArtistDescription=%(artistDescription)s,                                    
                                     LastUpdate=CURRENT_TIMESTAMP
                                     WHERE PageId=%(pageId)s"""
                 success = db_update(setting_sql, setting_data)
             else:
                 setting_sql = """INSERT INTO ArtistPageSettings (PageId,
                      ArtistTemplateTypeId, ShowTitle, TitlePosition, VipPackageContents,
-                        ArtistDescription, GradientStartColor) VALUES (
+                        ArtistDescription) VALUES (
                         %(pageId)s, %(artistTemplateTypeId)s, %(showTitle)s, 
                         %(titlePosition)s, %(vipPackageContents)s,
-                        %(artistDescription)s, %(gradientStartColor)s)"""
+                        %(artistDescription)s)"""
                 setting_id = db_insert(setting_sql, setting_data)
                 success = setting_id > 0
 
@@ -950,6 +948,9 @@ class PageService:
                 page.last_update = get_override_string_value_or_default(
                     row["LastUpdated"]
                 )
+                page.gradient_start_color = get_override_string_value_or_default(
+                    row["GradientStartColor"]
+                )
 
                 page_type = PageType()
                 page_type.page_type_id = get_override_int_value_or_default(
@@ -981,9 +982,6 @@ class PageService:
                     )
                     artist_settings.vip_package_contents = (
                         get_override_string_value_or_default(row["VipPackageContents"])
-                    )
-                    artist_settings.gradient_start_color = (
-                        get_override_string_value_or_default(row["GradientStartColor"])
                     )
                     artist_settings.artist_description = (
                         get_override_string_value_or_default(row["ArtistDescription"])

@@ -97,7 +97,6 @@ class ArtistPageSettings:
     show_title: bool = True
     title_position: ArtistTitlePosition = ArtistTitlePosition.BOTTOM
     vip_package_contents: str = None
-    gradient_start_color: str = None
     artist_description: str = None
     last_update: str = None
 
@@ -135,6 +134,7 @@ class Page:
     sellers: list[PageSeller] = []
     events: list[VipEvent] = []
     artist_page_settings: ArtistPageSettings = None
+    gradient_start_color: str = None
 
 
 class FaqCategory:
