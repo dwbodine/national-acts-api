@@ -192,26 +192,6 @@ services:
     networks:
       - frontend_net
 
-  nationalactswww-new:
-    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactswww-new:latest
-    container_name: nationalactswww-new
-    expose:
-      - "3000"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.www-test.rule=Host(`test.nationalactsvip.com`)"
-      - "traefik.http.routers.www-test.entrypoints=websecure"
-      - "traefik.http.routers.www-test.priority=100"
-      - "traefik.http.routers.www-test.service=www-test"
-      - "traefik.http.routers.www-test.tls=true"
-      - "traefik.http.routers.www-test.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.www-test.tls.domains[0].main=test.nationalactsvip.com"
-      - "traefik.http.services.www-test.loadbalancer.server.port=3000"
-    restart: unless-stopped
-    logging: *default-logging
-    networks:
-      - frontend_net
-
 secrets:
   mysql_root_password:
     file: ./secrets/mysql_root_password.txt
