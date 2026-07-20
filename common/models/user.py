@@ -122,3 +122,17 @@ class UserResponse:
         Returns true/false if error message is present
         """
         return self.error_message is not None and self.error_message != ""
+
+
+class PostSubscriberRequest:
+    """
+    Request from front end to register new user
+    """
+
+    email: str
+    first_name: str
+    last_name: str
+    city: str
+    state: str
+    country: str
+    favorite_band: str

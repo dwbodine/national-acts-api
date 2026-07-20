@@ -10,6 +10,7 @@ import requests
 
 from common import db
 from common.models.sender_api import Subscriber
+from common.models.user import PostSubscriberRequest
 from common.utility import (
     get_override_int_value_or_default,
     get_override_string_value_or_default,
@@ -95,16 +96,22 @@ class SenderApiService:
 
         return subscriber
 
-    def add_subscriber_from_email(self, email: str):
+    def add_subscriber_from_email(self, request: PostSubscriberRequest):
         """
         Add or update subscriber in Sender API
         """
-        existing_subscriber = self.get_subscriber_by_email(email)
+        existing_subscriber = self.get_subscriber_by_email(request.email)
         if existing_subscriber is not None:
             return existing_subscriber.id
 
         new_subscriber = Subscriber()
-        new_subscriber.email = email
+        new_subscriber.email = request.email
+        new_subscriber.first_name = request.first_name
+        new_subscriber.last_name = request.last_name
+        new_subscriber.venue_city = request.city
+        new_subscriber.venue_state = request.state
+        new_subscriber.venue_country = request.country
+        new_subscriber.band = request.favorite_band
         success = self.create_subscriber(new_subscriber)
         if success is True:
             return 1  # set to temp value to indicate created

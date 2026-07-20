@@ -910,10 +910,6 @@ def update_moment():
     """
     API method to update moment
     """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
     moment = convert_json_to_snake_case_object(request.get_json(), FanMoment())
 
     service = MomentsService()
@@ -927,10 +923,6 @@ def delete_fan_moments():
     """
     API method to delete fan moments
     """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
     moment_date: str = get_override_string_value_or_default(
         request.json.get("momentDate", None), default=None
     )
