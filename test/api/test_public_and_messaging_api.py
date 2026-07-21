@@ -200,8 +200,9 @@ def test_public_add_or_confirm_subscriber_returns_sender_result(
         public_api,
         "SenderApiService",
         build_service(
-            add_subscriber_from_email=lambda email: (
-                captured.update({"email": email}) or "sender-123"
+            add_subscriber_from_email=lambda subscriber_request: (
+                captured.update({"subscriber_request": subscriber_request})
+                or "sender-123"
             )
         ),
     )
@@ -214,7 +215,7 @@ def test_public_add_or_confirm_subscriber_returns_sender_result(
 
     assert response.status_code == 200
     assert parse_json_response(response) == "sender-123"
-    assert captured["email"] == "fan@example.com"
+    assert captured["subscriber_request"].email == "fan@example.com"
 
 
 def test_public_add_or_confirm_subscriber_validates_email(monkeypatch, client):

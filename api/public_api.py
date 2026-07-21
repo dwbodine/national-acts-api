@@ -11,11 +11,13 @@ from common.constants import ImageType
 from common.event_service import EventService
 from common.faq_service import FaqService
 from common.moments_service import MomentsService
+from common.models.user import PostSubscriberRequest
 from common.page_service import PageService
 from common.public_service import PublicService
 from common.seller_service import SellerService
 from common.sender_api_service import SenderApiService
 from common.utility import (
+    convert_json_to_snake_case_object,
     convert_to_json,
     get_bucket_name_from_image_type,
     get_image_width_from_image_type,
@@ -344,14 +346,16 @@ def add_or_confirm_subscriber():
     if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
-    data = request.get_json()
-    email = get_override_string_value_or_default(data.get("email"))
+    data: PostSubscriberRequest = convert_json_to_snake_case_object(
+        request.get_json(), PostSubscriberRequest()
+    )
+    email = get_override_string_value_or_default(getattr(data, "email", None))
 
     if email is None:
         return {"msg": "Bad Request"}, 400
 
     sender_service = SenderApiService()
-    subscriber_id = sender_service.add_subscriber_from_email(email)
+    subscriber_id = sender_service.add_subscriber_from_email(data)
     return convert_to_json(subscriber_id)
 
 
