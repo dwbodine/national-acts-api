@@ -418,27 +418,25 @@ class PageService:
         if page_to_update is None or page_to_update.route is None:
             return None
 
+        page_id = page_to_update.page_id
         existing_image: str = None
         existing_thumbnail: str = None
         existing_preview: str = None
         existing_logo: str = None
-        if page_to_update.page_id > 0:
-            existing_page = self.get_page_by_route(
-                page_to_update.route, show_inactive=True
+        existing_page = self.get_page_by_route(page_to_update.route, show_inactive=True)
+
+        if existing_page is not None:
+            page_id = existing_page.page_id
+            existing_image = get_override_string_value_or_default(existing_page.image)
+            existing_thumbnail = get_override_string_value_or_default(
+                existing_page.thumbnail
             )
-            if existing_page is not None:
-                existing_image = get_override_string_value_or_default(
-                    existing_page.image
-                )
-                existing_thumbnail = get_override_string_value_or_default(
-                    existing_page.thumbnail
-                )
-                existing_preview = get_override_string_value_or_default(
-                    existing_page.link_preview_image
-                )
-                existing_logo = get_override_string_value_or_default(
-                    existing_page.logo_only_image
-                )
+            existing_preview = get_override_string_value_or_default(
+                existing_page.link_preview_image
+            )
+            existing_logo = get_override_string_value_or_default(
+                existing_page.logo_only_image
+            )
 
         image_str: str = get_override_string_value_or_default(page_to_update.image)
         thumbnail_str: str = get_override_string_value_or_default(
@@ -452,7 +450,7 @@ class PageService:
         )
 
         success: bool = False
-        page_id = page_to_update.page_id
+
         data = {
             "route": get_override_string_value_or_default(page_to_update.route),
             "title": get_override_string_value_or_default(page_to_update.title),
@@ -546,7 +544,7 @@ class PageService:
                 LinkPreviewImage, LogoOnly, Title1, SubTitle1, Title2, SubTitle2,
                 HTMLText, Inactive, UseIncludeDates, IncludeStart, IncludeEnd,
                 UseExcludeDates, ExcludeStart, ExcludeEnd, GoogleAnalyticsID,
-                ExtraHTMLHead, ExtraHTMLBody, GradientStartColorm LastUpdated) 
+                ExtraHTMLHead, ExtraHTMLBody, GradientStartColor, LastUpdated) 
                 VALUES (%(route)s, 
                 %(title)s, %(pageTypeId)s, %(image)s, %(thumbnail)s,
                 %(linkPreviewImage)s, %(logoOnly)s, %(title1)s, %(subtitle1)s,
@@ -580,13 +578,28 @@ class PageService:
                     page_to_update.artist_page_settings.artist_template_type_id
                 ),
                 "showTitle": get_override_tinyint_value_or_default_from_bool(
-                    page_to_update.artist_page_settings.show_title
+                    getattr(
+                        page_to_update.artist_page_settings,
+                        "show_title",
+                        False,
+                    ),
+                    default=False,
                 ),
                 "titlePosition": get_override_int_value_or_default(
-                    page_to_update.artist_page_settings.title_position
+                    getattr(
+                        page_to_update.artist_page_settings,
+                        "title_position",
+                        1,
+                    ),
+                    default=1,
                 ),
                 "vipPackageContents": get_override_string_value_or_default(
-                    page_to_update.artist_page_settings.vip_package_contents
+                    getattr(
+                        page_to_update.artist_page_settings,
+                        "vip_package_contents",
+                        None,
+                    ),
+                    default=None,
                 ),
                 "artistDescription": get_override_string_value_or_default(
                     getattr(
