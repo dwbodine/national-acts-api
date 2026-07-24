@@ -3,6 +3,7 @@ Public API routes
 """
 
 import os
+import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request
 
@@ -28,6 +29,9 @@ from common.utility import (
 )
 
 public_api = Blueprint("public_api", __name__)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 # BEGIN PUBLIC ROUTES
@@ -275,18 +279,21 @@ def upload_image(image_type_str: str):
     api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
 
     if sender_key is None or api_key is None or sender_key != api_key:
+        logger.error("Unauthorized upload attempted")
         return {"msg": "Unauthorized"}, 401
 
-    if (
-        len(request.files) == 0
-        or "tempFile" not in request.files
-        or image_type_str is None
-    ):
+    if image_type_str is None:
+        logger.warning("Image type string not found")
+        return {"msg": "Bad Request"}, 400
+
+    if len(request.files) == 0:
+        logger.warning("Upload file not found")
         return {"msg": "Bad Request"}, 400
 
     try:
         image_type = ImageType(image_type_str)
     except ValueError:
+        logger.error("Image type %s not found", image_type_str)
         return {"msg": "Bad Request"}, 400
 
     bucket_name = get_bucket_name_from_image_type(image_type)
