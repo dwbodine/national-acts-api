@@ -290,6 +290,14 @@ def upload_image(image_type_str: str):
         logger.warning("Upload file not found")
         return {"msg": "Bad Request"}, 400
 
+    if len(request.files) == 0:
+        logger.warning("No upload file found")
+        return {"msg": "Bad Request"}, 400
+
+    if "tempFile" not in request.files:
+        logger.warning("Upload tempFile not found")
+        return {"msg": "Bad Request"}, 400
+
     try:
         image_type = ImageType(image_type_str)
     except ValueError:
