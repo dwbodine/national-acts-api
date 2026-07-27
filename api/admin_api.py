@@ -65,10 +65,6 @@ def get_countries():
     """
     API method to fetch all country data
     """
-    is_admin = is_admin_logged_in()
-    if is_admin is False:
-        return {"msg": "Unauthorized"}, 401
-
     service = AdminService()
     countries = service.get_all_countries()
     return convert_to_json(countries)

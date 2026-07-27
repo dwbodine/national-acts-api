@@ -52,8 +52,8 @@ def test_upload_image_to_bucket_saves_sanitized_file_and_uploads_png(
     monkeypatch.setattr(
         public_service,
         "resize_and_move_temp_file_to_s3",
-        lambda temp_filename, bucket_name, max_width, is_png, subfolder=None: resize_calls.append(
-            (temp_filename, bucket_name, max_width, is_png, subfolder)
+        lambda temp_filename, bucket_name, max_width, subfolder=None: resize_calls.append(
+            (temp_filename, bucket_name, max_width, subfolder)
         )
         or "uploaded.png",
     )
@@ -66,7 +66,7 @@ def test_upload_image_to_bucket_saves_sanitized_file_and_uploads_png(
 
     assert filename == "uploaded.png"
     assert request.files["tempFile"].saved_paths == [str(tmp_dir / "my_image_1_.png")]
-    assert resize_calls == [("my_image_1_.png", "preview-bucket", 400, True, None)]
+    assert resize_calls == [("my_image_1_.png", "preview-bucket", 400, None)]
 
 
 def test_upload_image_to_bucket_returns_none_when_temp_file_is_missing(

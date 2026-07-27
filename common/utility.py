@@ -4,6 +4,7 @@ Utilites for Python app
 
 import json
 import logging
+import mimetypes
 import re
 import os
 import http.client
@@ -14,7 +15,8 @@ import boto3
 from pytz import country_timezones
 import pytz
 from stringcase import camelcase, snakecase
-from PIL import Image
+from PIL import Image, ImageSequence
+from pillow_heif import register_heif_opener
 
 from common.constants import (
     EVENT_THUMBNAIL_IMAGE_WIDTH,
@@ -34,6 +36,10 @@ from common.models.ticket_socket import Country, Timezone, TicketSocketOrder
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# Pillow does not ship a HEIC/HEIF decoder. Register pillow-heif as a Pillow
+# plugin so the existing Image.open/save workflow can handle those formats.
+register_heif_opener()
 
 
 class CamelCaseJsonEncoder(json.JSONEncoder):
@@ -99,12 +105,10 @@ def resize_and_move_temp_file_to_s3(
     temp_filename: str,
     bucket_name: str,
     max_width: int,
-    is_png: bool = False,
     subfolder: str = None,
 ) -> str:
     """
     Move a file from the API /tmp directory to an AWS S3 bucket
-
     """
     filename: str = None
 
@@ -117,8 +121,12 @@ def resize_and_move_temp_file_to_s3(
     if os.name == "nt" and len(temp_dir) > 0:
         temp_dir = temp_dir.replace("/", "\\")
 
-    # resize image to specified width
-    image_file = resize_tmp_image(temp_filename, max_width)
+    # Decode HEIC/HEIF, resize its pixels, and encode the final JPEG only once.
+    extension = os.path.splitext(temp_filename)[1].lower()
+    if extension in (".heic", ".heif"):
+        image_file = resize_tmp_image(temp_filename, max_width, "JPEG")
+    else:
+        image_file = resize_tmp_image(temp_filename, max_width)
 
     if image_file is not None:
         filename = get_s3_file_key(image_file, subfolder)
@@ -128,11 +136,16 @@ def resize_and_move_temp_file_to_s3(
         if os.path.exists(origin_file) and bucket_name is not None:
             s3_client = boto3.client("s3")
 
-            extra_args = {"ContentType": "image/jpeg"}
-            if is_png is True:
-                extra_args = {"ContentType": "image/png"}
-
             try:
+                with Image.open(origin_file) as resized_image:
+                    content_type = Image.MIME.get(resized_image.format)
+                if content_type is None:
+                    content_type = (
+                        mimetypes.guess_type(origin_file)[0]
+                        or "application/octet-stream"
+                    )
+                extra_args = {"ContentType": content_type}
+
                 # upload to s3
                 s3_client.upload_file(
                     origin_file, bucket_name, filename, ExtraArgs=extra_args
@@ -198,9 +211,14 @@ def remove_file(file_name: str, bucket_name: str):
     return success
 
 
-def resize_tmp_image(image_name: str, resize_width: int = 0):
+def resize_tmp_image(image_name: str, resize_width: int = 0, output_format: str = None):
     """
-    Resizes an image in the /tmp folder using Pillow
+    Resize an image in the /tmp folder using its Pillow-detected format.
+
+    Any format that Pillow can both read and write is supported. Multi-frame
+    images are resized frame-by-frame when the format has a ``save_all``
+    encoder. When ``output_format`` is JPEG, the decoded image is resized in
+    memory and encoded once at high quality.
     """
     pacific_tz = pytz.timezone("America/Los_Angeles")
     image_id: str = datetime.now(pacific_tz).strftime("%Y%m%d%H%M%S")
@@ -214,6 +232,7 @@ def resize_tmp_image(image_name: str, resize_width: int = 0):
         try:
             image = Image.open(image_path)
             filename = image.filename
+            image_format = output_format or image.format
 
             last_index = filename.rfind(".")
             if last_index < 0:
@@ -221,29 +240,54 @@ def resize_tmp_image(image_name: str, resize_width: int = 0):
                     "resize_tmp_image - image_path did not have file extension"
                 )
                 return None
-            resize_file_path = (
-                f"{filename[0:last_index]}_{image_id}{filename[last_index:]}"
+            output_extension = (
+                ".jpg" if image_format == "JPEG" else filename[last_index:]
             )
+            resize_file_path = f"{filename[0:last_index]}_{image_id}{output_extension}"
 
             # default to square(ish) thumbnail if no width given
             if resize_width <= 0:
                 resize_width = int(os.getenv("THUMBNAIL_SIZE"))
 
-            # only resize if image width is larger than desired
-            if image.width > resize_width:
-                # get current dimensions
-                width = image.width
-                height = image.height
+            if image_format is None:
+                raise ValueError("Pillow could not determine the image format")
 
-                # manually calculate ratio
-                ratio = image.height / image.width
-                width = resize_width
-                height = width * ratio
+            frames = []
+            for source_frame in ImageSequence.Iterator(image):
+                frame = source_frame.copy()
+                if frame.width > resize_width:
+                    resized_height = max(
+                        1, round(frame.height * resize_width / frame.width)
+                    )
+                    frame.thumbnail(
+                        (resize_width, resized_height), Image.Resampling.LANCZOS
+                    )
+                if image_format == "JPEG" and frame.mode != "RGB":
+                    frame = frame.convert("RGB")
+                frames.append(frame)
 
-                # set dimensions and resize
-                size = width, height
-                image.thumbnail(size, Image.Resampling.LANCZOS)
-            image.save(resize_file_path, image.format)
+            if not frames:
+                raise ValueError("Pillow did not find any image frames")
+
+            Image.init()
+            if len(frames) > 1 and image_format in Image.SAVE_ALL:
+                save_options = {
+                    "format": image_format,
+                    "save_all": True,
+                    "append_images": frames[1:],
+                }
+                for option in ("duration", "loop"):
+                    if option in image.info:
+                        save_options[option] = image.info[option]
+                frames[0].save(resize_file_path, **save_options)
+            else:
+                save_options = {"format": image_format}
+                if image_format == "JPEG":
+                    save_options.update({"quality": 95, "subsampling": 0})
+                frames[0].save(resize_file_path, **save_options)
+
+            for frame in frames:
+                frame.close()
             image.close()
             if not os.path.exists(resize_file_path):
                 logger.error(

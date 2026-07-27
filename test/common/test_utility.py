@@ -234,6 +234,85 @@ def test_resize_tmp_image_resizes_existing_image(monkeypatch, workspace_tmp_path
         assert resized_image.width == 400
 
 
+@pytest.mark.parametrize(
+    ("extension", "image_format"),
+    (("bmp", "BMP"), ("webp", "WEBP"), ("tiff", "TIFF")),
+)
+def test_resize_tmp_image_supports_other_pillow_formats(
+    monkeypatch, workspace_tmp_path, extension, image_format
+):
+    """
+    Test that resizing is not limited to JPEG and PNG files.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / f"photo.{extension}"
+    Image.new("RGB", (600, 300), color="purple").save(image_path, format=image_format)
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+
+    resized_name = utility.resize_tmp_image(image_path.name, 200)
+
+    assert resized_name is not None
+    with Image.open(temp_dir / resized_name) as resized_image:
+        assert resized_image.format == image_format
+        assert resized_image.size == (200, 100)
+
+
+def test_resize_tmp_image_supports_heic(monkeypatch, workspace_tmp_path):
+    """
+    Test that the registered pillow-heif plugin decodes and encodes HEIC files.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / "photo.heic"
+    Image.new("RGB", (600, 300), color="purple").save(image_path, format="HEIF")
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+
+    resized_name = utility.resize_tmp_image(image_path.name, 200)
+
+    assert resized_name is not None
+    with Image.open(temp_dir / resized_name) as resized_image:
+        assert resized_image.format == "HEIF"
+        assert resized_image.size == (200, 100)
+
+
+def test_resize_tmp_image_preserves_animated_gif_frames(
+    monkeypatch, workspace_tmp_path
+):
+    """
+    Test that every frame in a multi-frame image is resized and retained.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / "animated.gif"
+    frames = [
+        Image.new("RGB", (300, 150), color="red"),
+        Image.new("RGB", (300, 150), color="blue"),
+    ]
+    frames[0].save(
+        image_path,
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        duration=125,
+        loop=0,
+    )
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+
+    resized_name = utility.resize_tmp_image(image_path.name, 100)
+
+    assert resized_name is not None
+    with Image.open(temp_dir / resized_name) as resized_image:
+        assert resized_image.format == "GIF"
+        assert resized_image.n_frames == 2
+        assert resized_image.size == (100, 50)
+        # GIF stores frame durations in centiseconds.
+        assert resized_image.info["duration"] == 120
+
+
 def test_resize_tmp_image_uses_default_thumbnail_size(monkeypatch, workspace_tmp_path):
     """
     Test that resize_tmp_image falls back to THUMBNAIL_SIZE when width is not provided.
@@ -373,25 +452,72 @@ def test_resize_and_move_temp_file_to_s3_uploads_resized_jpeg(
     assert not (temp_dir / result).exists()
 
 
-def test_resize_and_move_temp_file_to_s3_uploads_png(monkeypatch, workspace_tmp_path):
+@pytest.mark.parametrize("extension", ("heic", "heif"))
+def test_resize_and_move_temp_file_to_s3_converts_heif_to_jpeg_before_resizing(
+    monkeypatch, workspace_tmp_path, extension
+):
     """
-    Test that resize_and_move_temp_file_to_s3 uses PNG content type when requested.
+    Test that HEIC and HEIF uploads are converted to JPEG before resizing.
     """
     api_path = workspace_tmp_path / "api"
     temp_dir = api_path / "tmp"
     temp_dir.mkdir(parents=True)
-    image_path = temp_dir / "photo.png"
-    Image.new("RGB", (800, 400), color="red").save(image_path)
+    image_path = temp_dir / f"photo.{extension}"
+    Image.new("RGB", (800, 400), color="red").save(image_path, format="HEIF")
+    fake_s3 = FakeS3Client()
+    resize_calls = []
+    original_resize = utility.resize_tmp_image
+
+    def track_resize(image_name, resize_width, output_format=None):
+        resize_calls.append((image_name, resize_width, output_format))
+        return original_resize(image_name, resize_width, output_format)
+
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+    monkeypatch.setattr(utility.boto3, "client", lambda service: fake_s3)
+    monkeypatch.setattr(utility, "resize_tmp_image", track_resize)
+
+    result = utility.resize_and_move_temp_file_to_s3(image_path.name, "bucket", 400)
+
+    assert result is not None
+    assert resize_calls == [(image_path.name, 400, "JPEG")]
+    assert result.endswith(".jpg")
+    assert fake_s3.uploaded[0][2].endswith(".jpg")
+    assert fake_s3.uploaded[0][3] == {"ContentType": "image/jpeg"}
+    assert not image_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("extension", "image_format", "content_type"),
+    (
+        ("bmp", "BMP", "image/bmp"),
+        ("gif", "GIF", "image/gif"),
+        ("tiff", "TIFF", "image/tiff"),
+        ("webp", "WEBP", "image/webp"),
+    ),
+)
+def test_resize_and_move_temp_file_to_s3_detects_content_type(
+    monkeypatch,
+    workspace_tmp_path,
+    extension,
+    image_format,
+    content_type,
+):
+    """
+    Test that S3 receives the MIME type registered for the Pillow format.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / f"photo.{extension}"
+    Image.new("RGB", (800, 400), color="red").save(image_path, format=image_format)
     fake_s3 = FakeS3Client()
     monkeypatch.setenv("API_FILE_PATH", str(api_path))
     monkeypatch.setattr(utility.boto3, "client", lambda service: fake_s3)
 
-    result = utility.resize_and_move_temp_file_to_s3(
-        "photo.png", "bucket", 400, is_png=True
-    )
+    result = utility.resize_and_move_temp_file_to_s3(image_path.name, "bucket", 400)
 
     assert result is not None
-    assert fake_s3.uploaded[0][3] == {"ContentType": "image/png"}
+    assert fake_s3.uploaded[0][3] == {"ContentType": content_type}
 
 
 def test_resize_and_move_temp_file_to_s3_returns_none_when_resize_fails(

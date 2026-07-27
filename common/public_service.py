@@ -51,10 +51,8 @@ class PublicService:
                 logger.error("Temp file did not save correctly: %s", save_path)
                 return None
 
-            is_png = temp_filename.endswith(".png")
-
             filename = resize_and_move_temp_file_to_s3(
-                temp_filename, bucket_name, max_width, is_png, subfolder
+                temp_filename, bucket_name, max_width, subfolder
             )
 
         except Exception as error:  # pylint: disable=broad-exception-caught

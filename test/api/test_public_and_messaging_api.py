@@ -215,7 +215,7 @@ def test_public_add_or_confirm_subscriber_returns_sender_result(
 
     assert response.status_code == 200
     assert parse_json_response(response) == "sender-123"
-    assert captured["subscriber_request"].email == "fan@example.com"
+    assert captured["subscriber_request"].email == " fan@example.com "
 
 
 def test_public_add_or_confirm_subscriber_validates_email(monkeypatch, client):

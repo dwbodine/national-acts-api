@@ -270,7 +270,7 @@ def get_all_timezones():
 
 
 @public_api.route("/public/uploadImage/<string:image_type_str>", methods=["POST"])
-def upload_image(image_type_str: str):
+def upload_image(image_type_str: str):  # pylint: disable=too-many-return-statements
     """
     Uploads a file to a specified S3 bucket
     """
@@ -312,6 +312,7 @@ def upload_image(image_type_str: str):
     filename: str = service.upload_image_to_bucket(
         request, bucket_name, max_width, subfolder
     )
+
     return convert_to_json(filename)
 
 

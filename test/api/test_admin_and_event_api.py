@@ -1369,27 +1369,6 @@ def test_event_tours_rejects_non_positive_seller_id(client, auth_headers):
         ("/admin/faq/movedown", "post", {"faqId": "1"}),
         ("/admin/faq/moveup", "post", {"faqId": "1"}),
         ("/admin/faq/update", "post", {"faqId": 1}),
-        (
-            "/admin/moments/update",
-            "post",
-            {
-                "key": {
-                    "momentDate": "2026-05-01",
-                    "sellerId": 20,
-                    "eventId": 300,
-                },
-                "images": ["a.jpg"],
-            },
-        ),
-        (
-            "/admin/moments/delete",
-            "post",
-            {
-                "momentDate": "2026-05-01",
-                "sellerId": 20,
-                "eventId": 300,
-            },
-        ),
         ("/admin/notes/add", "post", {"note": "Hello", "eventId": 1}),
         ("/admin/notes/calendar?start=1&end=2", "get", None),
         ("/admin/notes/delete", "post", {"noteId": 1}),

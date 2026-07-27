@@ -160,6 +160,13 @@ def build_page_row(**overrides):
         "ExcludeEnd": "2026-04-12 00:00:00",
         "GoogleAnalyticsID": "GA-1",
         "LastUpdated": "2026-04-23 10:00:00",
+        "GradientStartColor": "#112233",
+        "ArtistTemplateTypeId": 1,
+        "ShowTitle": 1,
+        "TitlePosition": 1,
+        "ArtistSettingsLastUpdate": "2026-04-23 10:00:00",
+        "VipPackageContents": "VIP package",
+        "ArtistDescription": "Artist description",
         "PageTypeID": 7,
         "PageTypeName": "Artist",
     }

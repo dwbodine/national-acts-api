@@ -187,6 +187,7 @@ def build_event_row(**overrides):
         "IsCancelled": 0,
         "CancelledDate": None,
         "ExcludeFromDashboard": 0,
+        "EventNote": None,
         "EventId": 222,
         "URL": "https://tickets.example.com",
         "Thumbnail": "ticket-socket.jpg",

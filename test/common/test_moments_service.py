@@ -140,10 +140,11 @@ class FakeSeller:
         20: "Alpha Presents",
     }
 
-    def __init__(self, seller_id, get_event_categories=True):
+    def __init__(self, seller_id, get_event_categories=True, get_images=True):
         self.seller_id = seller_id
         self.name = self.SELLER_NAMES.get(seller_id)
         self.get_event_categories = get_event_categories
+        self.get_images = get_images
 
 
 class FakeMomentEventService:

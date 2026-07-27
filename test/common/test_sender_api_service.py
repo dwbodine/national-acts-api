@@ -3,6 +3,7 @@ Unit tests for common.sender_api_service helpers.
 """
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from common import sender_api_service
 from common.models.sender_api import Subscriber
@@ -231,7 +232,7 @@ def test_add_subscriber_from_email_returns_existing_subscriber_id(monkeypatch):
     )
 
     subscriber_id = sender_api_service.SenderApiService().add_subscriber_from_email(
-        "known@example.com"
+        SimpleNamespace(email="known@example.com")
     )
 
     assert subscriber_id == "sender-123"
@@ -255,10 +256,18 @@ def test_add_subscriber_from_email_creates_missing_subscriber(monkeypatch):
     )
 
     subscriber_id = sender_api_service.SenderApiService().add_subscriber_from_email(
-        "new@example.com"
+        SimpleNamespace(
+            email="new@example.com",
+            first_name="New",
+            last_name="Subscriber",
+            city="Austin",
+            state="TX",
+            country="US",
+            favorite_band="Test Band",
+        )
     )
 
-    assert subscriber_id == 0
+    assert subscriber_id == 1
     assert len(created_subscribers) == 1
     assert created_subscribers[0].email == "new@example.com"
 
@@ -281,7 +290,15 @@ def test_add_subscriber_from_email_returns_error_marker_when_create_fails(
     )
 
     subscriber_id = sender_api_service.SenderApiService().add_subscriber_from_email(
-        "new@example.com"
+        SimpleNamespace(
+            email="new@example.com",
+            first_name="New",
+            last_name="Subscriber",
+            city="Austin",
+            state="TX",
+            country="US",
+            favorite_band="Test Band",
+        )
     )
 
     assert subscriber_id == -1
