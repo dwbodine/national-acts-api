@@ -278,6 +278,30 @@ def test_resize_tmp_image_supports_heic(monkeypatch, workspace_tmp_path):
         assert resized_image.size == (200, 100)
 
 
+def test_resize_tmp_image_preserves_display_orientation(
+    monkeypatch, workspace_tmp_path
+):
+    """
+    Test that EXIF orientation is applied once and removed from the output.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / "portrait.jpg"
+    image = Image.new("RGB", (120, 60), color="purple")
+    exif = image.getexif()
+    exif[274] = 6  # Display by rotating 90 degrees clockwise.
+    image.save(image_path, format="JPEG", exif=exif)
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+
+    resized_name = utility.resize_tmp_image(image_path.name, 200)
+
+    assert resized_name is not None
+    with Image.open(temp_dir / resized_name) as resized_image:
+        assert resized_image.size == (60, 120)
+        assert resized_image.getexif().get(274, 1) == 1
+
+
 def test_resize_tmp_image_preserves_animated_gif_frames(
     monkeypatch, workspace_tmp_path
 ):
@@ -480,6 +504,31 @@ def test_resize_and_move_temp_file_to_s3_converts_heif_to_jpeg_before_resizing(
 
     assert result is not None
     assert resize_calls == [(image_path.name, 400, "JPEG")]
+    assert result.endswith(".jpg")
+    assert fake_s3.uploaded[0][2].endswith(".jpg")
+    assert fake_s3.uploaded[0][3] == {"ContentType": "image/jpeg"}
+    assert not image_path.exists()
+
+
+@pytest.mark.parametrize("filename", ("mobile-upload.jpg", "blob"))
+def test_resize_and_move_temp_file_to_s3_detects_heif_from_file_contents(
+    monkeypatch, workspace_tmp_path, filename
+):
+    """
+    Test HEIF detection when a mobile client supplies a misleading filename.
+    """
+    api_path = workspace_tmp_path / "api"
+    temp_dir = api_path / "tmp"
+    temp_dir.mkdir(parents=True)
+    image_path = temp_dir / filename
+    Image.new("RGB", (800, 400), color="red").save(image_path, format="HEIF")
+    fake_s3 = FakeS3Client()
+    monkeypatch.setenv("API_FILE_PATH", str(api_path))
+    monkeypatch.setattr(utility.boto3, "client", lambda service: fake_s3)
+
+    result = utility.resize_and_move_temp_file_to_s3(filename, "bucket", 400)
+
+    assert result is not None
     assert result.endswith(".jpg")
     assert fake_s3.uploaded[0][2].endswith(".jpg")
     assert fake_s3.uploaded[0][3] == {"ContentType": "image/jpeg"}

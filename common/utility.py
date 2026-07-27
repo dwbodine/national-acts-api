@@ -15,7 +15,7 @@ import boto3
 from pytz import country_timezones
 import pytz
 from stringcase import camelcase, snakecase
-from PIL import Image, ImageSequence
+from PIL import Image, ImageOps, ImageSequence
 from pillow_heif import register_heif_opener
 
 from common.constants import (
@@ -121,9 +121,21 @@ def resize_and_move_temp_file_to_s3(
     if os.name == "nt" and len(temp_dir) > 0:
         temp_dir = temp_dir.replace("/", "\\")
 
-    # Decode HEIC/HEIF, resize its pixels, and encode the final JPEG only once.
+    # Mobile clients may send HEIF bytes with a .jpg or extensionless filename,
+    # so inspect the file signature through Pillow instead of trusting the name.
     extension = os.path.splitext(temp_filename)[1].lower()
-    if extension in (".heic", ".heif"):
+    is_heif = extension in (".heic", ".heif")
+    if not is_heif:
+        source_file = os.path.join(temp_dir, temp_filename)
+        try:
+            with Image.open(source_file) as source_image:
+                is_heif = source_image.format in ("HEIF", "HEIC")
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Let resize_tmp_image handle and log unreadable image files.
+            pass
+
+    # Decode HEIC/HEIF, resize its pixels, and encode the final JPEG only once.
+    if is_heif:
         image_file = resize_tmp_image(temp_filename, max_width, "JPEG")
     else:
         image_file = resize_tmp_image(temp_filename, max_width)
@@ -235,15 +247,16 @@ def resize_tmp_image(image_name: str, resize_width: int = 0, output_format: str 
             image_format = output_format or image.format
 
             last_index = filename.rfind(".")
-            if last_index < 0:
+            if last_index < 0 and output_format is None:
                 logger.error(
                     "resize_tmp_image - image_path did not have file extension"
                 )
                 return None
+            filename_stem = filename if last_index < 0 else filename[0:last_index]
             output_extension = (
                 ".jpg" if image_format == "JPEG" else filename[last_index:]
             )
-            resize_file_path = f"{filename[0:last_index]}_{image_id}{output_extension}"
+            resize_file_path = f"{filename_stem}_{image_id}{output_extension}"
 
             # default to square(ish) thumbnail if no width given
             if resize_width <= 0:
@@ -254,7 +267,10 @@ def resize_tmp_image(image_name: str, resize_width: int = 0, output_format: str 
 
             frames = []
             for source_frame in ImageSequence.Iterator(image):
-                frame = source_frame.copy()
+                # Bake EXIF orientation into the pixels before resizing. The
+                # transposed copy has its orientation tag removed, preventing
+                # the saved image from being rotated again by a viewer.
+                frame = ImageOps.exif_transpose(source_frame)
                 if frame.width > resize_width:
                     resized_height = max(
                         1, round(frame.height * resize_width / frame.width)
