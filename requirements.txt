@@ -8,7 +8,7 @@ sendgrid==6.12.5
 googlemaps==4.10.0
 stringcase==1.2.0
 requests==2.34.2
-pillow==12.2.0
+pillow==12.3.0
 pillow-heif==1.5.0
 phonenumbers==9.0.31
 pytz==2026.2
