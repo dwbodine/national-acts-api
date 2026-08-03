@@ -219,6 +219,7 @@ class PageService:
                 PageSellers.SpotifyOverride,
                 PageSellers.WebsiteOverride,
                 PageSellers.WebsiteDisplayTextOverride,
+                PageSellers.IsPrimary,
                 pc.CountryName AS CountryNameOverride,
                 pc.CountryCode AS CountryCodeOverride,
                 Sellers.Name AS SellerName,
@@ -253,7 +254,7 @@ class PageService:
         if is_public is True:
             sql += """ AND Inactive = 0"""
 
-        sql += """ ORDER BY Sellers.Name ASC"""
+        sql += """ ORDER BY PageSellers.IsPrimary DESC, Sellers.Name ASC"""
         rows = db_query_all(sql, data)
         for row in rows:
             page_seller_id = get_override_int_value_or_default(row["PageSellerId"])
@@ -273,6 +274,9 @@ class PageService:
 
             page_seller.show_display_name = show_display_name
             page_seller.seller_name = seller_name
+            page_seller.is_primary = get_override_bool_value_or_default(
+                row["IsPrimary"]
+            )
 
             if is_public is True:
                 if show_display_name is True and display_name is not None:
@@ -670,7 +674,8 @@ class PageService:
                         YouTubeOverride=%(youtube)s,
                         SpotifyOverride=%(spotify)s,
                         WebsiteOverride=%(website)s,
-                        WebsiteDisplayTextOverride=%(websiteDisplayText)s,                                
+                        WebsiteDisplayTextOverride=%(websiteDisplayText)s,    
+                        IsPrimary=%(is_primary)s,                            
                         LastUpdate=CURRENT_TIMESTAMP
                         WHERE PageSellerId=%(pageSellerId)s"""
                     update_data = {
@@ -765,6 +770,9 @@ class PageService:
                         "pageSellerId": get_override_int_value_or_default(
                             found_seller.page_seller_id
                         ),
+                        "is_primary": get_override_tinyint_value_or_default_from_bool(
+                            getattr(seller, "is_primary", False)
+                        ),
                     }
                     success = db_update(update_sql, update_data)
                     sellers_updated = success
@@ -775,10 +783,10 @@ class PageService:
                         CityOverride, StateOverride, ZipOverride, CountryIdOverride, PhoneOverride,
                         EmailOverride, TwitterOverride, FacebookOverride, InstagramOverride,
                         YouTubeOverride, SpotifyOverride, WebsiteOverride, WebsiteDisplayTextOverride,
-                        LastUpdate) VALUES (%(sellerId)s, %(pageId)s, %(displayName)s, %(showDisplayName)s, 
+                        IsPrimary, LastUpdate) VALUES (%(sellerId)s, %(pageId)s, %(displayName)s, %(showDisplayName)s, 
                         %(address)s, %(city)s, %(state)s, %(zip)s, %(country_id)s, %(phone)s, %(email)s,
                         %(twitter)s, %(facebook)s, %(instagram)s, %(youtube)s, %(spotify)s, %(website)s,
-                        %(websiteDisplayText)s, CURRENT_TIMESTAMP)"""
+                        %(websiteDisplayText)s, %(is_primary)s,CURRENT_TIMESTAMP)"""
                     insert_data = {
                         "sellerId": get_override_int_value_or_default(seller.seller_id),
                         "pageId": page_id,
@@ -867,6 +875,9 @@ class PageService:
                             )
                             if hasattr(seller, "website_display_text")
                             else None
+                        ),
+                        "is_primary": get_override_tinyint_value_or_default_from_bool(
+                            getattr(seller, "is_primary", False)
                         ),
                     }
                     ps_id = db_insert(insert_sql, insert_data)

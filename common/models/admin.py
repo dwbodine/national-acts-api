@@ -86,6 +86,7 @@ class PageSeller:
     website: str = None
     website_display_text: str = None
     seller_name: str = None
+    is_primary: bool = None
 
 
 class ArtistPageSettings:

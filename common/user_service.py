@@ -855,6 +855,7 @@ class UserService:
                     FROM Pages 
                     JOIN PageSellers ON PageSellers.PageId = Pages.PageID
                     WHERE PageSellers.SellerId=%(seller_id)s 
+                    AND (Pages.PageTypeID <> 7 OR PageSellers.IsPrimary = 1)
                     ORDER BY Pages.Route"""
         data = {"seller_id": seller_id}
         rows = db_query_all(sql, data)

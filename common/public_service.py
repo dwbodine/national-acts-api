@@ -78,6 +78,7 @@ class PublicService:
             JOIN PageSellers ON FeaturedArtists.PageSellerId = PageSellers.PageSellerId
             JOIN Sellers ON PageSellers.SellerId = Sellers.SellerId
             JOIN Pages ON PageSellers.PageId = Pages.PageId
+            WHERE PageSellers.IsPrimary = 1
             ORDER BY FeaturedArtists.FeaturedArtistOrder
         """
 

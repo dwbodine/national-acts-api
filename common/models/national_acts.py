@@ -690,8 +690,9 @@ class Seller:
         sql += """ WHERE Sellers.SellerId=%(sellerId)s"""
 
         if get_images is True:
-            sql += """ ORDER BY PageSellers.LastUpdate ASC, 
-                    FanMomentImages.DateUploaded DESC LIMIT 1"""
+            sql += """ AND (Pages.PageTypeID <> 7 OR PageSellers.IsPrimary = 1)
+                        ORDER BY PageSellers.LastUpdate ASC,
+                         FanMomentImages.DateUploaded DESC LIMIT 1"""
         data = {"sellerId": self.seller_id}
 
         row = db_query_one(sql, data)

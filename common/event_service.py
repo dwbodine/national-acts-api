@@ -706,13 +706,14 @@ class EventService:
                 LEFT JOIN TicketSocketEvents tse
                     ON tse.Id = ee.TicketSocketEventId
                 WHERE ee.EventDate >= CURDATE()
+                AND ps.IsPrimary = 1
                 AND COALESCE(p.LinkPreviewImage, '') != ''
                 GROUP BY
                     p.PageOrder,
                     ee.SellerId,
                     p.Route
                 ORDER BY p.PageOrder, MIN(ee.EventDate) ASC
-                LIMIT 18;"""
+                LIMIT 20;"""
 
         sql = sql.replace("\n", "")
 
