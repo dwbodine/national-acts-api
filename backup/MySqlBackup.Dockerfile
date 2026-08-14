@@ -12,10 +12,12 @@ ENV TZ=UTC
 COPY backup.sh /backup.sh
 COPY restore.sh /restore.sh
 COPY fetch-latest-backup.sh /fetch-latest-backup.sh
+COPY backup.env /backup/backup.env
 COPY crontab /etc/crontabs/root
 
 RUN chmod +x /backup.sh
 RUN chmod +x /restore.sh
 RUN chmod +x /fetch-latest-backup.sh
+RUN chmod 600 /backup/backup.env
 
 CMD ["crond", "-f", "-l", "2"]

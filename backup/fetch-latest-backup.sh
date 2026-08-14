@@ -27,7 +27,7 @@ echo "Locating latest backup in s3://${S3_BUCKET}/${S3_PREFIX}/ ..."
 LATEST_KEY=$(aws s3api list-objects-v2 \
   --bucket "$S3_BUCKET" \
   --prefix "$S3_PREFIX/" \
-  --query 'Contents | sort_by(@, &LastModified)[-1].Key' \
+  --query 'sort_by(Contents || `[]`, &LastModified)[-1].Key' \
   --output text)
 
 if [[ -z "$LATEST_KEY" || "$LATEST_KEY" == "None" ]]; then
