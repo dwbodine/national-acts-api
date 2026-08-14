@@ -88,19 +88,17 @@ services:
     mem_limit: 256m
     environment:
       AWS_EC2_METADATA_DISABLED: "false"
-      MYSQL_CONTAINER: nationalactsdb
-      MYSQL_USER: root
       MYSQL_PASSWORD_FILE: /run/secrets/mysql_root_password
-      MYSQL_DATABASE: nationalacts20
-      S3_BUCKET: nationalactsvip-mysql-backup
       AWS_REGION: us-east-1
     secrets:
       - mysql_root_password
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/ec2-user/.aws:/root/.aws:ro
     logging: *default-logging
     networks:
       - internal_net
+      - frontend_net
 
   phpmyadmin:
     image: phpmyadmin:latest

@@ -31,6 +31,7 @@ secrets/
 seeds/
 *.pem
 aws/cron.tab
+backup/backup.env
 gitleaks-report.json
 
 # PyInstaller
