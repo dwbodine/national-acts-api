@@ -42,6 +42,7 @@ class OrderService:
         ts_order_id: int = None,
         search_term: str = None,
         show_hidden_from_dashboard: bool = False,
+        sort_descending=False,
     ):
         """
         Retreive order data from database
@@ -226,8 +227,12 @@ class OrderService:
             sql += """ ORDER BY TicketSocketOrders.PurchaserLastName ASC,
                     TicketSocketOrders.PurchaserFirstName ASC, 
                     TicketSocketOrders.Email ASC"""
+        elif sort_descending is True:
+            sql += """ ORDER BY TicketSocketOrders.PurchaseTimestamp DESC,
+                    TicketSocketEvents.EventDate DESC, 
+                    TicketSocketEvents.Title DESC"""
         else:
-            sql += """ ORDER BY TicketSocketOrders.PurchaseDate ASC,
+            sql += """ ORDER BY TicketSocketOrders.PurchaseTimestamp ASC,
                     TicketSocketEvents.EventDate ASC, 
                     TicketSocketEvents.Title ASC"""
 

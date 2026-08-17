@@ -5,6 +5,7 @@ Public API routes
 import os
 import logging
 from datetime import datetime, timedelta
+import time
 from flask import Blueprint, request
 
 from common.admin_service import AdminService
@@ -13,6 +14,7 @@ from common.event_service import EventService
 from common.faq_service import FaqService
 from common.moments_service import MomentsService
 from common.models.user import PostSubscriberRequest
+from common.order_service import OrderService
 from common.page_service import PageService
 from common.public_service import PublicService
 from common.seller_service import SellerService
@@ -124,6 +126,25 @@ def get_events():
         is_website=is_website,
         is_public=True,
     )
+    return convert_to_json(results)
+
+
+@public_api.route("/public/recent_orders")
+def get_orders():
+    """
+    API method for public website to fetch orders from last 48 hours
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = OrderService()
+    end = int(time.time())
+    start = end - (86400 * 2)  # last 48 hours
+    results = service.get_orders(start=start, end=end, sort_descending=True)
     return convert_to_json(results)
 
 
