@@ -713,7 +713,7 @@ class EventService:
                     ee.SellerId,
                     p.Route
                 ORDER BY p.PageOrder, MIN(ee.EventDate) ASC
-                LIMIT 20;"""
+                LIMIT 21;"""
 
         sql = sql.replace("\n", "")
 
