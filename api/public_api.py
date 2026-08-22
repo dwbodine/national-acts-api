@@ -17,6 +17,7 @@ from common.models.user import PostSubscriberRequest
 from common.order_service import OrderService
 from common.page_service import PageService
 from common.public_service import PublicService
+from common.refund_service import RefundService
 from common.seller_service import SellerService
 from common.sender_api_service import SenderApiService
 from common.utility import (
@@ -71,6 +72,43 @@ def get_faq_categories():
 
     service = FaqService()
     categories = service.get_faq_categories()
+    return convert_to_json(categories)
+
+
+@public_api.route("/public/refund/<int:category_id>")
+def get_refund_policies(category_id: int):
+    """
+    API method to fetch refund policies by category_id (0 for all)
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    if category_id is None:
+        category_id = 0
+
+    service = RefundService()
+    refund_policies = service.get_refund_policy_by_category_id(category_id)
+    return convert_to_json(refund_policies)
+
+
+@public_api.route("/public/refund/categories")
+def get_refund_categories():
+    """
+    API method to fetch all refund categories
+    """
+    # secured by public api key
+    sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
+    api_key = get_override_string_value_or_default(os.environ.get("PUBLIC_API_KEY"))
+
+    if sender_key is None or api_key is None or sender_key != api_key:
+        return {"msg": "Unauthorized"}, 401
+
+    service = RefundService()
+    categories = service.get_refund_categories()
     return convert_to_json(categories)
 
 

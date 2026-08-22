@@ -19,11 +19,13 @@ from common.models.admin import (
     FanMomentKey,
     FeaturedArtist,
     Page,
+    RefundPolicy,
     SiteSetting,
 )
 from common.moments_service import MomentsService
 from common.order_service import OrderService
 from common.page_service import PageService
+from common.refund_service import RefundService
 from common.role_service import RoleService
 from common.seller_service import SellerService
 from common.tour_service import TourService
@@ -248,6 +250,25 @@ def update_faq():
 
     service = FaqService()
     success = service.update_faq(faq)
+    return convert_to_json(success)
+
+
+@admin_api.route("/admin/refund_policy/update", methods=["POST"])
+@jwt_required()
+def update_refund_policy():
+    """
+    API method to update refund policy
+    """
+    is_admin = is_admin_logged_in()
+    if is_admin is False:
+        return {"msg": "Unauthorized"}, 401
+
+    refund_policy = convert_json_to_snake_case_object(
+        request.get_json(), RefundPolicy()
+    )
+
+    service = RefundService()
+    success = service.update_refund_policy(refund_policy)
     return convert_to_json(success)
 
 

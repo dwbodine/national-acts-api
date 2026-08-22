@@ -159,6 +159,25 @@ class Faq:
     answer: str
 
 
+class RefundCategory:
+    """
+    Model for refund policy category
+    """
+
+    refund_category_id: int
+    category_name: str
+
+
+class RefundPolicy:
+    """
+    Model for refund policy
+    """
+
+    refund_policy_id: int
+    category: RefundCategory
+    policy_text: str
+
+
 class FeaturedArtist:
     """
     Model for featured artists
