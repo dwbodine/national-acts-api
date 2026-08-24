@@ -67,12 +67,15 @@ class FaqService:
             )
             if last_number > 0:
                 data["order"] = last_number + 1
-                sql = """INSERT INTO FAQ (FAQCategoryId, QuestionOrder,
-                            QuestionText, AnswerHTML) 
-                        VALUES (%(category_id)s, %(order)s,
-                            %(question)s, %(answer)s)"""
-                faq_id = db_insert(sql, data)
-                success = faq_id > 0
+            else:
+                data["order"] = 1
+
+            sql = """INSERT INTO FAQ (FAQCategoryId, QuestionOrder,
+                        QuestionText, AnswerHTML) 
+                    VALUES (%(category_id)s, %(order)s,
+                        %(question)s, %(answer)s)"""
+            faq_id = db_insert(sql, data)
+            success = faq_id > 0
         return success
 
     def get_last_question_number(self, category_id: int):
