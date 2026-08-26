@@ -96,9 +96,17 @@ class FaqService:
         Delete FAQ
         """
         success: bool = True
-        sql = """DELETE FROM FAQ WHERE FAQID=%(faq_id)s"""
+        sql = """SELECT FAQCategoryID, QuestionOrder FROM FAQ WHERE FAQID=%(faq_id)s"""
         data = {"faq_id": faq_id}
-        success = db_delete(sql, data)
+        category_id: int = 0
+        row = db_query_one(sql, data)
+        if row:
+            category_id = get_override_int_value_or_default(row["FAQCategoryID"])
+            sql = """DELETE FROM FAQ WHERE FAQID=%(faq_id)s"""
+            data = {"faq_id": faq_id}
+            success = db_delete(sql, data)
+            if success:
+                success = self.__renumber_faqs(category_id)
         return success
 
     def get_faq_categories(self):
@@ -144,20 +152,25 @@ class FaqService:
                     data2 = {"category_id": category_id, "new_number": new_number}
                     row2 = db_query_one(sql2, data2)
                     existing_id: int = 0
+                    update_sql = """UPDATE FAQ
+                                        SET QuestionOrder=%(new_number)s
+                                        WHERE FAQID=%(faq_id)s"""
+                    update_data = {"new_number": new_number, "faq_id": faq_id}
+                    success = db_update(update_sql, update_data)
                     if row2:
                         existing_id = get_override_int_value_or_default(row2["FAQID"])
-                    if existing_id > 0:
-                        update_sql = """UPDATE FAQ
-                                            SET QuestionOrder=%(new_number)s
-                                            WHERE FAQID=%(faq_id)s"""
-                        update_data = {"new_number": new_number, "faq_id": faq_id}
-                        success = db_update(update_sql, update_data)
-                        if success:
-                            update_sql2 = """UPDATE FAQ
-                                                SET QuestionOrder=%(order)s
-                                                WHERE FAQID=%(existing_id)s"""
-                            update_data2 = {"order": order, "existing_id": existing_id}
-                            success = db_update(update_sql2, update_data2)
+                        if existing_id > 0:
+                            if success:
+                                update_sql2 = """UPDATE FAQ
+                                                    SET QuestionOrder=%(order)s
+                                                    WHERE FAQID=%(existing_id)s"""
+                                update_data2 = {
+                                    "order": order,
+                                    "existing_id": existing_id,
+                                }
+                                success = db_update(update_sql2, update_data2)
+                    if success:
+                        success = self.__renumber_faqs(category_id)
         return success
 
     def move_up(self, faq_id: int):
@@ -182,21 +195,23 @@ class FaqService:
                                     AND QuestionOrder=%(new_number)s"""
                     data2 = {"category_id": category_id, "new_number": new_number}
                     row2 = db_query_one(sql2, data2)
+                    update_sql = """UPDATE FAQ
+                                        SET QuestionOrder=%(new_number)s
+                                        WHERE FAQID=%(faq_id)s"""
+                    update_data = {"new_number": new_number, "faq_id": faq_id}
+                    success = db_update(update_sql, update_data)
                     existing_id: int = 0
-                    if row2:
+                    if row2:                        
                         existing_id = get_override_int_value_or_default(row2["FAQID"])
-                    if existing_id > 0:
-                        update_sql = """UPDATE FAQ
-                                            SET QuestionOrder=%(new_number)s
-                                            WHERE FAQID=%(faq_id)s"""
-                        update_data = {"new_number": new_number, "faq_id": faq_id}
-                        success = db_update(update_sql, update_data)
-                        if success:
-                            update_sql2 = """UPDATE FAQ
-                                                SET QuestionOrder=%(order)s
-                                                WHERE FAQID=%(existing_id)s"""
-                            update_data2 = {"order": order, "existing_id": existing_id}
-                            success = db_update(update_sql2, update_data2)
+                        if existing_id > 0:
+                            if success:
+                                update_sql2 = """UPDATE FAQ
+                                                    SET QuestionOrder=%(order)s
+                                                    WHERE FAQID=%(existing_id)s"""
+                                update_data2 = {"order": order, "existing_id": existing_id}
+                                success = db_update(update_sql2, update_data2)
+                    if success:
+                        success = self.__renumber_faqs(category_id)
         return success
 
     def __parse_faq_from_row_dict(self, row: dict):
@@ -215,3 +230,22 @@ class FaqService:
         )
         faq.category = category
         return faq
+
+    def __renumber_faqs(self, category_id: int):
+        """
+        Renumber FAQs in a category sequentially, starting at one.
+        """
+        sql = """UPDATE FAQ AS faq
+                        JOIN (
+                            SELECT FAQID,
+                                ROW_NUMBER() OVER (
+                                    ORDER BY QuestionOrder ASC, FAQID ASC
+                                ) AS NewQuestionOrder
+                            FROM FAQ
+                            WHERE FAQCategoryID=%(category_id)s
+                        ) AS ordered_faq
+                            ON ordered_faq.FAQID=faq.FAQID
+                        SET faq.QuestionOrder=ordered_faq.NewQuestionOrder
+                        WHERE faq.FAQCategoryID=%(category_id)s"""
+        data = {"category_id": category_id}
+        return db_update(sql, data)

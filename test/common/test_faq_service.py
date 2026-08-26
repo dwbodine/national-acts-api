@@ -542,3 +542,24 @@ def test_move_up_returns_false_when_first_update_fails(monkeypatch):
     success = faq_service.FaqService().move_up(9)
 
     assert success is False
+
+
+def test_renumber_faqs_updates_category_in_question_order(monkeypatch):
+    """
+    Test that renumber_faqs performs the renumbering in one SQL update.
+    """
+    calls = []
+    monkeypatch.setattr(
+        faq_service,
+        "db_update",
+        lambda sql, data: calls.append((sql, data)) or True,
+    )
+
+    success = faq_service.FaqService().renumber_faqs(4)
+
+    assert success is True
+    assert len(calls) == 1
+    assert "ROW_NUMBER() OVER" in calls[0][0]
+    assert "ORDER BY QuestionOrder ASC, FAQID ASC" in calls[0][0]
+    assert "SET faq.QuestionOrder=ordered_faq.NewQuestionOrder" in calls[0][0]
+    assert calls[0][1] == {"category_id": 4}
