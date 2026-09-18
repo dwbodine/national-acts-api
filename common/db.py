@@ -6,7 +6,7 @@ import os
 import mariadb
 
 
-def db_get_connection() -> mariadb.Connection:
+def db_get_connection(timeout=3000) -> mariadb.Connection:
     """
     Connect to MySql database
     """
@@ -20,7 +20,7 @@ def db_get_connection() -> mariadb.Connection:
         password=password,
         host=host,
         database=database,
-        connect_timeout=3000,
+        connect_timeout=timeout,
         port=3306,
         autocommit=True,
     )

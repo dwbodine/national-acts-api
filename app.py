@@ -129,7 +129,7 @@ def health():
     message: str = None
     header: str = "<h1>Health Check</h1><p>"
     try:
-        conn = db_get_connection()
+        conn = db_get_connection(timeout=5)
     except Exception as error:  # pylint: disable=broad-exception-caught
         message = str(error) + "\n" + traceback.format_exc()
         conn = None
