@@ -7,6 +7,7 @@ import json
 import logging
 
 import dotenv
+import pytest
 
 import app as app_module
 
@@ -248,6 +249,34 @@ def test_after_request_refreshes_near_expiring_tokens(monkeypatch):
         "userId": 7,
         "access_token": "token-for-ada@example.com",
     }
+
+
+@pytest.mark.parametrize(
+    "environment_variable",
+    ["PUBLIC_API_KEY", "INTERNAL_API_KEY", "TICKET_SOCKET_API_KEY"],
+)
+def test_after_request_skips_jwt_validation_for_api_tokens(
+    monkeypatch, environment_variable
+):
+    """
+    Skip JWT refresh handling when Authorization contains a configured API token.
+    """
+    api_token = f"{environment_variable.lower()}-value"
+    monkeypatch.setattr(app_module, "API_TOKENS", frozenset({api_token}))
+
+    def fail_if_called():
+        raise AssertionError("JWT validation should be skipped for API tokens")
+
+    monkeypatch.setattr(app_module, "get_jwt", fail_if_called)
+    response = build_json_response({"ok": True})
+
+    with app_module.app.test_request_context(
+        "/",
+        headers={"Authorization": api_token},
+    ):
+        result = app_module.after_request(response)
+
+    assert result.get_json() == {"ok": True}
 
 
 def test_after_request_leaves_non_expiring_tokens_unchanged(monkeypatch):

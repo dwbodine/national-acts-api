@@ -34,7 +34,7 @@ class ExchangeRateService:
             url += "/" + exchange_date.isoformat()
 
         exchange_rate_value: float = 1.0
-        api_key = os.getenv("STRIPE_API_KEY")
+        api_key = os.getenv("STRIPE_RATES_API_KEY")
         if api_key is not None:
             json_data = get_https_response(
                 host="api.striperates.com", url=url, api_key=api_key

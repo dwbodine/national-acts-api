@@ -19,7 +19,7 @@ def test_get_current_rate_returns_default_when_api_key_is_missing(monkeypatch):
     """
     Test that the current-rate lookup falls back to 1.0 without a Stripe API key.
     """
-    monkeypatch.delenv("STRIPE_API_KEY", raising=False)
+    monkeypatch.delenv("STRIPE_RATES_API_KEY", raising=False)
     target_ts = int(datetime(2026, 4, 20, 12, 0, 0).timestamp())
     current_ts = int(datetime(2026, 4, 23, 12, 0, 0).timestamp())
     monkeypatch.setattr(exchange_rate_service.time, "time", lambda: current_ts)
@@ -39,7 +39,7 @@ def test_get_current_rate_uses_stripe_response_and_rounds(monkeypatch):
     """
     target_ts = int(datetime(2026, 4, 23, 12, 0, 0).timestamp())
     calls = []
-    monkeypatch.setenv("STRIPE_API_KEY", "stripe-key")
+    monkeypatch.setenv("STRIPE_RATES_API_KEY", "stripe-key")
     monkeypatch.setattr(
         exchange_rate_service,
         "get_https_response",
@@ -76,7 +76,7 @@ def test_get_current_rate_returns_default_when_stripe_response_is_empty(monkeypa
     Test that the current-rate lookup falls back to 1.0 when Stripe returns no data.
     """
     target_ts = int(datetime(2026, 4, 23, 12, 0, 0).timestamp())
-    monkeypatch.setenv("STRIPE_API_KEY", "stripe-key")
+    monkeypatch.setenv("STRIPE_RATES_API_KEY", "stripe-key")
     monkeypatch.setattr(
         exchange_rate_service,
         "get_https_response",

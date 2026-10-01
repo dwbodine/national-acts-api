@@ -30,6 +30,8 @@ from api.user_api import user_api
 from api.report_api import report_api
 from api.messaging_api import messaging_api
 from api.ticket_orders_api import ticket_orders_api
+from api.external_api import external_api
+from api.stripe_api import stripe_api
 from common.db import db_get_connection
 
 current_path = os.path.dirname(__file__)
@@ -71,6 +73,18 @@ flask_logger.setLevel(logging.INFO)
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
+
+API_TOKENS = frozenset(
+    filter(
+        None,
+        (
+            os.environ.get("PUBLIC_API_KEY"),
+            os.environ.get("INTERNAL_API_KEY"),
+            os.environ.get("TICKET_SOCKET_API_KEY"),
+        ),
+    )
+)
+
 jwt = JWTManager(app)
 application = app
 
@@ -84,6 +98,8 @@ app.register_blueprint(user_api)
 app.register_blueprint(report_api)
 app.register_blueprint(messaging_api)
 app.register_blueprint(ticket_orders_api)
+app.register_blueprint(external_api)
+app.register_blueprint(stripe_api)
 
 
 @app.after_request
@@ -102,7 +118,9 @@ def after_request(response):
     response.cache_control.must_revalidate = True
 
     try:
-        if request.headers.get("Authorization") is not None:
+        authorization = request.headers.get("Authorization")
+
+        if authorization is not None and authorization not in API_TOKENS:
             exp_timestamp = get_jwt()["exp"]
             now = datetime.now(timezone.utc)
             target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
