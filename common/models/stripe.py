@@ -56,7 +56,7 @@ class StripeTransaction:
             if "domain" in payment_intent.metadata
             else ""
         )
-        
+
         self.processing_fee = (
             (payment_intent.latest_charge.balance_transaction.fee / 100)
             if payment_intent.latest_charge
@@ -67,7 +67,8 @@ class StripeTransaction:
             (payment_intent.latest_charge.balance_transaction.exchange_rate / 100)
             if payment_intent.latest_charge
             and payment_intent.latest_charge.balance_transaction
-            and payment_intent.latest_charge.balance_transaction.exchange_rate is not None
+            and payment_intent.latest_charge.balance_transaction.exchange_rate
+            is not None
             else 0.0
         )
 
