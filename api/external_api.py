@@ -23,6 +23,11 @@ def ticketsocket_checkin():
     """
 
     logger.info(
+        "TicketSocket check-in headers: %s",
+        list(request.headers.items()),
+    )
+
+    logger.info(
         "TicketSocket check-in POST fields: %s",
         request.form.to_dict(flat=False),
     )
