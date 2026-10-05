@@ -2,6 +2,10 @@
 
 This is the API layer for nationalactsvip.com
 
+Database changes and API releases use versioned Alembic migrations. See
+[database release workflow](docs/database-releases.md) for baseline adoption,
+local development, deployment, rollback, and recovery.
+
 Among the interesting points:
 - uses Python 3.13.7 with a Flask API
 - it is dockerized to run the database and PHPMyAdmin locally in containers

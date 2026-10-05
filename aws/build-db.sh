@@ -1,4 +1,9 @@
 #!/bin/bash
+set -Eeuo pipefail
+if [[ "${CONFIRM_DATABASE_REBUILD:-}" != "DELETE_DATABASE_AND_RESTORE" ]]; then
+  echo "Destructive database rebuild refused. Use release-api.sh for deployments." >&2
+  exit 1
+fi
 docker compose stop nationalactsdb
 docker compose rm -fsv nationalactsdb
 docker rmi 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsdb:latest

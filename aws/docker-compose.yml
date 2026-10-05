@@ -132,7 +132,7 @@ services:
       - internal_net
 
   nationalactsapi:
-    image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsapi:latest
+    image: ${API_IMAGE:-804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsapi:latest}
     container_name: nationalactsapi
     expose:
       - "5000"
@@ -154,6 +154,18 @@ services:
     networks:
       - frontend_net
       - internal_net
+
+  migrate:
+    image: ${API_IMAGE:-804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsapi:latest}
+    profiles: ["migration"]
+    restart: "no"
+    environment:
+      NATIONALACTS_ENV_SECRET: /run/secrets/nationalactsapi_migrations_env
+    secrets:
+      - nationalactsapi_migrations_env
+    networks:
+      - internal_net
+    command: ["python", "-m", "tools.migrate", "upgrade"]
 
   nationalactsusers:
     image: 804363746695.dkr.ecr.us-east-1.amazonaws.com/nationalactsvip/nationalactsusers:latest
@@ -195,3 +207,5 @@ secrets:
     file: ./secrets/mysql_root_password.txt
   nationalactsapi_env:
     file: ./secrets/nationalactsapi.env
+  nationalactsapi_migrations_env:
+    file: ./secrets/nationalactsapi_migrations.env

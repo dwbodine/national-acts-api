@@ -41,3 +41,8 @@ up.sh
 down.sh
 *.Dockerfile
 **/*.sql
+seeds/
+secrets/
+**/.env*
+docs/
+.github/

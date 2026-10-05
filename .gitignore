@@ -29,6 +29,7 @@ MANIFEST
 tmp/
 secrets/
 seeds/
+.releases/
 *.pem
 aws/cron.tab
 backup/backup.env

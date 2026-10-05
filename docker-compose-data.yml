@@ -1,0 +1,6 @@
+# Opt-in production data import for a NEW, empty local volume only.
+# Do not use on production. The main compose file creates an empty database.
+services:
+  nationalactsdb:
+    volumes:
+      - ./seeds/nationalacts20.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
