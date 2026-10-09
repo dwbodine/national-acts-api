@@ -1,7 +1,10 @@
-"""Stripe upgrade"""
+# pylint: disable=invalid-name
+# pylint: disable=no-member
+"""
+Stripe upgrade
+"""
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "7e3584499b4c"
 down_revision = "0001_baseline"
@@ -10,6 +13,10 @@ depends_on = None
 
 
 def upgrade():
+    """
+    Upgrade the database schema for Stripe integration.
+    """
+
     # rename old unused Orders table
     op.execute("""
         RENAME TABLE Orders TO PrintedTicketOrders
@@ -169,10 +176,46 @@ def upgrade():
             DROP COLUMN TicketSocketEventId
     """)
 
+    # add new Orders table
+    op.execute("""
+        CREATE TABLE TicketPartnerOrders (
+                    TicketPartnerOrderId INT NOT NULL AUTO_INCREMENT,
+                    TicketPartnerEventId INT NOT NULL,
+                    PartnerOrderId INT NULL,
+                    LastUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    
+                    PRIMARY KEY (TicketPartnerOrderId),
+                    
+                    CONSTRAINT FK_TicketPartnerOrders_TicketPartnerEvent
+                        FOREIGN KEY (TicketPartnerEventId)
+                        REFERENCES TicketPartnerEvents (TicketPartnerEventId)
+                        ON DELETE NO ACTION
+                        ON UPDATE NO ACTION, 
+                        
+                    UNIQUE KEY UQ_TicketPartnerOrders_PartnerEvent
+                        (TicketPartnerEventId, PartnerOrderId)
+
+                ) ENGINE=InnoDB
+                    DEFAULT CHARACTER SET utf8mb4
+                    COLLATE utf8mb4_unicode_ci;
+    """)
+
+    op.execute("""
+        INSERT INTO TicketPartnerOrders (TicketPartnerEventId, PartnerOrderId, LastUpdated)
+            SELECT tpe.TicketPartnerEventId, tso.Id, tso.LastUpdate
+                FROM TicketPartnerEvents tpe
+                JOIN TicketSocketOrders tso
+                    ON tpe.PartnerEventId = tso.TicketSocketEventId
+                WHERE tpe.TicketPartnerId = 2
+                    AND tpe.PartnerEventId IS NOT NULL
+                ORDER BY tso.PurchaseDate, tso.LastUpdate
+    """)
+
     # add new StripeTransactions table
     op.execute("""
         CREATE TABLE StripeTransactions (
                     StripeTransactionId VARCHAR(100) NOT NULL,
+                    TicketPartnerOrderId INT NOT NULL,
                     EventName VARCHAR(100) NOT NULL,
                     Description VARCHAR(255) NOT NULL,
                     DateReceived DATETIME NOT NULL,
@@ -188,6 +231,12 @@ def upgrade():
                     LastUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     
                     PRIMARY KEY (StripeTransactionId),
+                    
+                    CONSTRAINT FK_StripeTransactions_TicketPartnerOrder
+                        FOREIGN KEY (TicketPartnerOrderId)
+                        REFERENCES TicketPartnerOrders (TicketPartnerOrderId)
+                        ON DELETE NO ACTION
+                        ON UPDATE NO ACTION,
                                         
                     UNIQUE KEY UQ_StripeTransactions_StripeTransactionId
                         (StripeTransactionId)
@@ -197,33 +246,136 @@ def upgrade():
                     COLLATE utf8mb4_unicode_ci;
     """)
 
-    # create Tranaction order join table
     op.execute("""
-        CREATE TABLE StripeTransactionOrder (
-                    StripeTransactionOrderId INT NOT NULL AUTO_INCREMENT,
-                    StripeTransactionId VARCHAR(100) NOT NULL,
-                    OrderId INT NOT NULL,
-                    EventId INT NOT NULL,
-                    LastUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    
-                    PRIMARY KEY (StripeTransactionOrderId)
-                ) ENGINE=InnoDB
-                    DEFAULT CHARACTER SET utf8mb4
-                    COLLATE utf8mb4_unicode_ci;
-    
-                    
-        """)
+        ALTER TABLE DailyOrderData
+            ADD COLUMN TicketPartnerEventId INT NULL,
+            ADD COLUMN TicketPartnerOrderId INT NULL
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            ADD CONSTRAINT IX_DailyOrderData_PurchaseDate_EventId_OrderId
+                UNIQUE (PurchaseDate, TicketPartnerEventId, TicketPartnerOrderId);
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            ADD CONSTRAINT FK_DailyOrderData_TicketPartnerEvent
+            FOREIGN KEY (TicketPartnerEventId)
+            REFERENCES TicketPartnerEvents (TicketPartnerEventId)
+            ON DELETE NO ACTION
+            ON UPDATE NO ACTION;
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            ADD CONSTRAINT FK_DailyOrderData_TicketPartnerOrder
+            FOREIGN KEY (TicketPartnerOrderId)
+            REFERENCES TicketPartnerOrders (TicketPartnerOrderId)
+            ON DELETE NO ACTION
+            ON UPDATE NO ACTION;
+    """)
+
+    op.execute("""
+        UPDATE DailyOrderData dod
+            JOIN TicketPartnerEvents tpe
+                ON tpe.PartnerEventId = dod.TicketSocketEventId
+                AND tpe.TicketPartnerId = 2
+            SET dod.TicketPartnerEventId = tpe.TicketPartnerEventId            
+    """)
+
+    op.execute("""
+        UPDATE DailyOrderData dod
+            JOIN TicketPartnerOrders tpo
+                ON tpo.PartnerOrderId = dod.TicketSocketOrderId
+                SET dod.TicketPartnerOrderId = tpo.TicketPartnerOrderId            
+    """)
+
+    # op.execute("""
+    #     ALTER TABLE DailyOrderData
+    #        DROP FOREIGN KEY FK_DailyOrderData_TicketSocketEvent
+    # """)
+
+    # op.execute("""
+    #     ALTER TABLE DailyOrderData
+    #         DROP INDEX IX_DailyOrderData_PurchaseDate_EventId
+    # """)
+
+    # op.execute("""
+    #    ALTER TABLE DailyOrderData
+    #        DROP COLUMN TicketSocketEventId,
+    #        DROP COLUMN TicketSocketOrderId
+    # """)
 
 
 def downgrade():
-    # Replace this refusal only with a reviewed, data-preserving downgrade.
+    """
+    Downgrade the database schema for Stripe integration.
+    """
+
+    # op.execute("""
+    #     ALTER TABLE DailyOrderData
+    #         ADD COLUMN TicketSocketEventId INT NULL,
+    #         ADD COLUMN TicketSocketOrderId INT NULL
+    # """)
+
+    # op.execute("""
+    #     ALTER TABLE DailyOrderData
+    #         ADD CONSTRAINT IX_DailyOrderData_PurchaseDate_EventId
+    #         UNIQUE (PurchaseDate, TicketSocketEventId, TicketSocketOrderId);
+    # """)
+
+    # op.execute("""
+    #    ALTER TABLE DailyOrderData
+    #        ADD CONSTRAINT FK_DailyOrderData_TicketSocketEvent
+    #        FOREIGN KEY (TicketSocketEventId)
+    #        REFERENCES TicketSocketEvents (Id)
+    #        ON DELETE NO ACTION
+    #        ON UPDATE NO ACTION;
+    # """)
 
     op.execute("""
-        DROP TABLE StripeTransactionOrder
+        UPDATE DailyOrderData dod
+            JOIN TicketPartnerEvents tpe
+                ON tpe.TicketPartnerEventId = dod.TicketPartnerEventId
+                AND tpe.TicketPartnerId = 2
+            SET dod.TicketSocketEventId = tpe.PartnerEventId            
+    """)
+
+    op.execute("""
+        UPDATE DailyOrderData dod
+            JOIN TicketPartnerOrders tpo
+                ON tpo.TicketPartnerOrderId = dod.TicketPartnerOrderId
+                SET dod.TicketSocketOrderId = tpo.PartnerOrderId            
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            DROP FOREIGN KEY FK_DailyOrderData_TicketPartnerEvent
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            DROP FOREIGN KEY FK_DailyOrderData_TicketPartnerOrder
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            DROP INDEX IX_DailyOrderData_PurchaseDate_EventId_OrderId
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            DROP COLUMN TicketPartnerEventId,
+            DROP COLUMN TicketPartnerOrderId
     """)
 
     op.execute("""
         DROP TABLE StripeTransactions
+    """)
+
+    op.execute("""
+        DROP TABLE TicketPartnerOrders
     """)
 
     op.execute("""
