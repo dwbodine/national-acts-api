@@ -202,7 +202,7 @@ not blindly stamping or editing the recorded baseline to hide drift.
 Production already received this statement outside migrations:
 
 ```sql
-ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0;
+ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0 AFTER IsComped;
 ```
 
 The original baseline stays unchanged. The new revision order is:

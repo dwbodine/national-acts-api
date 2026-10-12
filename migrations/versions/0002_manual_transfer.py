@@ -11,7 +11,7 @@ depends_on = None
 
 def upgrade():
     op.execute(
-        "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0"
+        "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0 AFTER IsComped"
     )
 
 

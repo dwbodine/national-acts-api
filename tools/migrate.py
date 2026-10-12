@@ -94,11 +94,11 @@ def verify_manual_transfer(connection):
     expected = json.loads(
         (ROOT / "migrations/baseline-schema.json").read_text(encoding="utf-8")
     )
-    # The production ALTER appended a non-nullable column with default 0.
+    # Production places this non-nullable column immediately after IsComped.
     ddl = expected["TicketSocketOrders"]
     expected["TicketSocketOrders"] = ddl.replace(
-        "\n  PRIMARY KEY",
-        "\n  `IsManualTransfer` tinyint(4) NOT NULL DEFAULT 0,\n  PRIMARY KEY",
+        "\n  `IsSenderUpdated`",
+        "\n  `IsManualTransfer` tinyint(4) NOT NULL DEFAULT 0,\n  `IsSenderUpdated`",
         1,
     )
     verify_schema(connection, expected)

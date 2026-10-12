@@ -37,7 +37,7 @@ def test_adopt_existing_change_without_repeating_ddl(reconciled_database, unvers
     run, engine, _ = reconciled_database
     with engine.begin() as connection:
         connection.exec_driver_sql(
-            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0"
+            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0 AFTER IsComped"
         )
         connection.exec_driver_sql(
             "INSERT INTO Activity (ActivityName) VALUES ('preserve existing data')"
@@ -68,7 +68,9 @@ def test_adoption_refuses_missing_or_wrong_column(reconciled_database, definitio
         run("adopt-manual-transfer")
     with engine.begin() as connection:
         connection.exec_driver_sql(
-            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer " + definition
+            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer "
+            + definition
+            + " AFTER IsComped"
         )
     with pytest.raises(RuntimeError, match="TicketSocketOrders"):
         run("adopt-manual-transfer")
@@ -85,11 +87,28 @@ def test_adoption_refuses_unrelated_schema_change(reconciled_database):
     run, engine, _ = reconciled_database
     with engine.begin() as connection:
         connection.exec_driver_sql(
-            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0"
+            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0 AFTER IsComped"
         )
         connection.exec_driver_sql("ALTER TABLE Activity ADD COLUMN unexpected INT")
     with pytest.raises(RuntimeError, match="Activity"):
         run("adopt-manual-transfer")
+
+
+def test_adoption_refuses_wrong_column_position(reconciled_database):
+    run, engine, _ = reconciled_database
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0"
+        )
+    with pytest.raises(RuntimeError, match="TicketSocketOrders"):
+        run("adopt-manual-transfer")
+    with engine.connect() as connection:
+        assert (
+            connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+            == migrate.BASELINE
+        )
 
 
 def test_adoption_refuses_later_revision(reconciled_database):
