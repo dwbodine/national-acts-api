@@ -312,6 +312,7 @@ class OrderService:
             order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
             order.is_comped = get_override_bool_value_or_default(row["IsComped"])
             order.notes = get_override_string_value_or_default(row["Notes"])
+            order.is_manual_transfer = get_override_bool_value_or_default(row["IsManualTransfer"])
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -452,6 +453,7 @@ class OrderService:
             order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
             order.is_comped = get_override_bool_value_or_default(row["IsComped"])
             order.notes = get_override_string_value_or_default(row["Notes"])
+            order.is_manual_transfer = get_override_bool_value_or_default(row["IsManualTransfer"])
 
             if order.is_deleted is True:
                 order.is_active = False
@@ -764,6 +766,7 @@ class OrderService:
                              IsDeleted=%(isDeleted)s, 
                              IsComped=%(isComped)s,
                              Notes=%(notes)s,
+                             IsManualTransfer=%(is_manual_transfer)s,
                              LastUpdate=CURRENT_TIMESTAMP 
                              WHERE Id=%(ticket_socket_order_id)s"""
             update_data = {
@@ -778,6 +781,9 @@ class OrderService:
                     order_to_update.is_comped
                 ),
                 "notes": get_override_string_value_or_default(order_to_update.notes),
+                "is_manual_transfer": get_override_tinyint_value_or_default_from_bool(
+                    order_to_update.is_manual_transfer
+                ),
             }
             success = db_update(update_sql, update_data)
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:

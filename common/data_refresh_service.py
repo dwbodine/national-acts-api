@@ -551,6 +551,7 @@ class DataRefreshService:
                             order_success: bool = False
                             ticket_socket_order_id: int = 0
                             order_add_new: bool = False
+                            order_transferred: bool = False
 
                             # format phone before attempting to update
                             phone = get_override_string_value_or_default(order.phone)
@@ -613,6 +614,9 @@ class DataRefreshService:
                                 )
                                 order_active = get_override_bool_value_or_default(
                                     existing_order_row["IsActive"]
+                                )
+                                order_transferred = get_override_bool_value_or_default(
+                                    existing_order_row["IsManualTransfer"]
                                 )
 
                                 ticket_socket_order_id = (
@@ -844,7 +848,7 @@ class DataRefreshService:
                                                 AttendeeFirstName=%(attendeeFirstName)s,
                                                 AttendeeLastName=%(attendeeLastName)s,
                                                 ShirtSize=%(shirtSize)s"""
-                                        if ticket_price > 0:
+                                        if ticket_price > 0 and order_transferred is not True:
                                             sql += ", Price=%(price)s"
                                         sql += """,
                                                 LastUpdate=CURRENT_TIMESTAMP
