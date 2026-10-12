@@ -22,17 +22,22 @@ def ticketsocket_checkin():
     Handle ticket socket check-in requests.
     """
 
-    logger.info(
-        "TicketSocket check-in headers: %s",
-        list(request.headers.items()),
-    )
+    headers = request.headers
+    if not headers:
+        logger.info("TicketSocket check-in received no headers")
+    else:
+        logger.info(
+            "TicketSocket check-in headers: %s",
+            list(headers.items()),
+        )
 
-    logger.info(
-        "TicketSocket check-in POST fields: %s",
-        request.form.to_dict(flat=False),
-    )
+    form = request.form
+    if not form:
+        logger.info("TicketSocket check-in received no form fields")
+    else:
+        logger.info(
+            "TicketSocket check-in POST fields: %s",
+            form.to_dict(flat=False),
+        )
 
     return Response("ok", mimetype="text/plain")
-
-
-

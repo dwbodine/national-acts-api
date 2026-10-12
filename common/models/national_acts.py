@@ -263,6 +263,7 @@ class VipOrder(TicketSocketOrder):
     tickets: list[VipTicket] = []
     last_update: str = None
     notes: str = None
+    is_manual_transfer: bool = False
 
     def get_totals(self):
         """
