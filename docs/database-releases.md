@@ -197,6 +197,68 @@ not blindly stamping or editing the recorded baseline to hide drift.
 
 ## Local development
 
+### Reconcile the manual production column IsManualTransfer
+
+Production already received this statement outside migrations:
+
+```sql
+ALTER TABLE TicketSocketOrders ADD COLUMN IsManualTransfer TINYINT NOT NULL DEFAULT 0;
+```
+
+The original baseline stays unchanged. The new revision order is:
+
+```text
+0001_baseline -> 0002_manual_transfer -> 7e3584499b4c (Stripe)
+```
+
+`0002_manual_transfer` reproduces the exact non-nullable column/default for databases
+that have not received it. Because Stripe has not reached production, its parent
+revision now points to this reconciliation revision. If Stripe was already applied
+locally using the former chain, restore the pre-Stripe local snapshot before testing
+the revised chain. Alembic cannot infer a newly inserted ancestor's missing column
+from a database already recorded at the Stripe revision.
+
+For a versioned local database still at the original baseline and missing the
+column, apply only the reconciliation revision:
+
+```powershell
+.\.venv\Scripts\python.exe -m tools.migrate --env-file .env.development upgrade 0002_manual_transfer
+```
+
+This deliberately stops before Stripe. If a restored production snapshot already
+contains the column, use the verified adoption operation locally instead:
+
+```powershell
+.\.venv\Scripts\python.exe -m tools.migrate --env-file .env.development adopt-manual-transfer
+```
+
+For production, commit/test/publish the updated code, select the new image digest,
+and pull its migration image as in the release setup. Take a fresh backup, then run
+these commands beside the production compose file on EC2:
+
+```bash
+docker compose --profile migration run --rm --no-deps migrate python -m tools.migrate adopt-manual-transfer
+docker compose --profile migration run --rm --no-deps migrate python -m tools.migrate current
+```
+
+Adoption compares the entire schema with the original baseline plus exactly this
+column, ignoring only auto-increment counters. If the type, default, nullability,
+position, or another table differs, it refuses. It accepts only an unversioned
+database, the original baseline, or this reconciliation revision. It writes only
+Alembic bookkeeping; it does not re-run the production `ALTER TABLE`. Repeating it
+on the matching schema is supported. The expected current revision is
+`0002_manual_transfer`, not the Stripe head. `check` will still report that production
+is behind this checkout's head until Stripe is intentionally deployed.
+
+Do not use a general `upgrade` on production to register this already-executed
+change, and do not stamp to `head`. No production changes are performed merely by
+adding these files to the repository or publishing the image.
+
+The reconciliation downgrade removes the column only when every value is the
+default 0 (or there are no rows). It refuses if any value is nonzero,
+because removing the column would discard recorded information. Downgrading Stripe
+to `0002_manual_transfer` preserves the manual-transfer column.
+
 `docker compose up -d nationalactsdb` now creates an empty schema on a **new** volume.
 Existing volumes remain intact. Run `tools.migrate ... upgrade` to create the schema.
 For an explicitly requested data import into a new local volume, use

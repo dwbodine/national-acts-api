@@ -16,6 +16,7 @@ from sqlalchemy.engine import URL
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "0001_baseline"
+MANUAL_TRANSFER = "0002_manual_transfer"
 
 
 def configuration():
@@ -86,6 +87,24 @@ def verify_baseline(connection):
     expected = json.loads(
         (ROOT / "migrations/baseline-schema.json").read_text(encoding="utf-8")
     )
+    verify_schema(connection, expected)
+
+
+def verify_manual_transfer(connection):
+    expected = json.loads(
+        (ROOT / "migrations/baseline-schema.json").read_text(encoding="utf-8")
+    )
+    # The production ALTER appended a non-nullable column with default 0.
+    ddl = expected["TicketSocketOrders"]
+    expected["TicketSocketOrders"] = ddl.replace(
+        "\n  PRIMARY KEY",
+        "\n  `IsManualTransfer` tinyint(4) NOT NULL DEFAULT 0,\n  PRIMARY KEY",
+        1,
+    )
+    verify_schema(connection, expected)
+
+
+def verify_schema(connection, expected):
     actual = snapshot(connection)
     differences = sorted(
         name
@@ -93,7 +112,7 @@ def verify_baseline(connection):
         if expected.get(name) != actual.get(name)
     )
     if differences:
-        raise RuntimeError("Baseline mismatch in tables: " + ", ".join(differences))
+        raise RuntimeError("Schema mismatch in tables: " + ", ".join(differences))
 
 
 def main():
@@ -112,6 +131,7 @@ def main():
             "check",
             "adopt-baseline",
             "verify-baseline",
+            "adopt-manual-transfer",
             "snapshot",
             "revision",
         ],
@@ -156,6 +176,17 @@ def main():
                 connection.commit()
                 if args.action == "adopt-baseline":
                     command.stamp(config, BASELINE)
+            elif args.action == "adopt-manual-transfer":
+                if current not in ((), (BASELINE,), (MANUAL_TRANSFER,)):
+                    raise RuntimeError(
+                        "Manual-transfer adoption requires an unversioned, baseline, or manual-transfer database"
+                    )
+                verify_manual_transfer(connection)
+                connection.commit()
+                command.stamp(config, MANUAL_TRANSFER)
+                print(
+                    "Verified schema and recorded 0002_manual_transfer; no application DDL executed"
+                )
             elif args.action == "snapshot":
                 print(json.dumps(snapshot(connection), indent=2))
             elif args.action == "current":

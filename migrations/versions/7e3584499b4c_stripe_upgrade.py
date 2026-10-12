@@ -7,7 +7,7 @@ Stripe upgrade
 from alembic import op
 
 revision = "7e3584499b4c"
-down_revision = "0001_baseline"
+down_revision = "0002_manual_transfer"
 branch_labels = None
 depends_on = None
 

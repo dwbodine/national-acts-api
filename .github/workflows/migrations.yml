@@ -26,7 +26,7 @@ jobs:
         env:
           TEST_MARIADB_PORT: '3306'
           TEST_MARIADB_PASSWORD: migration-ci-only
-        run: python -m pytest -o addopts='' test/integration/test_migrations.py test/test_release_scripts.py
+        run: python -m pytest -o addopts='' test/integration/test_migrations.py test/integration/test_manual_transfer.py test/test_release_scripts.py
       - name: Shell syntax
         run: |
           for script in deploy.sh entrypoint.sh aws/release-common.sh aws/release-api.sh aws/rollback-api.sh aws/build-api.sh aws/build-db.sh aws/rebuild-all.sh; do
