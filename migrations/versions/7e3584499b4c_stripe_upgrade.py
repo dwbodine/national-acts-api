@@ -215,7 +215,7 @@ def upgrade():
     op.execute("""
         CREATE TABLE StripeTransactions (
                     StripeTransactionId VARCHAR(100) NOT NULL,
-                    TicketPartnerOrderId INT NOT NULL,
+                    TicketPartnerOrderId INT NULL,
                     EventName VARCHAR(100) NOT NULL,
                     Description VARCHAR(255) NOT NULL,
                     DateReceived DATETIME NOT NULL,
