@@ -3,6 +3,7 @@ External API routes - used by external systems to access/update data in the syst
 This is a separate API from the public API, which is used by the front-end web application.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, Response, request
@@ -38,6 +39,13 @@ def ticketsocket_checkin():
         logger.info(
             "TicketSocket check-in POST fields: %s",
             form.to_dict(flat=False),
+        )
+
+    payload = request.get_json(silent=True)
+    if payload is not None:
+        logger.info(
+            "TicketSocket check-in JSON payload: %s",
+            json.dumps(payload),
         )
 
     return Response("ok", mimetype="text/plain")
