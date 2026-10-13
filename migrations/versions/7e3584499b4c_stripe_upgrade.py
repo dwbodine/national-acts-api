@@ -291,6 +291,96 @@ def upgrade():
                 SET dod.TicketPartnerOrderId = tpo.TicketPartnerOrderId            
     """)
 
+    op.execute("""
+        ALTER TABLE EventNotes
+            DROP INDEX IX_EventNote_EventId
+    """)
+
+    op.execute("""
+        ALTER TABLE EventNotes
+            DROP INDEX FK_EventNote_ExternalEventId
+    """)
+
+    op.execute("""
+        ALTER TABLE EventNotes
+            RENAME COLUMN ExternalEventId TO EventId
+    """)
+
+    op.execute("""
+        ALTER TABLE EventNotes
+            ADD INDEX IX_EventNote_EventId
+                (EventId)
+    """)
+
+    op.execute("""
+        ALTER TABLE EventNotes
+            ADD CONSTRAINT FK_EventNote_EventId
+                FOREIGN KEY (EventId)
+                REFERENCES Events (EventId)
+                ON DELETE NO ACTION
+                ON UPDATE NO ACTION
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            DROP FOREIGN KEY FK_FanMoment_ExternalEventId
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            DROP INDEX IX_FanMoment_ExternalEventId
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            RENAME COLUMN ExternalEventId TO EventId
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            ADD INDEX IX_FanMoment_EventId
+                (EventId)
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            ADD CONSTRAINT FK_FanMoments_EventId
+                FOREIGN KEY (EventId)
+                REFERENCES Events (EventId)
+                ON DELETE NO ACTION
+                ON UPDATE NO ACTION
+    """)
+
+    op.execute("""
+        ALTER TABLE TourEvent
+            DROP FOREIGN KEY FK_TourEvent_ExternalEventId
+    """)
+
+    op.execute("""
+        ALTER TABLE TourEvent
+            DROP INDEX IX_TourEvent_Compound
+    """)
+
+    op.execute("""
+        ALTER TABLE TourEvent
+            RENAME COLUMN ExternalEventId TO EventId
+    """)
+
+    op.execute("""
+            ALTER TABLE TourEvent
+            ADD CONSTRAINT FK_TourEvent_EventId
+                FOREIGN KEY (EventId)
+                REFERENCES Events (EventId)
+                ON DELETE NO ACTION
+                ON UPDATE NO ACTION;
+    """)
+
+    op.execute("""
+        ALTER TABLE TourEvent
+            ADD INDEX IX_TourEvent_Compound
+                (TourEventId, TourId, EventId)
+    """)
+
     # op.execute("""
     #     ALTER TABLE DailyOrderData
     #        DROP FOREIGN KEY FK_DailyOrderData_TicketSocketEvent
@@ -307,11 +397,125 @@ def upgrade():
     #        DROP COLUMN TicketSocketOrderId
     # """)
 
+    # Preserve the existing event projection using the new partner mapping.
+    op.execute("""
+        CREATE SQL SECURITY INVOKER VIEW EventDetails AS
+        SELECT Sellers.SellerId AS SellerId,
+               Sellers.Name AS SellerName,
+               Sellers.SellerTypeId AS SellerType,
+               Events.EventId AS ExternalEventId,
+               TicketSocketEvents.Id AS TicketSocketEventId,
+               COALESCE(Events.EventDate, TicketSocketEvents.EventDate) AS EventDate,
+               TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
+               COALESCE(SellerEventCategory.IsVisibleOnSite, 1) AS IsVisibleOnSite,
+               COALESCE(SellerEventCategory.IsVisibleOnPortal, 1) AS IsVisibleOnPortal,
+               COALESCE(SellerEventCategory.SellerRatePercent, 0.0) AS SellerRatePercent,
+               TicketSocketEvents.IsVip AS IsVip,
+               Events.EventTime AS EventTime,
+               Events.MeetAndGreetTime AS MeetAndGreetTime,
+               Events.DoorsOpenTime AS DoorsOpenTime,
+               COALESCE(Events.Title, TicketSocketEvents.Title) AS Title,
+               COALESCE(Venues.Venue, TicketSocketEvents.Venue) AS Venue,
+               COALESCE(Venues.Address, TicketSocketEvents.Address) AS Address,
+               COALESCE(Venues.City, TicketSocketEvents.City) AS City,
+               COALESCE(Venues.State, TicketSocketEvents.State) AS State,
+               COALESCE(Venues.Zip, TicketSocketEvents.Zip) AS Zip,
+               COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,
+               Venues.TimeZone AS TimeZone,
+               Country.CountryId AS CountryId,
+               Country.CountryCode AS CountryCode,
+               COALESCE(Events.EmailSentToVips, 0) AS EmailSentToVips,
+               COALESCE(Events.TextSentToVips, 0) AS TextSentToVips,
+               COALESCE(Events.ListSentToBand, 0) AS ListSentToBand,
+               Events.ListSentTime AS ListSentTime,
+               COALESCE(Events.ListSentNumVips, 0) AS ListSentNumVips,
+               Events.CheckInLocation AS CheckInLocation,
+               Events.CheckInNotes AS CheckInNotes,
+               Events.AnnounceDate AS AnnounceDate,
+               Events.IsAddedToBandsInTown AS IsAddedToBandsInTown,
+               Events.URL AS ExternalUrl,
+               Events.Thumbnail AS ExternalThumbnail,
+               Events.VenueId AS ExternalEventVenueId,
+               Events.DisableLinkButton AS DisableLinkButton,
+               Events.DisableLinkReason AS DisableLinkReason,
+               Events.ExternalVipLink AS ExternalVipLink,
+               Events.DisableVipLinkButton AS DisableVipLinkButton,
+               Events.DisableVipLinkReason AS DisableVipLinkReason,
+               Events.IsActive AS IsActive,
+               Events.IsDeleted AS IsDeleted,
+               Events.IsHidden AS IsHidden,
+               Events.IsCancelled AS IsCancelled,
+               Events.CancelledDate AS CancelledDate,
+               Events.ExcludeFromDashboard AS ExcludeFromDashboard,
+               Events.EventNote AS EventNote,
+               TicketSocketEvents.EventId AS EventId,
+               TicketSocketEvents.URL AS URL,
+               TicketSocketEvents.Thumbnail AS Thumbnail,
+               Tour.AnnounceDate AS TourAnnounceDate,
+               COALESCE(Tour.IsActive, 0) AS IsTourActive,
+               COALESCE(TicketSocketEvents.IsSoldOut, 0) AS IsSoldOut,
+               TicketSocketEvents.LastUpdate AS LastUpdate
+        FROM Events
+        JOIN Sellers ON Sellers.SellerId = Events.SellerId
+        LEFT JOIN TicketPartnerEvents
+            ON TicketPartnerEvents.EventId = Events.EventId
+            AND TicketPartnerEvents.TicketPartnerId = 2
+        LEFT JOIN TicketSocketEvents
+            ON TicketSocketEvents.Id = TicketPartnerEvents.PartnerEventId
+        LEFT JOIN SellerEventCategory
+            ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+        LEFT JOIN Venues ON Venues.VenueID = Events.VenueId
+        LEFT JOIN Country ON Country.CountryId = Venues.CountryId
+        LEFT JOIN TourEvent ON TourEvent.EventId = Events.EventId
+        LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
+    """)
+
 
 def downgrade():
     """
     Downgrade the database schema for Stripe integration.
     """
+
+    # Remove the view before dropping mappings or renaming its source tables.
+    op.execute("DROP VIEW EventDetails")
+
+    # Undo dependent-table changes while the parent is still named Events.
+    op.execute("""
+        ALTER TABLE TourEvent
+            DROP FOREIGN KEY FK_TourEvent_EventId,
+            DROP INDEX IX_TourEvent_Compound,
+            RENAME COLUMN EventId TO ExternalEventId,
+            ADD UNIQUE INDEX IX_TourEvent_Compound
+                (TourEventId, TourId, ExternalEventId) USING BTREE,
+            ADD CONSTRAINT FK_TourEvent_ExternalEventId
+                FOREIGN KEY (ExternalEventId)
+                REFERENCES Events (EventId)
+                ON DELETE NO ACTION
+                ON UPDATE NO ACTION
+    """)
+
+    op.execute("""
+        ALTER TABLE FanMoments
+            DROP FOREIGN KEY FK_FanMoments_EventId,
+            DROP INDEX IX_FanMoment_EventId,
+            RENAME COLUMN EventId TO ExternalEventId,
+            ADD UNIQUE INDEX IX_FanMoment_ExternalEventId (ExternalEventId),
+            ADD CONSTRAINT FK_FanMoment_ExternalEventId
+                FOREIGN KEY (ExternalEventId)
+                REFERENCES Events (EventId)
+                ON DELETE NO ACTION
+                ON UPDATE NO ACTION
+    """)
+
+    op.execute("""
+        ALTER TABLE EventNotes
+            DROP FOREIGN KEY FK_EventNote_EventId,
+            DROP INDEX IX_EventNote_EventId,
+            RENAME COLUMN EventId TO ExternalEventId,
+            ADD INDEX IX_EventNote_EventId
+                (ExternalEventId, EventNoteId, NoteTimestamp) USING BTREE,
+            ADD INDEX FK_EventNote_ExternalEventId (ExternalEventId) USING BTREE
+    """)
 
     # op.execute("""
     #     ALTER TABLE DailyOrderData

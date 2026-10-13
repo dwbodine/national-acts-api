@@ -82,70 +82,7 @@ class EventService:
         else:
             search_term = None
 
-        sql = """SELECT Sellers.SellerId AS SellerId,
-                    Sellers.Name AS SellerName,
-                    Sellers.SellerTypeId AS SellerType,
-                    ExternalEvents.EventId AS ExternalEventId, 
-                    TicketSocketEvents.Id AS TicketSocketEventId,                    
-                    COALESCE(ExternalEvents.EventDate, TicketSocketEvents.EventDate) AS EventDate,
-                    TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
-                    COALESCE(SellerEventCategory.IsVisibleOnSite, 1) AS IsVisibleOnSite,
-                    COALESCE(SellerEventCategory.IsVisibleOnPortal, 1) AS IsVisibleOnPortal,
-                    COALESCE(SellerEventCategory.SellerRatePercent, 0.0) AS SellerRatePercent,
-                    TicketSocketEvents.IsVip AS IsVip,
-                    ExternalEvents.EventTime AS EventTime,
-                    ExternalEvents.MeetAndGreetTime AS MeetAndGreetTime,
-                    ExternalEvents.DoorsOpenTime AS DoorsOpenTime,
-                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
-                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
-                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS Address,
-                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
-                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
-                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip,
-                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,
-                    ExternalEventVenues.TimeZone AS TimeZone,
-                    Country.CountryId AS CountryId,
-                    Country.CountryCode AS CountryCode,
-                    COALESCE(ExternalEvents.EmailSentToVips, 0) AS EmailSentToVips,
-                    COALESCE(ExternalEvents.TextSentToVips, 0) AS TextSentToVips,
-                    COALESCE(ExternalEvents.ListSentToBand, 0) AS ListSentToBand,
-                    ExternalEvents.ListSentTime AS ListSentTime,
-                    COALESCE(ExternalEvents.ListSentNumVips, 0) AS ListSentNumVips,
-                    ExternalEvents.CheckInLocation AS CheckInLocation,
-                    ExternalEvents.CheckInNotes AS CheckInNotes,                    
-                    ExternalEvents.AnnounceDate AS AnnounceDate,
-                    ExternalEvents.IsAddedToBandsInTown AS IsAddedToBandsInTown,                    
-                    ExternalEvents.URL AS ExternalUrl,
-                    ExternalEvents.Thumbnail AS ExternalThumbnail,                    
-                    ExternalEvents.ExternalEventVenueId AS ExternalEventVenueId,
-                    ExternalEvents.DisableLinkButton AS DisableLinkButton,
-                    ExternalEvents.DisableLinkReason AS DisableLinkReason, 
-                    ExternalEvents.ExternalVipLink AS ExternalVipLink,
-                    ExternalEvents.DisableVipLinkButton AS DisableVipLinkButton, 
-                    ExternalEvents.DisableVipLinkReason AS DisableVipLinkReason,
-                    ExternalEvents.IsActive AS IsActive,    
-                    ExternalEvents.IsDeleted AS IsDeleted,     
-                    ExternalEvents.IsHidden AS IsHidden,    
-                    ExternalEvents.IsCancelled AS IsCancelled,
-                    ExternalEvents.CancelledDate AS CancelledDate,   
-                    ExternalEvents.ExcludeFromDashboard AS ExcludeFromDashboard,
-                    ExternalEvents.EventNote AS EventNote,
-                    TicketSocketEvents.EventId AS EventId,                    
-                    TicketSocketEvents.URL AS URL,
-                    TicketSocketEvents.Thumbnail,                 
-                    Tour.AnnounceDate AS TourAnnounceDate,
-                    COALESCE(Tour.IsActive, 0) AS IsTourActive,
-                    COALESCE(TicketSocketEvents.IsSoldOut, 0) AS IsSoldOut,
-                    TicketSocketEvents.LastUpdate as LastUpdate
-                 FROM ExternalEvents
-            JOIN Sellers ON Sellers.SellerId = ExternalEvents.SellerId
-            LEFT JOIN TicketSocketEvents ON TicketSocketEvents.Id = ExternalEvents.TicketSocketEventId
-            LEFT JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
-            LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
-            LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
-            LEFT JOIN TourEvent ON TourEvent.ExternalEventId = ExternalEvents.EventId
-            LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId            
-            WHERE """
+        sql = """SELECT * FROM EventDetails WHERE """
         data = {}
 
         where_clause: list[str] = []
