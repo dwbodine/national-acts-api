@@ -452,6 +452,30 @@ snapshot. You need a plan for those newer orders and other writes before doing i
 
 ## Verification
 
+### OrderDetails view
+
+Stripe revision `7e3584499b4c` adds `OrderDetails` at the end of its upgrade. It starts with
+`TicketPartnerOrders`, uses `TicketPartnerEvents` to identify the partner and
+internal event, and left-joins TicketSocket's local order ID for partner 2 and
+matching event only. Stripe rows join by `TicketPartnerOrderId`. TicketSocket
+fields retain their names where unambiguous; Stripe fields have a `Stripe` prefix.
+`EventId` is the internal event ID; `TicketSocketNativeEventId` and
+`TicketSocketNativeOrderId` expose the source system's IDs separately.
+
+Mapped orders with no Stripe payment remain visible. Multiple Stripe transactions
+for an order produce multiple rows; this is not an aggregate with one row per
+order. Stripe transactions whose order link is NULL do not appear. The view uses
+the caller's privileges (`SQL SECURITY INVOKER`). Query it with
+`SELECT * FROM OrderDetails`. Stripe's downgrade drops both views before changing
+their source tables, and drops the partner/Stripe tables as part of its full rollback.
+It preserves the original TicketSocketOrders table but does not preserve payments
+or other rows stored only in the new tables. Apply the revised migration through
+the normal `tools.migrate ... upgrade` command on a database below Stripe.
+A database already recorded at Stripe will not rerun the edited upgrade. Existing
+development databases need their view definitions updated explicitly or a deliberate
+restore/reapplication on a disposable copy. The active chain contains only baseline,
+manual-transfer reconciliation, and Stripe.
+
 GitHub Actions runs migration tests on isolated MariaDB 12.2.2. Locally, point tests
 only at a disposable server whose root account can create/drop temporary databases:
 

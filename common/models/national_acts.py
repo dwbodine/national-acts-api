@@ -191,7 +191,7 @@ class Note:
     """
 
     note_id: int = 0
-    external_event_id: int = None
+    event_id: int = None
     note: str = None
     note_title: str = None
     note_timestamp: str = None
@@ -200,11 +200,11 @@ class Note:
 
 class VipTicket(TicketSocketTicket):
     """
-    National acts specific verison of TS tickets
+    National acts tickets
     """
 
-    ticket_socket_order_id: int = 0
-    ticket_socket_order_ticket_id: int = 0
+    ticket_partner_order_id: int = 0
+    ticket_partner_order_ticket_id: int = 0
     is_checked_in: bool = False
     checked_in_date: str = None
     is_refunded: bool = False
@@ -221,11 +221,12 @@ class VipTicket(TicketSocketTicket):
 
 class VipOrder(TicketSocketOrder):
     """
-    National acts specific version of TS orders
+    National acts orders
     """
 
-    ticket_socket_event_id: int = 0
-    ticket_socket_order_id: int = 0
+    ticket_partner_event_id: int = 0
+    ticket_partner_order_id: int = 0
+    ticket_partner_id: int = 0
     seller_name: str = None
     seller_id: int = 0
     venue: str = None
@@ -314,23 +315,24 @@ class VipOrder(TicketSocketOrder):
 
 class VipEvent(TicketSocketEvent):
     """
-    National acts specific version of TS events
+    National acts events
     """
 
-    # TicketSocketEvent properties
-    ticket_socket_event_id: int = 0
+    # base properties
+    ticket_partner_id: int = 0
+    ticket_partner_event_id: int = 0
     seller_event_category_id: int = None
     is_vip: bool = True
     is_sold_out: bool = False
 
-    # ExternalEvent properties
-    external_event_id: int = None
+    # Event properties
+    event_id: int = None
     seller_id: int = None
     meet_and_greet_time: str = None
     doors_open: str = None
     event_time: str = None
     external_url: str = None
-    external_event_venue_id: int = None
+    venue_id: int = None
     disable_link_button: bool = False
     disable_link_reason: str = None
     external_vip_link: str = None
@@ -517,7 +519,7 @@ class DailyOrderData:
     Represents one row + rollup data for table DailyOrderData
     """
 
-    ticket_socket_order_id: int = None
+    ticket_partner_order_id: int = None
     orders: int = 0
     tickets: int = 0
     ticket_revenue: float = 0
@@ -535,6 +537,7 @@ class DailyOrderData:
     state: str = None
     zip: str = None
     country: str = None
+    ticket_partner_id: int = 0
     ticket_socket_id: int = 0
     is_refunded: bool = False
     is_charged_back: bool = False
@@ -553,12 +556,12 @@ class DailyOrderData:
     def __init__(
         self,
         purchase_date: str,
-        ticket_socket_event_id: int,
+        ticket_partner_event_id: int,    
         exchange_rate: float,
         currency_symbol: str,
     ):
         self.purchase_date = purchase_date
-        self.ticket_socket_event_id = ticket_socket_event_id
+        self.ticket_partner_event_id = ticket_partner_event_id
         self.exchange_rate = exchange_rate
         self.currency_symbol = currency_symbol
 
@@ -675,8 +678,8 @@ class Seller:
         if get_images is True:
             sql += """, Pages.LogoOnly AS LogoOnly,
                      FanMomentImages.ImageName AS FanMomentImage, 
-                     ExternalEvents.EventId, 
-                     ExternalEvents.EventDate"""
+                     Events.EventId, 
+                     Events.EventDate"""
 
         sql += """ FROM Sellers
                     LEFT JOIN Country ON Sellers.CountryId = Country.CountryId"""
@@ -684,8 +687,8 @@ class Seller:
         if get_images is True:
             sql += """ LEFT JOIN PageSellers ON Sellers.SellerId = PageSellers.SellerId
             LEFT JOIN Pages ON PageSellers.PageId = Pages.PageId
-            LEFT JOIN ExternalEvents ON Sellers.SellerId = ExternalEvents.SellerId
-            LEFT JOIN FanMoments ON FanMoments.ExternalEventId = ExternalEvents.EventId
+            LEFT JOIN Events ON Sellers.SellerId = Events.SellerId
+            LEFT JOIN FanMoments ON FanMoments.EventId = Events.EventId
             LEFT JOIN FanMomentImages ON FanMomentImages.FanMomentId = FanMoments.FanMomentId"""
 
         sql += """ WHERE Sellers.SellerId=%(sellerId)s"""

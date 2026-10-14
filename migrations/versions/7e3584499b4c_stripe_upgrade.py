@@ -403,7 +403,7 @@ def upgrade():
         SELECT Sellers.SellerId AS SellerId,
                Sellers.Name AS SellerName,
                Sellers.SellerTypeId AS SellerType,
-               Events.EventId AS ExternalEventId,
+               Events.EventId AS EventId,
                TicketSocketEvents.Id AS TicketSocketEventId,
                COALESCE(Events.EventDate, TicketSocketEvents.EventDate) AS EventDate,
                TicketSocketEvents.SellerEventCategoryId AS SellerEventCategoryId,
@@ -448,16 +448,17 @@ def upgrade():
                Events.CancelledDate AS CancelledDate,
                Events.ExcludeFromDashboard AS ExcludeFromDashboard,
                Events.EventNote AS EventNote,
-               TicketSocketEvents.EventId AS EventId,
+               TicketSocketEvents.EventId AS TicketSocketNativeEventId,
                TicketSocketEvents.URL AS URL,
                TicketSocketEvents.Thumbnail AS Thumbnail,
                Tour.AnnounceDate AS TourAnnounceDate,
                COALESCE(Tour.IsActive, 0) AS IsTourActive,
                COALESCE(TicketSocketEvents.IsSoldOut, 0) AS IsSoldOut,
+               TicketPartnerEvents.TicketPartnerId AS TicketPartnerId,
                TicketSocketEvents.LastUpdate AS LastUpdate
         FROM Events
         JOIN Sellers ON Sellers.SellerId = Events.SellerId
-        LEFT JOIN TicketPartnerEvents
+        JOIN TicketPartnerEvents
             ON TicketPartnerEvents.EventId = Events.EventId
             AND TicketPartnerEvents.TicketPartnerId = 2
         LEFT JOIN TicketSocketEvents
@@ -470,11 +471,71 @@ def upgrade():
         LEFT JOIN Tour ON Tour.TourId = TourEvent.TourId
     """)
 
+    op.execute("""
+        CREATE SQL SECURITY INVOKER VIEW OrderDetails AS
+        SELECT tpo.TicketPartnerOrderId AS TicketPartnerOrderId,
+                tpo.TicketPartnerEventId AS TicketPartnerEventId,
+                tpe.TicketPartnerId AS TicketPartnerId,
+                tpe.EventId AS EventId,
+                tpo.PartnerOrderId AS PartnerOrderId,
+                tpo.LastUpdated AS OrderLastUpdated,
+                tso.Id AS TicketSocketOrderId,
+                tso.TicketSocketEventId AS TicketSocketEventId,
+                tso.EventId AS TicketSocketNativeEventId,
+                tso.OrderId AS TicketSocketNativeOrderId,
+                tso.PurchaseDate AS PurchaseDate,
+                tso.PurchaseTimestamp AS PurchaseTimestamp,
+                tso.PurchaseUnixTimestamp AS PurchaseUnixTimestamp,
+                tso.Phone AS Phone,
+                tso.PhoneFormatted AS PhoneFormatted,
+                tso.UserId AS UserId,
+                tso.PurchaserLastName AS PurchaserLastName,
+                tso.PurchaserFirstName AS PurchaserFirstName,
+                tso.PurchaserCity AS PurchaserCity,
+                tso.PurchaserState AS PurchaserState,
+                tso.PurchaserZip AS PurchaserZip,
+                tso.PurchaserCountry AS PurchaserCountry,
+                tso.PurchaserIpAddress AS PurchaserIpAddress,
+                tso.Email AS Email,
+                tso.IsActive AS IsActive,
+                tso.IsDeleted AS IsDeleted,
+                tso.IsComped AS IsComped,
+                tso.IsManualTransfer AS IsManualTransfer,
+                tso.IsSenderUpdated AS IsSenderUpdated,
+                tso.Notes AS Notes,
+                tso.LastUpdate AS TicketSocketLastUpdate,
+                st.StripeTransactionId AS StripeTransactionId,
+                st.EventName AS StripeEventName,
+                st.Description AS StripeDescription,
+                st.DateReceived AS StripeDateReceived,
+                st.Total AS StripeTotal,
+                st.Insurance AS StripeInsurance,
+                st.ProcessingFee AS StripeProcessingFee,
+                st.CustomerName AS StripeCustomerName,
+                st.CustomerEmail AS StripeCustomerEmail,
+                st.CustomerPhone AS StripeCustomerPhone,
+                st.Currency AS StripeCurrency,
+                st.SourceUrl AS StripeSourceUrl,
+                st.ExchangeRate AS StripeExchangeRate,
+                st.LastUpdated AS StripeLastUpdated
+        FROM TicketPartnerOrders tpo
+        JOIN TicketPartnerEvents tpe
+            ON tpe.TicketPartnerEventId = tpo.TicketPartnerEventId
+        LEFT JOIN TicketSocketOrders tso
+            ON tpe.TicketPartnerId = 2
+            AND tso.Id = tpo.PartnerOrderId
+            AND tso.TicketSocketEventId = tpe.PartnerEventId
+        LEFT JOIN StripeTransactions st
+            ON st.TicketPartnerOrderId = tpo.TicketPartnerOrderId
+    """)
+
 
 def downgrade():
     """
     Downgrade the database schema for Stripe integration.
     """
+
+    op.execute("DROP VIEW OrderDetails")
 
     # Remove the view before dropping mappings or renaming its source tables.
     op.execute("DROP VIEW EventDetails")
