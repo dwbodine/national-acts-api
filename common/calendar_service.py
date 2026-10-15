@@ -27,7 +27,7 @@ class CalendarService:
     def add_note(
         self,
         note: str,
-        external_event_id: int = None,
+        event_id: int = None,
         calendar_date: str = None,
         note_title: str = None,
     ):
@@ -35,11 +35,11 @@ class CalendarService:
         API method to add a note specific to an event or calendar date
         """
         sql = """INSERT INTO EventNotes
-                    (ExternalEventId, Note, NoteTitle, NoteTimestamp)
-                    VALUES (%(externalEventId)s, %(note)s, """
+                    (EventId, Note, NoteTitle, NoteTimestamp)
+                    VALUES (%(eventId)s, %(note)s, """
         data = {
-            "externalEventId": (
-                external_event_id if external_event_id is not None else None
+            "eventId": (
+                event_id if event_id is not None else None
             ),
             "note": get_override_string_value_or_default(note),
         }
@@ -107,7 +107,7 @@ class CalendarService:
         """
         notes: list[Note] = []
         sql = """SELECT * FROM EventNotes
-                    WHERE ExternalEventId IS NULL AND
+                    WHERE EventId IS NULL AND
                     NoteTimestamp BETWEEN %(startDate)s and %(endDate)s 
                     ORDER BY NoteTimestamp ASC, IsCompleted DESC, NoteTitle ASC"""
         data = {
@@ -127,20 +127,20 @@ class CalendarService:
             notes.append(note)
         return notes
 
-    def get_event_notes(self, external_event_id: int):
+    def get_event_notes(self, eventId: int):
         """
         API method to fetch event notes
         """
         notes: list[Note] = []
         sql = """SELECT * FROM EventNotes
-                    WHERE ExternalEventId=%(externalEventId)s
+                    WHERE EventId=%(eventId)s
                     ORDER BY NoteTimestamp DESC"""
-        data = {"externalEventId": external_event_id}
+        data = {"eventId": eventId}
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
             note.note_id = get_override_int_value_or_default(row["EventNoteId"])
-            note.external_event_id = external_event_id
+            note.eventId = eventId
             note.note = get_override_string_value_or_default(row["Note"])
             note.note_timestamp = get_override_string_value_or_default(
                 row["NoteTimestamp"]

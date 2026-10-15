@@ -232,7 +232,7 @@ class DashboardService:
             dash_totals.service_fee_per_ticket = 0
         return dash_totals
 
-    def rebuild_daily_order_data_for_event(self, event_id: int):
+    def rebuild_daily_order_data_for_event(self, ticket_partner_event_id: int):
         """
         Clean out and rebuild daily order data for event
         """

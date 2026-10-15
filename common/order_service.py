@@ -683,7 +683,7 @@ class OrderService:
 
     def refund_order(
         self,
-        ticket_socket_order_id: int,
+        ticket_partner_order_id: int,
         refund_service_fees: bool = False,
         mark_chargeback: bool = False,
     ):
