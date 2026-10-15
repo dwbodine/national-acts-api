@@ -211,6 +211,42 @@ def upgrade():
                 ORDER BY tso.PurchaseDate, tso.LastUpdate
     """)
 
+    op.execute("""
+        CREATE TABLE `TicketPartnerOrderTickets` (
+            `TicketPartnerTicketId` INT(11) NOT NULL AUTO_INCREMENT,
+            `TicketPartnerOrderId` INT(11) NOT NULL,
+            `PartnerTicketId` INT(11) DEFAULT NULL,
+            `LastUpdated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            PRIMARY KEY (`TicketPartnerTicketId`),
+            UNIQUE KEY `UQ_TicketPartnerOrderTickets_TicketPartnerOrderTicketId`
+                (`TicketPartnerOrderId`, `PartnerTicketId`),
+            KEY `IX_TicketPartnerOrderTickets_TicketPartnerOrderId`
+                (`TicketPartnerOrderId`),
+
+            CONSTRAINT `FK_TicketPartnerOrderTickets_TicketPartnerOrders`
+                FOREIGN KEY (`TicketPartnerOrderId`)
+                REFERENCES `TicketPartnerOrders` (`TicketPartnerOrderId`)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+
+        ) ENGINE=InnoDB
+        DEFAULT CHARSET=utf8mb4
+        COLLATE=utf8mb4_unicode_ci;
+    """)
+
+    op.execute("""
+        INSERT INTO TicketPartnerOrderTickets (TicketPartnerOrderId, PartnerTicketId)
+            SELECT tpo.TicketPartnerOrderId, tsot.Id
+                FROM TicketPartnerOrders tpo
+                JOIN TicketSocketOrderTickets tsot
+                    ON tsot.TicketSocketOrderId = tpo.PartnerOrderId
+                JOIN TicketPartnerEvents tpe
+                    ON tpe.TicketPartnerEventId = tpo.TicketPartnerEventId                
+                WHERE tpe.TicketPartnerId = 2
+                    AND tpe.PartnerEventId IS NOT NULL
+                ORDER BY tsot.Id
+    """)
+
     # add new StripeTransactions table
     op.execute("""
         CREATE TABLE StripeTransactions (
@@ -633,6 +669,10 @@ def downgrade():
         ALTER TABLE DailyOrderData
             DROP COLUMN TicketPartnerEventId,
             DROP COLUMN TicketPartnerOrderId
+    """)
+
+    op.execute("""
+        DROP TABLE TicketPartnerOrderTickets
     """)
 
     op.execute("""
