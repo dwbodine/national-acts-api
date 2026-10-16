@@ -196,7 +196,7 @@ class TicketSocketService:
                     continue
 
                 event = TicketSocketEvent()
-                event.event_id = event_id
+                event.original_event_id = event_id
                 event.title = title
 
                 # build list of categories for deep copy later
@@ -384,7 +384,7 @@ class TicketSocketService:
                 event.ticket_types = ticket_types
 
                 # orders
-                event.orders = self.get_orders_from_event_id(event.event_id)
+                event.orders = self.get_orders_from_event_id(event.original_event_id)
 
                 # append a copy of the event for each category, unless we're filtering
                 # by category in which case only append if it matches the filter
@@ -539,8 +539,8 @@ class TicketSocketService:
     ):
         # get data from order
         order = TicketSocketOrder()
-        order.order_id = order_id
-        order.event_id = event_id
+        order.original_order_id = order_id
+        order.original_event_id = event_id
 
         if "cancelled" in json_data:
             order.cancelled = bool(json_data["cancelled"])
@@ -768,7 +768,7 @@ class TicketSocketService:
                     continue
 
                 ticket = TicketSocketTicket()
-                ticket.ticket_id = ticket_id
+                ticket.original_ticket_id = ticket_id
                 ticket.ticket_type = ticket_type
                 ticket.price = price
                 ticket.service_fee = service_fee

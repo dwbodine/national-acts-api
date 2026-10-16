@@ -111,7 +111,8 @@ def test_view_preserves_projection_and_downgrade_removes_it(database):
                 text("SELECT * FROM EventDetails ORDER BY EventId")
             ).mappings()
         ]
-    # The current view uses internal EventId and includes TicketSocket mappings only.
+    # Compare the TicketSocket projections and separately verify local mappings.
+    socket_rows = [row for row in actual if row["TicketPartnerId"] == 2]
     expected_view = [
         {
             (
@@ -125,15 +126,18 @@ def test_view_preserves_projection_and_downgrade_removes_it(database):
         if row["TicketSocketEventId"] is not None
     ]
     assert [
-        {key: row[key] for key in expected_view[0]} for row in actual
+        {key: row[key] for key in expected_view[0]} for row in socket_rows
     ] == expected_view
     assert actual[0]["EventId"] == 11
     assert actual[0]["TicketSocketEventId"] == 101
     assert actual[0]["TicketSocketNativeEventId"] == 1001
     assert actual[0]["Venue"] == "Local venue"
     assert actual[0]["IsTourActive"] == 1
-    assert actual[1]["Venue"] == "Fallback venue"
-    assert len(actual) == 2
+    assert socket_rows[1]["Venue"] == "Fallback venue"
+    local_rows = [row for row in actual if row["TicketPartnerId"] == 1]
+    assert {row["EventId"] for row in local_rows} == {12, 13}
+    assert all(row["TicketSocketEventId"] is None for row in local_rows)
+    assert len(actual) == 5
     run("downgrade", migrate.MANUAL_TRANSFER)
     with engine.connect() as connection:
         assert (

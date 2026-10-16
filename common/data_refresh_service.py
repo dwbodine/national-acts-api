@@ -13,6 +13,7 @@ import traceback
 import pytz
 import phonenumbers
 
+from common.ticket_partner_service import TicketPartnerService
 from common.db import (
     db_query_all,
     db_query_one,
@@ -33,7 +34,6 @@ from common.utility import (
     get_pacific_purchase_timestamp_from_order,
 )
 from common.ticket_socket_service import TicketSocketService
-from common.event_service import EventService
 from common.models.national_acts import (
     VipEvent,
     Seller,
@@ -220,7 +220,6 @@ class DataRefreshService:
 
             if total_events_from_service > 0:
                 processing_timer = time.time()
-                event_service = EventService()
                 logger.info(
                     "refresh_database_from_ticket_socket - Got results from TS, processing..."
                 )
@@ -230,14 +229,14 @@ class DataRefreshService:
                         service_events_skipped.append(
                             evt.title
                             + " - eventId "
-                            + str(evt.event_id)
+                            + str(evt.original_event_id)
                             + " ("
                             + evt.ticket_socket_url
                             + ")"
                         )
                         continue
 
-                    service_events.append(evt.event_id)
+                    service_events.append(evt.original_event_id)
                     # compile event data for update
                     address = evt.venue.address1
 
@@ -273,7 +272,7 @@ class DataRefreshService:
                                     AND SellerEventCategoryId=%(sellerEventCategoryId)s"""
 
                     data = {
-                        "event_id": evt.event_id,
+                        "event_id": evt.original_event_id,
                         "sellerEventCategoryId": evt.seller_event_category_id,
                     }
 
@@ -299,38 +298,11 @@ class DataRefreshService:
                                 WHERE Id=%(id)s"""
                         event_success = db_update(sql, event_data, cnx)
 
-                        # double-check date in External Events
-                        ex_sql = """SELECT * FROM ExternalEvents WHERE TicketSocketEventId=%(id)s"""
-                        ex_data = {"id": ticket_socket_event_id}
-                        ex_row = db_query_one(ex_sql, ex_data, cnx)
-                        if ex_row:
-                            # this should always be the case and is just
-                            # here to fix the event date if it's off
-                            ex_event_date = get_override_string_value_or_default(
-                                ex_row["EventDate"]
-                            )
-                            ex_id = get_override_int_value_or_default(ex_row["EventId"])
-                            if evt.event_date != ex_event_date:
-                                ex_sql2 = """UPDATE ExternalEvents SET EventDate=%(event_date)s,
-                                    LastUpdate=CURRENT_TIMESTAMP
-                                    WHERE EventId=%(id)s"""
-                                ex_data2 = {"event_date": evt.event_date, "id": ex_id}
-                                event_success = db_update(ex_sql2, ex_data2, cnx)
-                        else:
-                            # but..if by some unforseen circumstance,
-                            # there is no matching ExternalEvent then add it
-                            event_data["seller_id"] = get_override_int_value_or_default(
-                                evt.seller_id
-                            )
-                            event_data["id"] = ticket_socket_event_id
-                            event_success = event_service.add_to_external_events(
-                                event_data, evt, cnx
-                            )
                     else:
                         event_add_new = True
                         # insert new event
                         event_data["event_id"] = get_override_int_value_or_default(
-                            evt.event_id
+                            evt.original_event_id
                         )
                         event_data["sellerEventCategoryId"] = (
                             get_override_int_value_or_default(
@@ -350,15 +322,11 @@ class DataRefreshService:
                         ticket_socket_event_id = db_insert(sql, event_data, cnx)
                         event_success = ticket_socket_event_id > 0
 
-                        # automatically add new events to external events table
-                        if event_success is True:
-                            event_data["seller_id"] = get_override_int_value_or_default(
-                                evt.seller_id
-                            )
-                            event_data["id"] = ticket_socket_event_id
-                            event_success = event_service.add_to_external_events(
-                                event_data, evt, cnx
-                            )
+                    if ticket_socket_event_id > 0:
+                        partner_event_id = TicketPartnerService().ensure_imported_event(
+                            ticket_socket_event_id, event_data, evt, cnx
+                        )
+                        event_success = event_success and partner_event_id > 0
 
                     # if the update succeeded, update counters
                     if event_success:
@@ -368,7 +336,7 @@ class DataRefreshService:
                             events_updated += 1
                     else:
                         # if that failed, just mark it failed and skip orders
-                        events_failed.append(evt.event_id)
+                        events_failed.append(evt.original_event_id)
                         update_success = False
                         continue
 
@@ -386,10 +354,16 @@ class DataRefreshService:
 
                             total_tickets_available += tickets_available
 
-                            ticket_type_sql = """SELECT
-                                    TicketSocketTicketTypes.*
-                                    FROM TicketSocketTicketTypes 
+                            if TicketPartnerService().ensure_ticket_type(
+                                ticket_socket_event_id, ticket_type.ticket_type_id, cnx
+                            ) <= 0:
+                                ticket_types_failed.append(ticket_type.ticket_type_id)
+                                update_success = False
+                                continue
+                            ticket_type_sql = """SELECT *
+                                    FROM TicketTypeDetails
                                     WHERE TicketSocketEventId=%(ticket_socket_event_id)s
+                                    AND TicketPartnerId=2
                                     AND TicketSocketTicketTypeId=%(ticketSocketTicketTypeId)s"""
                             ticket_type_sql_data = {
                                 "ticketSocketTicketTypeId": get_override_int_value_or_default(
@@ -461,10 +435,8 @@ class DataRefreshService:
                                 ticket_socket_type_id = db_insert(
                                     sql, ticket_type_data, cnx
                                 )
-                                ticket_type_success = (
-                                    ticket_socket_type_id is not None
-                                    and ticket_socket_type_id > 0
-                                )
+                                # This source table has no AUTO_INCREMENT key.
+                                ticket_type_success = ticket_socket_type_id is None or ticket_socket_type_id >= 0
 
                             # if the update succeeded, update counters
                             if ticket_type_success:
@@ -483,9 +455,9 @@ class DataRefreshService:
                             order_deleted: bool = False
                             order_active: bool = True
 
-                            if order.event_id != evt.event_id:
+                            if order.original_event_id != evt.original_event_id:
                                 continue
-                            event_orders.append(order.order_id)
+                            event_orders.append(order.original_order_id)
                             # compile order data for update
 
                             purchase_date = get_pacific_purchase_date_from_order(order)
@@ -507,7 +479,7 @@ class DataRefreshService:
                                     order.user_id
                                 ),
                                 "event_id": get_override_int_value_or_default(
-                                    order.event_id
+                                    order.original_event_id
                                 ),
                                 "purchaserLastName": get_override_string_value_or_default(
                                     order.purchaser_last_name
@@ -543,7 +515,7 @@ class DataRefreshService:
 
                             data = {
                                 "ticket_socket_event_id": ticket_socket_event_id,
-                                "order_id": order.order_id,
+                                "order_id": order.original_order_id,
                             }
 
                             existing_order_row = db_query_one(order_sql, data, cnx)
@@ -645,14 +617,14 @@ class DataRefreshService:
                                     != existing_purchase_timestamp
                                 ):
                                     check_cleanup_data = {
-                                        "ticket_socket_event_id": ticket_socket_event_id,
+                                        "ticket_partner_event_id": partner_event_id,
                                         "purchaseDate": get_override_string_value_or_default(
                                             existing_order_row["PurchaseDate"]
                                         ),
                                     }
                                     check_cleanup_sql = """SELECT DailyOrderData.DailyOrderDataId
                                             FROM DailyOrderData
-                                            WHERE TicketSocketEventId=%(ticket_socket_event_id)s
+                                            WHERE TicketPartnerEventId=%(ticket_partner_event_id)s
                                             AND PurchaseDate=DATE(%(purchaseDate)s)"""
                                     rows = db_query_all(
                                         check_cleanup_sql, check_cleanup_data
@@ -696,7 +668,7 @@ class DataRefreshService:
                                 order_data["phone_formatted"] = phone_formatted
                                 # insert new order
                                 order_data["order_id"] = (
-                                    get_override_int_value_or_default(order.order_id)
+                                    get_override_int_value_or_default(order.original_order_id)
                                 )
                                 order_data["ticket_socket_event_id"] = (
                                     ticket_socket_event_id
@@ -721,15 +693,19 @@ class DataRefreshService:
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
 
-                            # if the update succeeded, update counters
+                            partner_order_id = TicketPartnerService().ensure_order(
+                                ticket_socket_event_id, ticket_socket_order_id, cnx
+                            ) if ticket_socket_order_id > 0 else 0
+                            order_success = order_success and partner_order_id > 0
+
+                            # Count an import only after its partner mapping exists.
                             if order_success:
                                 if order_add_new:
                                     orders_inserted += 1
                                 else:
                                     orders_updated += 1
                             else:
-                                # if that failed, just mark it failed and skip orders
-                                orders_failed.append(order.order_id)
+                                orders_failed.append(order.original_order_id)
                                 update_success = False
                                 continue
 
@@ -746,7 +722,7 @@ class DataRefreshService:
                                 db_delete(delete_sql, delete_data)
 
                                 for ticket in order.tickets:
-                                    order_tickets.append(ticket.ticket_id)
+                                    order_tickets.append(ticket.original_ticket_id)
                                     # compile ticket data for update
                                     ticket_data = {
                                         "ticket_type": get_override_string_value_or_default(
@@ -796,7 +772,7 @@ class DataRefreshService:
 
                                     data = {
                                         "ticket_socket_order_id": ticket_socket_order_id,
-                                        "ticketId": ticket.ticket_id,
+                                        "ticketId": ticket.original_ticket_id,
                                     }
 
                                     existing_ticket = db_query_one(
@@ -861,7 +837,7 @@ class DataRefreshService:
                                         ticket_add_new = True
                                         ticket_data["ticketId"] = (
                                             get_override_int_value_or_default(
-                                                ticket.ticket_id
+                                                ticket.original_ticket_id
                                             )
                                         )
                                         ticket_data["ticket_socket_order_id"] = (
@@ -896,6 +872,11 @@ class DataRefreshService:
                                             ticket_socket_order_ticket_id > 0
                                         )
 
+                                    if ticket_success:
+                                        provider_ticket_id = ticket_socket_order_ticket_id if ticket_add_new else ticket_data["id"]
+                                        ticket_success = TicketPartnerService().ensure_ticket(
+                                            partner_order_id, provider_ticket_id, cnx
+                                        ) > 0
                                     # if the update succeeded, update counters
                                     if ticket_success:
                                         if ticket_add_new:
@@ -904,7 +885,7 @@ class DataRefreshService:
                                             tickets_updated += 1
                                     else:
                                         # if that failed, just mark it failed and skip orders
-                                        tickets_failed.append(ticket.ticket_id)
+                                        tickets_failed.append(ticket.original_ticket_id)
                                         update_success = False
                                         continue
 

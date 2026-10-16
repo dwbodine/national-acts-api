@@ -13,7 +13,7 @@ from common.calendar_service import CalendarService
 from common.common_api import is_admin_logged_in
 from common.faq_service import FaqService
 from common.models.admin import (
-    ExternalVenue,
+    Venue,
     FanMoment,
     Faq,
     FanMomentKey,
@@ -878,7 +878,7 @@ def get_all_venues():
     search_term: str = get_override_string_value_or_default(request.args.get("search"))
 
     service = AdminService()
-    venues = service.get_external_venues(search_term)
+    venues = service.get_venues(search_term)
     return convert_to_json(venues)
 
 
@@ -892,10 +892,10 @@ def update_venue():
     if is_admin is False:
         return {"msg": "Unauthorized"}, 401
 
-    venue = convert_json_to_snake_case_object(request.get_json(), ExternalVenue())
+    venue = convert_json_to_snake_case_object(request.get_json(), Venue())
 
     service = AdminService()
-    venue = service.update_external_venue(venue)
+    venue = service.update_venue(venue)
     return convert_to_json(venue)
 
 
@@ -917,7 +917,7 @@ def delete_venue():
         return {"msg": "Bad Request"}, 400
 
     service = AdminService()
-    success = service.delete_external_venue(venue_id)
+    success = service.delete_venue(venue_id)
     return convert_to_json(success)
 
 

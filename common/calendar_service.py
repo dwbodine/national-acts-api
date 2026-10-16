@@ -140,7 +140,7 @@ class CalendarService:
         for row in rows:
             note = Note()
             note.note_id = get_override_int_value_or_default(row["EventNoteId"])
-            note.eventId = eventId
+            note.event_id = eventId
             note.note = get_override_string_value_or_default(row["Note"])
             note.note_timestamp = get_override_string_value_or_default(
                 row["NoteTimestamp"]

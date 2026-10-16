@@ -145,15 +145,12 @@ class UpdateService:
         Reformat all existing phone numbers in the database using Python phonenumbers library
         """
         success: bool = True
-        sql = """SELECT TicketSocketOrders.Id,
-                TicketSocketOrders.Phone, 
-                COALESCE(Country.CountryCode, 'US') AS CountryCode
-                FROM TicketSocketOrders 
-                JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId
-                JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
-                LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
-                WHERE TicketSocketOrders.Phone IS NOT NULL"""
+        sql = """SELECT DISTINCT od.TicketSocketOrderId AS Id, od.Phone,
+                    COALESCE(ed.CountryCode, 'US') AS CountryCode
+                FROM OrderDetails od
+                JOIN EventDetails ed ON ed.TicketPartnerEventId=od.TicketPartnerEventId
+                WHERE od.TicketPartnerId=2 AND od.TicketSocketOrderId IS NOT NULL
+                    AND od.Phone IS NOT NULL"""
         rows = db_query_all(sql)
         for row in rows:
             order_id = get_override_int_value_or_default(row["Id"])
@@ -192,10 +189,10 @@ class UpdateService:
         if report.missing is not None and len(report.missing) > 0:
             for missing_image in report.missing:
                 data = {"thumb": missing_image}
-                find_sql = """SELECT * FROM ExternalEvents WHERE Thumbnail=%(thumb)s LIMIT 0, 1"""
+                find_sql = """SELECT DISTINCT EventId FROM EventDetails WHERE ExternalThumbnail=%(thumb)s LIMIT 0, 1"""
                 row = db_query_one(find_sql, data)
                 if row:
-                    sql = """UPDATE ExternalEvents SET Thumbnail=NULL,
+                    sql = """UPDATE Events SET Thumbnail=NULL,
                             LastUpdate=CURRENT_TIMESTAMP
                             WHERE Thumbnail=%(thumb)s and EventDate < CURRENT_DATE"""
 
@@ -260,11 +257,13 @@ class UpdateService:
         Fetches a list of events for the year for a seller and
         rebuilds the daily order data for them
         """
-        sql = """SELECT Id FROM TicketSocketEvents
-            WHERE YEAR(TicketSocketEvents.EventDate) = %(year)s 
-            AND MONTH(TicketSocketEvents.EventDate) = %(month)s 
-            AND EXISTS(SELECT 1 FROM TicketSocketOrders WHERE
-                TicketSocketOrders.TicketSocketEventId = TicketSocketEvents.Id)"""
+        sql = """SELECT DISTINCT ed.TicketPartnerEventId AS Id
+                FROM EventDetails ed
+                WHERE YEAR(ed.EventDate)=%(year)s AND MONTH(ed.EventDate)=%(month)s
+                    AND ed.TicketPartnerId=2
+                    AND EXISTS (SELECT 1 FROM OrderDetails od
+                        WHERE od.TicketPartnerEventId=ed.TicketPartnerEventId
+                            AND od.TicketSocketOrderId IS NOT NULL)"""
         data = {"year": year, "month": month}
         rows = db_query_all(sql, data)
         num_events = len(rows)

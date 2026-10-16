@@ -47,11 +47,13 @@ def test_get_payment_intents_auto_pages_through_every_result(monkeypatch):
     monkeypatch.setenv("STRIPE_API_SECRET_KEY", "sk_test_example")
     monkeypatch.setattr(stripe_service.stripe, "StripeClient", FakeStripeClient)
 
-    stripe_service.StripeService().get_payment_intents(start=100, end=200)
+    result = stripe_service.StripeService().get_payment_intents(start=100, end=200)
 
     assert calls["api_key"] == "sk_test_example"
     assert calls["params"] == {
         "created": {"gte": 100, "lt": 200},
         "limit": 100,
+        "expand": ["data.latest_charge.balance_transaction"],
     }
     assert calls["iterated"] is True
+    assert result == []

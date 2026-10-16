@@ -143,7 +143,7 @@ def build_event_row(**overrides):
         "SellerId": 7,
         "SellerName": "Seller A",
         "SellerType": 2,
-        "ExternalEventId": 10,
+        "EventId": 10,
         "TicketSocketEventId": 20,
         "EventDate": "2026-05-01",
         "SellerEventCategoryId": 5,
@@ -175,7 +175,7 @@ def build_event_row(**overrides):
         "IsAddedToBandsInTown": 1,
         "ExternalUrl": "https://external.example.com",
         "ExternalThumbnail": None,
-        "ExternalEventVenueId": 99,
+        "VenueId": 99,
         "DisableLinkButton": 0,
         "DisableLinkReason": None,
         "ExternalVipLink": None,
@@ -188,7 +188,9 @@ def build_event_row(**overrides):
         "CancelledDate": None,
         "ExcludeFromDashboard": 0,
         "EventNote": None,
-        "EventId": 222,
+        "TicketSocketNativeEventId": 222,
+        "TicketPartnerEventId": 20,
+        "TicketPartnerId": 2,
         "URL": "https://tickets.example.com",
         "Thumbnail": "ticket-socket.jpg",
         "TourAnnounceDate": None,
@@ -294,12 +296,12 @@ def test_get_events_and_orders_builds_search_and_seller_filters(monkeypatch):
     )
 
     assert not events
-    assert "COALESCE(ExternalEvents.IsDeleted, 0) = 0" in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsActive, 1) = 1" in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsHidden, 0) = 0" in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsCancelled, 0) = 0" in calls[0][0]
-    assert "LIKE ('%VIPNight%')" in calls[0][0]
-    assert calls[0][1] == {"sellerId_0": 7}
+    assert "COALESCE(IsDeleted, 0) = 0" in calls[0][0]
+    assert "COALESCE(IsActive, 1) = 1" in calls[0][0]
+    assert "COALESCE(IsHidden, 0) = 0" in calls[0][0]
+    assert "COALESCE(IsCancelled, 0) = 0" in calls[0][0]
+    assert calls[0][1]["searchTerm"] == "%VIPNight%"
+    assert calls[0][1] == {"sellerId_0": 7, "searchTerm": "%VIPNight%"}
 
 
 def test_get_events_and_orders_uses_prepopulated_seller_ids_without_appending_seller_id(
@@ -334,10 +336,10 @@ def test_get_events_and_orders_uses_tour_event_ids_for_tour_filter(monkeypatch):
         calls.append((sql, data))
         if "FROM TourEvent" in sql:
             return [
-                {"ExternalEventId": 91},
-                {"ExternalEventId": 0},
-                {"ExternalEventId": None},
-                {"ExternalEventId": 92},
+                {"EventId": 91},
+                {"EventId": 0},
+                {"EventId": None},
+                {"EventId": 92},
             ]
         return []
 
@@ -347,7 +349,7 @@ def test_get_events_and_orders_uses_tour_event_ids_for_tour_filter(monkeypatch):
 
     assert not events
     assert calls[0][1] == {"tour_id": 77}
-    assert "ExternalEvents.EventId IN" in calls[1][0]
+    assert "EventId IN" in calls[1][0]
     assert calls[1][1] == {"eventId_0": 91, "eventId_1": 92}
 
 
@@ -365,7 +367,7 @@ def test_get_events_and_orders_uses_event_id_filter_when_provided(monkeypatch):
     events = event_service.EventService().get_events_and_orders(event_id=55)
 
     assert not events
-    assert "ExternalEvents.EventId = %(event_id)s" in calls[0][0]
+    assert "EventId = %(event_id)s" in calls[0][0]
     assert calls[0][1] == {"event_id": 55}
 
 
@@ -378,7 +380,7 @@ def test_get_events_and_orders_handles_tours_without_valid_event_ids(monkeypatch
     def fake_db_query_all(sql, data):
         calls.append((sql, data))
         if "FROM TourEvent" in sql:
-            return [{"ExternalEventId": 0}, {"ExternalEventId": None}]
+            return [{"EventId": 0}, {"EventId": None}]
         return []
 
     monkeypatch.setattr(event_service, "db_query_all", fake_db_query_all)
@@ -386,7 +388,7 @@ def test_get_events_and_orders_handles_tours_without_valid_event_ids(monkeypatch
     events = event_service.EventService().get_events_and_orders(tour_id=77)
 
     assert not events
-    assert "ExternalEvents.EventId IN" not in calls[1][0]
+    assert "EventId IN" not in calls[1][0]
     assert calls[1][1] == {}
 
 
@@ -411,7 +413,7 @@ def test_get_events_and_orders_maps_public_events_and_skips_future_announces(
                 AnnounceDate="2026-04-01 09:00:00",
             ),
             build_event_row(
-                ExternalEventId=11,
+                EventId=11,
                 TicketSocketEventId=21,
                 AnnounceDate="2026-05-10 09:00:00",
                 Title="Future Event",
@@ -428,7 +430,7 @@ def test_get_events_and_orders_maps_public_events_and_skips_future_announces(
 
     assert len(events) == 1
     assert FakeCalendarService.instances[0].calls == [10]
-    assert events[0].external_event_id == 10
+    assert events[0].event_id == 10
     assert events[0].thumbnail == "override.jpg"
     assert events[0].external_thumbnail == "override.jpg"
     assert events[0].ticket_socket_url == "https://vip.example.com"
@@ -455,14 +457,14 @@ def test_get_events_and_orders_skips_future_tour_announces_for_public_events(
         "db_query_all",
         lambda sql, data: [
             build_event_row(
-                ExternalEventId=10,
+                EventId=10,
                 TicketSocketEventId=20,
                 AnnounceDate=None,
                 TourAnnounceDate="2026-05-10 09:00:00",
                 IsTourActive=1,
             ),
             build_event_row(
-                ExternalEventId=11,
+                EventId=11,
                 TicketSocketEventId=21,
                 AnnounceDate=None,
                 TourAnnounceDate="2026-04-01 09:00:00",
@@ -496,18 +498,18 @@ def test_get_events_and_orders_applies_external_and_visibility_filters(monkeypat
         "db_query_all",
         lambda sql, data: [
             build_event_row(
-                ExternalEventId=11,
+                EventId=11,
                 TicketSocketEventId=None,
                 Title="External Only",
             ),
             build_event_row(
-                ExternalEventId=12,
+                EventId=12,
                 TicketSocketEventId=22,
                 Title="Hidden On Site",
                 IsVisibleOnSite=0,
             ),
             build_event_row(
-                ExternalEventId=13,
+                EventId=13,
                 TicketSocketEventId=23,
                 Title="Visible Event",
             ),
@@ -546,13 +548,13 @@ def test_get_events_and_orders_skips_portal_hidden_events(monkeypatch):
         "db_query_all",
         lambda sql, data: [
             build_event_row(
-                ExternalEventId=12,
+                EventId=12,
                 TicketSocketEventId=22,
                 Title="Hidden On Portal",
                 IsVisibleOnPortal=0,
             ),
             build_event_row(
-                ExternalEventId=13,
+                EventId=13,
                 TicketSocketEventId=23,
                 Title="Visible Event",
             ),
@@ -592,7 +594,7 @@ def test_get_events_and_orders_loads_ticket_types_orders_and_country_timezones(
 
     def fake_db_query_all(sql, data):
         calls.append((sql, data))
-        if "FROM TicketSocketTicketTypes" in sql:
+        if "FROM TicketTypeDetails" in sql:
             return [
                 build_ticket_type_row(
                     TicketSocketTicketTypeId=7,
@@ -658,10 +660,10 @@ def test_get_events_and_orders_builds_date_and_exclusion_filters(monkeypatch):
 
     assert not events
     assert (
-        "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
+        "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
     )
     assert (
-        "ExternalEvents.EventDate NOT BETWEEN %(exclude_start)s AND %(exclude_end)s"
+        "EventDate NOT BETWEEN %(exclude_start)s AND %(exclude_end)s"
         in calls[0][0]
     )
     assert calls[0][1] == {
@@ -689,7 +691,7 @@ def test_get_events_and_orders_builds_future_end_only_filter(monkeypatch):
 
     assert not events
     assert (
-        "ExternalEvents.EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
+        "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
     )
     assert calls[0][1] == {
         "startDate": "2026-04-23",
@@ -711,7 +713,7 @@ def test_get_events_and_orders_builds_start_only_filter(monkeypatch):
     events = event_service.EventService().get_events_and_orders(start=1746057600)
 
     assert not events
-    assert "ExternalEvents.EventDate >= %(startDate)s" in calls[0][0]
+    assert "EventDate >= %(startDate)s" in calls[0][0]
     assert calls[0][1] == {"startDate": "2025-04-30"}
 
 
@@ -789,7 +791,7 @@ def test_get_events_and_orders_loads_ticket_types_without_portal_filter(
 
     def fake_db_query_all(sql, data):
         calls.append((sql, data))
-        if "FROM TicketSocketTicketTypes" in sql:
+        if "FROM TicketTypeDetails" in sql:
             return [build_ticket_type_row()]
         return [build_event_row()]
 
@@ -834,7 +836,7 @@ def test_disable_events_updates_rows_and_rebuilds_dashboard(monkeypatch):
         event_service,
         "db_query_one",
         lambda sql, data: query_calls.append((sql, data))
-        or {"TicketSocketEventId": 44},
+        or {"TicketPartnerEventId": 44},
     )
     monkeypatch.setattr(event_service, "DashboardService", FakeDashboardService)
 
@@ -965,7 +967,7 @@ def test_delete_events_marks_deleted_and_rebuilds_dashboard(monkeypatch):
     monkeypatch.setattr(
         event_service,
         "db_query_one",
-        lambda sql, data: {"TicketSocketEventId": 70},
+        lambda sql, data: {"TicketPartnerEventId": 70},
     )
     monkeypatch.setattr(event_service, "DashboardService", FakeDashboardService)
 
@@ -1073,10 +1075,10 @@ def test_get_events_and_orders_uses_deleted_inactive_and_visibility_branches(
     )
 
     assert not events
-    assert "COALESCE(ExternalEvents.IsDeleted, 0) = 0" not in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsActive, 1) = 0" in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsHidden, 0) = 0" not in calls[0][0]
-    assert "COALESCE(ExternalEvents.IsCancelled, 0) = 0" not in calls[0][0]
+    assert "COALESCE(IsDeleted, 0) = 0" not in calls[0][0]
+    assert "COALESCE(IsActive, 1) = 0" in calls[0][0]
+    assert "COALESCE(IsHidden, 0) = 0" not in calls[0][0]
+    assert "COALESCE(IsCancelled, 0) = 0" not in calls[0][0]
 
 
 def test_hide_events_returns_false_when_an_update_fails(monkeypatch):
@@ -1231,4 +1233,19 @@ def test_get_tours_from_recent_events_maps_recent_tour_cards(monkeypatch):
     assert "p.PageTypeID = 7" in calls[0]
     assert "p.PageOrder" in calls[0]
     assert "ORDER BY p.PageOrder, MIN(ee.EventDate) ASC" in calls[0]
-    assert "LIMIT 18" in calls[0]
+    assert "LIMIT 21" in calls[0]
+
+
+import pytest
+from common.ticket_partner_service import TicketPartnerService
+
+@pytest.fixture(autouse=True)
+def partner_mapping_fixture(monkeypatch):
+    """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
+    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
+    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
+    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)
+    monkeypatch.setattr(TicketPartnerService, "ensure_ticket_type", lambda self, event, kind, cnx=None: 1)

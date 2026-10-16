@@ -235,8 +235,8 @@ def upgrade():
     """)
 
     op.execute("""
-        INSERT INTO TicketPartnerOrderTickets (TicketPartnerOrderId, PartnerTicketId)
-            SELECT tpo.TicketPartnerOrderId, tsot.Id
+        INSERT INTO TicketPartnerOrderTickets (TicketPartnerOrderId, PartnerTicketId, LastUpdated)
+            SELECT tpo.TicketPartnerOrderId, tsot.Id, tsot.LastUpdate
                 FROM TicketPartnerOrders tpo
                 JOIN TicketSocketOrderTickets tsot
                     ON tsot.TicketSocketOrderId = tpo.PartnerOrderId
@@ -324,6 +324,7 @@ def upgrade():
         UPDATE DailyOrderData dod
             JOIN TicketPartnerOrders tpo
                 ON tpo.PartnerOrderId = dod.TicketSocketOrderId
+                AND tpo.TicketPartnerEventId = dod.TicketPartnerEventId
                 SET dod.TicketPartnerOrderId = tpo.TicketPartnerOrderId            
     """)
 
@@ -417,21 +418,21 @@ def upgrade():
                 (TourEventId, TourId, EventId)
     """)
 
-    # op.execute("""
-    #     ALTER TABLE DailyOrderData
-    #        DROP FOREIGN KEY FK_DailyOrderData_TicketSocketEvent
-    # """)
+    unmapped_daily_rows = op.get_bind().exec_driver_sql("""
+        SELECT COUNT(*) FROM DailyOrderData
+        WHERE TicketPartnerEventId IS NULL
+            OR (TicketSocketOrderId IS NOT NULL AND TicketPartnerOrderId IS NULL)
+    """).scalar_one()
+    if unmapped_daily_rows:
+        raise RuntimeError("DailyOrderData contains rows without partner mappings; legacy columns were not dropped")
 
-    # op.execute("""
-    #     ALTER TABLE DailyOrderData
-    #         DROP INDEX IX_DailyOrderData_PurchaseDate_EventId
-    # """)
-
-    # op.execute("""
-    #    ALTER TABLE DailyOrderData
-    #        DROP COLUMN TicketSocketEventId,
-    #        DROP COLUMN TicketSocketOrderId
-    # """)
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            DROP FOREIGN KEY FK_DailyOrderData_TicketSocketEvent,
+            DROP INDEX IX_DailyOrderData_PurchaseDate_EventId,
+            DROP COLUMN TicketSocketEventId,
+            DROP COLUMN TicketSocketOrderId
+    """)
 
     # Preserve the existing event projection using the new partner mapping.
     op.execute("""
@@ -471,7 +472,7 @@ def upgrade():
                Events.IsAddedToBandsInTown AS IsAddedToBandsInTown,
                Events.URL AS ExternalUrl,
                Events.Thumbnail AS ExternalThumbnail,
-               Events.VenueId AS ExternalEventVenueId,
+               Events.VenueId AS VenueId,
                Events.DisableLinkButton AS DisableLinkButton,
                Events.DisableLinkReason AS DisableLinkReason,
                Events.ExternalVipLink AS ExternalVipLink,
@@ -491,14 +492,15 @@ def upgrade():
                COALESCE(Tour.IsActive, 0) AS IsTourActive,
                COALESCE(TicketSocketEvents.IsSoldOut, 0) AS IsSoldOut,
                TicketPartnerEvents.TicketPartnerId AS TicketPartnerId,
+               TicketPartnerEvents.TicketPartnerEventId AS TicketPartnerEventId,
                TicketSocketEvents.LastUpdate AS LastUpdate
         FROM Events
         JOIN Sellers ON Sellers.SellerId = Events.SellerId
         JOIN TicketPartnerEvents
             ON TicketPartnerEvents.EventId = Events.EventId
-            AND TicketPartnerEvents.TicketPartnerId = 2
         LEFT JOIN TicketSocketEvents
             ON TicketSocketEvents.Id = TicketPartnerEvents.PartnerEventId
+            AND TicketPartnerEvents.TicketPartnerId = 2
         LEFT JOIN SellerEventCategory
             ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
         LEFT JOIN Venues ON Venues.VenueID = Events.VenueId
@@ -566,11 +568,165 @@ def upgrade():
     """)
 
 
+    op.execute("""
+        CREATE SQL SECURITY INVOKER VIEW OrderOverview AS
+SELECT DISTINCT
+    od.TicketSocketOrderId AS Id,
+    od.TicketSocketNativeOrderId AS OrderId,
+    od.TicketSocketNativeEventId AS EventId,
+    od.TicketPartnerOrderId, od.TicketPartnerEventId, od.TicketPartnerId,
+    od.TicketSocketEventId, od.PurchaseDate, od.PurchaseTimestamp,
+    od.PurchaseUnixTimestamp, od.UserId, od.Phone, od.Email,
+    od.PurchaserLastName, od.PurchaserFirstName, od.PurchaserCity,
+    od.PurchaserState, od.PurchaserZip, od.PurchaserCountry,
+    od.PurchaserIpAddress, od.IsActive, od.IsDeleted, od.IsComped,
+    od.IsManualTransfer, od.Notes, od.TicketSocketLastUpdate AS LastUpdate,
+    ed.SellerEventCategoryId, ed.ExcludeFromDashboard,
+    ed.Title AS EventTitle, ed.EventDate, ed.SellerName, ed.SellerId,
+    ed.Venue, ed.Address AS EventAddress, ed.City AS EventCity,
+    ed.State AS EventState, ed.Zip AS EventZip, ed.Country AS EventCountry,
+    COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
+    ExchangeRates.Symbol, ExchangeRates.Multiplier,
+    UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev
+FROM OrderDetails od
+JOIN EventDetails ed ON ed.TicketPartnerEventId = od.TicketPartnerEventId
+JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = ed.SellerEventCategoryId
+JOIN TicketSocket ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
+JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
+LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId
+    AND ExchangeRateHistory.MidnightDate = od.PurchaseDate
+    """)
+
+
+    op.execute("""
+        CREATE TABLE PartnerTicketTypes (
+            PartnerTicketTypeId INT NOT NULL AUTO_INCREMENT,
+            TicketPartnerEventId INT NOT NULL,
+            ProviderTicketTypeId INT NULL,
+            LastUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+            PRIMARY KEY (PartnerTicketTypeId),
+            UNIQUE KEY UQ_PartnerTicketTypes_Event_Type
+                (TicketPartnerEventId, ProviderTicketTypeId),
+            CONSTRAINT FK_PartnerTicketTypes_TicketPartnerEvent
+                FOREIGN KEY (TicketPartnerEventId)
+                REFERENCES TicketPartnerEvents (TicketPartnerEventId)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+        ) ENGINE=InnoDB
+            DEFAULT CHARACTER SET utf8mb4
+            COLLATE utf8mb4_unicode_ci
+    """)
+
+    op.execute("""
+        INSERT INTO PartnerTicketTypes
+            (TicketPartnerEventId, ProviderTicketTypeId, LastUpdated)
+        SELECT tpe.TicketPartnerEventId, tst.TicketSocketTicketTypeId, tst.LastUpdate
+        FROM TicketPartnerEvents tpe
+        JOIN TicketSocketTicketTypes tst
+            ON tst.TicketSocketEventId = tpe.PartnerEventId
+        WHERE tpe.TicketPartnerId = 2
+        ORDER BY tpe.TicketPartnerEventId, tst.TicketTypeOrder, tst.TicketSocketTicketTypeId
+    """)
+
+    op.execute("""
+        CREATE SQL SECURITY INVOKER VIEW TicketTypeDetails AS
+        SELECT ptt.PartnerTicketTypeId AS PartnerTicketTypeId,
+               ptt.TicketPartnerEventId AS TicketPartnerEventId,
+               tpe.TicketPartnerId AS TicketPartnerId,
+               tpe.EventId AS EventId,
+               ptt.ProviderTicketTypeId AS ProviderTicketTypeId,
+               ptt.LastUpdated AS TicketTypeLastUpdated,
+               tse.Id AS TicketSocketEventId,
+               tse.EventId AS TicketSocketNativeEventId,
+               tst.TicketSocketTicketTypeId AS TicketSocketTicketTypeId,
+               tst.TicketTypeName AS TicketTypeName,
+               tst.TotalAvailable AS TotalAvailable,
+               tst.IsActive AS IsActive,
+               tst.TicketTypeOrder AS TicketTypeOrder,
+               tst.LastUpdate AS TicketSocketLastUpdate
+        FROM PartnerTicketTypes ptt
+        JOIN TicketPartnerEvents tpe
+            ON tpe.TicketPartnerEventId = ptt.TicketPartnerEventId
+        LEFT JOIN TicketSocketEvents tse
+            ON tpe.TicketPartnerId = 2
+            AND tse.Id = tpe.PartnerEventId
+        LEFT JOIN TicketSocketTicketTypes tst
+            ON tst.TicketSocketEventId = tse.Id
+            AND tst.TicketSocketTicketTypeId = ptt.ProviderTicketTypeId
+    """)
+
+    op.execute("""
+        CREATE SQL SECURITY INVOKER VIEW TicketDetails AS
+        SELECT tpot.TicketPartnerTicketId AS TicketPartnerTicketId,
+               tpot.TicketPartnerOrderId AS TicketPartnerOrderId,
+               tpo.TicketPartnerEventId AS TicketPartnerEventId,
+               tpe.TicketPartnerId AS TicketPartnerId,
+               tpe.EventId AS EventId,
+               tpot.PartnerTicketId AS PartnerTicketId,
+               tpo.PartnerOrderId AS PartnerOrderId,
+               tpot.LastUpdated AS TicketLastUpdated,
+               tso.Id AS TicketSocketOrderId,
+               tso.TicketSocketEventId AS TicketSocketEventId,
+               tso.EventId AS TicketSocketNativeEventId,
+               tso.OrderId AS TicketSocketNativeOrderId,
+               tso.IsActive AS OrderIsActive,
+               tso.IsDeleted AS OrderIsDeleted,
+               tso.IsComped AS OrderIsComped,
+               tsot.Id AS TicketSocketOrderTicketId,
+               tsot.TicketId AS TicketSocketNativeTicketId,
+               tsot.TicketSocketTicketTypeId AS TicketSocketTicketTypeId,
+               tst.PartnerTicketTypeId AS PartnerTicketTypeId,
+               tsot.TicketType AS TicketType,
+               COALESCE(tst.TicketTypeOrder, 1) AS TicketTypeOrder,
+               tsot.Price AS Price,
+               tsot.ServiceFee AS ServiceFee,
+               tsot.AttendeeFirstName AS AttendeeFirstName,
+               tsot.AttendeeLastName AS AttendeeLastName,
+               tsot.AttendeePhone AS AttendeePhone,
+               tsot.AttendeeEmail AS AttendeeEmail,
+               tsot.ShirtSize AS ShirtSize,
+               tsot.IsActive AS IsActive,
+               tsot.IsCheckedIn AS IsCheckedIn,
+               tsot.CheckedInDate AS CheckedInDate,
+               tsot.IsRefunded AS IsRefunded,
+               tsot.RefundDate AS RefundDate,
+               tsot.IsChargedBack AS IsChargedBack,
+               tsot.ChargebackDate AS ChargebackDate,
+               tsot.IsServiceFeeRefunded AS IsServiceFeeRefunded,
+               tsot.BarCode AS BarCode,
+               tsot.AvailableScans AS AvailableScans,
+               tsot.PurchaseLocation AS PurchaseLocation,
+               tsot.ScannedTimestamp AS ScannedTimestamp,
+               tsot.LastUpdate AS TicketSocketLastUpdate
+        FROM TicketPartnerOrderTickets tpot
+        JOIN TicketPartnerOrders tpo
+            ON tpo.TicketPartnerOrderId = tpot.TicketPartnerOrderId
+        JOIN TicketPartnerEvents tpe
+            ON tpe.TicketPartnerEventId = tpo.TicketPartnerEventId
+        LEFT JOIN TicketSocketOrders tso
+            ON tpe.TicketPartnerId = 2
+            AND tso.Id = tpo.PartnerOrderId
+            AND tso.TicketSocketEventId = tpe.PartnerEventId
+        LEFT JOIN TicketSocketOrderTickets tsot
+            ON tsot.Id = tpot.PartnerTicketId
+            AND tsot.TicketSocketOrderId = tso.Id
+        LEFT JOIN TicketTypeDetails tst
+            ON tst.TicketPartnerEventId = tpo.TicketPartnerEventId
+            AND tst.ProviderTicketTypeId = tsot.TicketSocketTicketTypeId
+            AND tst.TicketPartnerId = 2
+            AND tst.TicketSocketTicketTypeId IS NOT NULL
+    """)
+
+
 def downgrade():
     """
     Downgrade the database schema for Stripe integration.
     """
 
+    op.execute("DROP VIEW TicketDetails")
+    op.execute("DROP VIEW TicketTypeDetails")
+    op.execute("DROP TABLE PartnerTicketTypes")
+    op.execute("DROP VIEW OrderOverview")
     op.execute("DROP VIEW OrderDetails")
 
     # Remove the view before dropping mappings or renaming its source tables.
@@ -614,26 +770,11 @@ def downgrade():
             ADD INDEX FK_EventNote_ExternalEventId (ExternalEventId) USING BTREE
     """)
 
-    # op.execute("""
-    #     ALTER TABLE DailyOrderData
-    #         ADD COLUMN TicketSocketEventId INT NULL,
-    #         ADD COLUMN TicketSocketOrderId INT NULL
-    # """)
-
-    # op.execute("""
-    #     ALTER TABLE DailyOrderData
-    #         ADD CONSTRAINT IX_DailyOrderData_PurchaseDate_EventId
-    #         UNIQUE (PurchaseDate, TicketSocketEventId, TicketSocketOrderId);
-    # """)
-
-    # op.execute("""
-    #    ALTER TABLE DailyOrderData
-    #        ADD CONSTRAINT FK_DailyOrderData_TicketSocketEvent
-    #        FOREIGN KEY (TicketSocketEventId)
-    #        REFERENCES TicketSocketEvents (Id)
-    #        ON DELETE NO ACTION
-    #        ON UPDATE NO ACTION;
-    # """)
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            ADD COLUMN TicketSocketEventId INT NULL AFTER PurchaseDate,
+            ADD COLUMN TicketSocketOrderId INT NULL AFTER TicketSocketEventId
+    """)
 
     op.execute("""
         UPDATE DailyOrderData dod
@@ -647,7 +788,19 @@ def downgrade():
         UPDATE DailyOrderData dod
             JOIN TicketPartnerOrders tpo
                 ON tpo.TicketPartnerOrderId = dod.TicketPartnerOrderId
+                AND tpo.TicketPartnerEventId = dod.TicketPartnerEventId
                 SET dod.TicketSocketOrderId = tpo.PartnerOrderId            
+    """)
+
+    op.execute("""
+        ALTER TABLE DailyOrderData
+            MODIFY COLUMN TicketSocketEventId INT NOT NULL,
+            ADD CONSTRAINT IX_DailyOrderData_PurchaseDate_EventId
+                UNIQUE (PurchaseDate, TicketSocketEventId, TicketSocketOrderId),
+            ADD CONSTRAINT FK_DailyOrderData_TicketSocketEvent
+                FOREIGN KEY (TicketSocketEventId)
+                REFERENCES TicketSocketEvents (Id)
+                ON DELETE NO ACTION ON UPDATE NO ACTION
     """)
 
     op.execute("""

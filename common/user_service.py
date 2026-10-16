@@ -554,9 +554,9 @@ class UserService:
 
         user = self.__retrieve_user_from_database(user_id=user_id, fetch_sellers=True)
 
-        sql = """SELECT SellerId
-                 FROM ExternalEvents 
-                 WHERE ExternalEvents.EventId=%(event_id)s"""
+        sql = """SELECT DISTINCT SellerId
+                 FROM EventDetails
+                 WHERE EventId=%(event_id)s"""
 
         data = {"event_id": event_id}
 

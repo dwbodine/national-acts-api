@@ -52,57 +52,32 @@ class DashboardService:
         start = f"{current_year}-01-01 00:00:00"
         end = now.strftime("%Y-%m-%d 23:59:59")
 
-        sql = """SELECT DailyOrderData.*,
-                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS Title,
-                    COALESCE(ExternalEvents.EventDate, TicketSocketEvents.EventDate) AS EventDate,
-                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
-                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
-                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
-                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS Zip, 
-                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,                    
-                    Sellers.Name AS SellerName,
-                    Sellers.SellerId,
-                    TicketSocket.TicketSocketId,
-                    TicketSocket.AccountName 
-                    FROM DailyOrderData 
-                    JOIN ExternalEvents 
-                        ON ExternalEvents.TicketSocketEventId
-                            = DailyOrderData.TicketSocketEventId 
-                    JOIN TicketSocketEvents 
-                        ON TicketSocketEvents.Id
-                            = DailyOrderData.TicketSocketEventId 
-                    JOIN SellerEventCategory 
-                        ON SellerEventCategory.SellerEventCategoryId
-                            = TicketSocketEvents.SellerEventCategoryId 
-                    JOIN TicketSocket 
-                        ON TicketSocket.TicketSocketId
-                            = SellerEventCategory.TicketSocketId 
-                    LEFT JOIN ExternalEventVenues
-                        ON ExternalEventVenues.VenueID
-                            = ExternalEvents.ExternalEventVenueId
-                    LEFT JOIN Country ON
-                        Country.CountryId = 
-                            ExternalEventVenues.CountryId
-                    JOIN Sellers
-                        ON Sellers.SellerId = ExternalEvents.SellerId 
-                 WHERE DailyOrderData.PurchaseDate
-                    BETWEEN %(start)s and %(end)s 
-                    ORDER BY DailyOrderData.PurchaseDate, Sellers.Name"""
+        sql = """SELECT DISTINCT DailyOrderData.*,
+                    ed.Title, ed.EventDate, ed.Venue, ed.City, ed.State,
+                    ed.Zip, ed.Country, ed.SellerName, ed.SellerId,
+                    ed.TicketPartnerId, TicketSocket.TicketSocketId, TicketSocket.AccountName
+                FROM DailyOrderData
+                JOIN EventDetails ed ON ed.TicketPartnerEventId=DailyOrderData.TicketPartnerEventId
+                JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId=ed.SellerEventCategoryId
+                JOIN TicketSocket ON TicketSocket.TicketSocketId=SellerEventCategory.TicketSocketId
+                WHERE DailyOrderData.PurchaseDate BETWEEN %(start)s AND %(end)s
+                ORDER BY DailyOrderData.PurchaseDate, ed.SellerName"""
         data = {"start": start, "end": end}
 
         rows = db_query_all(sql, data)
         for row in rows:
             purchase_date = get_override_string_value_or_default(row["PurchaseDate"])
-            ticket_socket_event_id = get_override_int_value_or_default(
-                row["TicketSocketEventId"]
+            ticket_partner_event_id = get_override_int_value_or_default(
+                row["TicketPartnerEventId"]
             )
             exchange_rate = get_override_float_value_or_default(row["ExchangeRate"])
             currency_symbol = get_override_string_value_or_default(
                 row["CurrencySymbol"]
             )
             order_data = DailyOrderData(
-                purchase_date, ticket_socket_event_id, exchange_rate, currency_symbol
+                purchase_date, ticket_partner_event_id, exchange_rate, currency_symbol
             )
+            order_data.ticket_partner_id = get_override_int_value_or_default(row["TicketPartnerId"])
             order_data.last_update = get_override_string_value_or_default(
                 row["LastUpdate"]
             )
@@ -142,8 +117,8 @@ class DashboardService:
             order_data.ticket_socket_id = get_override_int_value_or_default(
                 row["TicketSocketId"]
             )
-            order_data.ticket_socket_order_id = get_override_int_value_or_default(
-                row["TicketSocketOrderId"], default=None
+            order_data.ticket_partner_order_id = get_override_int_value_or_default(
+                row["TicketPartnerOrderId"], default=None
             )
             order_data.is_refunded = get_override_bool_value_or_default(
                 row["IsRefunded"]
@@ -236,29 +211,19 @@ class DashboardService:
         """
         Clean out and rebuild daily order data for event
         """
-        event_sql = """SELECT TicketSocketEvents.Id as TicketSocketEventId,
-                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
-                            SellerEventCategory.SellerId,
-                            COALESCE(ExternalEvents.ExcludeFromDashboard, 0) AS ExcludeFromDashboard
-                            FROM TicketSocketEvents
-                            JOIN SellerEventCategory ON 
-                             TicketSocketEvents.SellerEventCategoryId = 
-                             SellerEventCategory.SellerEventCategoryId                         
-                            LEFT JOIN ExternalEvents ON
-                             ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                            WHERE TicketSocketEvents.Id=%(ticket_socket_event_id)s"""
-        event_data = {"ticket_socket_event_id": event_id}
+        event_sql = """SELECT DISTINCT TicketPartnerEventId, YEAR(EventDate) AS EventYear,
+                            SellerId, COALESCE(ExcludeFromDashboard, 0) AS ExcludeFromDashboard
+                        FROM EventDetails
+                        WHERE TicketPartnerEventId=%(ticket_partner_event_id)s"""
+        event_data = {"ticket_partner_event_id": ticket_partner_event_id}
         event_row = db_query_one(event_sql, event_data)
         if event_row:
-            event_id: int = get_override_int_value_or_default(
-                event_row["TicketSocketEventId"]
-            )
             hide_from_dashboard = get_override_bool_value_or_default(
                 event_row["ExcludeFromDashboard"]
             )
 
             do_service = DailyOrderService()
-            do_service.cleanup_daily_order_data_for_event(event_id)
+            do_service.cleanup_daily_order_data_for_event(ticket_partner_event_id)
 
             if not hide_from_dashboard:
                 event_year: int = get_override_int_value_or_default(

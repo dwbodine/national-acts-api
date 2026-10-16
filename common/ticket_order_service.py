@@ -31,21 +31,21 @@ class TicketOrdersService:
         orders: list[TicketOrder] = []
         sql = """SELECT TicketOrders.*,
                     TicketOrderAgeLimit.TicketOrderAgeLimitName,
-                    ExternalEvents.EventID 
+                    Events.EventID
                     FROM TicketOrders
                     JOIN TicketOrderAgeLimit ON 
                         TicketOrderAgeLimit.TicketOrderAgeLimitId =
                         TicketOrders.TicketOrderAgeLimitId
-                    JOIN ExternalEvents ON
-                        ExternalEvents.EventID = 
+                    JOIN (SELECT DISTINCT EventId FROM EventDetails) Events ON
+                        Events.EventID =
                         TicketOrders.ExternalEventId
                     """
         if show_fulfilled is True and show_paid is True:
-            sql = """ WHERE TicketOrders.Fulfilled=1 AND TicketOrders.Paid=1"""
+            sql += """ WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=1"""
         elif show_fulfilled is True:
-            sql = """ WHERE TicketOrders.Fulfilled=1 AND TicketOrders.Paid=0"""
+            sql += """ WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=0"""
         elif show_fulfilled is False and show_paid is False:
-            sql = """ WHERE TicketOrders.Fulfilled=0 AND TicketOrders.Paid=0"""
+            sql += """ WHERE TicketOrders.IsFulfilled=0 AND TicketOrders.IsPaid=0"""
         rows = db_query_all(sql)
         for row in rows:
             order = self.__get_order_data_from_row(row, event_service)
@@ -64,13 +64,13 @@ class TicketOrdersService:
 
         sql = """SELECT TicketOrders.*,
                     TicketOrderAgeLimit.TicketOrderAgeLimitName,
-                    ExternalEvents.EventID 
+                    Events.EventID
                     FROM TicketOrders
                     JOIN TicketOrderAgeLimit ON 
                         TicketOrderAgeLimit.TicketOrderAgeLimitId =
                         TicketOrders.TicketOrderAgeLimitId
-                    JOIN ExternalEvents ON
-                        ExternalEvents.EventID = 
+                    JOIN (SELECT DISTINCT EventId FROM EventDetails) Events ON
+                        Events.EventID =
                         TicketOrders.ExternalEventId
                     WHERE TicketOrders.TicketOrderId=%(order_id)s
                     """
@@ -187,7 +187,7 @@ class TicketOrdersService:
         data = {
             "date": get_override_string_value_or_default(order_to_update.order_date),
             "eventId": get_override_int_value_or_default(
-                order_to_update.event.external_event_id
+                order_to_update.event.event_id
             ),
             "ageLimitId": get_override_int_value_or_default(
                 order_to_update.age_limit.age_limit_id

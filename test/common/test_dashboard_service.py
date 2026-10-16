@@ -111,7 +111,8 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
         return [
             {
                 "PurchaseDate": "2026-01-10",
-                "TicketSocketEventId": 11,
+                "TicketPartnerEventId": 11,
+                "TicketPartnerId": 2,
                 "ExchangeRate": 2.0,
                 "CurrencySymbol": "C$",
                 "LastUpdate": "2026-01-10 10:00:00",
@@ -130,7 +131,7 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
                 "ServiceFeeRevenue": 20.0,
                 "TotalRevenue": 120.0,
                 "TicketSocketId": 5,
-                "TicketSocketOrderId": None,
+                "TicketPartnerOrderId": None,
                 "IsRefunded": 0,
                 "NumTicketsRefunded": 0,
                 "RevenueRefunded": 0,
@@ -142,7 +143,8 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
             },
             {
                 "PurchaseDate": "2026-01-11",
-                "TicketSocketEventId": 11,
+                "TicketPartnerEventId": 11,
+                "TicketPartnerId": 2,
                 "ExchangeRate": 2.0,
                 "CurrencySymbol": "C$",
                 "LastUpdate": "2026-01-11 10:00:00",
@@ -161,7 +163,7 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
                 "ServiceFeeRevenue": 0.0,
                 "TotalRevenue": 0.0,
                 "TicketSocketId": 5,
-                "TicketSocketOrderId": 99,
+                "TicketPartnerOrderId": 99,
                 "IsRefunded": 1,
                 "NumTicketsRefunded": 1,
                 "RevenueRefunded": 50.0,
@@ -173,7 +175,8 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
             },
             {
                 "PurchaseDate": "2026-01-12",
-                "TicketSocketEventId": 11,
+                "TicketPartnerEventId": 11,
+                "TicketPartnerId": 2,
                 "ExchangeRate": 2.0,
                 "CurrencySymbol": "C$",
                 "LastUpdate": "2026-01-12 10:00:00",
@@ -192,7 +195,7 @@ def test_get_dashboard_data_rolls_up_purchase_refund_and_chargeback_rows(
                 "ServiceFeeRevenue": 0.0,
                 "TotalRevenue": 0.0,
                 "TicketSocketId": 5,
-                "TicketSocketOrderId": 100,
+                "TicketPartnerOrderId": 100,
                 "IsRefunded": 0,
                 "NumTicketsRefunded": 0,
                 "RevenueRefunded": 0,
@@ -292,7 +295,7 @@ def test_rebuild_daily_order_data_for_event_only_cleans_when_hidden(monkeypatch)
         dashboard_service,
         "db_query_one",
         lambda sql, data: {
-            "TicketSocketEventId": 55,
+            "TicketPartnerEventId": 55,
             "EventYear": 2026,
             "SellerId": 7,
             "ExcludeFromDashboard": 1,
@@ -320,7 +323,7 @@ def test_rebuild_daily_order_data_for_event_rebuilds_visible_event(monkeypatch):
         dashboard_service,
         "db_query_one",
         lambda sql, data: {
-            "TicketSocketEventId": 88,
+            "TicketPartnerEventId": 88,
             "EventYear": 2026,
             "SellerId": 9,
             "ExcludeFromDashboard": 0,
@@ -351,7 +354,7 @@ def test_rebuild_daily_order_data_for_event_skips_update_when_no_orders(monkeypa
         dashboard_service,
         "db_query_one",
         lambda sql, data: {
-            "TicketSocketEventId": 89,
+            "TicketPartnerEventId": 89,
             "EventYear": 2026,
             "SellerId": 11,
             "ExcludeFromDashboard": 0,

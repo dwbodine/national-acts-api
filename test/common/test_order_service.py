@@ -102,6 +102,9 @@ def build_order_row(**overrides):
         "Multiplier": 2.0,
         "CurrencyAbbrev": "CAD",
         "Id": 11,
+        "TicketPartnerOrderId": 11,
+        "TicketPartnerEventId": 44,
+        "TicketPartnerId": 2,
         "OrderId": 2222,
         "EventId": 333,
         "LastUpdate": "2026-04-23 10:00:00",
@@ -132,6 +135,7 @@ def build_order_row(**overrides):
         "IsActive": 1,
         "IsDeleted": 0,
         "IsComped": 0,
+        "IsManualTransfer": 0,
         "Notes": "Front row",
     }
     row.update(overrides)
@@ -160,6 +164,7 @@ def build_ticket_row(**overrides):
         "AttendeeEmail": "ada@example.com",
         "ShirtSize": "M",
         "Id": 501,
+        "TicketPartnerTicketId": 501,
         "IsRefunded": 0,
         "IsServiceFeeRefunded": 0,
         "RefundDate": None,
@@ -185,8 +190,8 @@ def create_ticket(
     Create a VipTicket instance for update-order tests.
     """
     ticket = VipTicket()
-    ticket.ticket_socket_order_ticket_id = ticket_id
-    ticket.ticket_socket_order_id = order_id
+    ticket.ticket_partner_order_ticket_id = ticket_id
+    ticket.ticket_partner_order_id = order_id
     ticket.price = 55.0
     ticket.service_fee = 12.0
     ticket.is_checked_in = True
@@ -208,7 +213,7 @@ def create_order(ticket_socket_order_id=11):
     Create a VipOrder instance for update-order tests.
     """
     order = VipOrder()
-    order.ticket_socket_order_id = ticket_socket_order_id
+    order.ticket_partner_order_id = ticket_socket_order_id
     order.is_active = True
     order.is_deleted = False
     order.is_comped = False
@@ -268,8 +273,8 @@ def test_get_orders_builds_numeric_search_and_maps_orders(monkeypatch):
     orders = order_service.OrderService().get_orders(search_term="2222")
 
     assert len(orders) == 2
-    assert "TicketSocketOrders.OrderId=2222" in calls[0][0]
-    assert orders[0].ticket_socket_order_id == 11
+    assert "o.OrderId=2222" in calls[0][0]
+    assert orders[0].ticket_partner_order_id == 11
     assert orders[0].exchange_rate == 3.0
     assert orders[0].currency_abbrev == "CAD"
     assert orders[0].currency_symbol == "C$"
@@ -304,9 +309,9 @@ def test_get_orders_uses_seller_categories_and_date_filters(monkeypatch):
 
     assert not orders
     assert "WITH" in calls[0][0]
-    assert "TicketSocketEvents.SellerEventCategoryId IN" in calls[0][0]
-    assert "TicketSocketOrders.IsDeleted = 0" in calls[0][0]
-    assert "ExternalEvents.ExcludeFromDashboard <> 1" in calls[0][0]
+    assert "o.SellerEventCategoryId IN" in calls[0][0]
+    assert "o.IsDeleted = 0" in calls[0][0]
+    assert "o.ExcludeFromDashboard <> 1" in calls[0][0]
     assert calls[0][1] == {
         "sellerEventCategoryId_0": 10,
         "sellerEventCategoryId_1": 11,
@@ -317,7 +322,7 @@ def test_get_orders_uses_seller_categories_and_date_filters(monkeypatch):
 
 def test_get_orders_filters_by_ticket_socket_order_id(monkeypatch):
     """
-    Test that get_orders filters directly by the TicketSocket order id when provided.
+    Test that get_orders filters directly by the TicketSocket order id when provido.
     """
     calls = []
     monkeypatch.setattr(
@@ -329,7 +334,7 @@ def test_get_orders_filters_by_ticket_socket_order_id(monkeypatch):
     orders = order_service.OrderService().get_orders(ts_order_id=55)
 
     assert not orders
-    assert "TicketSocketOrders.Id = %(order_id)s" in calls[0][0]
+    assert "o.TicketPartnerOrderId = %(order_id)s" in calls[0][0]
     assert calls[0][1] == {"order_id": 55}
 
 
@@ -376,14 +381,14 @@ def test_get_orders_uses_open_range_filters_for_deleted_orders(monkeypatch):
 
     assert not orders
     assert "WITH" in calls[0][0]
-    assert "TicketSocketOrders.IsActive = 0" in calls[0][0]
-    assert "ExternalEvents.ExcludeFromDashboard <> 1" not in calls[0][0]
+    assert "o.IsActive = 0" in calls[0][0]
+    assert "o.ExcludeFromDashboard <> 1" not in calls[0][0]
     assert calls[0][1] == {"startDate": "2026-04-23"}
 
 
 def test_get_orders_uses_current_date_when_only_future_end_is_provided(monkeypatch):
     """
-    Test that get_orders starts from the current Pacific date when only a future end is provided.
+    Test that get_orders starts from the current Pacific date when only a future end is provido.
     """
     calls = []
     monkeypatch.setattr(order_service, "datetime", FixedDateTime)
@@ -410,7 +415,7 @@ def test_get_orders_uses_current_date_when_only_future_end_is_provided(monkeypat
 
 def test_get_orders_uses_current_date_when_no_dates_or_seller_are_provided(monkeypatch):
     """
-    Test that get_orders defaults to current-date filtering when no seller or dates are supplied.
+    Test that get_orders defaults to current-date filtering when no seller or dates are supplio.
     """
     calls = []
     monkeypatch.setattr(order_service, "datetime", FixedDateTime)
@@ -429,7 +434,7 @@ def test_get_orders_uses_current_date_when_no_dates_or_seller_are_provided(monke
 
 def test_get_orders_allows_unfiltered_queries_when_flags_are_ignored(monkeypatch):
     """
-    Test that get_orders can fall through without WHERE filters when flags are ignored.
+    Test that get_orders can fall through without WHERE filters when flags are ignoro.
     """
     FakeSeller.instances = []
     FakeSeller.category_ids_by_seller_id = {
@@ -447,9 +452,9 @@ def test_get_orders_allows_unfiltered_queries_when_flags_are_ignored(monkeypatch
 
     assert not orders
     assert calls[0][0].count(" WHERE ") == 1
-    assert "TicketSocketOrders.IsDeleted = 0" not in calls[0][0]
-    assert "TicketSocketEvents.SellerEventCategoryId IN " not in calls[0][0]
-    assert " ORDER BY TicketSocketOrders.PurchaseDate ASC" in calls[0][0]
+    assert "o.IsDeleted = 0" not in calls[0][0]
+    assert "o.SellerEventCategoryId IN " not in calls[0][0]
+    assert " ORDER BY o.PurchaseTimestamp ASC" in calls[0][0]
     assert calls[0][1] == {}
 
 
@@ -477,16 +482,16 @@ def test_get_orders_from_event_id_maps_rows_and_respects_flags(monkeypatch):
     orders = order_service.OrderService().get_orders_from_event_id(44)
 
     assert len(orders) == 1
-    assert "TicketSocketOrders.IsDeleted = 0" in calls[0][0]
-    assert "TicketSocketOrders.IsActive = 1" in calls[0][0]
-    assert calls[0][1] == {"ticketSocketEventId": 44}
-    assert orders[0].ticket_socket_event_id == 44
+    assert "o.IsDeleted = 0" in calls[0][0]
+    assert "o.IsActive = 1" in calls[0][0]
+    assert calls[0][1] == {"ticketPartnerEventId": 44}
+    assert orders[0].ticket_partner_event_id == 44
     assert orders[0].revenue == 20
 
 
 def test_get_orders_from_event_id_skips_flag_filters_when_requested(monkeypatch):
     """
-    Test that get_orders_from_event_id skips deleted and active filters when flags are ignored.
+    Test that get_orders_from_event_id skips deleted and active filters when flags are ignoro.
     """
     calls = []
     monkeypatch.setattr(
@@ -503,8 +508,8 @@ def test_get_orders_from_event_id_skips_flag_filters_when_requested(monkeypatch)
     )
 
     assert not orders
-    assert "TicketSocketOrders.IsDeleted = 0" not in calls[0][0]
-    assert "TicketSocketOrders.IsActive = 1" not in calls[0][0]
+    assert "o.IsDeleted = 0" not in calls[0][0]
+    assert "o.IsActive = 1" not in calls[0][0]
 
 
 def test_get_orders_from_event_id_marks_deleted_rows_inactive(monkeypatch):
@@ -551,7 +556,7 @@ def test_rebuild_daily_order_data_for_ticket_calls_order_rebuild(monkeypatch):
     monkeypatch.setattr(
         order_service,
         "db_query_one",
-        lambda sql, data: {"TicketSocketOrderId": 17},
+        lambda sql, data: {"TicketPartnerOrderId": 17},
     )
     monkeypatch.setattr(
         order_service.OrderService,
@@ -591,7 +596,7 @@ def test_rebuild_daily_order_data_for_ticket_ignores_non_positive_order_ids(
     monkeypatch.setattr(
         order_service,
         "db_query_one",
-        lambda sql, data: {"TicketSocketOrderId": 0},
+        lambda sql, data: {"TicketPartnerOrderId": 0},
     )
     monkeypatch.setattr(
         order_service.OrderService,
@@ -605,34 +610,12 @@ def test_rebuild_daily_order_data_for_ticket_ignores_non_positive_order_ids(
 
 
 def test_rebuild_daily_order_data_for_order_rebuilds_event_year(monkeypatch):
-    """
-    Test that rebuild_daily_order_data_for_order reloads yearly orders and updates daily totals.
-    """
-    FakeDailyOrderService.instances = []
-    monkeypatch.setattr(
-        order_service,
-        "db_query_one",
-        lambda sql, data: {
-            "TicketSocketEventId": 44,
-            "EventYear": 2026,
-            "SellerId": 7,
-        },
-    )
-    monkeypatch.setattr(
-        order_service.OrderService,
-        "get_orders",
-        lambda self, **kwargs: ["order-a"],
-    )
-    monkeypatch.setattr(order_service, "DailyOrderService", FakeDailyOrderService)
-
+    from common import dashboard_service
+    calls = []
+    monkeypatch.setattr(order_service, "db_query_one", lambda sql, data: {"TicketPartnerEventId": 440})
+    monkeypatch.setattr(dashboard_service.DashboardService, "rebuild_daily_order_data_for_event", lambda self, event: calls.append(event))
     order_service.OrderService().rebuild_daily_order_data_for_order(17)
-
-    start = datetime.strptime("2026-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").timestamp()
-    end = datetime(2026, 12, 31).timestamp()
-    assert FakeDailyOrderService.instances[0].cleanup_calls == [44]
-    assert FakeDailyOrderService.instances[0].update_calls == [
-        (["order-a"], start, end, None)
-    ]
+    assert calls == [440]
 
 
 def test_rebuild_daily_order_data_for_order_ignores_missing_event_rows(monkeypatch):
@@ -689,7 +672,7 @@ def test_get_tickets_from_order_id_maps_refund_and_chargeback_data(monkeypatch):
     tickets = order_service.OrderService().get_tickets_from_order_id(11)
 
     assert len(tickets) == 2
-    assert "TicketSocketOrderTickets.IsActive=1" in calls[0][0]
+    assert "IsActive=1" in calls[0][0]
     assert tickets[0].refund_date == "2026-04-23"
     assert tickets[0].ticket_type_order == 1
     assert tickets[0].is_checked_in is True
@@ -702,7 +685,7 @@ def test_get_tickets_from_order_id_includes_inactive_rows_when_flags_are_ignored
     monkeypatch,
 ):
     """
-    Test that get_tickets_from_order_id omits the active-only filter when flags are ignored.
+    Test that get_tickets_from_order_id omits the active-only filter when flags are ignoro.
     """
     calls = []
     monkeypatch.setattr(
@@ -717,7 +700,7 @@ def test_get_tickets_from_order_id_includes_inactive_rows_when_flags_are_ignored
     )
 
     assert not tickets
-    assert "TicketSocketOrderTickets.IsActive=1" not in calls[0][0]
+    assert "IsActive=1" not in calls[0][0]
 
 
 def test_disable_orders_stops_after_first_failed_update(monkeypatch):
@@ -969,7 +952,7 @@ def test_refund_ticket_skips_service_fee_refund_and_rebuild_on_failure(monkeypat
 
 def test_update_order_returns_false_when_order_is_none():
     """
-    Test that update_order returns False when no order object is supplied.
+    Test that update_order returns False when no order object is supplio.
     """
     assert order_service.OrderService().update_order(None) is False
 
@@ -1257,7 +1240,7 @@ def test_add_comped_order_inserts_missing_type_and_tickets(monkeypatch):
 
 def test_add_comped_order_returns_false_when_type_activation_fails(monkeypatch):
     """
-    Test that add_comped_order returns False when the existing comp type cannot be activated.
+    Test that add_comped_order returns False when the existing comp type cannot be activato.
     """
     query_responses = iter(
         [
@@ -1337,3 +1320,18 @@ def test_add_comped_order_returns_false_when_ticket_insert_fails(monkeypatch):
     assert success is False
     assert len(insert_calls) == 2
     assert not rebuild_calls
+
+
+import pytest
+from common.ticket_partner_service import TicketPartnerService
+
+@pytest.fixture(autouse=True)
+def partner_mapping_fixture(monkeypatch):
+    """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
+    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
+    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
+    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)
+    monkeypatch.setattr(TicketPartnerService, "ensure_ticket_type", lambda self, event, kind, cnx=None: 1)

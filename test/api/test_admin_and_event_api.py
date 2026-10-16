@@ -861,10 +861,10 @@ def test_admin_venue_routes_validate_and_forward_requests(
         admin_api,
         "AdminService",
         build_service(
-            get_external_venues=lambda search_term: [{"search": search_term}],
-            update_external_venue=lambda venue: captured.update({"venue": venue})
+            get_venues=lambda search_term: [{"search": search_term}],
+            update_venue=lambda venue: captured.update({"venue": venue})
             or {"venueId": venue.venue_id},
-            delete_external_venue=lambda venue_id: (
+            delete_venue=lambda venue_id: (
                 captured.update({"deleted": venue_id}) or True
             ),
         ),

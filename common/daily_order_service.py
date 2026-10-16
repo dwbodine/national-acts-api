@@ -58,24 +58,24 @@ class DailyOrderService:
         inserts: int = 0
         for order_data in daily_order_data:
             sql = """SELECT DailyOrderDataId FROM DailyOrderData
-                        WHERE TicketSocketEventId=%(ticketSocketEventId)s
+                        WHERE TicketPartnerEventId=%(ticketPartnerEventId)s
                         AND PurchaseDate=DATE(%(purchaseDate)s)"""
             data = {
-                "ticketSocketEventId": order_data.ticket_socket_event_id,
+                "ticketPartnerEventId": order_data.ticket_partner_event_id,
                 "purchaseDate": order_data.purchase_date,
             }
 
-            if order_data.ticket_socket_order_id is not None:
-                sql += """ AND TicketSocketOrderId=%(ticketSocketOrderId)s"""
-                data["ticketSocketOrderId"] = order_data.ticket_socket_order_id
+            if order_data.ticket_partner_order_id is not None:
+                sql += """ AND TicketPartnerOrderId=%(ticketPartnerOrderId)s"""
+                data["ticketPartnerOrderId"] = order_data.ticket_partner_order_id
             else:
-                sql += """ AND TicketSocketOrderId IS NULL"""
+                sql += """ AND TicketPartnerOrderId IS NULL"""
 
             existing_data = db_query_one(sql, data)
 
             update_data = {
                 "purchaseDate": order_data.purchase_date,
-                "ticketSocketEventId": order_data.ticket_socket_event_id,
+                "ticketPartnerEventId": order_data.ticket_partner_event_id,
                 "orders": order_data.orders,
                 "tickets": order_data.tickets,
                 "ticketRevenue": order_data.ticket_revenue,
@@ -93,7 +93,7 @@ class DailyOrderService:
                 "numTicketsChargedBack": order_data.num_tickets_charged_back,
                 "revenueChargedBack": order_data.revenue_charged_back,
                 "serviceFeeRevenueChargedBack": order_data.service_fee_revenue_charged_back,
-                "ticketSocketOrderId": order_data.ticket_socket_order_id,
+                "ticketPartnerOrderId": order_data.ticket_partner_order_id,
                 "exchangeRate": order_data.exchange_rate,
                 "currencySymbol": order_data.currency_symbol,
             }
@@ -115,7 +115,8 @@ class DailyOrderService:
                                 NumTicketsChargedBack=%(numTicketsChargedBack)s,
                                 RevenueChargedBack=%(revenueChargedBack)s,
                                 ServiceFeeRevenueChargedBack=%(serviceFeeRevenueChargedBack)s,
-                                TicketSocketOrderId=%(ticketSocketOrderId)s, 
+                                TicketPartnerEventId=%(ticketPartnerEventId)s,
+                                TicketPartnerOrderId=%(ticketPartnerOrderId)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE DailyOrderDataId=%(dailyOrderDataId)s"""
                 update_data["dailyOrderDataId"] = daily_order_data_id
@@ -123,20 +124,20 @@ class DailyOrderService:
                 if success:
                     updates += 1
             else:
-                insert_sql = """INSERT INTO DailyOrderData (PurchaseDate, TicketSocketEventId,
+                insert_sql = """INSERT INTO DailyOrderData (PurchaseDate, TicketPartnerEventId,
                                     Orders, Tickets, ExchangeRate, CurrencySymbol,
                                     TicketRevenue, ServiceFeeRevenue, TotalRevenue, IsRefunded,
                                     IsChargeback, NumTicketsRefunded, RevenueRefunded,
                                     ServiceFeeRevenueRefunded, NumTicketsChargedBack,
                                     RevenueChargedBack, ServiceFeeRevenueChargedBack,
-                                    TicketSocketOrderId, LastUpdate) VALUES (%(purchaseDate)s,
-                                    %(ticketSocketEventId)s, %(orders)s, %(tickets)s,
+                                    TicketPartnerOrderId, LastUpdate) VALUES (%(purchaseDate)s,
+                                    %(ticketPartnerEventId)s, %(orders)s, %(tickets)s,
                                     %(exchangeRate)s, %(currencySymbol)s, %(ticketRevenue)s,
                                     %(serviceFeeRevenue)s, %(totalRevenue)s, %(isRefunded)s,
                                     %(isChargeback)s, %(numTicketsRefunded)s, %(revenueRefunded)s,
                                     %(serviceFeeRevenueRefunded)s, %(numTicketsChargedBack)s,
                                     %(revenueChargedBack)s, %(serviceFeeRevenueChargedBack)s,
-                                    %(ticketSocketOrderId)s,
+                                    %(ticketPartnerOrderId)s,
                                     CURRENT_TIMESTAMP)"""
 
                 daily_order_data_id = db_insert(insert_sql, update_data)
@@ -166,8 +167,8 @@ class DailyOrderService:
                 continue
 
             purchase_date_pacific = get_pacific_purchase_date_from_order(order)
-            ticket_socket_event_id: int = order.ticket_socket_event_id
-            ticket_socket_order_id: int = order.ticket_socket_order_id
+            ticket_partner_event_id: int = order.ticket_partner_event_id
+            ticket_partner_order_id: int = order.ticket_partner_order_id
 
             # daily order data is keyed off of purchase timestamp for purchases,
             # refund date for refunds and chargeback date for chargebacks
@@ -186,16 +187,16 @@ class DailyOrderService:
 
             # see if we don't have an entry for this event already
             for do_idx, do in enumerate(daily_order_data):
-                if do.ticket_socket_event_id == ticket_socket_event_id:
+                if do.ticket_partner_event_id == ticket_partner_event_id:
                     if (
                         order.has_refunds is True
-                        and do.ticket_socket_order_id == ticket_socket_order_id
+                        and do.ticket_partner_order_id == ticket_partner_order_id
                     ):
                         refund_order_data = do
                         found_refund_index = do_idx
                     elif (
                         order.has_chargebacks is True
-                        and do.ticket_socket_order_id == ticket_socket_order_id
+                        and do.ticket_partner_order_id == ticket_partner_order_id
                     ):
                         chargeback_order_data = do
                         found_chargeback_index = do_idx
@@ -216,7 +217,7 @@ class DailyOrderService:
                         exchange_rate: ExchangeRate = None
                         if refund_date is not None:
                             exchange_rate = self.get_exchange_rate_for_order_by_date(
-                                ticket_socket_order_id, refund_date
+                                ticket_partner_order_id, refund_date
                             )
                         usd_rate = (
                             exchange_rate.usd_rate if exchange_rate is not None else 1
@@ -228,19 +229,19 @@ class DailyOrderService:
                         )
                         refund_order_data = DailyOrderData(
                             ticket.refund_date,
-                            ticket_socket_event_id,
+                            ticket_partner_event_id,
                             usd_rate,
                             symbol,
                         )
-                        refund_order_data.ticket_socket_order_id = (
-                            ticket_socket_order_id
+                        refund_order_data.ticket_partner_order_id = (
+                            ticket_partner_order_id
                         )
                         refund_order_data.is_refunded = True
                         refund_order_data.is_charged_back = False
                     elif ticket.is_refunded is not True and order_data is None:
                         exchange_rate: ExchangeRate = (
                             self.get_exchange_rate_for_order_by_date(
-                                ticket_socket_event_id, purchase_date_pacific
+                                ticket_partner_order_id, purchase_date_pacific
                             )
                         )
                         usd_rate = (
@@ -253,11 +254,11 @@ class DailyOrderService:
                         )
                         order_data = DailyOrderData(
                             purchase_date_pacific,
-                            ticket_socket_event_id,
+                            ticket_partner_event_id,
                             usd_rate,
                             symbol,
                         )
-                        order_data.ticket_socket_order_id = None
+                        order_data.ticket_partner_order_id = None
                         order_data.is_refunded = False
                         order_data.is_charged_back = False
             elif order.has_chargebacks is True and chargeback_order_data is None:
@@ -271,7 +272,7 @@ class DailyOrderService:
                         exchange_rate: ExchangeRate = None
                         if chargeback_date is not None:
                             exchange_rate = self.get_exchange_rate_for_order_by_date(
-                                ticket_socket_order_id, chargeback_date
+                                ticket_partner_order_id, chargeback_date
                             )
                         usd_rate = (
                             exchange_rate.usd_rate if exchange_rate is not None else 1
@@ -283,18 +284,18 @@ class DailyOrderService:
                         )
                         chargeback_order_data = DailyOrderData(
                             ticket.chargeback_date,
-                            ticket_socket_event_id,
+                            ticket_partner_event_id,
                             usd_rate,
                             symbol,
                         )
-                        chargeback_order_data.ticket_socket_order_id = (
-                            ticket_socket_order_id
+                        chargeback_order_data.ticket_partner_order_id = (
+                            ticket_partner_order_id
                         )
                         chargeback_order_data.is_refunded = False
                         chargeback_order_data.is_charged_back = True
                     elif ticket.is_charged_back is not True and order_data is None:
                         exchange_rate = self.get_exchange_rate_for_order_by_date(
-                            ticket_socket_order_id, purchase_date_pacific
+                            ticket_partner_order_id, purchase_date_pacific
                         )
                         usd_rate = (
                             exchange_rate.usd_rate if exchange_rate is not None else 1
@@ -306,27 +307,27 @@ class DailyOrderService:
                         )
                         order_data = DailyOrderData(
                             purchase_date_pacific,
-                            ticket_socket_event_id,
+                            ticket_partner_event_id,
                             usd_rate,
                             symbol,
                         )
-                        order_data.ticket_socket_order_id = None
+                        order_data.ticket_partner_order_id = None
                         order_data.is_refunded = False
                         order_data.is_charged_back = False
 
             # handle adding entry for purchase if we don't have it
             if order_data is None and (start <= purchase_timestamp <= end):
                 exchange_rate = self.get_exchange_rate_for_order_by_date(
-                    ticket_socket_order_id, purchase_date_pacific
+                    ticket_partner_order_id, purchase_date_pacific
                 )
                 usd_rate = exchange_rate.usd_rate if exchange_rate is not None else 1
                 symbol = (
                     exchange_rate.currency_symbol if exchange_rate is not None else "$"
                 )
                 order_data = DailyOrderData(
-                    purchase_date_pacific, ticket_socket_event_id, usd_rate, symbol
+                    purchase_date_pacific, ticket_partner_event_id, usd_rate, symbol
                 )
-                order_data.ticket_socket_order_id = None
+                order_data.ticket_partner_order_id = None
                 order_data.is_refunded = False
                 order_data.is_charged_back = False
 
@@ -373,27 +374,26 @@ class DailyOrderService:
         (which would be needed in refunds, cancellations and chargebacks)
         """
         sql = """DELETE FROM DailyOrderData
-          WHERE TicketSocketEventId=%(ticketSocketEventId)s"""
-        data = {"ticketSocketEventId": event_id}
+          WHERE TicketPartnerEventId=%(ticketPartnerEventId)s"""
+        data = {"ticketPartnerEventId": event_id}
         db_delete(sql, data)
 
     def get_exchange_rate_for_order_by_date(
-        self, ticket_socket_order_id: int, midnight_date: str
+        self, ticket_partner_order_id: int, midnight_date: str
     ) -> ExchangeRate:
         """
         Used to pull an exchange rate for an order by a specific date -
         helpful in calculating USD for purchase or refunds
         """
-        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
+        sql = """SELECT DISTINCT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
                 ExchangeRates.ServiceTokenId AS ExchangeRateSlug,
                 ExchangeRates.Symbol AS CurrencySymbol,
                 ExchangeRates.Multiplier AS Multiplier,
                 ExchangeRates.ExchangeRateId AS ExchangeRateId
-                FROM TicketSocketOrders
-                JOIN TicketSocketEvents
-                    ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
+                FROM OrderDetails od
+                JOIN EventDetails ed ON ed.TicketPartnerEventId=od.TicketPartnerEventId
                 JOIN SellerEventCategory 
-                    ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
+                    ON SellerEventCategory.SellerEventCategoryId = ed.SellerEventCategoryId
                 JOIN Sellers
                     ON Sellers.SellerId = SellerEventCategory.SellerId 
                 JOIN TicketSocket
@@ -401,11 +401,11 @@ class DailyOrderService:
                 JOIN ExchangeRates
                     ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
                 LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId
-                WHERE TicketSocketOrders.Id=%(ticket_socket_order_id)s and ExchangeRateHistory.MidnightDate=%(midnight_date)s
+                WHERE od.TicketPartnerOrderId=%(ticket_partner_order_id)s and ExchangeRateHistory.MidnightDate=%(midnight_date)s
                 LIMIT 0,1"""
 
         data = {
-            "ticket_socket_order_id": ticket_socket_order_id,
+            "ticket_partner_order_id": ticket_partner_order_id,
             "midnight_date": midnight_date,
         }
 

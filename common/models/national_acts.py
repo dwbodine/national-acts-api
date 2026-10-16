@@ -166,9 +166,9 @@ class SellerEventCategory:
             )
 
     def __find_events(self):
-        sql = """SELECT COUNT(TicketSocketEvents.Id) AS NumEvents
-                FROM TicketSocketEvents 
-                WHERE TicketSocketEvents.SellerEventCategoryId = 
+        sql = """SELECT COUNT(DISTINCT TicketSocketEventId) AS NumEvents
+                FROM EventDetails
+                WHERE SellerEventCategoryId =
                 %(sellerEventCategoryId)s"""
         data = {"sellerEventCategoryId": self.seller_event_category_id}
         row = db_query_one(sql, data)
@@ -687,7 +687,8 @@ class Seller:
         if get_images is True:
             sql += """ LEFT JOIN PageSellers ON Sellers.SellerId = PageSellers.SellerId
             LEFT JOIN Pages ON PageSellers.PageId = Pages.PageId
-            LEFT JOIN Events ON Sellers.SellerId = Events.SellerId
+            LEFT JOIN (SELECT DISTINCT EventId, EventDate, SellerId FROM EventDetails) Events
+                ON Sellers.SellerId = Events.SellerId
             LEFT JOIN FanMoments ON FanMoments.EventId = Events.EventId
             LEFT JOIN FanMomentImages ON FanMomentImages.FanMomentId = FanMoments.FanMomentId"""
 

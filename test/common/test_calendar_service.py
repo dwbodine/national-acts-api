@@ -21,7 +21,7 @@ def test_add_note_inserts_calendar_note_with_title_and_timestamp(monkeypatch):
 
     result = calendar_service.CalendarService().add_note(
         note="Call venue",
-        external_event_id=12,
+        event_id=12,
         calendar_date="2026-05-01",
         note_title="Reminder",
     )
@@ -29,7 +29,7 @@ def test_add_note_inserts_calendar_note_with_title_and_timestamp(monkeypatch):
     assert result == 17
     assert "%(noteTitle)s, %(noteTimestamp)s" in calls[0][0]
     assert calls[0][1] == {
-        "externalEventId": 12,
+        "eventId": 12,
         "note": "Call venue",
         "noteTitle": "Reminder",
         "noteTimestamp": "2026-05-01",
@@ -50,13 +50,13 @@ def test_add_note_inserts_event_note_without_calendar_fields(monkeypatch):
 
     result = calendar_service.CalendarService().add_note(
         note="Doors moved",
-        external_event_id=None,
+        event_id=None,
     )
 
     assert result == 23
     assert "NULL, CURRENT_TIMESTAMP" in calls[0][0]
     assert calls[0][1] == {
-        "externalEventId": None,
+        "eventId": None,
         "note": "Doors moved",
     }
 
@@ -194,10 +194,10 @@ def test_get_event_notes_maps_rows_for_external_event(monkeypatch):
 
     notes = calendar_service.CalendarService().get_event_notes(33)
 
-    assert calls[0][1] == {"externalEventId": 33}
+    assert calls[0][1] == {"eventId": 33}
     assert len(notes) == 1
     assert notes[0].note_id == 7
-    assert notes[0].external_event_id == 33
+    assert notes[0].event_id == 33
     assert notes[0].note == "Bring guest list"
     assert notes[0].note_timestamp == "2026-05-01 10:30:00"
 

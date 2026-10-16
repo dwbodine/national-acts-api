@@ -55,7 +55,7 @@ class StripeService:
             for payment_intent in payment_intents.auto_paging_iter():
                 transaction_count += 1
 
-                order_id = payment_intent.metadata["orderId"]
+                order_id = payment_intent.metadata.get("orderId")
 
                 if not order_id:
                     continue

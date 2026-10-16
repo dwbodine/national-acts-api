@@ -30,6 +30,10 @@ def test_order_details_sources_and_stripe_rollback(database):
         "INSERT INTO TicketSocketOrders (Id, TicketSocketEventId, EventId, OrderId, PurchaseDate, PurchaseTimestamp, UserId, Phone, PurchaserFirstName, PurchaserLastName, Email, IsManualTransfer) VALUES (11, 10, 900, 1100, '2026-10-14', '2026-10-14 12:00:00', 1, '5550100', 'Ticket', 'Buyer', 'ticket@example.com', 1), (12, 10, 900, 1200, '2026-10-14', '2026-10-14 12:00:00', 2, '', 'Other', 'Buyer', 'other@example.com', 0)",
         "INSERT INTO TicketPartnerEvents (TicketPartnerEventId, TicketPartnerId, EventId, PartnerEventId) VALUES (100, 2, 1, 10), (101, 1, 1, NULL), (102, 2, 2, 20)",
         "INSERT INTO TicketPartnerOrders (TicketPartnerOrderId, TicketPartnerEventId, PartnerOrderId) VALUES (1, 100, 11), (2, 100, 12), (3, 101, 11), (4, 101, NULL), (5, 102, 11)",
+        "INSERT INTO TicketSocketTicketTypes (TicketSocketTicketTypeId, TicketSocketEventId, TicketTypeName, TotalAvailable, TicketTypeOrder) VALUES (7, 10, 'VIP', 100, 3), (7, 20, 'Other event VIP', 50, 8)",
+        "INSERT INTO PartnerTicketTypes (TicketPartnerEventId, ProviderTicketTypeId) VALUES (100, 7), (102, 7)",
+        "INSERT INTO TicketSocketOrderTickets (Id, TicketSocketOrderId, TicketSocketTicketTypeId, TicketId, TicketType, Price, IsCheckedIn, IsRefunded) VALUES (21, 11, 7, 2100, 'VIP', 50, 1, 0), (22, 12, 7, 2200, 'VIP', 60, 0, 0), (23, 11, 0, 2300, 'Comp', 0, 0, 1)",
+        "INSERT INTO TicketPartnerOrderTickets (TicketPartnerTicketId, TicketPartnerOrderId, PartnerTicketId) VALUES (101, 1, 21), (102, 2, NULL), (103, 3, 21), (104, 2, 21), (105, 5, 21), (106, 1, 23)",
     ]
     with engine.begin() as connection:
         for statement in statements:
@@ -81,8 +85,50 @@ def test_order_details_sources_and_stripe_rollback(database):
     assert rows[4]["TicketSocketOrderId"] is None
     assert rows[4]["StripeTransactionId"] is None
     assert rows[5]["TicketSocketOrderId"] is None  # Same ID, different event.
+    with engine.connect() as connection:
+        tickets = [
+            dict(row) for row in connection.execute(
+                text("SELECT * FROM TicketDetails ORDER BY TicketPartnerTicketId")
+            ).mappings()
+        ]
+        # Multiple Stripe payments must not multiply ticket rows.
+        assert len(tickets) == 6
+        ticket = tickets[0]
+        assert ticket["TicketPartnerTicketId"] == 101
+        assert ticket["TicketPartnerOrderId"] == 1
+        assert ticket["TicketPartnerEventId"] == 100
+        assert ticket["TicketPartnerId"] == 2
+        assert ticket["EventId"] == 1
+        assert ticket["TicketSocketOrderTicketId"] == ticket["PartnerTicketId"] == 21
+        assert ticket["TicketSocketNativeTicketId"] == 2100
+        assert ticket["TicketSocketNativeOrderId"] == 1100
+        assert ticket["TicketSocketNativeEventId"] == 900
+        assert ticket["IsCheckedIn"] == 1
+        assert ticket["OrderIsDeleted"] == 0
+        assert ticket["Price"] == 50
+        assert ticket["TicketTypeOrder"] == 3
+        for missing in tickets[1:5]:
+            assert missing["TicketSocketOrderTicketId"] is None
+            assert missing["IsActive"] is None
+        assert tickets[2]["TicketSocketOrderId"] is None  # Different partner.
+        assert tickets[3]["TicketSocketOrderId"] == 12  # Ticket belongs to order 11.
+        assert tickets[4]["TicketSocketOrderId"] is None  # Different event.
+        assert tickets[5]["TicketTypeOrder"] == 1  # No provider ticket type.
+        assert connection.exec_driver_sql("""
+            SELECT COUNT(*) FROM TicketDetails
+            WHERE EventId=1 AND TicketPartnerId=2 AND OrderIsDeleted <> 1
+                AND IsActive=1 AND IsRefunded=0 AND IsChargedBack=0
+        """).scalar_one() == 1
     run("downgrade", "0002_manual_transfer")
     with engine.connect() as connection:
+        assert (
+            connection.exec_driver_sql("SHOW FULL TABLES LIKE 'OrderOverview'").first()
+            is None
+        )
+        assert (
+            connection.exec_driver_sql("SHOW FULL TABLES LIKE 'TicketDetails'").first()
+            is None
+        )
         assert (
             connection.exec_driver_sql("SHOW FULL TABLES LIKE 'OrderDetails'").first()
             is None
@@ -122,6 +168,7 @@ def test_order_details_sources_and_stripe_rollback(database):
     run("upgrade")
     run("check")
     with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM TicketDetails").scalar_one() == 3
         assert (
             connection.exec_driver_sql("SELECT COUNT(*) FROM OrderDetails").scalar_one()
             == 2

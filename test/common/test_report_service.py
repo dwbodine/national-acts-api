@@ -30,7 +30,7 @@ def test_get_missing_venue_events_maps_event_and_venue_data(monkeypatch):
     events = report_service.ReportService().get_missing_venue_events()
 
     assert len(events) == 1
-    assert events[0].external_event_id == 7
+    assert events[0].event_id == 7
     assert events[0].title == "VIP Night"
     assert events[0].event_date == "2026-05-01"
     assert events[0].venue.name == "Arena"

@@ -139,52 +139,34 @@ class MomentsService:
             )"""]
 
         if event_id is not None:
-            where_clause.append("FanMoments.ExternalEventId = %(event_id)s")
+            where_clause.append("FanMoments.EventId = %(event_id)s")
             data["event_id"] = event_id
         else:
             if seller_id is not None:
-                where_clause.append("ExternalEvents.SellerId = %(seller_id)s")
+                where_clause.append("ed.SellerId = %(seller_id)s")
                 data["seller_id"] = seller_id
             if start_date is not None:
-                where_clause.append("ExternalEvents.EventDate >= %(start_date)s")
+                where_clause.append("ed.EventDate >= %(start_date)s")
                 data["start_date"] = start_date
             if end_date is not None:
-                where_clause.append("ExternalEvents.EventDate <= %(end_date)s")
+                where_clause.append("ed.EventDate <= %(end_date)s")
                 data["end_date"] = end_date
 
         sql = f"""
-            SELECT
-                FanMoments.FanMomentId AS FanMomentId,
-                FanMoments.ExternalEventId AS ExternalEventId,
-                ExternalEvents.EventDate AS EventDate,
-                ExternalEvents.SellerId AS SellerId,
-                Sellers.Name AS SellerName,
-                COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) AS EventTitle,
-                COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue,
-                COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS City,
-                COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS State,
-                COALESCE(Country.CountryName, TicketSocketEvents.Country) AS Country,
-                Country.CountryId AS CountryId
+            SELECT DISTINCT FanMoments.FanMomentId, FanMoments.EventId,
+                ed.EventDate, ed.SellerId, ed.SellerName, ed.Title AS EventTitle,
+                ed.Venue, ed.City, ed.State, ed.Country, ed.CountryId
             FROM FanMoments
-            JOIN ExternalEvents
-                ON ExternalEvents.EventId = FanMoments.ExternalEventId
-            JOIN Sellers
-                ON Sellers.SellerId = ExternalEvents.SellerId
-            LEFT JOIN TicketSocketEvents
-                ON TicketSocketEvents.Id = ExternalEvents.TicketSocketEventId
-            LEFT JOIN ExternalEventVenues
-                ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
-            LEFT JOIN Country
-                ON Country.CountryId = ExternalEventVenues.CountryId
+            JOIN EventDetails ed ON ed.EventId=FanMoments.EventId
             WHERE {" AND ".join(where_clause)}
-            ORDER BY ExternalEvents.EventDate DESC,
+            ORDER BY ed.EventDate DESC,
                 FanMoments.LastUpdated DESC,
-                FanMoments.ExternalEventId DESC
+                FanMoments.EventId DESC
         """
         if limit is not None and limit > 0:
             sql += f" LIMIT 0, {int(limit)}"
 
-        sql = sql.replace("\n", "")
+        sql = sql.replace("\n", " ")
 
         return db_query_all(sql, data)
 
@@ -228,7 +210,7 @@ class MomentsService:
         fm_key = FanMomentKey()
         fm_key.moment_date = self._format_db_date(row.get("EventDate"))
         fm_key.seller_id = self._try_parse_int(row.get("SellerId"))
-        fm_key.event_id = self._try_parse_int(row.get("ExternalEventId"))
+        fm_key.event_id = self._try_parse_int(row.get("EventId"))
         fm_key.seller_name = row.get("SellerName")
         fm_key.event_title = row.get("EventTitle")
         fm_key.event_venue = row.get("Venue")
@@ -431,7 +413,7 @@ class MomentsService:
         try:
             existing = db_query_one(
                 """SELECT FanMomentId FROM FanMoments
-                    WHERE ExternalEventId=%(event_id)s""",
+                    WHERE EventId=%(event_id)s""",
                 data,
             )
             if existing:
@@ -439,14 +421,14 @@ class MomentsService:
                 db_update(
                     """UPDATE FanMoments
                         SET LastUpdated=CURRENT_TIMESTAMP
-                        WHERE ExternalEventId=%(event_id)s""",
+                        WHERE EventId=%(event_id)s""",
                     data,
                 )
                 return fan_moment_id
 
             fan_moment_id = db_insert(
                 """INSERT INTO FanMoments
-                    (ExternalEventId)
+                    (EventId)
                     VALUES (%(event_id)s)""",
                 data,
             )
@@ -537,7 +519,7 @@ class MomentsService:
         try:
             existing = db_query_one(
                 """SELECT FanMomentId FROM FanMoments
-                    WHERE ExternalEventId=%(event_id)s""",
+                    WHERE EventId=%(event_id)s""",
                 {"event_id": event_id},
             )
             if not existing:
@@ -554,7 +536,7 @@ class MomentsService:
             )
             db_delete(
                 """DELETE FROM FanMoments
-                    WHERE ExternalEventId=%(event_id)s""",
+                    WHERE EventId=%(event_id)s""",
                 {"event_id": event_id},
             )
             return True
@@ -575,7 +557,7 @@ class MomentsService:
                 FROM FanMomentImages
                 JOIN FanMoments
                     ON FanMoments.FanMomentId = FanMomentImages.FanMomentId
-                WHERE FanMoments.ExternalEventId=%(event_id)s
+                WHERE FanMoments.EventId=%(event_id)s
                 ORDER BY FanMomentImages.DateUploaded ASC,
                     FanMomentImages.FanMomentImageId ASC""",
             {"event_id": event_id},

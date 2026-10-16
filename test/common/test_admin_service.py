@@ -3,7 +3,7 @@ Unit tests for common.admin_service helpers.
 """
 
 from common import admin_service
-from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
+from common.models.admin import Venue, SiteSetting, SiteSettingType
 from common.models.national_acts import VipEvent
 from common.models.ticket_socket import Country, TicketSocketTicketType, Timezone
 
@@ -116,9 +116,9 @@ def create_site_setting(
 
 def create_external_venue(venue_id=0):
     """
-    Create an ExternalVenue instance for tests.
+    Create an Venue instance for tests.
     """
-    venue = ExternalVenue()
+    venue = Venue()
     venue.venue_id = venue_id
     venue.venue = "The Arena"
     venue.address = "123 Main"
@@ -131,14 +131,14 @@ def create_external_venue(venue_id=0):
     return venue
 
 
-def create_vip_event(external_event_id=0, ticket_socket_event_id=12):
+def create_vip_event(event_id=0, ticket_socket_event_id=12):
     """
     Create a VipEvent instance for tests.
     """
     event = VipEvent()
-    event.external_event_id = external_event_id
+    event.event_id = event_id
     event.seller_id = 44
-    event.ticket_socket_event_id = ticket_socket_event_id
+    event.ticket_partner_event_id = ticket_socket_event_id
     event.title = "VIP Night"
     event.event_date = "2026-05-01"
     event.meet_and_greet_time = "17:00"
@@ -154,7 +154,7 @@ def create_vip_event(external_event_id=0, ticket_socket_event_id=12):
     event.email_sent_to_vips = True
     event.text_sent_to_vips = False
     event.external_url = "https://event"
-    event.external_event_venue_id = 99
+    event.venue_id = 99
     event.disable_link_button = False
     event.disable_link_reason = None
     event.external_vip_link = "https://vip"
@@ -353,9 +353,9 @@ def test_get_all_accounts_returns_ticket_socket_service_instances(monkeypatch):
     assert [account.ticket_socket_id for account in accounts] == [3, 4]
 
 
-def test_get_external_venues_maps_country_timezones_and_search_sql(monkeypatch):
+def test_get_venues_maps_country_timezones_and_search_sql(monkeypatch):
     """
-    Test that get_external_venues maps venue rows and adds country timezones.
+    Test that get_venues maps venue rows and adds country timezones.
     """
     calls = []
     timezone = Timezone()
@@ -387,7 +387,7 @@ def test_get_external_venues_maps_country_timezones_and_search_sql(monkeypatch):
         lambda country_code: [timezone],
     )
 
-    venues = admin_service.AdminService().get_external_venues("Nash")
+    venues = admin_service.AdminService().get_venues("Nash")
 
     assert len(venues) == 1
     assert venues[0].venue_id == 7
@@ -397,9 +397,9 @@ def test_get_external_venues_maps_country_timezones_and_search_sql(monkeypatch):
     assert "LIKE ('%Nash%')" in calls[0]
 
 
-def test_get_external_venues_ignores_short_search_terms(monkeypatch):
+def test_get_venues_ignores_short_search_terms(monkeypatch):
     """
-    Test that get_external_venues does not add a search filter for short terms.
+    Test that get_venues does not add a search filter for short terms.
     """
     calls = []
 
@@ -423,7 +423,7 @@ def test_get_external_venues_ignores_short_search_terms(monkeypatch):
 
     monkeypatch.setattr(admin_service, "db_query_all", fake_db_query_all)
 
-    venues = admin_service.AdminService().get_external_venues("Au")
+    venues = admin_service.AdminService().get_venues("Au")
 
     assert len(venues) == 1
     assert venues[0].country is None
@@ -431,9 +431,9 @@ def test_get_external_venues_ignores_short_search_terms(monkeypatch):
     assert "LIKE ('%Au%')" not in calls[0]
 
 
-def test_update_external_venue_inserts_new_venue(monkeypatch):
+def test_update_venue_inserts_new_venue(monkeypatch):
     """
-    Test that update_external_venue inserts a new venue and sets its id.
+    Test that update_venue inserts a new venue and sets its id.
     """
     calls = []
     venue = create_external_venue(venue_id=0)
@@ -445,17 +445,17 @@ def test_update_external_venue_inserts_new_venue(monkeypatch):
 
     monkeypatch.setattr(admin_service, "db_insert", fake_db_insert)
 
-    updated_venue = admin_service.AdminService().update_external_venue(venue)
+    updated_venue = admin_service.AdminService().update_venue(venue)
 
     assert updated_venue is venue
     assert venue.venue_id == 77
-    assert "INSERT INTO ExternalEventVenues" in calls[0][0]
+    assert "INSERT INTO Venues" in calls[0][0]
     assert calls[0][1]["venue"] == "The Arena"
 
 
-def test_update_external_venue_updates_existing_venue(monkeypatch):
+def test_update_venue_updates_existing_venue(monkeypatch):
     """
-    Test that update_external_venue updates an existing venue.
+    Test that update_venue updates an existing venue.
     """
     calls = []
     venue = create_external_venue(venue_id=8)
@@ -466,26 +466,26 @@ def test_update_external_venue_updates_existing_venue(monkeypatch):
 
     monkeypatch.setattr(admin_service, "db_update", fake_db_update)
 
-    updated_venue = admin_service.AdminService().update_external_venue(venue)
+    updated_venue = admin_service.AdminService().update_venue(venue)
 
     assert updated_venue is venue
-    assert "UPDATE ExternalEventVenues" in calls[0][0]
+    assert "UPDATE Venues" in calls[0][0]
     assert calls[0][1]["venue_id"] == 8
 
 
-def test_update_external_venue_returns_none_when_update_fails(monkeypatch):
+def test_update_venue_returns_none_when_update_fails(monkeypatch):
     """
-    Test that update_external_venue returns None when persistence fails.
+    Test that update_venue returns None when persistence fails.
     """
     venue = create_external_venue(venue_id=8)
     monkeypatch.setattr(admin_service, "db_update", lambda sql, data: False)
 
-    assert admin_service.AdminService().update_external_venue(venue) is None
+    assert admin_service.AdminService().update_venue(venue) is None
 
 
-def test_update_external_venue_uses_default_country_when_missing(monkeypatch):
+def test_update_venue_uses_default_country_when_missing(monkeypatch):
     """
-    Test that update_external_venue falls back to the default country id when missing.
+    Test that update_venue falls back to the default country id when missing.
     """
     calls = []
     venue = create_external_venue(venue_id=8)
@@ -498,17 +498,17 @@ def test_update_external_venue_uses_default_country_when_missing(monkeypatch):
 
     monkeypatch.setattr(admin_service, "db_update", fake_db_update)
 
-    updated_venue = admin_service.AdminService().update_external_venue(venue)
+    updated_venue = admin_service.AdminService().update_venue(venue)
 
     assert updated_venue is venue
     assert calls[0][1]["country_id"] == 55
 
 
-def test_update_external_venue_uses_default_country_when_country_id_is_missing(
+def test_update_venue_uses_default_country_when_country_id_is_missing(
     monkeypatch,
 ):
     """
-    Test that update_external_venue falls back to the default country id when the country object has no id.
+    Test that update_venue falls back to the default country id when the country object has no id.
     """
     calls = []
     venue = create_external_venue(venue_id=8)
@@ -521,15 +521,15 @@ def test_update_external_venue_uses_default_country_when_country_id_is_missing(
 
     monkeypatch.setattr(admin_service, "db_update", fake_db_update)
 
-    updated_venue = admin_service.AdminService().update_external_venue(venue)
+    updated_venue = admin_service.AdminService().update_venue(venue)
 
     assert updated_venue is venue
     assert calls[0][1]["country_id"] == 55
 
 
-def test_delete_external_venue_deletes_row(monkeypatch):
+def test_delete_venue_deletes_row(monkeypatch):
     """
-    Test that delete_external_venue deletes the requested venue id.
+    Test that delete_venue deletes the requested venue id.
     """
     calls = []
     monkeypatch.setattr(
@@ -538,7 +538,7 @@ def test_delete_external_venue_deletes_row(monkeypatch):
         lambda sql, data: calls.append((sql, data)) or True,
     )
 
-    success = admin_service.AdminService().delete_external_venue(15)
+    success = admin_service.AdminService().delete_venue(15)
 
     assert success is True
     assert calls[0][1] == {"venue_id": 15}
@@ -707,6 +707,8 @@ def test_get_ticket_socket_events_only_maps_ticket_socket_events(monkeypatch):
         return [
             {
                 "Id": 8,
+                "TicketPartnerEventId": 8,
+                "AppEventId": 80,
                 "IsVisibleOnSite": 1,
                 "IsVisibleOnPortal": 0,
                 "EventId": 444,
@@ -740,7 +742,7 @@ def test_get_ticket_socket_events_only_maps_ticket_socket_events(monkeypatch):
     events = admin_service.AdminService().get_ticket_socket_events_only(44)
 
     assert len(events) == 1
-    assert events[0].ticket_socket_event_id == 8
+    assert events[0].ticket_partner_event_id == 8
     assert events[0].venue.country.timezones == [timezone]
     assert events[0].is_visible_on_portal is False
     assert calls[0][1] == {"seller_id": 44}
@@ -758,6 +760,8 @@ def test_get_ticket_socket_events_only_uses_placeholder_country_when_lookup_fail
         lambda sql, data: [
             {
                 "Id": 8,
+                "TicketPartnerEventId": 8,
+                "AppEventId": 80,
                 "IsVisibleOnSite": 1,
                 "IsVisibleOnPortal": 1,
                 "EventId": 444,
@@ -844,8 +848,8 @@ def test_refund_all_event_orders_refunds_orders_and_rebuilds_dashboard(monkeypat
         admin_service,
         "db_query_all",
         lambda sql, data: [
-            {"OrderId": 11, "EventId": 222},
-            {"OrderId": 12, "EventId": 222},
+            {"TicketPartnerOrderId": 11, "TicketPartnerEventId": 222},
+            {"TicketPartnerOrderId": 12, "TicketPartnerEventId": 222},
         ],
     )
     monkeypatch.setattr(admin_service, "OrderService", FakeOrderService)
@@ -873,8 +877,8 @@ def test_refund_all_event_orders_stops_on_first_failed_refund(monkeypatch):
         admin_service,
         "db_query_all",
         lambda sql, data: [
-            {"OrderId": 11, "EventId": 222},
-            {"OrderId": 12, "EventId": 222},
+            {"TicketPartnerOrderId": 11, "TicketPartnerEventId": 222},
+            {"TicketPartnerOrderId": 12, "TicketPartnerEventId": 222},
         ],
     )
     monkeypatch.setattr(admin_service, "OrderService", FakeOrderService)
@@ -958,7 +962,7 @@ def test_send_list_to_band_marks_event_sent_and_returns_updated_event(monkeypatc
     """
     FakeEventService.instances = []
     updated_event = VipEvent()
-    updated_event.external_event_id = 5
+    updated_event.event_id = 5
     FakeEventService.events_to_return = [updated_event]
     update_calls = []
     monkeypatch.setattr(
@@ -1054,10 +1058,10 @@ def test_update_event_updates_existing_event_and_ticket_types(monkeypatch):
     FakeEventService.instances = []
     FakeDashboardService.instances = []
     existing_event = VipEvent()
-    existing_event.external_event_id = 12
+    existing_event.event_id = 12
     FakeEventService.events_to_return = [existing_event]
     update_calls = []
-    event = create_vip_event(external_event_id=12, ticket_socket_event_id=99)
+    event = create_vip_event(event_id=12, ticket_socket_event_id=99)
     event.ticket_types = [
         TicketSocketTicketType(99, 200, "B", 10, True, 2),
         TicketSocketTicketType(99, 100, "A", 10, False, 1),
@@ -1074,12 +1078,12 @@ def test_update_event_updates_existing_event_and_ticket_types(monkeypatch):
     success = admin_service.AdminService().update_event(event)
 
     assert success is True
-    assert "UPDATE ExternalEvents" in update_calls[0][0]
+    assert "UPDATE Events" in update_calls[0][0]
     assert update_calls[1][1]["ticket_type_id"] == 100
     assert update_calls[1][1]["order"] == 1
     assert update_calls[2][1]["ticket_type_id"] == 200
     assert update_calls[2][1]["order"] == 2
-    assert FakeDashboardService.instances[0].rebuild_calls == [99]
+    assert FakeDashboardService.instances[0].rebuild_calls == [12]
 
 
 def test_update_event_inserts_new_event_and_skips_rebuild_without_ticket_types(
@@ -1088,7 +1092,7 @@ def test_update_event_inserts_new_event_and_skips_rebuild_without_ticket_types(
     """
     Test that update_event inserts a new event and skips rebuild without ticket types.
     """
-    event = create_vip_event(external_event_id=0, ticket_socket_event_id=-1)
+    event = create_vip_event(event_id=0, ticket_socket_event_id=-1)
     event.ticket_types = []
     insert_calls = []
     monkeypatch.setattr(
@@ -1100,7 +1104,7 @@ def test_update_event_inserts_new_event_and_skips_rebuild_without_ticket_types(
     success = admin_service.AdminService().update_event(event)
 
     assert success is True
-    assert "INSERT INTO ExternalEvents" in insert_calls[0][0]
+    assert "INSERT INTO Events" in insert_calls[0][0]
     assert insert_calls[0][1]["ticket_socket_event_id"] is None
 
 
@@ -1110,7 +1114,7 @@ def test_update_event_inserts_new_event_with_ticket_types_and_rebuilds(monkeypat
     """
     FakeDashboardService.instances = []
     update_calls = []
-    event = create_vip_event(external_event_id=0, ticket_socket_event_id=99)
+    event = create_vip_event(event_id=0, ticket_socket_event_id=99)
     event.ticket_types = [TicketSocketTicketType(99, 100, "VIP", 10, True, 1)]
     monkeypatch.setattr(admin_service, "DashboardService", FakeDashboardService)
     monkeypatch.setattr(admin_service, "db_insert", lambda sql, data: 88)
@@ -1125,7 +1129,7 @@ def test_update_event_inserts_new_event_with_ticket_types_and_rebuilds(monkeypat
     assert success is True
     assert len(update_calls) == 1
     assert update_calls[0][1]["ticket_type_id"] == 100
-    assert FakeDashboardService.instances[0].rebuild_calls == [99]
+    assert FakeDashboardService.instances[0].rebuild_calls == [88]
 
 
 def test_update_event_inserts_new_event_without_refreshing_existing_event(monkeypatch):
@@ -1133,7 +1137,7 @@ def test_update_event_inserts_new_event_without_refreshing_existing_event(monkey
     Test that update_event skips the existing-event lookup when the external id is not positive.
     """
     calls = []
-    event = create_vip_event(external_event_id=0, ticket_socket_event_id=-1)
+    event = create_vip_event(event_id=0, ticket_socket_event_id=-1)
     monkeypatch.setattr(
         admin_service,
         "EventService",
@@ -1153,7 +1157,7 @@ def test_update_event_uses_insert_path_when_existing_event_lookup_is_empty(monke
     """
     FakeEventService.instances = []
     FakeEventService.events_to_return = []
-    event = create_vip_event(external_event_id=12, ticket_socket_event_id=-1)
+    event = create_vip_event(event_id=12, ticket_socket_event_id=-1)
     insert_calls = []
     monkeypatch.setattr(admin_service, "EventService", FakeEventService)
     monkeypatch.setattr(
@@ -1165,7 +1169,7 @@ def test_update_event_uses_insert_path_when_existing_event_lookup_is_empty(monke
     success = admin_service.AdminService().update_event(event)
 
     assert success is True
-    assert "INSERT INTO ExternalEvents" in insert_calls[0][0]
+    assert "INSERT INTO Events" in insert_calls[0][0]
 
 
 def test_update_event_stops_when_ticket_type_update_fails(monkeypatch):
@@ -1175,9 +1179,9 @@ def test_update_event_stops_when_ticket_type_update_fails(monkeypatch):
     FakeEventService.instances = []
     FakeDashboardService.instances = []
     existing_event = VipEvent()
-    existing_event.external_event_id = 12
+    existing_event.event_id = 12
     FakeEventService.events_to_return = [existing_event]
-    event = create_vip_event(external_event_id=12, ticket_socket_event_id=99)
+    event = create_vip_event(event_id=12, ticket_socket_event_id=99)
     event.ticket_types = [
         TicketSocketTicketType(99, 100, "A", 10, True, 1),
         TicketSocketTicketType(99, 200, "B", 10, True, 2),
@@ -1196,3 +1200,17 @@ def test_update_event_stops_when_ticket_type_update_fails(monkeypatch):
 
     assert success is False
     assert not FakeDashboardService.instances
+
+
+import pytest
+from common.ticket_partner_service import TicketPartnerService
+
+@pytest.fixture(autouse=True)
+def partner_mapping_fixture(monkeypatch):
+    """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
+    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
+    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
+    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
+    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)

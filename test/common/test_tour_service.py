@@ -81,7 +81,7 @@ def create_event(external_event_id):
     Create a VipEvent instance with an external event id.
     """
     event = VipEvent()
-    event.external_event_id = external_event_id
+    event.event_id = external_event_id
     return event
 
 
@@ -113,9 +113,9 @@ def test_get_all_tours_maps_tours_sellers_and_events(monkeypatch):
         if "FROM TourSeller" in sql:
             return [{"SellerId": 100}, {"SellerId": 200}]
         return [
-            {"ExternalEventId": 44},
-            {"ExternalEventId": 0},
-            {"ExternalEventId": 55},
+            {"EventId": 44},
+            {"EventId": 0},
+            {"EventId": 55},
         ]
 
     monkeypatch.setattr(tour_service, "db_query_all", fake_db_query_all)
@@ -128,7 +128,7 @@ def test_get_all_tours_maps_tours_sellers_and_events(monkeypatch):
     assert tours[0].is_active is True
     assert tours[0].announce_date == "2026-05-01"
     assert [seller.seller_id for seller in tours[0].sellers] == [100, 200]
-    assert [event.external_event_id for event in tours[0].events] == [44]
+    assert [event.event_id for event in tours[0].events] == [44]
     assert "WHERE EXISTS" in calls[0][0]
     assert "ORDER BY Tour.AnnounceDate ASC, Tour.TourName ASC" in calls[0][0]
     assert calls[0][1] == {"seller_id": 7}

@@ -24,7 +24,7 @@ class FakeEventService:
         Record event lookups and return a simple event object.
         """
         FakeEventService.calls.append((event_id, ignore_flags))
-        return SimpleNamespace(event_id=event_id, external_event_id=event_id)
+        return SimpleNamespace(event_id=event_id)
 
 
 def build_order(order_id=9):
@@ -34,7 +34,7 @@ def build_order(order_id=9):
     order = TicketOrder()
     order.order_id = order_id
     order.order_date = "2026-04-23"
-    order.event = SimpleNamespace(external_event_id=55)
+    order.event = SimpleNamespace(event_id=55)
     order.age_limit = TicketOrderAgeLimit()
     order.age_limit.age_limit_id = 2
     order.age_limit.age_limit_name = "21+"
@@ -166,7 +166,8 @@ def test_get_ticket_orders_uses_paid_and_fulfilled_filter(monkeypatch):
     )
 
     assert not orders
-    assert captured_sql[0] == " WHERE TicketOrders.Fulfilled=1 AND TicketOrders.Paid=1"
+    assert "FROM TicketOrders" in captured_sql[0]
+    assert "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=1" in captured_sql[0]
 
 
 def test_get_ticket_orders_uses_unfulfilled_unpaid_filter(monkeypatch):
@@ -186,7 +187,8 @@ def test_get_ticket_orders_uses_unfulfilled_unpaid_filter(monkeypatch):
     )
 
     assert not orders
-    assert captured_sql[0] == " WHERE TicketOrders.Fulfilled=0 AND TicketOrders.Paid=0"
+    assert "FROM TicketOrders" in captured_sql[0]
+    assert "WHERE TicketOrders.IsFulfilled=0 AND TicketOrders.IsPaid=0" in captured_sql[0]
 
 
 def test_get_ticket_orders_uses_fulfilled_unpaid_filter(monkeypatch):
@@ -206,7 +208,8 @@ def test_get_ticket_orders_uses_fulfilled_unpaid_filter(monkeypatch):
     )
 
     assert not orders
-    assert captured_sql[0] == " WHERE TicketOrders.Fulfilled=1 AND TicketOrders.Paid=0"
+    assert "FROM TicketOrders" in captured_sql[0]
+    assert "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=0" in captured_sql[0]
 
 
 def test_get_ticket_order_by_id_returns_none_for_blank_id():
