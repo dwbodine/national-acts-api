@@ -1,0 +1,2 @@
+docker cp ./seeds/nationalacts20.sql nationalactsdb:/tmp/local-refresh.sql
+docker exec nationalactsdb sh -c 'export MYSQL_PWD=$(cat /run/secrets/mysql_root_password); exec mariadb --user=root nationalacts20 < /tmp/local-refresh.sql'

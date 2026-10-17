@@ -155,14 +155,18 @@ class FakeEventService:
     add_results = []
     add_calls = []
 
-    def add_to_external_events(self, event_data, evt, cnx):
+    def ensure_imported_event(self, provider_event_id, event_data, evt, cnx):
         """
         Record the add request and return the configured result.
         """
-        FakeEventService.add_calls.append((event_data.copy(), evt.event_id, cnx))
+        FakeEventService.add_calls.append(
+            (event_data.copy(), evt.original_event_id, cnx)
+        )
         if FakeEventService.add_results:
-            return FakeEventService.add_results.pop(0)
-        return True
+            return (
+                provider_event_id + 10000 if FakeEventService.add_results.pop(0) else 0
+            )
+        return provider_event_id + 10000
 
 
 def create_event(event_id, event_category_id, title, orders):
@@ -255,7 +259,7 @@ def create_ticket(
     Create a simple ticket-like object for refresh tests.
     """
     return SimpleNamespace(
-        ticket_id=ticket_id,
+        original_ticket_id=ticket_id,
         ticket_type_id=ticket_type_id,
         ticket_type=ticket_type,
         price=price,
@@ -283,8 +287,8 @@ def create_refresh_order(
     Create a simple order-like object for refresh tests.
     """
     return SimpleNamespace(
-        order_id=order_id,
-        event_id=event_id,
+        original_order_id=order_id,
+        original_event_id=event_id,
         purchase_date=purchase_date,
         purchase_unix_timestamp=purchase_unix_timestamp,
         phone=phone,
@@ -315,7 +319,7 @@ def create_refresh_event(
     Create a simple event-like object for refresh tests.
     """
     return SimpleNamespace(
-        event_id=event_id,
+        original_event_id=event_id,
         seller_event_category_id=seller_event_category_id,
         seller_id=seller_id,
         title=title or f"Event {event_id}",
@@ -621,10 +625,10 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
                 result = {"Id": 300}
             elif event_id == 101:
                 result = {"Id": 301}
-        elif "FROM ExternalEvents" in sql:
+        elif "FROM Events" in sql:
             if data["id"] == 300:
                 result = {"EventDate": "2024-01-01", "EventId": 900}
-        elif "FROM TicketSocketTicketTypes" in sql:
+        elif "FROM TicketTypeDetails" in sql:
             if data["ticketSocketTicketTypeId"] == 201:
                 result = {"TicketTypeOrder": 9}
         elif "FROM TicketSocketOrders" in sql:
@@ -634,6 +638,7 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
                     "PhoneFormatted": "+1 206-555-9999",
                     "Phone": "2065559999",
                     "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -663,6 +668,16 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
 
     update_calls = []
     delete_calls = []
+    order_mapping_calls = []
+    cleanup_lookup_calls = []
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_order",
+        lambda self, event, order, cnx=None: order_mapping_calls.append(
+            (event, order, cnx)
+        )
+        or order,
+    )
 
     def fake_update(sql, data, cnx=None):
         """
@@ -689,7 +704,13 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
         "common.data_refresh_service.db_get_connection", lambda: fake_connection
     )
     monkeypatch.setattr("common.data_refresh_service.db_query_one", fake_query_one)
-    monkeypatch.setattr("common.data_refresh_service.db_query_all", fake_query_all)
+
+    def query_all(sql, data=None):
+        if "FROM DailyOrderData" in sql:
+            cleanup_lookup_calls.append((sql, dict(data)))
+        return fake_query_all(sql, data)
+
+    monkeypatch.setattr("common.data_refresh_service.db_query_all", query_all)
     monkeypatch.setattr("common.data_refresh_service.db_insert", fake_insert)
     monkeypatch.setattr("common.data_refresh_service.db_update", fake_update)
     monkeypatch.setattr("common.data_refresh_service.db_delete", fake_delete)
@@ -698,7 +719,11 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
         FakeRefreshHistory,
     )
     monkeypatch.setattr("common.data_refresh_service.UserService", FakeUserService)
-    monkeypatch.setattr("common.data_refresh_service.EventService", FakeEventService)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        FakeEventService.ensure_imported_event,
+    )
     monkeypatch.setattr(
         "common.data_refresh_service.get_pacific_purchase_date_from_order",
         lambda order: order.purchase_date,
@@ -735,10 +760,19 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
     assert results.args[12] == 1
     assert results.args[13] == 1
     assert results.args[14] == 1
-    assert len(FakeEventService.add_calls) == 2
-    assert FakeEventService.add_calls[0][1] == 101
-    assert FakeEventService.add_calls[1][1] == 102
-    assert any("UPDATE ExternalEvents SET EventDate" in sql for sql, _ in update_calls)
+    assert len(FakeEventService.add_calls) == 3
+    assert [call[1] for call in FakeEventService.add_calls] == [100, 101, 102]
+    assert all(call[2] is fake_connection for call in FakeEventService.add_calls)
+    assert [(event, order) for event, order, _ in order_mapping_calls] == [
+        (300, 800),
+        (300, 601),
+    ]
+    assert all(cnx is fake_connection for _, _, cnx in order_mapping_calls)
+    assert cleanup_lookup_calls[0][1] == {
+        "ticket_partner_event_id": 10300,
+        "purchaseDate": "2024-06-01",
+    }
+    assert "WHERE TicketPartnerEventId=" in cleanup_lookup_calls[0][0]
     assert any(
         "UPDATE TicketSocketEvents SET IsSoldOut" in sql for sql, _ in update_calls
     )
@@ -802,9 +836,9 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
             event_id = data["event_id"]
             if event_id in (200, 201, 202, 203):
                 result = {"Id": event_id + 1000}
-        elif "FROM ExternalEvents" in sql:
+        elif "FROM Events" in sql:
             result = {"EventDate": "2024-07-01", "EventId": 901}
-        elif "FROM TicketSocketTicketTypes" in sql:
+        elif "FROM TicketTypeDetails" in sql:
             result = None
         elif "FROM TicketSocketOrders" in sql:
             if data["order_id"] == 6001:
@@ -813,6 +847,7 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
                     "PhoneFormatted": None,
                     "Phone": None,
                     "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-10",
@@ -823,6 +858,7 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
                     "PhoneFormatted": None,
                     "Phone": None,
                     "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-10",
@@ -844,7 +880,7 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
         """
         _ = data, cnx
         if "INSERT INTO TicketSocketTicketTypes" in sql:
-            return 0
+            return -1
         if "INSERT INTO TicketSocketEvents" in sql:
             return 0
         return 999
@@ -882,7 +918,11 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
     monkeypatch.setattr(
         "common.data_refresh_service.MessagingService", FakeMessagingService
     )
-    monkeypatch.setattr("common.data_refresh_service.EventService", FakeEventService)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        FakeEventService.ensure_imported_event,
+    )
     monkeypatch.setattr(
         "common.data_refresh_service.get_pacific_purchase_date_from_order",
         lambda order: order.purchase_date,
@@ -955,9 +995,9 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
         result = None
         if "FROM TicketSocketEvents" in sql:
             result = {"Id": 1300}
-        elif "FROM ExternalEvents" in sql:
+        elif "FROM Events" in sql:
             result = {"EventDate": "2024-07-01", "EventId": 930}
-        elif "FROM TicketSocketTicketTypes" in sql:
+        elif "FROM TicketTypeDetails" in sql:
             result = {"TicketTypeOrder": 1}
         elif "FROM TicketSocketOrders" in sql:
             order_id = data["order_id"]
@@ -968,6 +1008,7 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "PhoneFormatted": "saved",
                     "Phone": "2065550000",
                     "IsComped": 1,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -977,6 +1018,7 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "PhoneFormatted": "ca formatted",
                     "Phone": "6045550000",
                     "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -986,6 +1028,7 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "PhoneFormatted": None,
                     "Phone": "9999999999",
                     "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -1124,3 +1167,118 @@ def test_refresh_database_from_ticket_socket_leaves_username_blank_when_user_is_
 
     assert results.username is None
     assert fake_connection.closed is False
+
+
+import pytest
+from common.ticket_partner_service import TicketPartnerService
+
+
+@pytest.fixture(autouse=True)
+def partner_mapping_fixture(monkeypatch):
+    """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_order",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_event",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_ticket",
+        lambda self, value, order=None: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_event",
+        lambda self, event, partner, provider=None, cnx=None: event,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        lambda self, provider, data, event, cnx=None: provider,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket",
+        lambda self, order, ticket, cnx=None: ticket,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket_type",
+        lambda self, event, kind, cnx=None: 1,
+    )
+
+
+@pytest.mark.parametrize("failed_mapping", ["event", "order"])
+def test_refresh_reports_mapping_failure_before_processing_children(
+    monkeypatch, failed_mapping
+):
+    event = create_refresh_event(
+        100, 10, orders=[create_refresh_order(5001, 100, tickets=[create_ticket(7001)])]
+    )
+    connection = FakeConnection()
+    calls = []
+    monkeypatch.setattr(
+        DataRefreshService,
+        "retrieve_ticket_socket_events_for_update",
+        lambda self, **kwargs: [event],
+    )
+    monkeypatch.setattr(
+        "common.data_refresh_service.db_get_connection", lambda: connection
+    )
+
+    def query(sql, data=None, cnx=None):
+        if "FROM TicketSocketEvents" in sql:
+            return {"Id": 300}
+        if "FROM TicketSocketOrders" in sql:
+            return {
+                "Id": 800,
+                "IsComped": 0,
+                "IsDeleted": 0,
+                "IsActive": 1,
+                "IsManualTransfer": 0,
+                "Phone": None,
+                "PhoneFormatted": None,
+                "PurchaseDate": "2024-06-10",
+            }
+        raise AssertionError(
+            "Child records should not be queried after mapping failure"
+        )
+
+    monkeypatch.setattr("common.data_refresh_service.db_query_one", query)
+    monkeypatch.setattr("common.data_refresh_service.db_update", lambda *args: True)
+    monkeypatch.setattr(
+        "common.data_refresh_service.TicketSocketRefreshHistory", FakeRefreshHistory
+    )
+    monkeypatch.setattr(
+        "common.data_refresh_service.MessagingService", FakeMessagingService
+    )
+
+    def ensure_event(self, provider, data, evt, cnx=None):
+        calls.append(("event", provider, cnx))
+        return 0 if failed_mapping == "event" else 30
+
+    def ensure_order(self, provider_event, provider_order, cnx=None):
+        calls.append(("order", provider_order, cnx))
+        return 0
+
+    monkeypatch.setattr(TicketPartnerService, "ensure_imported_event", ensure_event)
+    monkeypatch.setattr(TicketPartnerService, "ensure_order", ensure_order)
+    result = DataRefreshService().refresh_database_from_ticket_socket(start=10)
+    assert result.succeeded is False
+    assert calls[0] == ("event", 300, connection)
+    if failed_mapping == "event":
+        assert len(calls) == 1
+        assert result.args[1] == [100]
+        assert result.args[6] == 0  # No event counted as successfully updated.
+    else:
+        assert calls[1] == ("order", 800, connection)
+        assert result.args[2] == [5001]
+        assert result.args[9] == 0  # No order counted as successfully updated.

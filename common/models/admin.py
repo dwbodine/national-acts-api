@@ -36,9 +36,9 @@ class SiteSetting:
     dirty: bool
 
 
-class ExternalVenue:
+class Venue:
     """
-    setting for "external event venues"
+    setting for venues
     """
 
     venue_id: int

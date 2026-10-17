@@ -405,10 +405,11 @@ def test_health_returns_database_available_message(monkeypatch):
             """
             closed["value"] = True
 
-    def get_connection():
+    def get_connection(timeout):
         """
         Return an open fake connection for the health check.
         """
+        assert timeout == 5
         return FakeConnection()
 
     monkeypatch.setattr(app_module, "db_get_connection", get_connection)
@@ -434,10 +435,11 @@ def test_health_returns_database_failed_message_for_closed_connection(monkeypatc
 
         open = False
 
-    def get_connection():
+    def get_connection(timeout):
         """
         Return a closed fake connection for the health check.
         """
+        assert timeout == 5
         return FakeConnection()
 
     monkeypatch.setattr(app_module, "db_get_connection", get_connection)
@@ -455,10 +457,11 @@ def test_health_returns_database_not_available_when_connection_is_none(monkeypat
     Return the unavailable-database message when no connection object is returned.
     """
 
-    def get_connection():
+    def get_connection(timeout):
         """
         Return no connection object for the health check.
         """
+        assert timeout == 5
         return None
 
     monkeypatch.setattr(app_module, "db_get_connection", get_connection)
@@ -476,10 +479,11 @@ def test_health_returns_exception_message_when_connection_raises(monkeypatch):
     Return the formatted database exception message when connection setup fails.
     """
 
-    def raise_connection_error():
+    def raise_connection_error(timeout):
         """
         Raise a database connection error for the health check.
         """
+        assert timeout == 5
         raise RuntimeError("db down")
 
     monkeypatch.setattr(app_module, "db_get_connection", raise_connection_error)

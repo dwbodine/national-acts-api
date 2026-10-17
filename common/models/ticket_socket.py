@@ -102,7 +102,7 @@ class TicketSocketTicket:
     Ticket object in TicketSocket API
     """
 
-    ticket_id: int = 0
+    original_ticket_id: int = 0
     ticket_type: str = None
     price: float = 0
     service_fee: float = 0
@@ -121,8 +121,8 @@ class TicketSocketOrder:
     Order object from TicketSocket API
     """
 
-    order_id: int = 0
-    event_id: int = 0
+    original_order_id: int = 0
+    original_event_id: int = 0
     user_id: int = 0
     tickets: list[TicketSocketTicket] = []
     phone: str = None
@@ -146,7 +146,7 @@ class TicketSocketEvent:
     Event object from TicketSocket API
     """
 
-    event_id: int = 0
+    original_event_id: int = 0
     title: str = None
     event_date: str = None
     thumbnail: str = None

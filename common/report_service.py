@@ -25,26 +25,17 @@ class ReportService:
         Gets events with missing venue data
         """
         events: list[VipEvent] = []
-        sql = """SELECT ExternalEvents.EventID,
-                ExternalEvents.Title,
-                ExternalEvents.EventDate,
-                TicketSocketEvents.Venue,
-                TicketSocketEvents.Address,
-                TicketSocketEvents.City,
-                TicketSocketEvents.State,
-                TicketSocketEvents.Zip,
-                TicketSocketEvents.Country
-            FROM ExternalEvents
-            JOIN TicketSocketEvents
-                ON TicketSocketEvents.Id =
-                    ExternalEvents.TicketSocketEventId
-            WHERE ExternalEvents.ExternalEventVenueId IS NULL
-            ORDER BY ExternalEvents.EventDate DESC"""
+        sql = """SELECT DISTINCT EventId AS EventID, Title, EventDate,
+                    Venue, Address, City, State, Zip, Country
+                FROM EventDetails
+                WHERE VenueId IS NULL AND TicketPartnerId=2
+                    AND TicketSocketEventId IS NOT NULL
+                ORDER BY EventDate DESC"""
 
         rows = db_query_all(sql)
         for row in rows:
             event = VipEvent()
-            event.external_event_id = get_override_int_value_or_default(row["EventID"])
+            event.event_id = get_override_int_value_or_default(row["EventID"])
             event.title = get_override_string_value_or_default(row["Title"])
             event.event_date = get_override_string_value_or_default(row["EventDate"])
             venue_name = get_override_string_value_or_default(row["Venue"])
@@ -116,11 +107,11 @@ class ReportService:
             if image is not None:
                 database_images.append(image)
 
-        sql = """SELECT DISTINCT Thumbnail
-                    FROM ExternalEvents
-                    WHERE COALESCE(Thumbnail, '') <> ''
-                    AND Thumbnail NOT LIKE 'http%'
-                    ORDER BY Thumbnail"""
+        sql = """SELECT DISTINCT ExternalThumbnail AS Thumbnail
+                    FROM EventDetails
+                    WHERE COALESCE(ExternalThumbnail, '') <> ''
+                    AND ExternalThumbnail NOT LIKE 'http%'
+                    ORDER BY ExternalThumbnail"""
         rows = db_query_all(sql)
         for row in rows:
             image = get_override_string_value_or_default(row["Thumbnail"])

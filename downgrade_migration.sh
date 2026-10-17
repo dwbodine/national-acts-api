@@ -1,0 +1,1 @@
+ python -m tools.migrate --env-file .env.development downgrade

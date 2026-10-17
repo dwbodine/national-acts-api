@@ -85,6 +85,15 @@ class ArtistTitlePosition(IntEnum):
     BOTTOM = 1
 
 
+class TicketPartner(IntEnum):
+    """
+    Enum to translate to a ticket partner
+    """
+
+    NATIONAL_ACTS = 1
+    TICKET_SOCKET = 2
+
+
 HEADER_IMAGE_WIDTH: int = 1600
 HOMEBANNER_IMAGE_WIDTH: int = 1600
 LOGO_IMAGE_WIDTH: int = 400

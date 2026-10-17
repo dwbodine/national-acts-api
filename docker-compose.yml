@@ -14,7 +14,6 @@ services:
       - mysql_root_password
     volumes:
       - db_data:/var/lib/mysql
-      - ./seeds/nationalacts20.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
     networks:
       - app-network
     ports:

@@ -429,31 +429,18 @@ class SenderApiService:
 
             stored_subscribers: list[Subscriber] = []
 
-            sql = """SELECT DISTINCT TicketSocketOrders.PurchaserLastName,
-                        TicketSocketOrders.PurchaserFirstName, 
-                        TicketSocketOrders.Email,
-                        COALESCE(TicketSocketOrders.PhoneFormatted, TicketSocketOrders.Phone) as Phone,
-                        TicketSocketOrders.PurchaserZip,
-                        COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) as Venue,
-                        COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS VenueAddress,
-                        COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS VenueCity,
-                        COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS VenueState,
-                        COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS VenueZip,
-                        COALESCE(Country.CountryName, TicketSocketEvents.Country) AS VenueCountry,
-                        Sellers.Name as Band,
-                        TicketSocketOrders.Id as OrderId 
-                    FROM TicketSocketOrders 
-                    JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
-                    JOIN SellerEventCategory ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
-                    JOIN Sellers ON Sellers.SellerId = SellerEventCategory.SellerId
-                    LEFT JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                    LEFT JOIN ExternalEventVenues ON ExternalEventVenues.VenueID = ExternalEvents.ExternalEventVenueId
-                    LEFT JOIN Country ON Country.CountryId = ExternalEventVenues.CountryId
-                    WHERE COALESCE(TicketSocketOrders.Email, '') <> ''
-                    AND TicketSocketOrders.IsDeleted <> 1
-                    AND TicketSocketOrders.IsSenderUpdated <> 1 
-                    ORDER BY TicketSocketOrders.PurchaseDate DESC
-                    """
+            sql = """SELECT DISTINCT od.PurchaserLastName, od.PurchaserFirstName,
+                    od.Email, COALESCE(od.PhoneFormatted, od.Phone) AS Phone, od.PurchaserZip,
+                    ed.Venue, ed.Address AS VenueAddress, ed.City AS VenueCity,
+                    ed.State AS VenueState, ed.Zip AS VenueZip, ed.Country AS VenueCountry,
+                    ed.SellerName AS Band, od.TicketSocketOrderId AS OrderId
+                FROM OrderDetails od
+                JOIN EventDetails ed ON ed.TicketPartnerEventId=od.TicketPartnerEventId
+                WHERE od.TicketPartnerId=2 AND od.TicketSocketOrderId IS NOT NULL
+                    AND COALESCE(od.Email, '') <> '' AND od.IsDeleted <> 1
+                    AND od.IsSenderUpdated <> 1
+                ORDER BY od.PurchaseDate DESC
+                """
 
             if limit > 0:
                 sql += """ LIMIT 0, %(limit)s"""

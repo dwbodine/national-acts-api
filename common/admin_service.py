@@ -6,11 +6,11 @@ import os
 
 from datetime import datetime
 import pytz
-from common.constants import ImageType
+from common.constants import ImageType, TicketPartner
 from common.dashboard_service import DashboardService
 from common.db import db_delete, db_query_all, db_insert, db_query_one, db_update
 from common.event_service import EventService
-from common.models.admin import ExternalVenue, SiteSetting, SiteSettingType
+from common.models.admin import SiteSetting, SiteSettingType, Venue
 from common.models.national_acts import TicketSocketRefreshHistory, VipEvent
 from common.models.ticket_socket import (
     Country,
@@ -20,6 +20,7 @@ from common.models.ticket_socket import (
 )
 from common.order_service import OrderService
 from common.ticket_socket_service import TicketSocketService
+from common.ticket_partner_service import TicketPartnerService
 from common.utility import (
     get_bucket_name_from_image_type,
     get_country_from_country_name,
@@ -152,38 +153,38 @@ class AdminService:
             accounts.append(account)
         return accounts
 
-    def get_external_venues(self, search_term: str = None):
+    def get_venues(self, search_term: str = None):
         """
-        Fetch all external venues from database
+        Fetch all venues from database
         """
-        venues: list[ExternalVenue] = []
-        sql = """SELECT ExternalEventVenues.VenueID,
-            ExternalEventVenues.Venue,
-            ExternalEventVenues.Address,
-            ExternalEventVenues.City,
-            ExternalEventVenues.State,
-            ExternalEventVenues.Zip,
-            ExternalEventVenues.CountryId,
-            ExternalEventVenues.TimeZone,
+        venues: list[Venue] = []
+        sql = """SELECT Venues.VenueID,
+            Venues.Venue,
+            Venues.Address,
+            Venues.City,
+            Venues.State,
+            Venues.Zip,
+            Venues.CountryId,
+            Venues.TimeZone,
             Country.CountryName,
             Country.CountryCode,
-            (SELECT 1 FROM ExternalEvents
-                WHERE ExternalEvents.ExternalEventVenueId = 
-                ExternalEventVenues.VenueID Limit 0, 1) as HasEvents
-            FROM ExternalEventVenues 
-            LEFT JOIN Country on Country.CountryId = ExternalEventVenues.CountryId """
+            (SELECT 1 FROM EventDetails
+                WHERE EventDetails.VenueId =
+                Venues.VenueID Limit 0, 1) as HasEvents
+            FROM Venues 
+            LEFT JOIN Country on Country.CountryId = Venues.CountryId """
         if search_term is not None and len(search_term) >= 3:
             sql += """WHERE CONCAT_WS (' ', COALESCE(Country.CountryName, ''),
-                    COALESCE(ExternalEventVenues.Venue, ''),
-                    COALESCE(ExternalEventVenues.Address, ''),
-                    COALESCE(ExternalEventVenues.City, ''),
-                    COALESCE(ExternalEventVenues.State, ''))
+                    COALESCE(Venues.Venue, ''),
+                    COALESCE(Venues.Address, ''),
+                    COALESCE(Venues.City, ''),
+                    COALESCE(Venues.State, ''))
                     LIKE ('%""" + search_term + """%') """
         sql += """ORDER BY Venue ASC"""
         sql = sql.replace("\n", "")
         rows = db_query_all(sql)
         for row in rows:
-            venue = ExternalVenue()
+            venue = Venue()
             venue.venue_id = get_override_int_value_or_default(row["VenueID"])
             venue.venue = get_override_string_value_or_default(row["Venue"])
             venue.address = get_override_string_value_or_default(row["Address"])
@@ -206,9 +207,9 @@ class AdminService:
 
         return venues
 
-    def update_external_venue(self, venue: ExternalVenue):
+    def update_venue(self, venue: Venue):
         """
-        Add a venue to the database
+        Add/update a venue in the database
         """
 
         success = False
@@ -232,7 +233,7 @@ class AdminService:
         }
 
         if venue.venue_id is None or venue.venue_id == 0:
-            sql = """INSERT INTO ExternalEventVenues
+            sql = """INSERT INTO Venues
                         (Venue, Address, City, State, Zip, CountryId, TimeZone)
                      VALUES(%(venue)s, %(address)s, %(city)s, %(state)s,
                      %(zip)s, %(country_id)s, %(timezone)s)"""
@@ -241,7 +242,7 @@ class AdminService:
             venue.venue_id = venue_id
         else:
             data["venue_id"] = get_override_int_value_or_default(venue.venue_id)
-            sql = """UPDATE ExternalEventVenues SET Venue=%(venue)s,
+            sql = """UPDATE Venues SET Venue=%(venue)s,
                         Address=%(address)s,
                         City=%(city)s, 
                         State=%(state)s,
@@ -252,12 +253,12 @@ class AdminService:
             success = db_update(sql, data)
         return venue if success is True else None
 
-    def delete_external_venue(self, venue_id: int):
+    def delete_venue(self, venue_id: int):
         """
         Remove a venue from the database
         """
 
-        sql = """DELETE FROM ExternalEventVenues WHERE VenueID=%(venue_id)s"""
+        sql = """DELETE FROM Venues WHERE VenueID=%(venue_id)s"""
         data = {"venue_id": venue_id}
         db_delete(sql, data)
         return True
@@ -407,31 +408,28 @@ class AdminService:
 
     def get_ticket_socket_events_only(self, seller_id: int = None):
         """
-        Fetch only TS events for association with External Events
+        Fetch only TS events for association with Events
         """
         events: list[VipEvent] = []
-        sql = """SELECT SellerEventCategory.SellerId,
-                SellerEventCategory.IsVisibleOnSite,
-                SellerEventCategory.IsVisibleOnPortal,
-                TicketSocketEvents.*
-            FROM TicketSocketEvents
-            JOIN SellerEventCategory 
-                ON SellerEventCategory.SellerEventCategoryId =
-                TicketSocketEvents.SellerEventCategoryId """
-
+        sql = """SELECT DISTINCT SellerId, IsVisibleOnSite, IsVisibleOnPortal,
+                    TicketPartnerEventId, EventId AS AppEventId,
+                    TicketSocketEventId AS Id, TicketSocketNativeEventId AS EventId,
+                    Title, EventDate, Thumbnail, URL, State, Zip, Country, Venue,
+                    Address, City, IsVip, IsSoldOut
+                FROM EventDetails
+                WHERE TicketPartnerId=2 AND TicketSocketEventId IS NOT NULL"""
         data = {}
-
         if seller_id is not None:
-            sql += """ WHERE SellerEventCategory.SellerId=%(seller_id)s"""
+            sql += " AND SellerId=%(seller_id)s"
             data["seller_id"] = seller_id
-
-        sql += " ORDER BY TicketSocketEvents.EventDate, TicketSocketEvents.Title"
+        sql += " ORDER BY EventDate, Title"
 
         rows = db_query_all(sql, data)
         for row in rows:
             vip_event = VipEvent()
-            vip_event.ticket_socket_event_id = get_override_int_value_or_default(
-                row["Id"]
+            vip_event.ticket_partner_id = TicketPartner.TICKET_SOCKET
+            vip_event.ticket_partner_event_id = get_override_int_value_or_default(
+                row["TicketPartnerEventId"]
             )
             vip_event.is_visible_on_site = get_override_bool_value_or_default(
                 row["IsVisibleOnSite"]
@@ -439,7 +437,10 @@ class AdminService:
             vip_event.is_visible_on_portal = get_override_bool_value_or_default(
                 row["IsVisibleOnPortal"]
             )
-            vip_event.event_id = get_override_int_value_or_default(row["EventId"])
+            vip_event.event_id = get_override_int_value_or_default(row["AppEventId"])
+            vip_event.original_event_id = get_override_int_value_or_default(
+                row["EventId"]
+            )
             vip_event.title = get_override_string_value_or_default(row["Title"])
             vip_event.event_date = get_override_string_value_or_default(
                 row["EventDate"]
@@ -494,13 +495,13 @@ class AdminService:
                 }
                 sql = ""
                 if is_cancelled is True:
-                    sql = """UPDATE ExternalEvents
+                    sql = """UPDATE Events
                                 SET IsCancelled=1,
                                 CancelledDate=%(cancelled_date)s,
                                 LastUpdate=CURRENT_TIMESTAMP
                                 WHERE EventId=%(event_id)s"""
                 else:
-                    sql = """UPDATE ExternalEvents
+                    sql = """UPDATE Events
                                 SET IsCancelled=0,
                                 CancelledDate=NULL,
                                 LastUpdate=CURRENT_TIMESTAMP
@@ -525,32 +526,32 @@ class AdminService:
             success = self.cancel_event([event_id], True)
 
         if success is True:
-            sql = """SELECT TicketSocketOrders.Id AS OrderId,
-                        TicketSocketEvents.Id AS EventId
-                        FROM TicketSocketOrders
-                        JOIN TicketSocketEvents ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId
-                        JOIN ExternalEvents ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                        WHERE ExternalEvents.EventId=%(event_id)s"""
+            sql = """SELECT DISTINCT TicketPartnerOrderId,
+                        TicketPartnerEventId
+                        FROM OrderDetails
+                        WHERE EventId=%(event_id)s"""
             data = {"event_id": event_id}
             rows = db_query_all(sql, data)
-            ticket_socket_event_id: int = None
+            ticket_partner_event_id: int = None
             if len(rows) > 0:
                 for row in rows:
-                    order_id = get_override_int_value_or_default(row["OrderId"])
-                    if ticket_socket_event_id is None:
-                        ticket_socket_event_id = get_override_int_value_or_default(
-                            row["EventId"]
+                    ticket_partner_order_id = get_override_int_value_or_default(
+                        row["TicketPartnerOrderId"]
+                    )
+                    if ticket_partner_event_id is None:
+                        ticket_partner_event_id = get_override_int_value_or_default(
+                            row["TicketPartnerEventId"]
                         )
                     order_service = OrderService()
                     success = order_service.refund_order(
-                        order_id, refund_service_fees, False
+                        ticket_partner_order_id, refund_service_fees, False
                     )
                     if success is False:
                         break
-                if success is True and ticket_socket_event_id is not None:
+                if success is True:
                     dashboard_service = DashboardService()
                     dashboard_service.rebuild_daily_order_data_for_event(
-                        ticket_socket_event_id
+                        ticket_partner_event_id
                     )
 
         return success
@@ -562,29 +563,21 @@ class AdminService:
         updated_event: VipEvent = None
         num_vips: int = 0
         if is_sent is True:
-            event_sql = """SELECT COUNT(TicketSocketOrderTickets.Id) AS NumVips
-                            FROM TicketSocketOrderTickets
-                            JOIN TicketSocketOrders 
-                                ON TicketSocketOrders.Id =
-                                    TicketSocketOrderTickets.TicketSocketOrderId         
-                            JOIN TicketSocketEvents
-                                ON TicketSocketEvents.Id = 
-                                    TicketSocketOrders.TicketSocketEventId
-                            JOIN ExternalEvents
-                                ON ExternalEvents.TicketSocketEventId = 
-                                    TicketSocketEvents.Id
-                            WHERE ExternalEvents.EventId=%(event_id)s
-                            AND TicketSocketOrders.IsDeleted <> 1
-                            AND TicketSocketOrderTickets.IsActive = 1
-                            AND TicketSocketOrderTickets.IsRefunded = 0
-                            AND TicketSocketOrderTickets.IsChargedBack = 0
-                            GROUP BY ExternalEvents.EventId"""
+            event_sql = """SELECT COUNT(*) AS NumVips
+                            FROM TicketDetails
+                            WHERE EventId = %(event_id)s
+                                AND TicketPartnerId = 2
+                                AND OrderIsDeleted <> 1
+                                AND IsActive = 1
+                                AND IsRefunded = 0
+                                AND IsChargedBack = 0
+                            GROUP BY TicketDetails.EventId"""
             event_data = {"event_id": event_id}
             row = db_query_one(event_sql, event_data)
             if row:
                 num_vips = get_override_int_value_or_default(row["NumVips"])
 
-        sql = """UPDATE ExternalEvents
+        sql = """UPDATE Events
                     SET ListSentToBand=%(listSent)s,
                     LastUpdate=CURRENT_TIMESTAMP,
                     ListSentNumVips=%(numVips)s, """
@@ -624,24 +617,30 @@ class AdminService:
             return False
 
         ticket_socket_event_id: int = get_override_int_value_or_default(
-            event_to_update.ticket_socket_event_id, default=None
+            (
+                TicketPartnerService().socket_event(
+                    event_to_update.ticket_partner_event_id
+                )
+                if event_to_update.ticket_partner_event_id > 0
+                else None
+            ),
+            default=None,
         )
         if ticket_socket_event_id is not None and ticket_socket_event_id <= 0:
             ticket_socket_event_id = None
 
         existing_event: VipEvent = None
-        if event_to_update.external_event_id > 0:
+        if event_to_update.event_id > 0:
             event_service = EventService()
             existing_events = event_service.get_events_and_orders(
                 get_orders=False,
                 ignore_flags=True,
-                event_id=event_to_update.external_event_id,
+                event_id=event_to_update.event_id,
             )
             if len(existing_events) > 0:
                 existing_event = existing_events[0]
 
         update_data = {
-            "ticket_socket_event_id": ticket_socket_event_id,
             "title": get_override_string_value_or_default(event_to_update.title),
             "event_date": get_override_string_value_or_default(
                 event_to_update.event_date
@@ -683,9 +682,7 @@ class AdminService:
                 event_to_update.text_sent_to_vips
             ),
             "url": get_override_string_value_or_default(event_to_update.external_url),
-            "external_event_venue_id": get_override_int_value_or_default(
-                event_to_update.external_event_venue_id
-            ),
+            "venue_id": get_override_int_value_or_default(event_to_update.venue_id),
             "disable_link_button": get_override_tinyint_value_or_default_from_bool(
                 event_to_update.disable_link_button
             ),
@@ -717,17 +714,16 @@ class AdminService:
 
         if existing_event is not None:
             update_data["event_id"] = get_override_int_value_or_default(
-                event_to_update.external_event_id
+                event_to_update.event_id
             )
-            update_sql = """UPDATE ExternalEvents
-                            SET TicketSocketEventId=%(ticket_socket_event_id)s, 
-                                Title=%(title)s,
+            update_sql = """UPDATE Events
+                            SET Title=%(title)s,
                                 EventDate=%(event_date)s,
                                 MeetAndGreetTime=%(meet_and_greet_time)s,
                                 DoorsOpenTime=%(doors_open_time)s,
                                 EventTime=%(event_time)s,
                                 URL=%(url)s,
-                                ExternalEventVenueId=%(external_event_venue_id)s,
+                                VenueId=%(venue_id)s,
                                 DisableLinkButton=%(disable_link_button)s,
                                 DisableLinkReason=%(disable_link_reason)s,
                                 ExternalVipLink=%(external_vip_link)s,
@@ -750,20 +746,21 @@ class AdminService:
                             WHERE EventId=%(event_id)s"""
 
             success = db_update(update_sql, update_data)
+            event_id = event_to_update.event_id
         else:
             update_data["seller_id"] = get_override_int_value_or_default(
                 event_to_update.seller_id
             )
-            update_sql = """INSERT INTO ExternalEvents (SellerId, Title, EventDate,
-                TicketSocketEventId, EventTime, MeetAndGreetTime, DoorsOpenTime, URL, 
-                ExternalEventVenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
+            update_sql = """INSERT INTO Events (SellerId, Title, EventDate,
+                EventTime, MeetAndGreetTime, DoorsOpenTime, URL,
+                VenueId, DisableLinkButton, DisableLinkReason, ExternalVipLink, 
                 DisableVipLinkButton, DisableVipLinkReason, IsActive, IsAddedToBandsInTown, 
                 IsDeleted, IsHidden, AnnounceDate, CheckInLocation, CheckInNotes, 
                 EmailSentToVips, TextSentToVips, Thumbnail, ExcludeFromDashboard, IsCancelled,
                 EventNote, Created, LastUpdate) VALUES
-                (%(seller_id)s, %(title)s, %(event_date)s,%(ticket_socket_event_id)s,
+                (%(seller_id)s, %(title)s, %(event_date)s,
                 %(event_time)s, %(meet_and_greet_time)s,%(doors_open_time)s, %(url)s,
-                %(external_event_venue_id)s, %(disable_link_button)s,
+                %(venue_id)s, %(disable_link_button)s,
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
                 %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isDeleted)s, 
                 %(isHidden)s, %(announceDate)s, %(checkInLocation)s, %(checkInNotes)s,
@@ -773,6 +770,13 @@ class AdminService:
             event_id = db_insert(update_sql, update_data)
             success = event_id > 0
 
+        if not success:
+            return False
+        ticket_partner_event_id = TicketPartnerService().ensure_event(
+            event_id, event_to_update.ticket_partner_id or 1, ticket_socket_event_id
+        )
+        if ticket_partner_event_id <= 0:
+            return False
         if (
             ticket_socket_event_id is not None
             and event_to_update.is_deleted is False
@@ -818,6 +822,6 @@ class AdminService:
             if success is True:
                 dashboard_service = DashboardService()
                 dashboard_service.rebuild_daily_order_data_for_event(
-                    ticket_socket_event_id
+                    ticket_partner_event_id
                 )
         return success

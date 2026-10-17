@@ -8,8 +8,9 @@ mkdir -p /app/tmp
 chown -R 5678:5678 /app/tmp
 
 # Copy dotenv from secrets (root-only readable) into /app/.env for appuser
-if [ -f /run/secrets/nationalactsapi_env ]; then
-  cp /run/secrets/nationalactsapi_env /app/.env
+ENV_SECRET="${NATIONALACTS_ENV_SECRET:-/run/secrets/nationalactsapi_env}"
+if [ -f "$ENV_SECRET" ]; then
+  cp "$ENV_SECRET" /app/.env
   chown 5678:5678 /app/.env
   chmod 600 /app/.env
 fi

@@ -1,0 +1,48 @@
+# A separate database/project/volume for release rehearsal; never uses db_data.
+name: nationalacts-staging
+services:
+  staging-db:
+    image: mariadb:12.2.2-noble
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: nationalacts_stage
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/staging_root_password
+      MARIADB_USER: nationalacts_migrator
+      MARIADB_PASSWORD_FILE: /run/secrets/staging_migration_password
+    secrets:
+      - staging_root_password
+      - staging_migration_password
+    volumes:
+      - staging_db_data:/var/lib/mysql
+    networks:
+      - staging_net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  migrate:
+    image: ${API_IMAGE:?Set API_IMAGE to the candidate API image digest}
+    profiles: ["migration"]
+    environment:
+      NATIONALACTS_ENV_SECRET: /run/secrets/staging_migrations_env
+    secrets:
+      - staging_migrations_env
+    networks:
+      - staging_net
+    command: ["python", "-m", "tools.migrate", "upgrade"]
+    depends_on:
+      staging-db:
+        condition: service_healthy
+networks:
+  staging_net:
+    internal: true
+volumes:
+  staging_db_data:
+secrets:
+  staging_root_password:
+    file: ./secrets/staging_root_password.txt
+  staging_migration_password:
+    file: ./secrets/staging_migration_password.txt
+  staging_migrations_env:
+    file: ./secrets/nationalactsapi_staging.env

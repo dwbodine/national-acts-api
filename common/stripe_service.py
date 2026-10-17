@@ -12,6 +12,7 @@ from stripe.params import (
     PaymentIntentListParamsCreated,
 )
 
+from common.db import db_insert, db_query_all
 from common.models.stripe import StripeTransaction
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,8 @@ class StripeService:
             for payment_intent in payment_intents.auto_paging_iter():
                 transaction_count += 1
 
-                order_id = payment_intent.metadata["orderId"]
+                metadata = payment_intent.metadata
+                order_id = metadata["orderId"] if "orderId" in metadata else None
 
                 if not order_id:
                     continue
@@ -78,7 +80,7 @@ class StripeService:
                 )
                 transactions.append(transaction)
 
-                # Upsert into your database here
+                self._upsert_transaction(transaction)
 
             logger.info(
                 "Fetched %s Stripe payment intents; %s contained an order ID",
@@ -89,3 +91,63 @@ class StripeService:
         except Exception:  # pylint: disable=broad-exception-caught
             logger.exception("Error fetching payment intents")
             return None
+
+    def _upsert_transaction(self, transaction: StripeTransaction):
+        """Insert a successful intent, preserving any previously stored transaction."""
+        orders = db_query_all(
+            """SELECT DISTINCT tpo.TicketPartnerOrderId
+            FROM TicketSocketOrders tso
+            JOIN TicketPartnerEvents tpe
+                ON tpe.TicketPartnerId=2
+                AND tpe.PartnerEventId=tso.TicketSocketEventId
+            JOIN TicketPartnerOrders tpo
+                ON tpo.TicketPartnerEventId=tpe.TicketPartnerEventId
+                AND tpo.PartnerOrderId=tso.Id
+            WHERE tso.OrderId=%(order_id)s""",
+            {"order_id": transaction.order_id},
+        )
+        # Keep unmatched/ambiguous transactions without assigning the wrong order.
+        partner_order_id = (
+            orders[0]["TicketPartnerOrderId"] if len(orders) == 1 else None
+        )
+        if partner_order_id is None:
+            logger.warning(
+                "Stripe transaction %s matched %s partner orders for order %s",
+                transaction.stripe_id,
+                len(orders),
+                transaction.order_id,
+            )
+
+        data = {
+            "stripe_id": transaction.stripe_id,
+            "partner_order_id": partner_order_id,
+            "event_name": transaction.event_name or "",
+            "description": transaction.description or "",
+            "date_received": datetime.fromtimestamp(
+                transaction.date_received, timezone.utc
+            ).replace(tzinfo=None),
+            "total": transaction.total,
+            "insurance": transaction.insurance,
+            "processing_fee": transaction.processing_fee,
+            "customer_name": transaction.customer_name or "",
+            "customer_email": transaction.customer_email or "",
+            "customer_phone": transaction.customer_phone or "",
+            "currency": transaction.currency,
+            "source_url": transaction.source_url or "",
+            "exchange_rate": transaction.exchange_rate,
+        }
+        # All stored rows are successful. The duplicate branch must not refresh
+        # amounts, order links, or LastUpdated, including concurrent imports.
+        db_insert(
+            """INSERT INTO StripeTransactions (
+                StripeTransactionId, TicketPartnerOrderId, EventName, Description,
+                DateReceived, Total, Insurance, ProcessingFee, CustomerName,
+                CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate
+            ) VALUES (
+                %(stripe_id)s, %(partner_order_id)s, %(event_name)s, %(description)s,
+                %(date_received)s, %(total)s, %(insurance)s, %(processing_fee)s,
+                %(customer_name)s, %(customer_email)s, %(customer_phone)s,
+                %(currency)s, %(source_url)s, %(exchange_rate)s
+            ) ON DUPLICATE KEY UPDATE StripeTransactionId=StripeTransactionId""",
+            data,
+        )

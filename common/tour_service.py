@@ -106,7 +106,7 @@ class TourService:
         rows = db_query_all(sql, data)
         for row in rows:
             evt: VipEvent = None
-            event_id = get_override_int_value_or_default(row["ExternalEventId"])
+            event_id = get_override_int_value_or_default(row["EventId"])
             if event_id is not None and event_id > 0:
                 evts = event_service.get_events_and_orders(
                     event_id=event_id,
@@ -187,13 +187,11 @@ class TourService:
         db_delete(delete_sql, delete_data)
         for event in events:
             event_sql = """INSERT INTO TourEvent
-                (TourId, ExternalEventId)
+                (TourId, EventId)
                 VALUES(%(tourId)s, %(externalEventId)s)"""
             event_data = {
                 "tourId": get_override_int_value_or_default(tour_id),
-                "externalEventId": get_override_int_value_or_default(
-                    event.external_event_id
-                ),
+                "externalEventId": get_override_int_value_or_default(event.event_id),
             }
             tour_event_id = db_insert(event_sql, event_data)
             success = tour_event_id > 0

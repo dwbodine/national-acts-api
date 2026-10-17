@@ -231,7 +231,7 @@ def test_get_events_and_orders_maps_events_and_builds_filtered_url(monkeypatch):
         "&startsBefore=200&category=3",
         "jwt-token",
     )
-    assert events[0].event_id == 50
+    assert events[0].original_event_id == 50
     assert events[0].title == "VIP Night"
     assert events[0].event_category_id == 3
     assert isinstance(events[0].event_category_id, int)
@@ -506,8 +506,8 @@ def test_get_orders_from_event_id_maps_matching_order_response(monkeypatch):
     orders = service.get_orders_from_event_id(77)
 
     assert len(orders) == 1
-    assert orders[0].order_id == 11
-    assert orders[0].event_id == 77
+    assert orders[0].original_order_id == 11
+    assert orders[0].original_event_id == 77
     assert orders[0].cancelled is True
     assert orders[0].deleted is True
     assert orders[0].user_id == 9
@@ -528,7 +528,7 @@ def test_get_orders_from_event_id_maps_matching_order_response(monkeypatch):
     )
     assert orders[0].purchase_unix_timestamp == 1713882000
     assert len(orders[0].tickets) == 1
-    assert orders[0].tickets[0].ticket_id == 1001
+    assert orders[0].tickets[0].original_ticket_id == 1001
     assert orders[0].tickets[0].ticket_type == "VIP"
     assert orders[0].tickets[0].price == 50.0
     assert orders[0].tickets[0].service_fee == 10.0
@@ -730,7 +730,7 @@ def test_get_events_and_orders_skips_invalid_rows_and_uses_custom_field_fallback
     events = service.get_events_and_orders(unix_start=100)
 
     assert len(events) == 1
-    assert events[0].event_id == 65
+    assert events[0].original_event_id == 65
     assert events[0].venue.address1 == "Suite C"
     assert events[0].venue.city == "Nashville"
     assert events[0].venue.timezone == "America/Chicago"
@@ -967,8 +967,8 @@ def test_parse_response_to_order_object_handles_empty_ticket_payloads(monkeypatc
 
     order = parse_order(11, 77, {"cancelled": True, "deleted": True})
 
-    assert order.order_id == 11
-    assert order.event_id == 77
+    assert order.original_order_id == 11
+    assert order.original_event_id == 77
     assert order.cancelled is True
     assert order.deleted is True
     assert not order.tickets
@@ -1004,7 +1004,7 @@ def test_parse_response_to_order_object_skips_tickets_without_purchase_dates_or_
         },
     )
 
-    assert order.order_id == 11
+    assert order.original_order_id == 11
     assert not order.tickets
 
 
@@ -1257,7 +1257,7 @@ def test_parse_response_to_order_object_handles_missing_total_counts(monkeypatch
 
     order = parse_order(11, 77, {"tickets": {"data": []}})
 
-    assert order.order_id == 11
+    assert order.original_order_id == 11
     assert not order.tickets
 
 

@@ -12,7 +12,7 @@ from common.db import (
     db_insert,
     db_convert_list_to_parameters,
 )
-from common.daily_order_service import DailyOrderService
+from common.ticket_partner_service import TicketPartnerService
 from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller
 from common.models.ticket_socket import TicketSocketTicketType
 from common.utility import (
@@ -81,16 +81,16 @@ class OrderService:
                 WITH
                 RefundOrders AS (
                 SELECT DISTINCT
-                    TicketSocketOrderTickets.TicketSocketOrderId As RefundOrderId
+                    TicketDetails.TicketPartnerOrderId As RefundOrderId
                 FROM
-                    TicketSocketOrderTickets
+                    TicketDetails
                         WHERE (
-                            TicketSocketOrderTickets.IsRefunded = 1 
-                                AND TicketSocketOrderTickets.RefundDate 
+                            TicketDetails.IsRefunded = 1
+                                AND TicketDetails.RefundDate
                                 BETWEEN %(startDate)s AND %(endDate)s
                         ) OR (
-                            TicketSocketOrderTickets.IsChargedBack = 1 
-                                AND TicketSocketOrderTickets.ChargebackDate 
+                            TicketDetails.IsChargedBack = 1
+                                AND TicketDetails.ChargebackDate
                                 BETWEEN %(startDate)s AND %(endDate)s
                         )
                 )"""
@@ -103,105 +103,69 @@ class OrderService:
                 WITH
                 RefundOrders AS (
                 SELECT DISTINCT
-                    TicketSocketOrderTickets.TicketSocketOrderId As RefundOrderId
+                    TicketDetails.TicketPartnerOrderId As RefundOrderId
                 FROM
-                    TicketSocketOrderTickets
+                    TicketDetails
                         WHERE (
-                            TicketSocketOrderTickets.IsRefunded = 1 
-                                AND TicketSocketOrderTickets.RefundDate >= %(startDate)s
+                            TicketDetails.IsRefunded = 1
+                                AND TicketDetails.RefundDate >= %(startDate)s
                         ) OR(
-                            TicketSocketOrderTickets.IsChargedBack = 1 
-                                AND TicketSocketOrderTickets.ChargebackDate >= %(startDate)s
+                            TicketDetails.IsChargedBack = 1
+                                AND TicketDetails.ChargebackDate >= %(startDate)s
                         )
                 )"""
-        sql += """
-                SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
-                    ExchangeRates.Symbol,
-                    ExchangeRates.Multiplier,
-                    UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev, 
-                    TicketSocketOrders.*,
-                    COALESCE(ExternalEvents.Title, TicketSocketEvents.Title) as EventTitle, 
-                    TicketSocketEvents.EventDate, 
-                    Sellers.Name AS SellerName, 
-                    Sellers.SellerId, 
-                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue, 
-                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS EventAddress, 
-                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS EventCity, 
-                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS EventState, 
-                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
-                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS EventCountry
-                    FROM TicketSocketOrders
-                    JOIN TicketSocketEvents
-                        ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
-                    JOIN ExternalEvents
-                        ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                    JOIN SellerEventCategory 
-                        ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId
-                    JOIN Sellers
-                        ON Sellers.SellerId = SellerEventCategory.SellerId 
-                    JOIN TicketSocket
-                        ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
-                    JOIN ExchangeRates
-                        ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
-                    LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate
-                    LEFT JOIN ExternalEventVenues
-                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
-                    LEFT JOIN Country
-                        ON Country.CountryId = ExternalEventVenues.CountryId"""
 
-        sql += " WHERE "
+        sql += "SELECT * FROM OrderOverview o WHERE o.Id IS NOT NULL"
         data = {}
 
         where_clause: list[str] = []
         if ts_order_id is not None and ts_order_id > 0:
-            where_clause.append("TicketSocketOrders.Id = %(order_id)s")
+            where_clause.append("o.TicketPartnerOrderId = %(order_id)s")
             data["order_id"] = ts_order_id
         elif search_term is not None and len(search_term) > 0:
             search_sql: str = ""
             if search_term.isnumeric():
-                search_sql = """TicketSocketOrders.OrderId=""" + search_term
+                search_sql = """o.OrderId=""" + search_term
             else:
-                search_sql = """CONCAT_WS (' ', Sellers.Name,
-                            COALESCE(ExternalEvents.Title, TicketSocketEvents.Title),
-                            COALESCE(TicketSocketOrders.PurchaserLastName, ''),
-                            COALESCE(TicketSocketOrders.PurchaserFirstName, ''),
-                            COALESCE(TicketSocketOrders.Email, ''),
-                            COALESCE(Country.CountryName, TicketSocketEvents.Country, '')) 
+                search_sql = """CONCAT_WS (' ', o.SellerName,
+                            o.EventTitle,
+                            COALESCE(o.PurchaserLastName, ''),
+                            COALESCE(o.PurchaserFirstName, ''),
+                            COALESCE(o.Email, ''),
+                            COALESCE(o.EventCountry, ''))
                             LIKE ('%""" + search_term + """%')"""
             where_clause.append(search_sql)
         else:
             if ignore_flags is not True:
                 if show_deleted is not True:
-                    where_clause.append("TicketSocketOrders.IsDeleted = 0")
+                    where_clause.append("o.IsDeleted = 0")
                 else:
                     show_inactive = True
 
                 if show_inactive is True:
-                    where_clause.append("TicketSocketOrders.IsActive = 0")
+                    where_clause.append("o.IsActive = 0")
                 else:
-                    where_clause.append("TicketSocketOrders.IsActive = 1")
+                    where_clause.append("o.IsActive = 1")
 
                 if not show_hidden_from_dashboard:
-                    where_clause.append("ExternalEvents.ExcludeFromDashboard <> 1")
+                    where_clause.append("o.ExcludeFromDashboard <> 1")
 
             if len(seller_event_category_ids) > 0:
                 seller_event_category_id_str = db_convert_list_to_parameters(
                     seller_event_category_ids, data, "sellerEventCategoryId"
                 )
                 where_clause.append(
-                    "TicketSocketEvents.SellerEventCategoryId IN "
-                    + seller_event_category_id_str
+                    "o.SellerEventCategoryId IN " + seller_event_category_id_str
                 )
 
-            both_dates_sql = """(TicketSocketOrders.PurchaseDate
+            both_dates_sql = """(o.PurchaseDate
                                 BETWEEN %(startDate)s AND %(endDate)s OR
-                                TicketSocketOrders.Id in (
+                                o.TicketPartnerOrderId in (
                                     SELECT RefundOrderId FROM RefundOrders
                                 ))"""
 
-            start_date_sql = """(TicketSocketOrders.PurchaseDate >= %(startDate)s OR
-                                TicketSocketOrders.Id in (
+            start_date_sql = """(o.PurchaseDate >= %(startDate)s OR
+                                o.TicketPartnerOrderId in (
                                     SELECT RefundOrderId FROM RefundOrders
                                 ))"""
 
@@ -221,31 +185,30 @@ class OrderService:
                 data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
 
         if len(where_clause) > 0:
-            sql += " AND ".join(where_clause)
+            sql += " AND " + " AND ".join(where_clause)
 
         if search_term is not None:
-            sql += """ ORDER BY TicketSocketOrders.PurchaserLastName ASC,
-                    TicketSocketOrders.PurchaserFirstName ASC, 
-                    TicketSocketOrders.Email ASC"""
+            sql += """ ORDER BY o.PurchaserLastName ASC,
+                    o.PurchaserFirstName ASC,
+                    o.Email ASC"""
         elif sort_descending is True:
-            sql += """ ORDER BY TicketSocketOrders.PurchaseTimestamp DESC,
-                    TicketSocketEvents.EventDate DESC, 
-                    TicketSocketEvents.Title DESC"""
+            sql += """ ORDER BY o.PurchaseTimestamp DESC,
+                    o.EventDate DESC,
+                    o.EventTitle DESC"""
         else:
-            sql += """ ORDER BY TicketSocketOrders.PurchaseTimestamp ASC,
-                    TicketSocketEvents.EventDate ASC, 
-                    TicketSocketEvents.Title ASC"""
+            sql += """ ORDER BY o.PurchaseTimestamp ASC,
+                    o.EventDate ASC,
+                    o.EventTitle ASC"""
 
-        sql = sql.replace("\n", "")
+        sql = sql.replace("\n", " ")
 
         order_rows = db_query_all(sql, data)
         for row in order_rows:
             order_id = get_override_int_value_or_default(row["OrderId"])
             event_id = get_override_int_value_or_default(row["EventId"])
-            ticket_socket_order_id = get_override_int_value_or_default(row["Id"])
             order = VipOrder()
-            order.order_id = order_id
-            order.event_id = event_id
+            order.original_order_id = order_id
+            order.original_event_id = event_id
             order.last_update = get_override_string_value_or_default(row["LastUpdate"])
             order.event_title = get_override_string_value_or_default(row["EventTitle"])
             order.venue = get_override_string_value_or_default(row["Venue"])
@@ -261,10 +224,15 @@ class OrderService:
             order.event_date = get_override_string_value_or_default(row["EventDate"])
             order.seller_name = get_override_string_value_or_default(row["SellerName"])
             order.seller_id = get_override_int_value_or_default(row["SellerId"])
-            order.ticket_socket_event_id = get_override_int_value_or_default(
-                row["TicketSocketEventId"]
+            order.ticket_partner_event_id = get_override_int_value_or_default(
+                row["TicketPartnerEventId"]
             )
-            order.ticket_socket_order_id = ticket_socket_order_id
+            order.ticket_partner_order_id = get_override_int_value_or_default(
+                row["TicketPartnerOrderId"]
+            )
+            order.ticket_partner_id = get_override_int_value_or_default(
+                row["TicketPartnerId"]
+            )
             order.purchase_date = get_override_string_value_or_default(
                 row["PurchaseDate"]
             )
@@ -312,13 +280,15 @@ class OrderService:
             order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
             order.is_comped = get_override_bool_value_or_default(row["IsComped"])
             order.notes = get_override_string_value_or_default(row["Notes"])
-            order.is_manual_transfer = get_override_bool_value_or_default(row["IsManualTransfer"])
+            order.is_manual_transfer = get_override_bool_value_or_default(
+                row["IsManualTransfer"]
+            )
 
             if order.is_deleted is True:
                 order.is_active = False
 
             tickets = self.get_tickets_from_order_id(
-                ticket_socket_order_id, ignore_flags
+                order.ticket_partner_order_id, ignore_flags
             )
             order.tickets = tickets
             order.get_totals()
@@ -327,69 +297,36 @@ class OrderService:
 
     def get_orders_from_event_id(
         self,
-        ticket_socket_event_id: int,
+        ticket_partner_event_id: int,
         show_inactive: bool = False,
         show_deleted: bool = False,
         ignore_flags: bool = False,
     ):
         """
-        Get orders from TicketSocketEventId
+        Get orders from TicketPartnerEventId
         """
         orders: list[VipOrder] = []
-        sql = """SELECT COALESCE(ExchangeRateHistory.USDRate, 1.0) AS ExchangeRate,
-                    ExchangeRates.Symbol, UPPER(ExchangeRates.ServiceTokenId) AS CurrencyAbbrev,
-                    ExchangeRates.Multiplier,
-                    TicketSocketOrders.*,
-                    TicketSocketEvents.Title as EventTitle,
-                    TicketSocketEvents.EventDate, 
-                    Sellers.Name AS SellerName,
-                    Sellers.SellerId,
-                    COALESCE(ExternalEventVenues.Venue, TicketSocketEvents.Venue) AS Venue, 
-                    COALESCE(ExternalEventVenues.Address, TicketSocketEvents.Address) AS EventAddress, 
-                    COALESCE(ExternalEventVenues.City, TicketSocketEvents.City) AS EventCity, 
-                    COALESCE(ExternalEventVenues.State, TicketSocketEvents.State) AS EventState, 
-                    COALESCE(ExternalEventVenues.Zip, TicketSocketEvents.Zip) AS EventZip, 
-                    COALESCE(Country.CountryName, TicketSocketEvents.Country) AS EventCountry 
-                    FROM TicketSocketOrders
-                    JOIN TicketSocketEvents 
-                        ON TicketSocketEvents.Id = TicketSocketOrders.TicketSocketEventId 
-                    JOIN ExternalEvents
-                        ON ExternalEvents.TicketSocketEventId = TicketSocketEvents.Id
-                    JOIN SellerEventCategory 
-                        ON SellerEventCategory.SellerEventCategoryId = TicketSocketEvents.SellerEventCategoryId 
-                    JOIN Sellers 
-                        ON Sellers.SellerId = SellerEventCategory.SellerId 
-                    JOIN TicketSocket 
-                        ON TicketSocket.TicketSocketId = SellerEventCategory.TicketSocketId
-                    JOIN ExchangeRates 
-                        ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
-                    LEFT JOIN ExchangeRateHistory 
-                        ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId 
-                        AND ExchangeRateHistory.MidnightDate = TicketSocketOrders.PurchaseDate
-                    LEFT JOIN ExternalEventVenues
-                        ON ExternalEvents.ExternalEventVenueId = ExternalEventVenues.VenueID
-                    LEFT JOIN Country
-                        ON Country.CountryId = ExternalEventVenues.CountryId 
-                    WHERE TicketSocketOrders.TicketSocketEventId=%(ticketSocketEventId)s"""
-        data = {"ticketSocketEventId": ticket_socket_event_id}
+        sql = """SELECT * FROM OrderOverview o WHERE o.TicketPartnerId=2
+                    AND o.Id IS NOT NULL
+                    AND o.TicketPartnerEventId=%(ticketPartnerEventId)s"""
+        data = {"ticketPartnerEventId": ticket_partner_event_id}
 
         if show_deleted is not True and ignore_flags is not True:
-            sql += """ AND TicketSocketOrders.IsDeleted = 0"""
+            sql += """ AND o.IsDeleted = 0"""
 
         if show_inactive is not True and ignore_flags is not True:
-            sql += """ AND TicketSocketOrders.IsActive = 1"""
+            sql += """ AND o.IsActive = 1"""
 
-        sql += """ ORDER BY TicketSocketOrders.PurchaserLastName ASC,
-                    TicketSocketOrders.PurchaserFirstName ASC"""
+        sql += """ ORDER BY o.PurchaserLastName ASC,
+                    o.PurchaserFirstName ASC"""
 
         rows = db_query_all(sql, data)
         for row in rows:
             order_id = get_override_int_value_or_default(row["OrderId"])
             event_id = get_override_int_value_or_default(row["EventId"])
-            ticket_socket_order_id = get_override_int_value_or_default(row["Id"])
             order = VipOrder()
-            order.order_id = order_id
-            order.event_id = event_id
+            order.original_order_id = order_id
+            order.original_event_id = event_id
             order.venue = get_override_string_value_or_default(row["Venue"])
             order.event_title = get_override_string_value_or_default(row["EventTitle"])
             order.event_address = get_override_string_value_or_default(
@@ -404,8 +341,15 @@ class OrderService:
             order.event_date = get_override_string_value_or_default(row["EventDate"])
             order.seller_name = get_override_string_value_or_default(row["SellerName"])
             order.seller_id = get_override_int_value_or_default(row["SellerId"])
-            order.ticket_socket_event_id = ticket_socket_event_id
-            order.ticket_socket_order_id = ticket_socket_order_id
+            order.ticket_partner_event_id = get_override_int_value_or_default(
+                row["TicketPartnerEventId"]
+            )
+            order.ticket_partner_order_id = get_override_int_value_or_default(
+                row["TicketPartnerOrderId"]
+            )
+            order.ticket_partner_id = get_override_int_value_or_default(
+                row["TicketPartnerId"]
+            )
             order.purchase_date = get_override_string_value_or_default(
                 row["PurchaseDate"]
             )
@@ -453,13 +397,15 @@ class OrderService:
             order.is_deleted = get_override_bool_value_or_default(row["IsDeleted"])
             order.is_comped = get_override_bool_value_or_default(row["IsComped"])
             order.notes = get_override_string_value_or_default(row["Notes"])
-            order.is_manual_transfer = get_override_bool_value_or_default(row["IsManualTransfer"])
+            order.is_manual_transfer = get_override_bool_value_or_default(
+                row["IsManualTransfer"]
+            )
 
             if order.is_deleted is True:
                 order.is_active = False
 
             tickets = self.get_tickets_from_order_id(
-                ticket_socket_order_id, ignore_flags
+                order.ticket_partner_order_id, ignore_flags
             )
             order.tickets = tickets
             order.get_totals()
@@ -467,81 +413,56 @@ class OrderService:
         return orders
 
     def rebuild_daily_order_data_for_ticket(self, ticket_id: int):
-        """
-        Clean out daily order data for order attached to ticket
-        """
-        order_sql = """SELECT TicketSocketOrderId
-                        FROM TicketSocketOrderTickets
-                        WHERE Id=%(ticketId)s"""
-        order_data = {"ticketId": ticket_id}
-        row = db_query_one(order_sql, order_data)
-        if row:
-            order_id = int(row["TicketSocketOrderId"])
-            if order_id > 0:
-                self.rebuild_daily_order_data_for_order(order_id)
+        """Rebuild reporting for the parent of an application ticket."""
+        row = db_query_one(
+            """SELECT TicketPartnerOrderId FROM TicketDetails
+            WHERE TicketPartnerTicketId=%(id)s""",
+            {"id": ticket_id},
+        )
+        if row and int(row["TicketPartnerOrderId"]) > 0:
+            self.rebuild_daily_order_data_for_order(int(row["TicketPartnerOrderId"]))
 
     def rebuild_daily_order_data_for_order(self, order_id: int):
-        """
-        Clean out and rebuild daily order data for order
-        """
-        event_sql = """SELECT TicketSocketEvents.Id AS TicketSocketEventId,
-                            YEAR(TicketSocketEvents.EventDate) AS EventYear, 
-                            SellerEventCategory.SellerId
-                            FROM TicketSocketEvents
-                            JOIN TicketSocketOrders ON
-                             TicketSocketOrders.TicketSocketEventId = 
-                             TicketSocketEvents.Id        
-                            JOIN SellerEventCategory ON 
-                             TicketSocketEvents.SellerEventCategoryId = 
-                             SellerEventCategory.SellerEventCategoryId                         
-                            WHERE TicketSocketOrders.Id=%(ticket_socket_order_id)s"""
-        event_data = {"ticket_socket_order_id": order_id}
-        event_row = db_query_one(event_sql, event_data)
-        if event_row:
-            event_id: int = get_override_int_value_or_default(
-                event_row["TicketSocketEventId"]
+        """Rebuild reporting for the mapped event."""
+        # Defer this dependency: DashboardService also uses OrderService.
+        # pylint: disable-next=import-outside-toplevel,cyclic-import
+        from common.dashboard_service import (
+            DashboardService,
+        )
+
+        row = db_query_one(
+            """SELECT DISTINCT TicketPartnerEventId FROM OrderDetails
+            WHERE TicketPartnerOrderId=%(id)s""",
+            {"id": order_id},
+        )
+        if row:
+            DashboardService().rebuild_daily_order_data_for_event(
+                int(row["TicketPartnerEventId"])
             )
-            event_year: int = get_override_int_value_or_default(event_row["EventYear"])
-            event_seller_id: int = get_override_int_value_or_default(
-                event_row["SellerId"]
-            )
-
-            start = datetime.strptime(
-                f"{event_year}-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
-            ).timestamp()
-            end = datetime(event_year, 12, 31).timestamp()
-
-            orders = self.get_orders(start=start, end=end, seller_id=event_seller_id)
-
-            daily_order_service = DailyOrderService()
-            daily_order_service.cleanup_daily_order_data_for_event(event_id)
-
-            daily_order_service.update_daily_order_data(orders, start, end, None)
 
     def get_tickets_from_order_id(
-        self, ticket_socket_order_id: int, ignore_flags: bool = False
+        self, ticket_partner_order_id: int, ignore_flags: bool = False
     ):
         """
-        Get tickets from TicketSocketOrderId
+        Get tickets from TicketPartnerOrderId.
         """
         tickets: list[VipTicket] = []
-        sql = """SELECT TicketSocketOrderTickets.*,
-                    COALESCE(TicketSocketTicketTypes.TicketTypeOrder, 1) AS TicketTypeOrder
-                FROM TicketSocketOrderTickets
-                JOIN TicketSocketOrders on TicketSocketOrderTickets.TicketSocketOrderId = TicketSocketOrders.Id
-                LEFT JOIN TicketSocketTicketTypes ON 
-                    TicketSocketOrderTickets.TicketSocketTicketTypeId = TicketSocketTicketTypes.TicketSocketTicketTypeId
-	                AND TicketSocketTicketTypes.TicketSocketEventId = TicketSocketOrders.TicketSocketEventId
-                WHERE TicketSocketOrderTickets.TicketSocketOrderId =%(ticket_socket_order_id)s"""
+        sql = """SELECT TicketDetails.*,
+                    TicketSocketOrderTicketId AS Id,
+                    TicketSocketNativeTicketId AS TicketId,
+                    TicketSocketLastUpdate AS LastUpdate
+                FROM TicketDetails
+                WHERE TicketPartnerOrderId=%(ticket_partner_order_id)s
+                    AND TicketPartnerId=2 AND TicketSocketOrderTicketId IS NOT NULL"""
         if ignore_flags is not True:
-            sql += """ AND TicketSocketOrderTickets.IsActive=1"""
-        data = {"ticket_socket_order_id": ticket_socket_order_id}
+            sql += " AND IsActive=1"
+        data = {"ticket_partner_order_id": ticket_partner_order_id}
 
         rows = db_query_all(sql, data)
         for row in rows:
             ticket_id: int = get_override_int_value_or_default(row["TicketId"])
             ticket = VipTicket()
-            ticket.ticket_id = ticket_id
+            ticket.original_ticket_id = ticket_id
             ticket.is_active = get_override_bool_value_or_default(row["IsActive"])
             ticket.ticket_type = get_override_string_value_or_default(row["TicketType"])
             ticket.price = get_override_float_value_or_default(row["Price"])
@@ -573,9 +494,9 @@ class OrderService:
                 row["AttendeeEmail"]
             )
             ticket.shirt_size = get_override_string_value_or_default(row["ShirtSize"])
-            ticket.ticket_socket_order_id = ticket_socket_order_id
-            ticket.ticket_socket_order_ticket_id = get_override_int_value_or_default(
-                row["Id"]
+            ticket.ticket_partner_order_id = ticket_partner_order_id
+            ticket.ticket_partner_order_ticket_id = get_override_int_value_or_default(
+                row["TicketPartnerTicketId"]
             )
             is_refunded: bool = get_override_bool_value_or_default(row["IsRefunded"])
             ticket.is_service_fee_refunded = get_override_bool_value_or_default(
@@ -611,10 +532,15 @@ class OrderService:
 
     def disable_orders(self, ticket_socket_order_ids: list[int], disabled: bool):
         """
-        Marks orders as disabled
+        Marks application partner order IDs as disabled.
         """
         success: bool = True
-        for ticket_socket_order_id in ticket_socket_order_ids:
+        for partner_order_id in ticket_socket_order_ids:
+            ticket_socket_order_id = TicketPartnerService().socket_order(
+                partner_order_id
+            )
+            if ticket_socket_order_id is None:
+                return False
             sql = """UPDATE TicketSocketOrders
                         SET IsActive=%(is_active)s,
                         LastUpdate=CURRENT_TIMESTAMP
@@ -628,15 +554,20 @@ class OrderService:
             success = db_update(sql, data)
             if success is False:
                 break
-            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+            self.rebuild_daily_order_data_for_order(partner_order_id)
         return success
 
     def delete_orders(self, ticket_socket_order_ids: list[int], deleted: bool):
         """
-        Marks orders as deleted
+        Marks application partner order IDs as deleted.
         """
         success: bool = True
-        for ticket_socket_order_id in ticket_socket_order_ids:
+        for partner_order_id in ticket_socket_order_ids:
+            ticket_socket_order_id = TicketPartnerService().socket_order(
+                partner_order_id
+            )
+            if ticket_socket_order_id is None:
+                return False
             sql = """UPDATE TicketSocketOrders
                         SET IsDeleted=%(isDeleted)s,
                         LastUpdate=CURRENT_TIMESTAMP
@@ -648,18 +579,23 @@ class OrderService:
             success = db_update(sql, data)
             if success is False:
                 break
-            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+            self.rebuild_daily_order_data_for_order(partner_order_id)
         return success
 
     def check_in_tickets(
         self, ticket_socket_order_ticket_ids: list[int], checked_in: bool
     ):
         """
-        Marks tickets as checked in
+        Marks application partner ticket IDs as checked in.
         """
         success: bool = True
         pacific_tz = pytz.timezone("America/Los_Angeles")
-        for ticket_socket_order_ticket_id in ticket_socket_order_ticket_ids:
+        for partner_ticket_id in ticket_socket_order_ticket_ids:
+            ticket_socket_order_ticket_id = TicketPartnerService().socket_ticket(
+                partner_ticket_id
+            )
+            if ticket_socket_order_ticket_id is None:
+                return False
             sql = """UPDATE TicketSocketOrderTickets
                         SET IsCheckedIn=%(checkedIn)s,
                         CheckedInDate=%(checkedInDate)s,
@@ -683,13 +619,17 @@ class OrderService:
 
     def refund_order(
         self,
-        ticket_socket_order_id: int,
+        ticket_partner_order_id: int,
         refund_service_fees: bool = False,
         mark_chargeback: bool = False,
     ):
         """
         Refunds all tickets in an order
         """
+        partner_order_id = ticket_partner_order_id
+        ticket_socket_order_id = TicketPartnerService().socket_order(partner_order_id)
+        if ticket_socket_order_id is None:
+            return False
         pacific_tz = pytz.timezone("America/Los_Angeles")
         ticket_sql = """UPDATE TicketSocketOrderTickets
                 SET LastUpdate=CURRENT_TIMESTAMP"""
@@ -711,7 +651,7 @@ class OrderService:
         success = db_update(ticket_sql, ticket_data)
 
         if success is True:
-            self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+            self.rebuild_daily_order_data_for_order(partner_order_id)
 
         return success
 
@@ -719,8 +659,14 @@ class OrderService:
         self, ticket_socket_order_ticket_id: int, refund_service_fees: bool = False
     ):
         """
-        Refunds a single ticket
+        Refunds a single application partner ticket.
         """
+        partner_ticket_id = ticket_socket_order_ticket_id
+        ticket_socket_order_ticket_id = TicketPartnerService().socket_ticket(
+            partner_ticket_id
+        )
+        if ticket_socket_order_ticket_id is None:
+            return False
         pacific_tz = pytz.timezone("America/Los_Angeles")
         ticket_sql = """UPDATE TicketSocketOrderTickets
                     SET LastUpdate=CURRENT_TIMESTAMP,
@@ -737,7 +683,7 @@ class OrderService:
         success = db_update(ticket_sql, ticket_data)
 
         if success is True:
-            self.rebuild_daily_order_data_for_ticket(ticket_socket_order_ticket_id)
+            self.rebuild_daily_order_data_for_ticket(partner_ticket_id)
 
         return success
 
@@ -749,18 +695,31 @@ class OrderService:
         if order_to_update is None:
             return False
 
-        ticket_socket_order_id: int = get_override_int_value_or_default(
-            order_to_update.ticket_socket_order_id
-        )
+        partner_order_id = order_to_update.ticket_partner_order_id
+        ticket_socket_order_id = TicketPartnerService().socket_order(partner_order_id)
 
-        if ticket_socket_order_id <= 0:
+        if ticket_socket_order_id is None:
             return False
 
-        sql = """SELECT * FROM TicketSocketOrders WHERE Id=%(ticket_socket_order_id)s"""
-        data = {"ticket_socket_order_id": ticket_socket_order_id}
+        sql = """SELECT DISTINCT TicketPartnerOrderId
+                    FROM OrderDetails 
+                    WHERE TicketPartnerOrderId=%(partner_order_id)s 
+                        AND TicketPartnerId=2 AND TicketSocketOrderId IS NOT NULL"""
+        data = {"partner_order_id": partner_order_id}
         existing_order: VipOrder = db_query_one(sql, data)
 
         if existing_order is not None:
+            provider_ticket_ids = {}
+            if order_to_update.is_deleted is False:
+                for ticket in order_to_update.tickets:
+                    mapped_id = TicketPartnerService().socket_ticket(
+                        ticket.ticket_partner_order_ticket_id, partner_order_id
+                    )
+                    if mapped_id is None:
+                        return False
+                    provider_ticket_ids[ticket.ticket_partner_order_ticket_id] = (
+                        mapped_id
+                    )
             update_sql = """UPDATE TicketSocketOrders
                              SET IsActive=%(is_active)s, 
                              IsDeleted=%(isDeleted)s, 
@@ -786,14 +745,19 @@ class OrderService:
                 ),
             }
             success = db_update(update_sql, update_data)
+            if success is False:
+                return False
             if order_to_update.is_deleted is False and len(order_to_update.tickets) > 0:
                 for ticket in order_to_update.tickets:
+                    provider_ticket_id = provider_ticket_ids[
+                        ticket.ticket_partner_order_ticket_id
+                    ]
                     order_ticket_data = {
                         "ticketId": get_override_int_value_or_default(
-                            ticket.ticket_socket_order_ticket_id
+                            provider_ticket_id
                         ),
                         "ticket_socket_order_id": get_override_int_value_or_default(
-                            ticket.ticket_socket_order_id
+                            ticket_socket_order_id
                         ),
                         "price": get_override_float_value_or_default(ticket.price),
                         "serviceFee": get_override_float_value_or_default(
@@ -853,7 +817,7 @@ class OrderService:
                     if success is False:
                         break
             if success is True:
-                self.rebuild_daily_order_data_for_order(ticket_socket_order_id)
+                self.rebuild_daily_order_data_for_order(partner_order_id)
 
         return success
 
@@ -867,7 +831,9 @@ class OrderService:
         if event_id <= 0 or num_tickets <= 0:
             return False
 
-        sql = """SELECT TicketSocketEventId FROM ExternalEvents WHERE EventId=%(event_id)s"""
+        sql = """SELECT DISTINCT TicketSocketEventId
+                    FROM EventDetails 
+                    WHERE EventId=%(event_id)s AND TicketPartnerId=2"""
         data = {"event_id": event_id}
         existing_event: VipEvent = db_query_one(sql, data)
         if existing_event:
@@ -876,9 +842,14 @@ class OrderService:
             )
 
         if ticket_socket_event_id > 0:
-            type_test = """SELECT * FROM TicketSocketTicketTypes
+            if (
+                TicketPartnerService().ensure_ticket_type(ticket_socket_event_id, 0)
+                <= 0
+            ):
+                return False
+            type_test = """SELECT * FROM TicketTypeDetails
                             WHERE TicketSocketEventId=%(ticket_socket_event_id)s
-                            AND TicketSocketTicketTypeId=0"""
+                            AND TicketPartnerId=2 AND TicketSocketTicketTypeId=0"""
             type_test_data = {"ticket_socket_event_id": ticket_socket_event_id}
             existing_type: TicketSocketTicketType = db_query_one(
                 type_test, type_test_data
@@ -896,7 +867,9 @@ class OrderService:
                              VALUES (0, %(ticket_socket_event_id)s, 'Comp', 0,
                              CURRENT_TIMESTAMP)"""
                 type_id = db_insert(type_sql, type_test_data)
-                success = type_id >= 0
+                # This table has no AUTO_INCREMENT key; a successful insert can
+                # return None rather than a generated ID.
+                success = type_id is None or type_id >= 0
 
             if success is not True:
                 return False
@@ -913,6 +886,12 @@ class OrderService:
             add_data = {"ticket_socket_event_id": ticket_socket_event_id}
             order_id = db_insert(add_sql, add_data)
             success = order_id > 0
+            partner_order_id = (
+                TicketPartnerService().ensure_order(ticket_socket_event_id, order_id)
+                if success
+                else 0
+            )
+            success = success and partner_order_id > 0
             if success is True:
                 ticket_sql = """INSERT INTO TicketSocketOrderTickets (TicketSocketOrderId,
                         TicketSocketTicketTypeId, TicketId, TicketType, LastUpdate) VALUES (
@@ -924,9 +903,16 @@ class OrderService:
                     ticket_data = {"order_id": order_id, "ticketId": ticket_id}
                     new_ticket_id = db_insert(ticket_sql, ticket_data)
                     success = new_ticket_id > 0
+                    if success:
+                        success = (
+                            TicketPartnerService().ensure_ticket(
+                                partner_order_id, new_ticket_id
+                            )
+                            > 0
+                        )
                     if success is not True:
                         break
                 if success is True:
-                    self.rebuild_daily_order_data_for_order(order_id)
+                    self.rebuild_daily_order_data_for_order(partner_order_id)
 
         return success

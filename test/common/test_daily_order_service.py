@@ -45,8 +45,8 @@ def create_ticket(
 
 
 def create_order(
-    ticket_socket_event_id=10,
-    ticket_socket_order_id=100,
+    ticket_partner_event_id=10,
+    ticket_partner_order_id=100,
     purchase_date="2026-05-01",
     num_tickets=2,
     revenue=100.0,
@@ -67,8 +67,8 @@ def create_order(
     Create a VipOrder instance with the fields used by DailyOrderService.
     """
     order = VipOrder()
-    order.ticket_socket_event_id = ticket_socket_event_id
-    order.ticket_socket_order_id = ticket_socket_order_id
+    order.ticket_partner_event_id = ticket_partner_event_id
+    order.ticket_partner_order_id = ticket_partner_order_id
     order.purchase_date = purchase_date
     order.purchase_unix_timestamp = None
     order.is_deleted = is_deleted
@@ -131,7 +131,7 @@ def test_update_daily_order_data_inserts_new_purchase_rollup_and_updates_history
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: create_exchange_rate(
+        lambda self, ticket_partner_order_id, midnight_date: create_exchange_rate(
             1.5, "EUR"
         ),
     )
@@ -156,7 +156,7 @@ def test_update_daily_order_data_inserts_new_purchase_rollup_and_updates_history
     assert history.calls
     assert history.calls[0][0] is True
     assert history.calls[0][2:] == (1, 0)
-    assert select_calls[0][1]["ticketSocketEventId"] == 10
+    assert select_calls[0][1]["ticketPartnerEventId"] == 10
     assert select_calls[0][1]["purchaseDate"] == "2026-05-01"
     assert insert_calls[0][1]["orders"] == 1
     assert insert_calls[0][1]["tickets"] == 2
@@ -165,7 +165,7 @@ def test_update_daily_order_data_inserts_new_purchase_rollup_and_updates_history
     assert insert_calls[0][1]["totalRevenue"] == 120.0
     assert insert_calls[0][1]["exchangeRate"] == 1.5
     assert insert_calls[0][1]["currencySymbol"] == "EUR"
-    assert insert_calls[0][1]["ticketSocketOrderId"] is None
+    assert insert_calls[0][1]["ticketPartnerOrderId"] is None
 
 
 def test_update_daily_order_data_updates_existing_rollup(monkeypatch):
@@ -179,7 +179,7 @@ def test_update_daily_order_data_updates_existing_rollup(monkeypatch):
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr(
         "common.daily_order_service.db_query_one",
@@ -214,7 +214,7 @@ def test_update_daily_order_data_returns_none_without_history(monkeypatch):
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr(
         "common.daily_order_service.db_query_one",
@@ -244,7 +244,7 @@ def test_update_daily_order_data_stops_when_existing_update_fails(monkeypatch):
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr(
         "common.daily_order_service.db_query_one",
@@ -272,8 +272,8 @@ def test_update_daily_order_data_stops_when_insert_fails(monkeypatch):
     Test that update_daily_order_data stops processing and records failure when an insert fails.
     """
     orders = [
-        create_order(ticket_socket_event_id=10, ticket_socket_order_id=100),
-        create_order(ticket_socket_event_id=11, ticket_socket_order_id=101),
+        create_order(ticket_partner_event_id=10, ticket_partner_order_id=100),
+        create_order(ticket_partner_event_id=11, ticket_partner_order_id=101),
     ]
     history = FakeHistory()
     insert_calls = []
@@ -281,7 +281,7 @@ def test_update_daily_order_data_stops_when_insert_fails(monkeypatch):
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -308,8 +308,8 @@ def test_update_daily_order_data_skips_deleted_and_comped_orders(monkeypatch):
     Test that update_daily_order_data ignores deleted and comped orders in the rollup.
     """
     orders = [
-        create_order(ticket_socket_order_id=100, is_deleted=True),
-        create_order(ticket_socket_order_id=101, is_comped=True),
+        create_order(ticket_partner_order_id=100, is_deleted=True),
+        create_order(ticket_partner_order_id=101, is_comped=True),
     ]
     history = FakeHistory()
     monkeypatch.setattr("common.daily_order_service.time.time", lambda: 400.0)
@@ -355,7 +355,7 @@ def test_update_daily_order_data_creates_purchase_and_refund_rows(monkeypatch):
     history = FakeHistory()
 
     def fake_exchange_rate(
-        self, ticket_socket_order_id, midnight_date
+        self, ticket_partner_order_id, midnight_date
     ):  # pylint: disable=unused-argument
         if midnight_date == "2026-05-03":
             return create_exchange_rate(0.5, "CAD")
@@ -382,12 +382,12 @@ def test_update_daily_order_data_creates_purchase_and_refund_rows(monkeypatch):
     refund_row = next(call[1] for call in insert_calls if call[1]["isRefunded"] == 1)
     purchase_row = next(call[1] for call in insert_calls if call[1]["isRefunded"] == 0)
     assert refund_row["purchaseDate"] == "2026-05-03"
-    assert refund_row["ticketSocketOrderId"] == 100
+    assert refund_row["ticketPartnerOrderId"] == 100
     assert refund_row["numTicketsRefunded"] == 1
     assert refund_row["revenueRefunded"] == 50.0
     assert refund_row["serviceFeeRevenueRefunded"] == 10.0
     assert purchase_row["purchaseDate"] == "2026-05-01"
-    assert purchase_row["ticketSocketOrderId"] is None
+    assert purchase_row["ticketPartnerOrderId"] is None
     assert purchase_row["ticketRevenue"] == 100.0
 
 
@@ -412,7 +412,7 @@ def test_update_daily_order_data_creates_purchase_and_chargeback_rows(monkeypatc
     history = FakeHistory()
 
     def fake_exchange_rate(
-        self, ticket_socket_order_id, midnight_date
+        self, ticket_partner_order_id, midnight_date
     ):  # pylint: disable=unused-argument
         if midnight_date == "2026-05-04":
             return create_exchange_rate(0.7, "GBP")
@@ -443,7 +443,7 @@ def test_update_daily_order_data_creates_purchase_and_chargeback_rows(monkeypatc
         call[1] for call in insert_calls if call[1]["isChargeback"] == 0
     )
     assert chargeback_row["purchaseDate"] == "2026-05-04"
-    assert chargeback_row["ticketSocketOrderId"] == 100
+    assert chargeback_row["ticketPartnerOrderId"] == 100
     assert chargeback_row["numTicketsChargedBack"] == 1
     assert chargeback_row["revenueChargedBack"] == 50.0
     assert chargeback_row["serviceFeeRevenueChargedBack"] == 10.0
@@ -457,7 +457,7 @@ def test_update_daily_order_data_merges_refund_rows_for_same_order_id(monkeypatc
     """
     orders = [
         create_order(
-            ticket_socket_order_id=100,
+            ticket_partner_order_id=100,
             has_refunds=True,
             num_tickets=2,
             revenue=100.0,
@@ -473,7 +473,7 @@ def test_update_daily_order_data_merges_refund_rows_for_same_order_id(monkeypatc
             ],
         ),
         create_order(
-            ticket_socket_order_id=100,
+            ticket_partner_order_id=100,
             has_refunds=True,
             num_tickets=1,
             revenue=50.0,
@@ -491,7 +491,7 @@ def test_update_daily_order_data_merges_refund_rows_for_same_order_id(monkeypatc
     history = FakeHistory()
 
     def fake_exchange_rate(
-        self, ticket_socket_order_id, midnight_date
+        self, ticket_partner_order_id, midnight_date
     ):  # pylint: disable=unused-argument
         if midnight_date == "2026-05-03":
             return create_exchange_rate(0.5, "CAD")
@@ -532,7 +532,7 @@ def test_update_daily_order_data_merges_chargeback_rows_for_same_order_id(
     """
     orders = [
         create_order(
-            ticket_socket_order_id=100,
+            ticket_partner_order_id=100,
             has_chargebacks=True,
             num_tickets=2,
             revenue=100.0,
@@ -548,7 +548,7 @@ def test_update_daily_order_data_merges_chargeback_rows_for_same_order_id(
             ],
         ),
         create_order(
-            ticket_socket_order_id=100,
+            ticket_partner_order_id=100,
             has_chargebacks=True,
             num_tickets=1,
             revenue=50.0,
@@ -566,7 +566,7 @@ def test_update_daily_order_data_merges_chargeback_rows_for_same_order_id(
     history = FakeHistory()
 
     def fake_exchange_rate(
-        self, ticket_socket_order_id, midnight_date
+        self, ticket_partner_order_id, midnight_date
     ):  # pylint: disable=unused-argument
         if midnight_date == "2026-05-04":
             return create_exchange_rate(0.7, "GBP")
@@ -622,7 +622,7 @@ def test_update_daily_order_data_creates_refund_row_without_refund_dates(
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -662,7 +662,7 @@ def test_update_daily_order_data_creates_chargeback_row_without_chargeback_dates
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -693,7 +693,7 @@ def test_update_daily_order_data_scans_past_non_matching_existing_rows(
     """
     orders = [
         create_order(
-            ticket_socket_order_id=100,
+            ticket_partner_order_id=100,
             purchase_date="2026-05-01",
             has_refunds=True,
             num_tickets_refunded=1,
@@ -702,7 +702,7 @@ def test_update_daily_order_data_scans_past_non_matching_existing_rows(
             tickets=[create_ticket(is_refunded=True, refund_date="2026-05-03")],
         ),
         create_order(
-            ticket_socket_order_id=101,
+            ticket_partner_order_id=101,
             purchase_date="2026-05-02",
             has_refunds=True,
             num_tickets_refunded=1,
@@ -717,7 +717,7 @@ def test_update_daily_order_data_scans_past_non_matching_existing_rows(
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -741,10 +741,10 @@ def test_update_daily_order_data_merges_multiple_orders_on_same_date(monkeypatch
     """
     orders = [
         create_order(
-            ticket_socket_order_id=100, num_tickets=1, revenue=25.0, service_fees=5.0
+            ticket_partner_order_id=100, num_tickets=1, revenue=25.0, service_fees=5.0
         ),
         create_order(
-            ticket_socket_order_id=101, num_tickets=2, revenue=50.0, service_fees=10.0
+            ticket_partner_order_id=101, num_tickets=2, revenue=50.0, service_fees=10.0
         ),
     ]
     insert_calls = []
@@ -753,7 +753,7 @@ def test_update_daily_order_data_merges_multiple_orders_on_same_date(monkeypatch
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -799,7 +799,7 @@ def test_update_daily_order_data_skips_purchase_row_outside_range_but_keeps_refu
     monkeypatch.setattr(
         DailyOrderService,
         "get_exchange_rate_for_order_by_date",
-        lambda self, ticket_socket_order_id, midnight_date: None,
+        lambda self, ticket_partner_order_id, midnight_date: None,
     )
     monkeypatch.setattr("common.daily_order_service.db_query_one", lambda sql, data: {})
     monkeypatch.setattr(
@@ -826,7 +826,7 @@ def test_cleanup_daily_order_data_for_event_deletes_by_event_id(monkeypatch):
 
     DailyOrderService().cleanup_daily_order_data_for_event(55)
 
-    assert calls[0][1] == {"ticketSocketEventId": 55}
+    assert calls[0][1] == {"ticketPartnerEventId": 55}
 
 
 def test_get_exchange_rate_for_order_by_date_returns_rate_with_multiplier(monkeypatch):
@@ -856,7 +856,7 @@ def test_get_exchange_rate_for_order_by_date_returns_rate_with_multiplier(monkey
     assert exchange_rate.currency_symbol == "C$"
     assert exchange_rate.usd_rate == 3.0
     assert calls[0][1] == {
-        "ticket_socket_order_id": 100,
+        "ticket_partner_order_id": 100,
         "midnight_date": "2026-05-01",
     }
 

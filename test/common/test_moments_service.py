@@ -183,7 +183,7 @@ class FakeMomentEventService:
             event_seller_id, event_date, title = self.EVENTS[event_id]
             events.append(
                 SimpleNamespace(
-                    external_event_id=event_id,
+                    event_id=event_id,
                     seller_id=event_seller_id,
                     event_date=event_date,
                     title=title,
@@ -239,7 +239,7 @@ def build_fan_moment_row(
         images = ["fan.jpg"]
     return {
         "FanMomentId": event_id,
-        "ExternalEventId": event_id,
+        "EventId": event_id,
         "EventDate": event_date,
         "SellerId": seller_id,
         "SellerName": seller_name,
@@ -298,7 +298,7 @@ def build_fake_fan_moment_db(monkeypatch, rows=None):
         if "FanMomentImages.ImageName AS ImageName" in sql:
             event_id = data.get("event_id")
             for row in rows:
-                if row["ExternalEventId"] == event_id:
+                if row["EventId"] == event_id:
                     return [{"ImageName": image_name} for image_name in row["Images"]]
             return []
 
@@ -306,7 +306,7 @@ def build_fake_fan_moment_db(monkeypatch, rows=None):
         for row in rows:
             if len(row["Images"]) == 0:
                 continue
-            if "event_id" in data and row["ExternalEventId"] != data["event_id"]:
+            if "event_id" in data and row["EventId"] != data["event_id"]:
                 continue
             if "seller_id" in data and row["SellerId"] != data["seller_id"]:
                 continue
@@ -318,7 +318,7 @@ def build_fake_fan_moment_db(monkeypatch, rows=None):
 
         matching_rows = sorted(
             matching_rows,
-            key=lambda row: (row["EventDate"], row["ExternalEventId"]),
+            key=lambda row: (row["EventDate"], row["EventId"]),
             reverse=True,
         )
         if "LIMIT 0," in sql:
@@ -506,7 +506,7 @@ def test_filter_moments_returns_matching_fan_moment_objects(monkeypatch):
 
             return [
                 SimpleNamespace(
-                    external_event_id=event_id,
+                    event_id=event_id,
                     seller_id=event_sellers_by_id[event_id],
                     title=None,
                 )
@@ -593,7 +593,7 @@ def test_filter_moments_without_filters_returns_eight_most_recent(monkeypatch):
         ):
             return [
                 SimpleNamespace(
-                    external_event_id=event_id,
+                    event_id=event_id,
                     seller_id=20,
                     title=f"Event {event_id}",
                 )
@@ -1441,12 +1441,10 @@ def test_get_events_from_ids_skips_missing_events_and_sorts_none_values(monkeypa
             if event_id == 2:
                 return []
             if event_id == 3:
-                return [
-                    SimpleNamespace(external_event_id=3, event_date=None, title=None)
-                ]
+                return [SimpleNamespace(event_id=3, event_date=None, title=None)]
             return [
                 SimpleNamespace(
-                    external_event_id=event_id,
+                    event_id=event_id,
                     event_date="2026-05-01",
                     title="Alpha",
                 )
@@ -1458,7 +1456,7 @@ def test_get_events_from_ids_skips_missing_events_and_sorts_none_values(monkeypa
         {1, 2, 3, 4}
     )  # pylint: disable=protected-access
 
-    assert [(evt.external_event_id, evt.event_date, evt.title) for evt in events] == [
+    assert [(evt.event_id, evt.event_date, evt.title) for evt in events] == [
         (4, "2026-05-01", "Alpha"),
         (3, None, None),
     ]
