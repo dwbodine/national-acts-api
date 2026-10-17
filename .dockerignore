@@ -34,6 +34,9 @@ README.md
 .env.development
 test/
 test_runtime/
+.test_runtimepytest/
+.coverage
+.coverage.*
 tmp/
 *.log
 *deploy*.sh
