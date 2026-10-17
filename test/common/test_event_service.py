@@ -219,7 +219,7 @@ def build_ticket_type_row(**overrides):
 
 def create_vip_event(is_vip=True, ticket_socket_url="https://tickets.example.com"):
     """
-    Create a VipEvent instance for add_to_external_events tests.
+    Create a VipEvent instance for add_to_events tests.
     """
     event = VipEvent()
     event.is_vip = is_vip
@@ -659,13 +659,8 @@ def test_get_events_and_orders_builds_date_and_exclusion_filters(monkeypatch):
     )
 
     assert not events
-    assert (
-        "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
-    )
-    assert (
-        "EventDate NOT BETWEEN %(exclude_start)s AND %(exclude_end)s"
-        in calls[0][0]
-    )
+    assert "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
+    assert "EventDate NOT BETWEEN %(exclude_start)s AND %(exclude_end)s" in calls[0][0]
     assert calls[0][1] == {
         "startDate": "2025-04-30",
         "endDate": "2025-05-31",
@@ -690,9 +685,7 @@ def test_get_events_and_orders_builds_future_end_only_filter(monkeypatch):
     events = event_service.EventService().get_events_and_orders(end=future_end)
 
     assert not events
-    assert (
-        "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
-    )
+    assert "EventDate BETWEEN %(startDate)s AND %(endDate)s" in calls[0][0]
     assert calls[0][1] == {
         "startDate": "2026-04-23",
         "endDate": "2026-05-01",
@@ -1122,9 +1115,9 @@ def test_hide_events_updates_all_rows_on_success(monkeypatch):
     assert len(update_calls) == 2
 
 
-def test_add_to_external_events_reuses_existing_venue_for_vip_events(monkeypatch):
+def test_add_to_events_reuses_existing_venue_for_vip_events(monkeypatch):
     """
-    Test that add_to_external_events reuses an existing venue and stores VIP links.
+    Test that add_to_events reuses an existing venue and stores VIP links.
     """
     insert_calls = []
     monkeypatch.setattr(
@@ -1147,7 +1140,7 @@ def test_add_to_external_events_reuses_existing_venue_for_vip_events(monkeypatch
         "city": "Austin",
     }
 
-    success = event_service.EventService().add_to_external_events(
+    success = event_service.EventService().add_to_events(
         event_data,
         create_vip_event(is_vip=True),
         "cnx-1",
@@ -1160,11 +1153,11 @@ def test_add_to_external_events_reuses_existing_venue_for_vip_events(monkeypatch
     assert insert_calls[0][2] == "cnx-1"
 
 
-def test_add_to_external_events_inserts_non_vip_events_without_existing_venue(
+def test_add_to_events_inserts_non_vip_events_without_existing_venue(
     monkeypatch,
 ):
     """
-    Test that add_to_external_events stores the ticket URL for non-VIP events.
+    Test that add_to_events stores the ticket URL for non-VIP events.
     """
     insert_calls = []
     monkeypatch.setattr(event_service, "db_query_one", lambda sql, data: {})
@@ -1183,7 +1176,7 @@ def test_add_to_external_events_inserts_non_vip_events_without_existing_venue(
         "city": "Dallas",
     }
 
-    success = event_service.EventService().add_to_external_events(
+    success = event_service.EventService().add_to_events(
         event_data,
         create_vip_event(is_vip=False, ticket_socket_url="https://public.example.com"),
         "cnx-2",
@@ -1239,13 +1232,40 @@ def test_get_tours_from_recent_events_maps_recent_tour_cards(monkeypatch):
 import pytest
 from common.ticket_partner_service import TicketPartnerService
 
+
 @pytest.fixture(autouse=True)
 def partner_mapping_fixture(monkeypatch):
     """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
-    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
-    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
-    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)
-    monkeypatch.setattr(TicketPartnerService, "ensure_ticket_type", lambda self, event, kind, cnx=None: 1)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_order",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_event",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_ticket",
+        lambda self, value, order=None: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_event",
+        lambda self, event, partner, provider=None, cnx=None: event,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket",
+        lambda self, order, ticket, cnx=None: ticket,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket_type",
+        lambda self, event, kind, cnx=None: 1,
+    )

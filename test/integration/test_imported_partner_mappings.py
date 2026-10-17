@@ -15,17 +15,28 @@ from common.ticket_partner_service import TicketPartnerService
 pytestmark = pytest.mark.integration
 
 
-def test_imported_event_and_order_mappings_are_created_and_reused(database, monkeypatch):
+def test_imported_event_and_order_mappings_are_created_and_reused(
+    database, monkeypatch
+):
     run, engine, root = database
-    shutil.copytree(Path(__file__).resolve().parents[2] / "migrations/versions",
-                    root / "migrations/versions", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        Path(__file__).resolve().parents[2] / "migrations/versions",
+        root / "migrations/versions",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
     run("upgrade", "7e3584499b4c")
 
     def connect(timeout=3000):
-        return mariadb.connect(host="127.0.0.1", port=int(os.environ["TEST_MARIADB_PORT"]),
-                               user="root", password=os.environ["TEST_MARIADB_PASSWORD"],
-                               database=os.environ["MIGRATION_DB_DB"], autocommit=True)
+        return mariadb.connect(
+            host="127.0.0.1",
+            port=int(os.environ["TEST_MARIADB_PORT"]),
+            user="root",
+            password=os.environ["TEST_MARIADB_PASSWORD"],
+            database=os.environ["MIGRATION_DB_DB"],
+            autocommit=True,
+        )
+
     monkeypatch.setattr(db, "db_get_connection", connect)
     statements = [
         "INSERT INTO Sellers (SellerId, Name) VALUES (1, 'Seller')",
@@ -40,10 +51,19 @@ def test_imported_event_and_order_mappings_are_created_and_reused(database, monk
             connection.exec_driver_sql(sql)
     service = TicketPartnerService()
     assert service.ensure_order(100, 500) == 0  # Parent mapping must exist first.
-    event = SimpleNamespace(seller_id=1, event_date="2026-11-01", is_vip=True,
-                            ticket_socket_url="https://example.com/imported")
-    payload = {"title": "Imported", "eventDate": "2026-11-01", "thumbnail": None,
-               "venue": "New venue", "city": "New city"}
+    event = SimpleNamespace(
+        seller_id=1,
+        event_date="2026-11-01",
+        is_vip=True,
+        ticket_socket_url="https://example.com/imported",
+    )
+    payload = {
+        "title": "Imported",
+        "eventDate": "2026-11-01",
+        "thumbnail": None,
+        "venue": "New venue",
+        "city": "New city",
+    }
     cnx = connect()
     try:
         partner_event = service.ensure_imported_event(100, payload, event, cnx)
@@ -52,15 +72,34 @@ def test_imported_event_and_order_mappings_are_created_and_reused(database, monk
         assert partner_order > 0
         assert service.ensure_imported_event(100, payload, event, cnx) == partner_event
         assert service.ensure_order(100, 500, cnx) == partner_order
-        assert "id" not in payload  # Creating an application row does not mutate import data.
+        assert (
+            "id" not in payload
+        )  # Creating an application row does not mutate import data.
         event.event_date = "2026-11-02"
         assert service.ensure_imported_event(100, payload, event, cnx) == partner_event
     finally:
         cnx.close()
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM Events").scalar_one() == 1
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM TicketPartnerEvents").scalar_one() == 1
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM TicketPartnerOrders").scalar_one() == 1
-        assert str(connection.exec_driver_sql("SELECT EventDate FROM Events").scalar_one()) == "2026-11-02"
-        row = connection.exec_driver_sql("SELECT TicketPartnerEventId, TicketSocketOrderId, TicketSocketNativeOrderId FROM OrderDetails").one()
+        assert (
+            connection.exec_driver_sql("SELECT COUNT(*) FROM Events").scalar_one() == 1
+        )
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM TicketPartnerEvents"
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM TicketPartnerOrders"
+            ).scalar_one()
+            == 1
+        )
+        assert (
+            str(connection.exec_driver_sql("SELECT EventDate FROM Events").scalar_one())
+            == "2026-11-02"
+        )
+        row = connection.exec_driver_sql(
+            "SELECT TicketPartnerEventId, TicketSocketOrderId, TicketSocketNativeOrderId FROM OrderDetails"
+        ).one()
         assert tuple(row) == (partner_event, 500, 990)

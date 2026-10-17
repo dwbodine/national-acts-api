@@ -4,11 +4,7 @@ This is a separate API from the public API, which is used by the front-end web a
 """
 
 import logging
-from datetime import datetime, timezone
 from flask import Blueprint, Response, request
-import stripe
-
-from common.utility import convert_to_json
 
 external_api = Blueprint("external_api", __name__)
 

@@ -1105,7 +1105,7 @@ def test_update_event_inserts_new_event_and_skips_rebuild_without_ticket_types(
 
     assert success is True
     assert "INSERT INTO Events" in insert_calls[0][0]
-    assert insert_calls[0][1]["ticket_socket_event_id"] is None
+    assert "ticket_socket_event_id" not in insert_calls[0][1]
 
 
 def test_update_event_inserts_new_event_with_ticket_types_and_rebuilds(monkeypatch):
@@ -1205,12 +1205,35 @@ def test_update_event_stops_when_ticket_type_update_fails(monkeypatch):
 import pytest
 from common.ticket_partner_service import TicketPartnerService
 
+
 @pytest.fixture(autouse=True)
 def partner_mapping_fixture(monkeypatch):
     """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
-    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
-    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
-    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_order",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_event",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_ticket",
+        lambda self, value, order=None: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_event",
+        lambda self, event, partner, provider=None, cnx=None: event,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket",
+        lambda self, order, ticket, cnx=None: ticket,
+    )

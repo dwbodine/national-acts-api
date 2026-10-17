@@ -189,7 +189,9 @@ class UpdateService:
         if report.missing is not None and len(report.missing) > 0:
             for missing_image in report.missing:
                 data = {"thumb": missing_image}
-                find_sql = """SELECT DISTINCT EventId FROM EventDetails WHERE ExternalThumbnail=%(thumb)s LIMIT 0, 1"""
+                find_sql = """SELECT DISTINCT EventId
+                                FROM EventDetails 
+                                WHERE ExternalThumbnail=%(thumb)s LIMIT 0, 1"""
                 row = db_query_one(find_sql, data)
                 if row:
                     sql = """UPDATE Events SET Thumbnail=NULL,

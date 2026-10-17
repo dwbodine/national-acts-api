@@ -167,7 +167,9 @@ def test_get_ticket_orders_uses_paid_and_fulfilled_filter(monkeypatch):
 
     assert not orders
     assert "FROM TicketOrders" in captured_sql[0]
-    assert "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=1" in captured_sql[0]
+    assert (
+        "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=1" in captured_sql[0]
+    )
 
 
 def test_get_ticket_orders_uses_unfulfilled_unpaid_filter(monkeypatch):
@@ -188,7 +190,9 @@ def test_get_ticket_orders_uses_unfulfilled_unpaid_filter(monkeypatch):
 
     assert not orders
     assert "FROM TicketOrders" in captured_sql[0]
-    assert "WHERE TicketOrders.IsFulfilled=0 AND TicketOrders.IsPaid=0" in captured_sql[0]
+    assert (
+        "WHERE TicketOrders.IsFulfilled=0 AND TicketOrders.IsPaid=0" in captured_sql[0]
+    )
 
 
 def test_get_ticket_orders_uses_fulfilled_unpaid_filter(monkeypatch):
@@ -209,7 +213,9 @@ def test_get_ticket_orders_uses_fulfilled_unpaid_filter(monkeypatch):
 
     assert not orders
     assert "FROM TicketOrders" in captured_sql[0]
-    assert "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=0" in captured_sql[0]
+    assert (
+        "WHERE TicketOrders.IsFulfilled=1 AND TicketOrders.IsPaid=0" in captured_sql[0]
+    )
 
 
 def test_get_ticket_order_by_id_returns_none_for_blank_id():

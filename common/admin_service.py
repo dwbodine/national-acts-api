@@ -617,7 +617,14 @@ class AdminService:
             return False
 
         ticket_socket_event_id: int = get_override_int_value_or_default(
-            event_to_update.ticket_socket_event_id, default=None
+            (
+                TicketPartnerService().socket_event(
+                    event_to_update.ticket_partner_event_id
+                )
+                if event_to_update.ticket_partner_event_id > 0
+                else None
+            ),
+            default=None,
         )
         if ticket_socket_event_id is not None and ticket_socket_event_id <= 0:
             ticket_socket_event_id = None
@@ -675,9 +682,7 @@ class AdminService:
                 event_to_update.text_sent_to_vips
             ),
             "url": get_override_string_value_or_default(event_to_update.external_url),
-            "venue_id": get_override_int_value_or_default(
-                event_to_update.venue_id
-            ),
+            "venue_id": get_override_int_value_or_default(event_to_update.venue_id),
             "disable_link_button": get_override_tinyint_value_or_default_from_bool(
                 event_to_update.disable_link_button
             ),
@@ -718,7 +723,7 @@ class AdminService:
                                 DoorsOpenTime=%(doors_open_time)s,
                                 EventTime=%(event_time)s,
                                 URL=%(url)s,
-                                VenueId=%(external_event_venue_id)s,
+                                VenueId=%(venue_id)s,
                                 DisableLinkButton=%(disable_link_button)s,
                                 DisableLinkReason=%(disable_link_reason)s,
                                 ExternalVipLink=%(external_vip_link)s,
@@ -755,7 +760,7 @@ class AdminService:
                 EventNote, Created, LastUpdate) VALUES
                 (%(seller_id)s, %(title)s, %(event_date)s,
                 %(event_time)s, %(meet_and_greet_time)s,%(doors_open_time)s, %(url)s,
-                %(external_event_venue_id)s, %(disable_link_button)s,
+                %(venue_id)s, %(disable_link_button)s,
                 %(disable_link_reason)s, %(external_vip_link)s, %(disable_vip_link_button)s,
                 %(disable_vip_link_reason)s, %(is_active)s, %(isAddedToBandsInTown)s, %(isDeleted)s, 
                 %(isHidden)s, %(announceDate)s, %(checkInLocation)s, %(checkInNotes)s,
@@ -816,5 +821,7 @@ class AdminService:
 
             if success is True:
                 dashboard_service = DashboardService()
-                dashboard_service.rebuild_daily_order_data_for_event(ticket_partner_event_id)
+                dashboard_service.rebuild_daily_order_data_for_event(
+                    ticket_partner_event_id
+                )
         return success

@@ -354,9 +354,14 @@ class DataRefreshService:
 
                             total_tickets_available += tickets_available
 
-                            if TicketPartnerService().ensure_ticket_type(
-                                ticket_socket_event_id, ticket_type.ticket_type_id, cnx
-                            ) <= 0:
+                            if (
+                                TicketPartnerService().ensure_ticket_type(
+                                    ticket_socket_event_id,
+                                    ticket_type.ticket_type_id,
+                                    cnx,
+                                )
+                                <= 0
+                            ):
                                 ticket_types_failed.append(ticket_type.ticket_type_id)
                                 update_success = False
                                 continue
@@ -436,7 +441,10 @@ class DataRefreshService:
                                     sql, ticket_type_data, cnx
                                 )
                                 # This source table has no AUTO_INCREMENT key.
-                                ticket_type_success = ticket_socket_type_id is None or ticket_socket_type_id >= 0
+                                ticket_type_success = (
+                                    ticket_socket_type_id is None
+                                    or ticket_socket_type_id >= 0
+                                )
 
                             # if the update succeeded, update counters
                             if ticket_type_success:
@@ -668,7 +676,9 @@ class DataRefreshService:
                                 order_data["phone_formatted"] = phone_formatted
                                 # insert new order
                                 order_data["order_id"] = (
-                                    get_override_int_value_or_default(order.original_order_id)
+                                    get_override_int_value_or_default(
+                                        order.original_order_id
+                                    )
                                 )
                                 order_data["ticket_socket_event_id"] = (
                                     ticket_socket_event_id
@@ -693,9 +703,13 @@ class DataRefreshService:
                                 ticket_socket_order_id = db_insert(sql, order_data, cnx)
                                 order_success = ticket_socket_order_id > 0
 
-                            partner_order_id = TicketPartnerService().ensure_order(
-                                ticket_socket_event_id, ticket_socket_order_id, cnx
-                            ) if ticket_socket_order_id > 0 else 0
+                            partner_order_id = (
+                                TicketPartnerService().ensure_order(
+                                    ticket_socket_event_id, ticket_socket_order_id, cnx
+                                )
+                                if ticket_socket_order_id > 0
+                                else 0
+                            )
                             order_success = order_success and partner_order_id > 0
 
                             # Count an import only after its partner mapping exists.
@@ -824,7 +838,10 @@ class DataRefreshService:
                                                 AttendeeFirstName=%(attendeeFirstName)s,
                                                 AttendeeLastName=%(attendeeLastName)s,
                                                 ShirtSize=%(shirtSize)s"""
-                                        if ticket_price > 0 and order_transferred is not True:
+                                        if (
+                                            ticket_price > 0
+                                            and order_transferred is not True
+                                        ):
                                             sql += ", Price=%(price)s"
                                         sql += """,
                                                 LastUpdate=CURRENT_TIMESTAMP
@@ -873,10 +890,19 @@ class DataRefreshService:
                                         )
 
                                     if ticket_success:
-                                        provider_ticket_id = ticket_socket_order_ticket_id if ticket_add_new else ticket_data["id"]
-                                        ticket_success = TicketPartnerService().ensure_ticket(
-                                            partner_order_id, provider_ticket_id, cnx
-                                        ) > 0
+                                        provider_ticket_id = (
+                                            ticket_socket_order_ticket_id
+                                            if ticket_add_new
+                                            else ticket_data["id"]
+                                        )
+                                        ticket_success = (
+                                            TicketPartnerService().ensure_ticket(
+                                                partner_order_id,
+                                                provider_ticket_id,
+                                                cnx,
+                                            )
+                                            > 0
+                                        )
                                     # if the update succeeded, update counters
                                     if ticket_success:
                                         if ticket_add_new:

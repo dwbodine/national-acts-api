@@ -77,7 +77,9 @@ class DashboardService:
             order_data = DailyOrderData(
                 purchase_date, ticket_partner_event_id, exchange_rate, currency_symbol
             )
-            order_data.ticket_partner_id = get_override_int_value_or_default(row["TicketPartnerId"])
+            order_data.ticket_partner_id = get_override_int_value_or_default(
+                row["TicketPartnerId"]
+            )
             order_data.last_update = get_override_string_value_or_default(
                 row["LastUpdate"]
             )

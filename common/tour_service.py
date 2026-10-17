@@ -191,9 +191,7 @@ class TourService:
                 VALUES(%(tourId)s, %(externalEventId)s)"""
             event_data = {
                 "tourId": get_override_int_value_or_default(tour_id),
-                "externalEventId": get_override_int_value_or_default(
-                    event.event_id
-                ),
+                "externalEventId": get_override_int_value_or_default(event.event_id),
             }
             tour_event_id = db_insert(event_sql, event_data)
             success = tour_event_id > 0

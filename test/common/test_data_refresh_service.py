@@ -159,9 +159,13 @@ class FakeEventService:
         """
         Record the add request and return the configured result.
         """
-        FakeEventService.add_calls.append((event_data.copy(), evt.original_event_id, cnx))
+        FakeEventService.add_calls.append(
+            (event_data.copy(), evt.original_event_id, cnx)
+        )
         if FakeEventService.add_results:
-            return provider_event_id + 10000 if FakeEventService.add_results.pop(0) else 0
+            return (
+                provider_event_id + 10000 if FakeEventService.add_results.pop(0) else 0
+            )
         return provider_event_id + 10000
 
 
@@ -633,7 +637,8 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
                     "Id": 800,
                     "PhoneFormatted": "+1 206-555-9999",
                     "Phone": "2065559999",
-                    "IsComped": 0, "IsManualTransfer": 0,
+                    "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -665,8 +670,14 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
     delete_calls = []
     order_mapping_calls = []
     cleanup_lookup_calls = []
-    monkeypatch.setattr(TicketPartnerService, "ensure_order",
-        lambda self, event, order, cnx=None: order_mapping_calls.append((event, order, cnx)) or order)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_order",
+        lambda self, event, order, cnx=None: order_mapping_calls.append(
+            (event, order, cnx)
+        )
+        or order,
+    )
 
     def fake_update(sql, data, cnx=None):
         """
@@ -693,10 +704,12 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
         "common.data_refresh_service.db_get_connection", lambda: fake_connection
     )
     monkeypatch.setattr("common.data_refresh_service.db_query_one", fake_query_one)
+
     def query_all(sql, data=None):
         if "FROM DailyOrderData" in sql:
             cleanup_lookup_calls.append((sql, dict(data)))
         return fake_query_all(sql, data)
+
     monkeypatch.setattr("common.data_refresh_service.db_query_all", query_all)
     monkeypatch.setattr("common.data_refresh_service.db_insert", fake_insert)
     monkeypatch.setattr("common.data_refresh_service.db_update", fake_update)
@@ -706,7 +719,11 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
         FakeRefreshHistory,
     )
     monkeypatch.setattr("common.data_refresh_service.UserService", FakeUserService)
-    monkeypatch.setattr(TicketPartnerService, "ensure_imported_event", FakeEventService.ensure_imported_event)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        FakeEventService.ensure_imported_event,
+    )
     monkeypatch.setattr(
         "common.data_refresh_service.get_pacific_purchase_date_from_order",
         lambda order: order.purchase_date,
@@ -746,10 +763,14 @@ def test_refresh_database_from_ticket_socket_processes_existing_and_new_records(
     assert len(FakeEventService.add_calls) == 3
     assert [call[1] for call in FakeEventService.add_calls] == [100, 101, 102]
     assert all(call[2] is fake_connection for call in FakeEventService.add_calls)
-    assert [(event, order) for event, order, _ in order_mapping_calls] == [(300, 800), (300, 601)]
+    assert [(event, order) for event, order, _ in order_mapping_calls] == [
+        (300, 800),
+        (300, 601),
+    ]
     assert all(cnx is fake_connection for _, _, cnx in order_mapping_calls)
     assert cleanup_lookup_calls[0][1] == {
-        "ticket_partner_event_id": 10300, "purchaseDate": "2024-06-01"
+        "ticket_partner_event_id": 10300,
+        "purchaseDate": "2024-06-01",
     }
     assert "WHERE TicketPartnerEventId=" in cleanup_lookup_calls[0][0]
     assert any(
@@ -825,7 +846,8 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
                     "Id": 820,
                     "PhoneFormatted": None,
                     "Phone": None,
-                    "IsComped": 0, "IsManualTransfer": 0,
+                    "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-10",
@@ -835,7 +857,8 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
                     "Id": 821,
                     "PhoneFormatted": None,
                     "Phone": None,
-                    "IsComped": 0, "IsManualTransfer": 0,
+                    "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-10",
@@ -895,7 +918,11 @@ def test_refresh_database_from_ticket_socket_tracks_failures_and_emails_results(
     monkeypatch.setattr(
         "common.data_refresh_service.MessagingService", FakeMessagingService
     )
-    monkeypatch.setattr(TicketPartnerService, "ensure_imported_event", FakeEventService.ensure_imported_event)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        FakeEventService.ensure_imported_event,
+    )
     monkeypatch.setattr(
         "common.data_refresh_service.get_pacific_purchase_date_from_order",
         lambda order: order.purchase_date,
@@ -980,7 +1007,8 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "Id": 830,
                     "PhoneFormatted": "saved",
                     "Phone": "2065550000",
-                    "IsComped": 1, "IsManualTransfer": 0,
+                    "IsComped": 1,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -989,7 +1017,8 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "Id": 831,
                     "PhoneFormatted": "ca formatted",
                     "Phone": "6045550000",
-                    "IsComped": 0, "IsManualTransfer": 0,
+                    "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -998,7 +1027,8 @@ def test_refresh_database_from_ticket_socket_covers_remaining_order_and_ticket_b
                     "Id": 832,
                     "PhoneFormatted": None,
                     "Phone": "9999999999",
-                    "IsComped": 0, "IsManualTransfer": 0,
+                    "IsComped": 0,
+                    "IsManualTransfer": 0,
                     "IsDeleted": 0,
                     "IsActive": 1,
                     "PurchaseDate": "2024-06-01",
@@ -1142,47 +1172,103 @@ def test_refresh_database_from_ticket_socket_leaves_username_blank_when_user_is_
 import pytest
 from common.ticket_partner_service import TicketPartnerService
 
+
 @pytest.fixture(autouse=True)
 def partner_mapping_fixture(monkeypatch):
     """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""
-    monkeypatch.setattr(TicketPartnerService, "socket_order", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_event", lambda self, value: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "socket_ticket", lambda self, value, order=None: value if value and value > 0 else None)
-    monkeypatch.setattr(TicketPartnerService, "ensure_event", lambda self, event, partner, provider=None, cnx=None: event)
-    monkeypatch.setattr(TicketPartnerService, "ensure_imported_event", lambda self, provider, data, event, cnx=None: provider)
-    monkeypatch.setattr(TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order)
-    monkeypatch.setattr(TicketPartnerService, "ensure_ticket", lambda self, order, ticket, cnx=None: ticket)
-    monkeypatch.setattr(TicketPartnerService, "ensure_ticket_type", lambda self, event, kind, cnx=None: 1)
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_order",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_event",
+        lambda self, value: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "socket_ticket",
+        lambda self, value, order=None: value if value and value > 0 else None,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_event",
+        lambda self, event, partner, provider=None, cnx=None: event,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_imported_event",
+        lambda self, provider, data, event, cnx=None: provider,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService, "ensure_order", lambda self, event, order, cnx=None: order
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket",
+        lambda self, order, ticket, cnx=None: ticket,
+    )
+    monkeypatch.setattr(
+        TicketPartnerService,
+        "ensure_ticket_type",
+        lambda self, event, kind, cnx=None: 1,
+    )
 
 
 @pytest.mark.parametrize("failed_mapping", ["event", "order"])
-def test_refresh_reports_mapping_failure_before_processing_children(monkeypatch, failed_mapping):
-    event = create_refresh_event(100, 10, orders=[
-        create_refresh_order(5001, 100, tickets=[create_ticket(7001)])
-    ])
+def test_refresh_reports_mapping_failure_before_processing_children(
+    monkeypatch, failed_mapping
+):
+    event = create_refresh_event(
+        100, 10, orders=[create_refresh_order(5001, 100, tickets=[create_ticket(7001)])]
+    )
     connection = FakeConnection()
     calls = []
-    monkeypatch.setattr(DataRefreshService, "retrieve_ticket_socket_events_for_update",
-                        lambda self, **kwargs: [event])
-    monkeypatch.setattr("common.data_refresh_service.db_get_connection", lambda: connection)
+    monkeypatch.setattr(
+        DataRefreshService,
+        "retrieve_ticket_socket_events_for_update",
+        lambda self, **kwargs: [event],
+    )
+    monkeypatch.setattr(
+        "common.data_refresh_service.db_get_connection", lambda: connection
+    )
+
     def query(sql, data=None, cnx=None):
         if "FROM TicketSocketEvents" in sql:
             return {"Id": 300}
         if "FROM TicketSocketOrders" in sql:
-            return {"Id": 800, "IsComped": 0, "IsDeleted": 0, "IsActive": 1,
-                    "IsManualTransfer": 0, "Phone": None, "PhoneFormatted": None,
-                    "PurchaseDate": "2024-06-10"}
-        raise AssertionError("Child records should not be queried after mapping failure")
+            return {
+                "Id": 800,
+                "IsComped": 0,
+                "IsDeleted": 0,
+                "IsActive": 1,
+                "IsManualTransfer": 0,
+                "Phone": None,
+                "PhoneFormatted": None,
+                "PurchaseDate": "2024-06-10",
+            }
+        raise AssertionError(
+            "Child records should not be queried after mapping failure"
+        )
+
     monkeypatch.setattr("common.data_refresh_service.db_query_one", query)
     monkeypatch.setattr("common.data_refresh_service.db_update", lambda *args: True)
-    monkeypatch.setattr("common.data_refresh_service.TicketSocketRefreshHistory", FakeRefreshHistory)
-    monkeypatch.setattr("common.data_refresh_service.MessagingService", FakeMessagingService)
+    monkeypatch.setattr(
+        "common.data_refresh_service.TicketSocketRefreshHistory", FakeRefreshHistory
+    )
+    monkeypatch.setattr(
+        "common.data_refresh_service.MessagingService", FakeMessagingService
+    )
+
     def ensure_event(self, provider, data, evt, cnx=None):
         calls.append(("event", provider, cnx))
         return 0 if failed_mapping == "event" else 30
+
     def ensure_order(self, provider_event, provider_order, cnx=None):
         calls.append(("order", provider_order, cnx))
         return 0
+
     monkeypatch.setattr(TicketPartnerService, "ensure_imported_event", ensure_event)
     monkeypatch.setattr(TicketPartnerService, "ensure_order", ensure_order)
     result = DataRefreshService().refresh_database_from_ticket_socket(start=10)

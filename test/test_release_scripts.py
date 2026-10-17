@@ -45,6 +45,7 @@ bash "$SCRIPT_TO_RUN" "$NEW_IMAGE"
 
 @pytest.fixture
 def release_runner(tmp_path):
+    """Return a function that runs the release script with a given scenario."""
     bash = shutil.which("bash")
     git_bash = Path("C:/Program Files/Git/bin/bash.exe")
     if os.name == "nt":
@@ -80,6 +81,7 @@ def release_runner(tmp_path):
 
 
 def test_release_and_rollback_exact_images(release_runner):
+    """Test that a release and rollback can be performed with exact images."""
     result, events, directory = release_runner()
     assert result.returncode == 0, result.stderr
     assert events.index("aws s3 cp") < events.index("tools.migrate upgrade")

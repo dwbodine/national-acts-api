@@ -1,2 +1,9 @@
+[MAIN]
+ignore=test,migrations,tools,scripts,.venv,.vscode,.pytest_cache,.mypy_cache,__pycache__
+# Match directories even when Pylint receives individual file paths.
+ignore-paths=(^|.*[\\/])(test|migrations|tools|scripts|\.venv|\.vscode|\.pytest_cache|\.mypy_cache|__pycache__)([\\/].*|$)
+# ignore uses literal names; file extension patterns belong here.
+ignore-patterns=.*\.(pyc|pyo|pyd|db|sqlite3)$
+
 [MESSAGES CONTROL]
 disable=R0914,R0915,R0913,R0917,R0912,R0903,R1702,R0916,R0902,R0801

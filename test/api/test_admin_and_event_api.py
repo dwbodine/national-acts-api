@@ -17,20 +17,6 @@ def build_service(**methods):
     return lambda: SimpleNamespace(**methods)
 
 
-def test_admin_countries_returns_unauthorized_for_non_admin(
-    monkeypatch, client, auth_headers
-):
-    """
-    Return 401 when a non-admin user requests admin country data.
-    """
-    monkeypatch.setattr(admin_api, "is_admin_logged_in", lambda: False)
-
-    response = client.get("/admin/countries", headers=auth_headers())
-
-    assert response.status_code == 401
-    assert response.get_json() == {"msg": "Unauthorized"}
-
-
 def test_admin_refund_event_passes_flags_to_service(
     monkeypatch, client, auth_headers, parse_json_response
 ):

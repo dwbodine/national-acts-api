@@ -38,9 +38,7 @@ class CalendarService:
                     (EventId, Note, NoteTitle, NoteTimestamp)
                     VALUES (%(eventId)s, %(note)s, """
         data = {
-            "eventId": (
-                event_id if event_id is not None else None
-            ),
+            "eventId": (event_id if event_id is not None else None),
             "note": get_override_string_value_or_default(note),
         }
 
@@ -127,7 +125,7 @@ class CalendarService:
             notes.append(note)
         return notes
 
-    def get_event_notes(self, eventId: int):
+    def get_event_notes(self, event_id: int):
         """
         API method to fetch event notes
         """
@@ -135,12 +133,12 @@ class CalendarService:
         sql = """SELECT * FROM EventNotes
                     WHERE EventId=%(eventId)s
                     ORDER BY NoteTimestamp DESC"""
-        data = {"eventId": eventId}
+        data = {"eventId": event_id}
         rows = db_query_all(sql, data)
         for row in rows:
             note = Note()
             note.note_id = get_override_int_value_or_default(row["EventNoteId"])
-            note.event_id = eventId
+            note.event_id = event_id
             note.note = get_override_string_value_or_default(row["Note"])
             note.note_timestamp = get_override_string_value_or_default(
                 row["NoteTimestamp"]

@@ -112,9 +112,7 @@ class EventService:
                 seller_id_str = db_convert_list_to_parameters(
                     seller_ids, data, "sellerId"
                 )
-                where_clause.append(
-                    """(SellerId IN """ + seller_id_str + """)"""
-                )
+                where_clause.append("""(SellerId IN """ + seller_id_str + """)""")
 
             if ignore_flags is not True:
                 if show_deleted is not True:
@@ -134,19 +132,16 @@ class EventService:
                     where_clause.append("COALESCE(IsCancelled, 0) = 0")
 
             if search_term is not None and len(search_term) > 0:
-                where_clause.append("""CONCAT_WS (' ', SellerName, Title, Country, Venue, Address, City, State) LIKE %(searchTerm)s""")
+                where_clause.append("""CONCAT_WS (' ', SellerName, Title, Country,
+                        Venue, Address, City, State) LIKE %(searchTerm)s""")
                 data["searchTerm"] = "%" + search_term + "%"
 
             if start is not None and end is not None:
-                where_clause.append(
-                    "EventDate BETWEEN %(startDate)s AND %(endDate)s"
-                )
+                where_clause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
                 data["startDate"] = datetime.fromtimestamp(start).strftime("%Y-%m-%d")
                 data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
             elif end is not None and end > datetime.now(pacific_tz).timestamp():
-                where_clause.append(
-                    "EventDate BETWEEN %(startDate)s AND %(endDate)s"
-                )
+                where_clause.append("EventDate BETWEEN %(startDate)s AND %(endDate)s")
                 data["startDate"] = datetime.now(pacific_tz).strftime("%Y-%m-%d")
                 data["endDate"] = datetime.fromtimestamp(end).strftime("%Y-%m-%d")
             elif start is not None:
@@ -241,9 +236,15 @@ class EventService:
                 continue
 
             vip_event = VipEvent()
-            vip_event.ticket_partner_id = get_override_int_value_or_default(row["TicketPartnerId"])
-            vip_event.ticket_partner_event_id = get_override_int_value_or_default(row["TicketPartnerEventId"])
-            vip_event.original_event_id = get_override_int_value_or_default(row["TicketSocketNativeEventId"])
+            vip_event.ticket_partner_id = get_override_int_value_or_default(
+                row["TicketPartnerId"]
+            )
+            vip_event.ticket_partner_event_id = get_override_int_value_or_default(
+                row["TicketPartnerEventId"]
+            )
+            vip_event.original_event_id = get_override_int_value_or_default(
+                row["TicketSocketNativeEventId"]
+            )
             vip_event.event_id = event_id
             vip_event.announce_date = announce_date_str
             vip_event.tour_announce_date = tour_announce_date_str
@@ -318,9 +319,7 @@ class EventService:
             vip_event.event_time = get_override_string_value_or_default(
                 row["EventTime"]
             )
-            vip_event.venue_id = get_override_int_value_or_default(
-                row["VenueId"]
-            )
+            vip_event.venue_id = get_override_int_value_or_default(row["VenueId"])
             vip_event.disable_link_button = get_override_bool_value_or_default(
                 row["DisableLinkButton"]
             )
@@ -563,9 +562,7 @@ class EventService:
                     break
         return success
 
-    def add_to_events(
-        self, event_data: dict[str, any], evt: VipEvent, cnx: any
-    ):
+    def add_to_events(self, event_data: dict[str, any], evt: VipEvent, cnx: any):
         """
         Add a new event to events
         """
@@ -606,7 +603,10 @@ class EventService:
         event_id = db_insert(sql, event_data, cnx)
         event_success = event_id > 0
         if event_success:
-            event_success = TicketPartnerService().ensure_event(event_id, 2, event_data["id"], cnx) > 0
+            event_success = (
+                TicketPartnerService().ensure_event(event_id, 2, event_data["id"], cnx)
+                > 0
+            )
 
         return event_success
 

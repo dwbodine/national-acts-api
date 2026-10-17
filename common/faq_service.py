@@ -151,6 +151,8 @@ class FaqService:
                                     AND QuestionOrder=%(new_number)s"""
                     data2 = {"category_id": category_id, "new_number": new_number}
                     row2 = db_query_one(sql2, data2)
+                    if not row2:
+                        return False
                     existing_id: int = 0
                     update_sql = """UPDATE FAQ
                                         SET QuestionOrder=%(new_number)s
@@ -195,20 +197,25 @@ class FaqService:
                                     AND QuestionOrder=%(new_number)s"""
                     data2 = {"category_id": category_id, "new_number": new_number}
                     row2 = db_query_one(sql2, data2)
+                    if not row2:
+                        return False
                     update_sql = """UPDATE FAQ
                                         SET QuestionOrder=%(new_number)s
                                         WHERE FAQID=%(faq_id)s"""
                     update_data = {"new_number": new_number, "faq_id": faq_id}
                     success = db_update(update_sql, update_data)
                     existing_id: int = 0
-                    if row2:                        
+                    if row2:
                         existing_id = get_override_int_value_or_default(row2["FAQID"])
                         if existing_id > 0:
                             if success:
                                 update_sql2 = """UPDATE FAQ
                                                     SET QuestionOrder=%(order)s
                                                     WHERE FAQID=%(existing_id)s"""
-                                update_data2 = {"order": order, "existing_id": existing_id}
+                                update_data2 = {
+                                    "order": order,
+                                    "existing_id": existing_id,
+                                }
                                 success = db_update(update_sql2, update_data2)
                     if success:
                         success = self.__renumber_faqs(category_id)

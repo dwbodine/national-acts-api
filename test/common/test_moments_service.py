@@ -1441,9 +1441,7 @@ def test_get_events_from_ids_skips_missing_events_and_sorts_none_values(monkeypa
             if event_id == 2:
                 return []
             if event_id == 3:
-                return [
-                    SimpleNamespace(event_id=3, event_date=None, title=None)
-                ]
+                return [SimpleNamespace(event_id=3, event_date=None, title=None)]
             return [
                 SimpleNamespace(
                     event_id=event_id,

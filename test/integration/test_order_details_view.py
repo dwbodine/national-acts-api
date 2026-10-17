@@ -87,7 +87,8 @@ def test_order_details_sources_and_stripe_rollback(database):
     assert rows[5]["TicketSocketOrderId"] is None  # Same ID, different event.
     with engine.connect() as connection:
         tickets = [
-            dict(row) for row in connection.execute(
+            dict(row)
+            for row in connection.execute(
                 text("SELECT * FROM TicketDetails ORDER BY TicketPartnerTicketId")
             ).mappings()
         ]
@@ -168,7 +169,12 @@ def test_order_details_sources_and_stripe_rollback(database):
     run("upgrade")
     run("check")
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM TicketDetails").scalar_one() == 3
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM TicketDetails"
+            ).scalar_one()
+            == 3
+        )
         assert (
             connection.exec_driver_sql("SELECT COUNT(*) FROM OrderDetails").scalar_one()
             == 2

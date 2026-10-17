@@ -180,6 +180,7 @@ def build_page_seller_row(**overrides):
     """
     row = {
         "PageSellerId": 1,
+        "IsPrimary": 1,
         "SellerId": 101,
         "PageId": 1,
         "DisplayName": "Featured Artist",
@@ -750,6 +751,11 @@ def test_update_page_returns_none_when_new_page_insert_fails(monkeypatch):
     Test that update_page returns None when a new page insert fails.
     """
     page_to_update = create_page(page_id=0, route="new-page")
+    monkeypatch.setattr(
+        page_service.PageService,
+        "get_page_by_route",
+        lambda self, route, show_inactive=False: None,
+    )
     page_to_update.sellers = [create_page_seller(page_seller_id=0, seller_id=101)]
     monkeypatch.setattr(page_service, "db_insert", lambda sql, data: 0)
     monkeypatch.setattr(
@@ -900,6 +906,11 @@ def test_update_page_inserts_new_page_and_preserves_seller_country_id(monkeypatc
     Test that update_page inserts new pages and passes seller country ids on seller inserts.
     """
     insert_calls = []
+    monkeypatch.setattr(
+        page_service.PageService,
+        "get_page_by_route",
+        lambda self, route, show_inactive=False: None,
+    )
     page_to_update = create_page(page_id=0, route="new-page")
     page_to_update.page_type = create_page_type(page_type_id=7)
     page_to_update.sellers = [create_page_seller(page_seller_id=0, seller_id=101)]

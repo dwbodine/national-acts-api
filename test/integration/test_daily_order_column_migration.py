@@ -12,9 +12,12 @@ pytestmark = pytest.mark.integration
 @pytest.mark.parametrize("event_is_mapped", [True, False])
 def test_daily_order_columns_and_data_round_trip(database, event_is_mapped):
     run, engine, root = database
-    shutil.copytree(Path(__file__).resolve().parents[2] / "migrations/versions",
-                    root / "migrations/versions", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        Path(__file__).resolve().parents[2] / "migrations/versions",
+        root / "migrations/versions",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
     run("upgrade", "0002_manual_transfer")
     statements = [
         "INSERT INTO Sellers (SellerId, Name) VALUES (1, 'Seller')",
@@ -35,30 +38,62 @@ def test_daily_order_columns_and_data_round_trip(database, event_is_mapped):
         with pytest.raises(RuntimeError, match="without partner mappings"):
             run("upgrade", "7e3584499b4c")
         with engine.connect() as connection:
-            columns = {row[0] for row in connection.exec_driver_sql("SHOW COLUMNS FROM DailyOrderData")}
-            assert {'TicketSocketEventId', 'TicketSocketOrderId'} <= columns
-            assert connection.exec_driver_sql("SELECT COUNT(*) FROM DailyOrderData WHERE TicketSocketEventId=100").scalar_one() == 2
+            columns = {
+                row[0]
+                for row in connection.exec_driver_sql(
+                    "SHOW COLUMNS FROM DailyOrderData"
+                )
+            }
+            assert {"TicketSocketEventId", "TicketSocketOrderId"} <= columns
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT COUNT(*) FROM DailyOrderData WHERE TicketSocketEventId=100"
+                ).scalar_one()
+                == 2
+            )
         return
     run("upgrade", "7e3584499b4c")
     with engine.connect() as connection:
-        columns = {row[0] for row in connection.exec_driver_sql("SHOW COLUMNS FROM DailyOrderData")}
-        assert {'TicketPartnerEventId', 'TicketPartnerOrderId'} <= columns
-        assert not {'TicketSocketEventId', 'TicketSocketOrderId'} & columns
-        event_id = connection.exec_driver_sql("SELECT TicketPartnerEventId FROM TicketPartnerEvents").scalar_one()
-        order_id = connection.exec_driver_sql("SELECT TicketPartnerOrderId FROM TicketPartnerOrders").scalar_one()
+        columns = {
+            row[0]
+            for row in connection.exec_driver_sql("SHOW COLUMNS FROM DailyOrderData")
+        }
+        assert {"TicketPartnerEventId", "TicketPartnerOrderId"} <= columns
+        assert not {"TicketSocketEventId", "TicketSocketOrderId"} & columns
+        event_id = connection.exec_driver_sql(
+            "SELECT TicketPartnerEventId FROM TicketPartnerEvents"
+        ).scalar_one()
+        order_id = connection.exec_driver_sql(
+            "SELECT TicketPartnerOrderId FROM TicketPartnerOrders"
+        ).scalar_one()
         assert event_id != 100 and order_id != 110
-        rows = connection.exec_driver_sql("SELECT TicketPartnerEventId, TicketPartnerOrderId, TicketRevenue FROM DailyOrderData ORDER BY PurchaseDate").all()
-        assert [tuple(row) for row in rows] == [(event_id, None, 50), (event_id, order_id, 25)]
+        rows = connection.exec_driver_sql(
+            "SELECT TicketPartnerEventId, TicketPartnerOrderId, TicketRevenue FROM DailyOrderData ORDER BY PurchaseDate"
+        ).all()
+        assert [tuple(row) for row in rows] == [
+            (event_id, None, 50),
+            (event_id, order_id, 25),
+        ]
     run("downgrade", "0002_manual_transfer")
     with engine.connect() as connection:
-        columns = {row[0]: row for row in connection.exec_driver_sql("SHOW COLUMNS FROM DailyOrderData")}
-        assert not {'TicketPartnerEventId', 'TicketPartnerOrderId'} & columns.keys()
-        assert columns['TicketSocketEventId'][2] == 'NO'  # Restore legacy NOT NULL.
-        rows = connection.exec_driver_sql("SELECT TicketSocketEventId, TicketSocketOrderId, TicketRevenue FROM DailyOrderData ORDER BY PurchaseDate").all()
+        columns = {
+            row[0]: row
+            for row in connection.exec_driver_sql("SHOW COLUMNS FROM DailyOrderData")
+        }
+        assert not {"TicketPartnerEventId", "TicketPartnerOrderId"} & columns.keys()
+        assert columns["TicketSocketEventId"][2] == "NO"  # Restore legacy NOT NULL.
+        rows = connection.exec_driver_sql(
+            "SELECT TicketSocketEventId, TicketSocketOrderId, TicketRevenue FROM DailyOrderData ORDER BY PurchaseDate"
+        ).all()
         assert [tuple(row) for row in rows] == [(100, None, 50), (100, 110, 25)]
         ddl = connection.exec_driver_sql("SHOW CREATE TABLE DailyOrderData").one()[1]
-        assert 'FK_DailyOrderData_TicketSocketEvent' in ddl
-        assert 'IX_DailyOrderData_PurchaseDate_EventId' in ddl
+        assert "FK_DailyOrderData_TicketSocketEvent" in ddl
+        assert "IX_DailyOrderData_PurchaseDate_EventId" in ddl
     run("upgrade", "7e3584499b4c")
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM DailyOrderData").scalar_one() == 2
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM DailyOrderData"
+            ).scalar_one()
+            == 2
+        )

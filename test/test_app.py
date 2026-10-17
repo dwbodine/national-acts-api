@@ -476,7 +476,7 @@ def test_health_returns_exception_message_when_connection_raises(monkeypatch):
     Return the formatted database exception message when connection setup fails.
     """
 
-    def raise_connection_error():
+    def raise_connection_error(timeout):
         """
         Raise a database connection error for the health check.
         """

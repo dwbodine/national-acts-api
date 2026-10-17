@@ -556,7 +556,7 @@ class DailyOrderData:
     def __init__(
         self,
         purchase_date: str,
-        ticket_partner_event_id: int,    
+        ticket_partner_event_id: int,
         exchange_rate: float,
         currency_symbol: str,
     ):

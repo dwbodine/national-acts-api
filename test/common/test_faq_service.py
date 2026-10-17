@@ -143,9 +143,9 @@ def test_update_faq_inserts_new_faq_after_last_question(monkeypatch):
     }
 
 
-def test_update_faq_returns_false_when_new_category_has_no_last_number(monkeypatch):
+def test_update_faq_starts_empty_category_at_one(monkeypatch):
     """
-    Test that update_faq returns False when a new FAQ has no valid last question number.
+    Test that the first FAQ in an empty category starts at one.
     """
     monkeypatch.setattr(
         faq_service.FaqService,
@@ -153,9 +153,14 @@ def test_update_faq_returns_false_when_new_category_has_no_last_number(monkeypat
         lambda self, category_id: 0,
     )
 
+    calls = []
+    monkeypatch.setattr(
+        faq_service, "db_insert", lambda sql, data: calls.append(data) or 44
+    )
     success = faq_service.FaqService().update_faq(create_faq(faq_id=0))
 
-    assert success is False
+    assert success is True
+    assert calls[0]["order"] == 1
 
 
 def test_get_last_question_number_reads_max_order(monkeypatch):
@@ -191,6 +196,15 @@ def test_delete_faq_passes_faq_id_to_delete(monkeypatch):
     Test that delete_faq deletes the requested FAQ id.
     """
     calls = []
+    updates = []
+    monkeypatch.setattr(
+        faq_service,
+        "db_query_one",
+        lambda sql, data: {"FAQCategoryID": 4, "QuestionOrder": 2},
+    )
+    monkeypatch.setattr(
+        faq_service, "db_update", lambda sql, data: updates.append(data) or True
+    )
     monkeypatch.setattr(
         faq_service,
         "db_delete",
@@ -201,6 +215,7 @@ def test_delete_faq_passes_faq_id_to_delete(monkeypatch):
 
     assert success is True
     assert calls[0][1] == {"faq_id": 12}
+    assert updates == [{"category_id": 4}]
 
 
 def test_get_faq_categories_maps_rows(monkeypatch):
@@ -555,7 +570,7 @@ def test_renumber_faqs_updates_category_in_question_order(monkeypatch):
         lambda sql, data: calls.append((sql, data)) or True,
     )
 
-    success = faq_service.FaqService().renumber_faqs(4)
+    success = faq_service.FaqService()._FaqService__renumber_faqs(4)
 
     assert success is True
     assert len(calls) == 1

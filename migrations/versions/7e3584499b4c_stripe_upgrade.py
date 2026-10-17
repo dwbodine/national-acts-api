@@ -424,7 +424,9 @@ def upgrade():
             OR (TicketSocketOrderId IS NOT NULL AND TicketPartnerOrderId IS NULL)
     """).scalar_one()
     if unmapped_daily_rows:
-        raise RuntimeError("DailyOrderData contains rows without partner mappings; legacy columns were not dropped")
+        raise RuntimeError(
+            "DailyOrderData contains rows without partner mappings; legacy columns were not dropped"
+        )
 
     op.execute("""
         ALTER TABLE DailyOrderData
@@ -567,7 +569,6 @@ def upgrade():
             ON st.TicketPartnerOrderId = tpo.TicketPartnerOrderId
     """)
 
-
     op.execute("""
         CREATE SQL SECURITY INVOKER VIEW OrderOverview AS
 SELECT DISTINCT
@@ -596,7 +597,6 @@ JOIN ExchangeRates ON ExchangeRates.ExchangeRateId = TicketSocket.ExchangeRateId
 LEFT JOIN ExchangeRateHistory ON ExchangeRateHistory.ExchangeRateId = ExchangeRates.ExchangeRateId
     AND ExchangeRateHistory.MidnightDate = od.PurchaseDate
     """)
-
 
     op.execute("""
         CREATE TABLE PartnerTicketTypes (

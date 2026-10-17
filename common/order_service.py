@@ -12,8 +12,6 @@ from common.db import (
     db_insert,
     db_convert_list_to_parameters,
 )
-from common.daily_order_service import DailyOrderService
-from common.dashboard_service import DashboardService
 from common.ticket_partner_service import TicketPartnerService
 from common.models.national_acts import VipEvent, VipOrder, VipTicket, Seller
 from common.models.ticket_socket import TicketSocketTicketType
@@ -426,6 +424,12 @@ class OrderService:
 
     def rebuild_daily_order_data_for_order(self, order_id: int):
         """Rebuild reporting for the mapped event."""
+        # Defer this dependency: DashboardService also uses OrderService.
+        # pylint: disable-next=import-outside-toplevel,cyclic-import
+        from common.dashboard_service import (
+            DashboardService,
+        )
+
         row = db_query_one(
             """SELECT DISTINCT TicketPartnerEventId FROM OrderDetails
             WHERE TicketPartnerOrderId=%(id)s""",
@@ -697,7 +701,10 @@ class OrderService:
         if ticket_socket_order_id is None:
             return False
 
-        sql = """SELECT DISTINCT TicketPartnerOrderId FROM OrderDetails WHERE TicketPartnerOrderId=%(partner_order_id)s AND TicketPartnerId=2 AND TicketSocketOrderId IS NOT NULL"""
+        sql = """SELECT DISTINCT TicketPartnerOrderId
+                    FROM OrderDetails 
+                    WHERE TicketPartnerOrderId=%(partner_order_id)s 
+                        AND TicketPartnerId=2 AND TicketSocketOrderId IS NOT NULL"""
         data = {"partner_order_id": partner_order_id}
         existing_order: VipOrder = db_query_one(sql, data)
 
@@ -824,7 +831,9 @@ class OrderService:
         if event_id <= 0 or num_tickets <= 0:
             return False
 
-        sql = """SELECT DISTINCT TicketSocketEventId FROM EventDetails WHERE EventId=%(event_id)s AND TicketPartnerId=2"""
+        sql = """SELECT DISTINCT TicketSocketEventId
+                    FROM EventDetails 
+                    WHERE EventId=%(event_id)s AND TicketPartnerId=2"""
         data = {"event_id": event_id}
         existing_event: VipEvent = db_query_one(sql, data)
         if existing_event:
