@@ -45,6 +45,6 @@ def stripe_transactions():
     )
     end: int = get_override_int_value_or_default(request.args.get("end"), default=None)
 
-    result = service.get_payment_intents(start=start, end=end)
+    result = service.get_transactions(start=start, end=end)
 
     return convert_to_json(result)

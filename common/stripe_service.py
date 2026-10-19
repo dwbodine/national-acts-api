@@ -10,10 +10,12 @@ import stripe
 from stripe.params import (
     PaymentIntentListParams,
     PaymentIntentListParamsCreated,
+    RefundListParams,
+    RefundListParamsCreated,
 )
 
 from common.db import db_insert, db_query_all
-from common.models.stripe import StripeTransaction
+from common.models.stripe import StripeRefund, StripeTransaction
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,9 +26,9 @@ class StripeService:
     Service to interact with Stripe API
     """
 
-    def get_payment_intents(self, start: int = None, end: int = None):
+    def get_transactions(self, start: int = None, end: int = None):
         """
-        Get payment intents from Stripe API within the specified date range.
+        Get payment intents and refunds from Stripe API within the specified date range.
         """
         try:
             stripe_api_key = os.environ.get("STRIPE_API_SECRET_KEY")
@@ -76,7 +78,7 @@ class StripeService:
                 order_count += 1
 
                 transaction = StripeTransaction(
-                    order_id=order_id, payment_intent=payment_intent
+                    order_id=order_id, status=status, payment_intent=payment_intent
                 )
                 transactions.append(transaction)
 
@@ -87,9 +89,21 @@ class StripeService:
                 transaction_count,
                 order_count,
             )
-            return transactions
+            refund_params = RefundListParams(
+                created=RefundListParamsCreated(gte=start, lt=end),
+                limit=100,
+                expand=["data.payment_intent", "data.balance_transaction", "data.charge.balance_transaction"],
+            )
+            stripe_refunds = client.v1.refunds.list(refund_params)
+            refund_count = 0
+            refunds: list[StripeRefund] = []
+            for refund in stripe_refunds.auto_paging_iter():
+                refunds.append(StripeRefund(refund=refund))
+                refund_count += 1
+            logger.info("Fetched %s Stripe refunds", refund_count)
+            return refunds
         except Exception:  # pylint: disable=broad-exception-caught
-            logger.exception("Error fetching payment intents")
+            logger.exception("Error fetching Stripe transactions and refunds")
             return None
 
     def _upsert_transaction(self, transaction: StripeTransaction):
@@ -135,6 +149,9 @@ class StripeService:
             "currency": transaction.currency,
             "source_url": transaction.source_url or "",
             "exchange_rate": transaction.exchange_rate,
+            "status": transaction.status,
+            "payment_method": transaction.payment_method or "",
+            "stripe_account": transaction.stripe_account or "",
         }
         # All stored rows are successful. The duplicate branch must not refresh
         # amounts, order links, or LastUpdated, including concurrent imports.
@@ -142,12 +159,14 @@ class StripeService:
             """INSERT INTO StripeTransactions (
                 StripeTransactionId, TicketPartnerOrderId, EventName, Description,
                 DateReceived, Total, Insurance, ProcessingFee, CustomerName,
-                CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate
+                CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate,
+                Status, PaymentMethod, StripeAccount
             ) VALUES (
                 %(stripe_id)s, %(partner_order_id)s, %(event_name)s, %(description)s,
                 %(date_received)s, %(total)s, %(insurance)s, %(processing_fee)s,
                 %(customer_name)s, %(customer_email)s, %(customer_phone)s,
-                %(currency)s, %(source_url)s, %(exchange_rate)s
+                %(currency)s, %(source_url)s, %(exchange_rate)s,
+                %(status)s, %(payment_method)s, %(stripe_account)s
             ) ON DUPLICATE KEY UPDATE StripeTransactionId=StripeTransactionId""",
             data,
         )

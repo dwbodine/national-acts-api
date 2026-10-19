@@ -13,10 +13,23 @@ class StripeTransaction:
     def __init__(
         self,
         order_id: str,
+        status: str,
         payment_intent: stripe.PaymentIntent,
     ):
         self.stripe_id = payment_intent.id
         self.order_id = order_id
+        self.status = status
+        self.payment_method = (
+            payment_intent.payment_method_types[0]
+            if payment_intent.payment_method_types is not None
+            and len(payment_intent.payment_method_types) > 0
+            else "card"
+        )
+        self.stripe_account = (
+            payment_intent.metadata["stripeAccount"]
+            if "stripeAccount" in payment_intent.metadata
+            else ""
+        )
         self.event_id = (
             payment_intent.metadata["eventIds"]
             if "eventIds" in payment_intent.metadata
@@ -87,3 +100,87 @@ class StripeTransaction:
     customer_phone: str = ""
     source_url: str = ""
     exchange_rate: float = 0.0
+    status: str = ""
+    payment_method: str = ""
+    stripe_account: str = ""
+
+
+class StripeRefund:
+    """
+    Refund model
+    """
+
+    def __init__(
+        self,
+        refund: stripe.Refund,
+    ):
+        self.stripe_id = refund.id
+        self.amount = refund.amount / 100
+        self.currency = refund.currency
+        self.status = refund.status
+        self.reason = refund.reason
+        self.created_at = refund.created
+        payment_intent = refund.payment_intent
+        if payment_intent is not None:
+            self.payment_intent_id = (
+                payment_intent.id if payment_intent is not None else ""
+            )
+            self.original_amount = payment_intent.amount / 100
+            self.order_id = (
+                payment_intent.metadata["orderId"]
+                if "orderId" in payment_intent.metadata
+                else ""
+            )
+            self.customer_name = (
+                payment_intent.metadata["customerName"]
+                if "customerName" in payment_intent.metadata
+                else ""
+            )
+            self.customer_email = (
+                payment_intent.metadata["customerEmail"]
+                if "customerEmail" in payment_intent.metadata
+                else ""
+            )
+            self.customer_phone = (
+                payment_intent.metadata["customerPhone"]
+                if "customerPhone" in payment_intent.metadata
+                else ""
+            )
+            self.source_url = (
+                payment_intent.metadata["domain"]
+                if "domain" in payment_intent.metadata
+                else ""
+            )
+            self.event_id = (
+                payment_intent.metadata["eventIds"]
+                if "eventIds" in payment_intent.metadata
+                else ""
+            )
+            self.event_name = (
+                payment_intent.metadata["eventNames"]
+                if "eventNames" in payment_intent.metadata
+                else ""
+            )
+        balance_transaction = refund.balance_transaction
+        if balance_transaction is not None:
+            self.exchange_rate = (
+                balance_transaction.exchange_rate
+                if balance_transaction.exchange_rate is not None
+                else 0.0
+            )
+
+    stripe_id: str = ""
+    payment_intent_id: str = ""
+    amount: float = 0.0
+    currency: str = ""
+    status: str = ""
+    reason: str = ""
+    created_at: str = ""
+    order_id: str = ""
+    customer_name: str = ""
+    customer_email: str = ""
+    customer_phone: str = ""
+    source_url: str = ""
+    event_id: str = ""
+    event_name: str = ""
+    original_amount: float = 0.0
