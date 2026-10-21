@@ -121,7 +121,9 @@ class StripeRefund:
         self.reason = refund.reason
         self.created_at = refund.created
         payment_intent = refund.payment_intent
-        if payment_intent is not None:
+        if isinstance(payment_intent, str):
+            self.payment_intent_id = payment_intent
+        elif payment_intent is not None:
             self.payment_intent_id = (
                 payment_intent.id if payment_intent is not None else ""
             )
@@ -162,7 +164,7 @@ class StripeRefund:
                 else ""
             )
         balance_transaction = refund.balance_transaction
-        if balance_transaction is not None:
+        if balance_transaction is not None and not isinstance(balance_transaction, str):
             self.exchange_rate = (
                 balance_transaction.exchange_rate
                 if balance_transaction.exchange_rate is not None
@@ -184,3 +186,4 @@ class StripeRefund:
     event_id: str = ""
     event_name: str = ""
     original_amount: float = 0.0
+    exchange_rate: float = 0.0

@@ -9,6 +9,37 @@ import stripe
 from common import stripe_service
 
 
+def test_expanded_refund_details_are_persisted(monkeypatch):
+    """Keep expanded payment metadata and the refund exchange rate in storage."""
+    refund = stripe.Refund.construct_from({
+        "id": "re_expanded", "amount": 500, "currency": "usd",
+        "status": "pending", "reason": "requested_by_customer", "created": 150,
+        "payment_intent": {
+            "id": "pi_original", "amount": 2000,
+            "metadata": {"orderId": "42", "customerName": "Buyer",
+                         "customerEmail": "buyer@example.com", "customerPhone": "555",
+                         "domain": "example.com", "eventIds": "10,11", "eventNames": "VIP"},
+        },
+        "balance_transaction": {"exchange_rate": 1.25},
+    }, None)
+    writes = []
+    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    stripe_service.StripeService()._upset_refund(stripe_service.StripeRefund(refund))
+    data = writes[0]
+    assert data["PaymentIntentId"] == "pi_original"
+    assert data["OrderId"] == "42"
+    assert data["OriginalAmount"] == 20
+    assert data["Amount"] == 5
+    assert data["CustomerName"] == "Buyer"
+    assert data["CustomerEmail"] == "buyer@example.com"
+    assert data["CustomerPhone"] == "555"
+    assert data["SourceUrl"] == "example.com"
+    assert data["EventId"] == "10,11"
+    assert data["EventName"] == "VIP"
+    assert data["ExchangeRate"] == 1.25
+    assert data["Status"] == "pending"
+
+
 def test_get_transactions_auto_pages_through_every_result(monkeypatch):
     """Process every intent exposed by Stripe's auto-pagination iterator."""
 
@@ -58,13 +89,17 @@ def test_get_transactions_auto_pages_through_every_result(monkeypatch):
             stripe.Refund.construct_from({
                 "id": f"re_{index}", "payment_intent": "pi_older_payment",
                 "amount": 250, "currency": "usd", "status": "succeeded",
-                "reason": None, "created": 150,
+                "reason": None, "created": 150, "balance_transaction": None,
             }, None)
             for index in range(205)
         ))
 
     monkeypatch.setenv("STRIPE_API_SECRET_KEY", "sk_test_example")
     monkeypatch.setattr(stripe_service.stripe, "StripeClient", FakeStripeClient)
+    writes = []
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append((sql, data)) or 0
+    )
 
     result = stripe_service.StripeService().get_transactions(start=100, end=200)
 
@@ -75,13 +110,22 @@ def test_get_transactions_auto_pages_through_every_result(monkeypatch):
         "expand": ["data.latest_charge.balance_transaction"],
     }
     assert calls["iterated"] is True
-    assert calls["refund_params"] == {"created": {"gte": 100, "lt": 200}, "limit": 100}
+    assert calls["refund_params"]["created"] == {"gte": 100, "lt": 200}
+    assert calls["refund_params"]["limit"] == 100
     assert len(result) == 205
     assert all(isinstance(item, stripe_service.StripeRefund) for item in result)
     assert result[-1].stripe_id == "re_204"
     assert result[0].payment_intent_id == "pi_older_payment"
     assert result[0].amount == 2.5
     assert result[0].created_at == 150
+    assert len(writes) == 205
+    assert "INSERT INTO StripeRefunds" in writes[0][0]
+    assert "Status=VALUES(Status)" in writes[0][0]
+    assert writes[0][1]["StripeRefundId"] == "re_0"
+    assert writes[0][1]["PaymentIntentId"] == "pi_older_payment"
+    assert writes[0][1]["CreatedAt"] == datetime(1970, 1, 1, 0, 2, 30)
+    assert writes[0][1]["Amount"] == 2.5
+    assert writes[0][1]["ExchangeRate"] == 0
 
 
 @pytest.mark.parametrize(
@@ -148,7 +192,7 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
 
     transactions = stripe_service.StripeService().get_transactions(100, 200)
 
-    assert len(transactions) == 1
+    assert transactions == []
     assert len(inserts) == 1
     assert lookups[0][1] == {"order_id": "42621"}
     assert "WHERE tso.OrderId=%(order_id)s" in lookups[0][0]
@@ -166,5 +210,5 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     assert "Status, PaymentMethod, StripeAccount" in sql
     # A duplicate must leave every stored field, including LastUpdated, alone.
     assert sql.split("ON DUPLICATE KEY UPDATE")[1].strip() == (
-        "StripeTransactionId=StripeTransactionId"
+        "PaymentIntentId=PaymentIntentId"
     )
