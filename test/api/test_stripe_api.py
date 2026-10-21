@@ -30,28 +30,52 @@ def test_report_creates_exact_utc_day(report_client, monkeypatch):
     report = stripe.StripeObject.construct_from(
         {"id": "frr_test", "status": "pending", "result": None}, None
     )
-    client = SimpleNamespace(v1=SimpleNamespace(reporting=SimpleNamespace(
-        report_types=SimpleNamespace(retrieve=lambda report_type: SimpleNamespace(
-            data_available_end=int(datetime(2026, 10, 20, tzinfo=timezone.utc).timestamp())
-        )),
-        report_runs=SimpleNamespace(create=lambda params: calls.append(params) or report)
-    )))
+    client = SimpleNamespace(
+        v1=SimpleNamespace(
+            reporting=SimpleNamespace(
+                report_types=SimpleNamespace(
+                    retrieve=lambda report_type: SimpleNamespace(
+                        data_available_end=int(
+                            datetime(2026, 10, 20, tzinfo=timezone.utc).timestamp()
+                        )
+                    )
+                ),
+                report_runs=SimpleNamespace(
+                    create=lambda params: calls.append(params) or report
+                ),
+            )
+        )
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     response = report_client.post(
-        "/stripe/fees/report", json={"start_date": "2026-10-01"},
+        "/stripe/fees/report",
+        json={"start_date": "2026-10-01"},
         headers={"x-api-key": "test_endpoint_key"},
     )
     assert response.status_code == 202
     assert response.get_json()["id"] == "frr_test"
     expected = int(datetime(2026, 10, 1, tzinfo=timezone.utc).timestamp())
-    assert calls == [{
-        "report_type": "all_fees.incurred_at.itemized.2",
-        "parameters": {"interval_start": expected, "interval_end": expected + 86400},
-    }]
+    assert calls == [
+        {
+            "report_type": "all_fees.incurred_at.itemized.2",
+            "parameters": {
+                "interval_start": expected,
+                "interval_end": expected + 86400,
+            },
+        }
+    ]
 
 
-@pytest.mark.parametrize("payload", [None, [], {}, {"start_date": "2026-02-30"},
-                                      {"start_date": "2026-10-01T01:00:00Z"}])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {},
+        {"start_date": "2026-02-30"},
+        {"start_date": "2026-10-01T01:00:00Z"},
+    ],
+)
 def test_report_rejects_invalid_dates(report_client, payload):
     """Reject missing or non-calendar dates before calling Stripe."""
     response = report_client.post(
@@ -67,14 +91,19 @@ def test_report_requires_authentication(report_client):
 
 def test_report_defers_days_beyond_stripe_availability(report_client, monkeypatch):
     """Reject unavailable intervals before creating a report run."""
-    client = SimpleNamespace(v1=SimpleNamespace(reporting=SimpleNamespace(
-        report_types=SimpleNamespace(retrieve=lambda report_type: SimpleNamespace(
-            data_available_end=0
-        )),
-    )))
+    client = SimpleNamespace(
+        v1=SimpleNamespace(
+            reporting=SimpleNamespace(
+                report_types=SimpleNamespace(
+                    retrieve=lambda report_type: SimpleNamespace(data_available_end=0)
+                ),
+            )
+        )
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     response = report_client.post(
-        "/stripe/fees/report", json={"start_date": "2026-10-19"},
+        "/stripe/fees/report",
+        json={"start_date": "2026-10-19"},
         headers={"x-api-key": "test_endpoint_key"},
     )
     assert response.status_code == 409
@@ -83,12 +112,14 @@ def test_report_defers_days_beyond_stripe_availability(report_client, monkeypatc
 
 def test_report_returns_failure_status(report_client, monkeypatch):
     """Stripe failures must not look like accepted report requests."""
+
     def fail(self, start):
         raise stripe.APIError("unavailable")
 
     monkeypatch.setattr(StripeService, "create_fee_report", fail)
     response = report_client.post(
-        "/stripe/fees/report", json={"start_date": "2026-10-01"},
+        "/stripe/fees/report",
+        json={"start_date": "2026-10-01"},
         headers={"x-api-key": "test_endpoint_key"},
     )
     assert response.status_code == 502
@@ -102,22 +133,39 @@ def test_get_report_returns_status_and_result(report_client, monkeypatch, status
     report = stripe.StripeObject.construct_from(
         {"id": "frr_test", "status": status, "result": result}, None
     )
-    client = SimpleNamespace(v1=SimpleNamespace(reporting=SimpleNamespace(
-        report_runs=SimpleNamespace(retrieve=lambda report_id: calls.append(report_id) or report)
-    )))
+    client = SimpleNamespace(
+        v1=SimpleNamespace(
+            reporting=SimpleNamespace(
+                report_runs=SimpleNamespace(
+                    retrieve=lambda report_id: calls.append(report_id) or report
+                )
+            )
+        )
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     downloads = []
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
+
     class Download:
         """Fake Stripe CSV response."""
+
         status_code = 200
         content = (
-            ",".join(stripe_service.FEE_COLUMNS) + "\n" + ",".join(
-                {"incurred_by": "pi_test", "incurred_by_type": "payment_intent",
-                 "amount": "0.05", "currency": "usd"}.get(key, "")
+            ",".join(stripe_service.FEE_COLUMNS)
+            + "\n"
+            + ",".join(
+                {
+                    "incurred_by": "pi_test",
+                    "incurred_by_type": "payment_intent",
+                    "amount": "0.05",
+                    "currency": "usd",
+                }.get(key, "")
                 for key in stripe_service.FEE_COLUMNS
-            ) + "\n"
+            )
+            + "\n"
         ).encode()
 
         def __enter__(self):
@@ -130,7 +178,9 @@ def test_get_report_returns_status_and_result(report_client, monkeypatch, status
             pass
 
     monkeypatch.setattr(
-        requests, "get", lambda url, **kwargs: downloads.append((url, kwargs)) or Download()
+        requests,
+        "get",
+        lambda url, **kwargs: downloads.append((url, kwargs)) or Download(),
     )
     response = report_client.get(
         "/stripe/fees/report/frr_test", headers={"x-api-key": "test_endpoint_key"}
@@ -141,12 +191,22 @@ def test_get_report_returns_status_and_result(report_client, monkeypatch, status
         assert response.get_json()["status"] == "succeeded"
         assert len(writes) == 1
         assert writes[0]["IncurredBy"] == "pi_test"
-        assert downloads == [(
-            "https://files.stripe.com/v1/files/file_test/contents",
-            {"auth": ("sk_test_example", ""), "timeout": 60, "allow_redirects": False},
-        )]
+        assert downloads == [
+            (
+                "https://files.stripe.com/v1/files/file_test/contents",
+                {
+                    "auth": ("sk_test_example", ""),
+                    "timeout": 60,
+                    "allow_redirects": False,
+                },
+            )
+        ]
     else:
-        assert response.get_json() == {"id": "frr_test", "status": status, "result": result}
+        assert response.get_json() == {
+            "id": "frr_test",
+            "status": status,
+            "result": result,
+        }
         assert downloads == []
         assert writes == []
     assert calls == ["frr_test"]
@@ -160,6 +220,7 @@ def test_get_report_requires_authentication(report_client):
 @pytest.mark.parametrize("missing", [True, False])
 def test_get_report_handles_stripe_errors(report_client, monkeypatch, missing):
     """Distinguish nonexistent reports from upstream service failures."""
+
     def fail(self, report_id):
         if missing:
             raise stripe.InvalidRequestError(

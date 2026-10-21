@@ -28,17 +28,28 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 FEE_COLUMNS = {
-    "suite": "Suite", "product": "Product", "feature_name": "FeatureName",
+    "suite": "Suite",
+    "product": "Product",
+    "feature_name": "FeatureName",
     "balance_transaction_created": "BalanceTransactionCreated",
     "balance_transaction_id": "BalanceTransactionId",
     "balance_transaction_description": "BalanceTransactionDescription",
-    "fee_description": "FeeDescription", "incurred_by": "IncurredBy",
-    "incurred_by_type": "IncurredByType", "amount": "Amount", "tax": "Tax",
-    "currency": "Currency", "invoice_number": "InvoiceNumber",
-    "credit_note_number": "CreditNoteNumber", "incurred_at": "IncurredAt",
-    "feature_description": "FeatureDescription", "fee_transaction_id": "FeeTransactionId",
-    "fee_transaction_created": "FeeTransactionCreated", "pricing_tier": "PricingTier",
-    "fee_category": "FeeCategory", "settled_at": "SettledAt", "settled_via": "SettledVia",
+    "fee_description": "FeeDescription",
+    "incurred_by": "IncurredBy",
+    "incurred_by_type": "IncurredByType",
+    "amount": "Amount",
+    "tax": "Tax",
+    "currency": "Currency",
+    "invoice_number": "InvoiceNumber",
+    "credit_note_number": "CreditNoteNumber",
+    "incurred_at": "IncurredAt",
+    "feature_description": "FeatureDescription",
+    "fee_transaction_id": "FeeTransactionId",
+    "fee_transaction_created": "FeeTransactionCreated",
+    "pricing_tier": "PricingTier",
+    "fee_category": "FeeCategory",
+    "settled_at": "SettledAt",
+    "settled_via": "SettledVia",
 }
 
 
@@ -46,7 +57,9 @@ class FeeReportNotReady(ValueError):
     """The requested day's fees are not available from Stripe yet."""
 
     def __init__(self, available_until):
-        super().__init__("Stripe fee data is not available for the entire requested day")
+        super().__init__(
+            "Stripe fee data is not available for the entire requested day"
+        )
         self.available_until = available_until
 
 
@@ -122,7 +135,8 @@ class StripeService:
                 created=RefundListParamsCreated(gte=start, lt=end),
                 limit=100,
                 expand=[
-                    "data.payment_intent", "data.balance_transaction",
+                    "data.payment_intent",
+                    "data.balance_transaction",
                 ],
             )
             stripe_refunds = client.v1.refunds.list(refund_params)
@@ -149,16 +163,23 @@ class StripeService:
         if not api_key:
             raise RuntimeError("Stripe API key is not configured")
         client = stripe.StripeClient(api_key=api_key)
-        report_type = client.v1.reporting.report_types.retrieve("all_fees.incurred_at.itemized.2")
-        if int((start + timedelta(days=1)).timestamp()) > report_type.data_available_end:
+        report_type = client.v1.reporting.report_types.retrieve(
+            "all_fees.incurred_at.itemized.2"
+        )
+        if (
+            int((start + timedelta(days=1)).timestamp())
+            > report_type.data_available_end
+        ):
             raise FeeReportNotReady(report_type.data_available_end)
-        return client.v1.reporting.report_runs.create({
-            "report_type": "all_fees.incurred_at.itemized.2",
-            "parameters": {
-                "interval_start": int(start.timestamp()),
-                "interval_end": int((start + timedelta(days=1)).timestamp()),
-            },
-        })
+        return client.v1.reporting.report_runs.create(
+            {
+                "report_type": "all_fees.incurred_at.itemized.2",
+                "parameters": {
+                    "interval_start": int(start.timestamp()),
+                    "interval_end": int((start + timedelta(days=1)).timestamp()),
+                },
+            }
+        )
 
     def get_fee_report(self, report_id: str):
         """Import completed fee reports and return their status and import count."""
@@ -185,7 +206,9 @@ class StripeService:
                 raise ValueError("Malformed Stripe fee report row")
             if row["incurred_by_type"] != "payment_intent":
                 continue
-            data = {column: row[header] or None for header, column in FEE_COLUMNS.items()}
+            data = {
+                column: row[header] or None for header, column in FEE_COLUMNS.items()
+            }
             try:
                 for column in ("Amount", "Tax"):
                     data[column] = Decimal(data[column] or "0")
@@ -194,20 +217,29 @@ class StripeService:
                 if not row["amount"] or not data["Currency"]:
                     raise ValueError("Missing fee amount or currency")
                 for column in (
-                    "BalanceTransactionCreated", "IncurredAt",
-                    "FeeTransactionCreated", "SettledAt",
+                    "BalanceTransactionCreated",
+                    "IncurredAt",
+                    "FeeTransactionCreated",
+                    "SettledAt",
                 ):
                     if data[column]:
-                        data[column] = datetime.strptime(data[column], "%Y-%m-%d %H:%M:%S")
+                        data[column] = datetime.strptime(
+                            data[column], "%Y-%m-%d %H:%M:%S"
+                        )
             except (ValueError, InvalidOperation) as error:
                 raise ValueError("Invalid Stripe fee report value") from error
             # Stripe's fee/balance IDs can represent many itemized fees. Hash the
             # full normalized row so identical rows share one database key.
             canonical = {
                 key: (
-                    format(value, "f").rstrip("0").rstrip(".")
-                    if value.as_tuple().exponent < 0 else format(value, "f")
-                ) if isinstance(value, Decimal) else value
+                    (
+                        format(value, "f").rstrip("0").rstrip(".")
+                        if value.as_tuple().exponent < 0
+                        else format(value, "f")
+                    )
+                    if isinstance(value, Decimal)
+                    else value
+                )
                 for key, value in data.items()
             }
             signature = json.dumps(canonical, sort_keys=True, default=str)
@@ -236,7 +268,9 @@ class StripeService:
         # Use Stripe's fixed file host rather than forwarding credentials to a URL.
         with requests.get(
             f"https://files.stripe.com/v1/files/{quote(file_id, safe='')}/contents",
-            auth=(api_key, ""), timeout=60, allow_redirects=False,
+            auth=(api_key, ""),
+            timeout=60,
+            allow_redirects=False,
         ) as response:
             response.raise_for_status()
             if response.status_code != 200:
@@ -269,7 +303,9 @@ class StripeService:
         columns = ", ".join(data)
         placeholders = ", ".join(f"%({column})s" for column in data)
         updates = ", ".join(
-            f"{column}=VALUES({column})" for column in data if column != "StripeRefundId"
+            f"{column}=VALUES({column})"
+            for column in data
+            if column != "StripeRefundId"
         )
         db_insert(
             f"INSERT INTO StripeRefunds ({columns}) VALUES ({placeholders}) "

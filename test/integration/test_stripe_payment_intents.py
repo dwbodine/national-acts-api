@@ -13,7 +13,8 @@ def test_payment_intent_migration_round_trip(database):
     run, engine, root = database
     shutil.copytree(
         Path(__file__).resolve().parents[2] / "migrations/versions",
-        root / "migrations/versions", dirs_exist_ok=True,
+        root / "migrations/versions",
+        dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("__pycache__"),
     )
     run("upgrade", "0003_stripe_transaction_details")
@@ -32,16 +33,19 @@ def test_payment_intent_migration_round_trip(database):
         assert row[0] > 0
         assert row[1] == "pi_existing"
         assert row[2] == 100
-        updated_insert = insert.replace("StripeTransactions", "StripePaymentIntents").replace(
-            "StripeTransactionId", "PaymentIntentId"
-        )
+        updated_insert = insert.replace(
+            "StripeTransactions", "StripePaymentIntents"
+        ).replace("StripeTransactionId", "PaymentIntentId")
         connection.exec_driver_sql(
             updated_insert + " ON DUPLICATE KEY UPDATE PaymentIntentId=PaymentIntentId"
         )
         connection.exec_driver_sql(updated_insert.replace("pi_existing", "pi_new"))
-        assert connection.exec_driver_sql(
-            "SELECT COUNT(DISTINCT StripePaymentIntentId) FROM StripePaymentIntents"
-        ).scalar_one() == 2
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(DISTINCT StripePaymentIntentId) FROM StripePaymentIntents"
+            ).scalar_one()
+            == 2
+        )
         connection.exec_driver_sql("SELECT * FROM OrderDetails LIMIT 1").all()
         connection.exec_driver_sql("SELECT * FROM OrderOverview LIMIT 1").all()
     run("downgrade", "0003_stripe_transaction_details")

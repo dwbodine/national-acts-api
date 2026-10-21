@@ -15,19 +15,26 @@ def csv_content(rows):
     writer = csv.DictWriter(stream, fieldnames=stripe_service.FEE_COLUMNS)
     writer.writeheader()
     for row in rows:
-        writer.writerow({
-            "balance_transaction_id": "txn_shared", "fee_transaction_id": "ft_shared",
-            "currency": "usd", "amount": "0.050000000000000000",
-            "incurred_by_type": "payment_intent",
-            "incurred_at": "2026-10-09 00:00:00", **row,
-        })
+        writer.writerow(
+            {
+                "balance_transaction_id": "txn_shared",
+                "fee_transaction_id": "ft_shared",
+                "currency": "usd",
+                "amount": "0.050000000000000000",
+                "incurred_by_type": "payment_intent",
+                "incurred_at": "2026-10-09 00:00:00",
+                **row,
+            }
+        )
     return stream.getvalue().encode("utf-8-sig")
 
 
 def test_reimports_preserve_precision_and_shared_ids(monkeypatch):
     """Overlapping reports reuse row keys without collapsing different fee rows."""
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append((sql, data)))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append((sql, data))
+    )
     rows = [
         {"incurred_by": "pi_one"},
         {"incurred_by": "pi_two", "amount": "0.284736000000000001", "tax": "-0.000001"},
@@ -50,22 +57,37 @@ def test_reimports_preserve_precision_and_shared_ids(monkeypatch):
 def test_equivalent_decimal_rows_are_not_duplicated(monkeypatch):
     """Decimal formatting differences must not create separate fees."""
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
     service = stripe_service.StripeService()
-    count = service._upsert_fee_report(csv_content([
-        {"amount": "0.05", "tax": "0"},
-        {"amount": "0.050000000000000000", "tax": "0.000000000000000000"},
-    ]))
+    count = service._upsert_fee_report(
+        csv_content(
+            [
+                {"amount": "0.05", "tax": "0"},
+                {"amount": "0.050000000000000000", "tax": "0.000000000000000000"},
+            ]
+        )
+    )
     assert count == 1
     assert len(writes) == 1
 
 
-@pytest.mark.parametrize("invalid", [{"amount": "NaN"}, {"amount": "bad"},
-                                    {"incurred_at": "not-a-date"}, {"currency": ""}])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"amount": "NaN"},
+        {"amount": "bad"},
+        {"incurred_at": "not-a-date"},
+        {"currency": ""},
+    ],
+)
 def test_invalid_report_does_not_write_partial_rows(monkeypatch, invalid):
     """Validate the entire CSV before any rows are persisted."""
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
     with pytest.raises(ValueError):
         stripe_service.StripeService()._upsert_fee_report(csv_content([{}, invalid]))
     assert writes == []
@@ -80,13 +102,19 @@ def test_missing_headers_are_rejected():
 def test_only_payment_intent_fees_are_imported(monkeypatch):
     """Ignore charge, refund, and unclassified rows in a mixed fee report."""
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
-    count = stripe_service.StripeService()._upsert_fee_report(csv_content([
-        {"incurred_by": "pi_keep", "incurred_by_type": "payment_intent"},
-        {"incurred_by": "ch_skip", "incurred_by_type": "charge"},
-        {"incurred_by": "re_skip", "incurred_by_type": "refund"},
-        {"incurred_by_type": ""},
-    ]))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
+    count = stripe_service.StripeService()._upsert_fee_report(
+        csv_content(
+            [
+                {"incurred_by": "pi_keep", "incurred_by_type": "payment_intent"},
+                {"incurred_by": "ch_skip", "incurred_by_type": "charge"},
+                {"incurred_by": "re_skip", "incurred_by_type": "refund"},
+                {"incurred_by_type": ""},
+            ]
+        )
+    )
     assert count == 1
     assert len(writes) == 1
     assert writes[0]["IncurredBy"] == "pi_keep"

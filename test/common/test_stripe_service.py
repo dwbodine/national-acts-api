@@ -11,19 +11,35 @@ from common import stripe_service
 
 def test_expanded_refund_details_are_persisted(monkeypatch):
     """Keep expanded payment metadata and the refund exchange rate in storage."""
-    refund = stripe.Refund.construct_from({
-        "id": "re_expanded", "amount": 500, "currency": "usd",
-        "status": "pending", "reason": "requested_by_customer", "created": 150,
-        "payment_intent": {
-            "id": "pi_original", "amount": 2000,
-            "metadata": {"orderId": "42", "customerName": "Buyer",
-                         "customerEmail": "buyer@example.com", "customerPhone": "555",
-                         "domain": "example.com", "eventIds": "10,11", "eventNames": "VIP"},
+    refund = stripe.Refund.construct_from(
+        {
+            "id": "re_expanded",
+            "amount": 500,
+            "currency": "usd",
+            "status": "pending",
+            "reason": "requested_by_customer",
+            "created": 150,
+            "payment_intent": {
+                "id": "pi_original",
+                "amount": 2000,
+                "metadata": {
+                    "orderId": "42",
+                    "customerName": "Buyer",
+                    "customerEmail": "buyer@example.com",
+                    "customerPhone": "555",
+                    "domain": "example.com",
+                    "eventIds": "10,11",
+                    "eventNames": "VIP",
+                },
+            },
+            "balance_transaction": {"exchange_rate": 1.25},
         },
-        "balance_transaction": {"exchange_rate": 1.25},
-    }, None)
+        None,
+    )
     writes = []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
     stripe_service.StripeService()._upset_refund(stripe_service.StripeRefund(refund))
     data = writes[0]
     assert data["PaymentIntentId"] == "pi_original"
@@ -85,14 +101,24 @@ def test_get_transactions_auto_pages_through_every_result(monkeypatch):
     def list_refunds(params):
         """Return multiple pages of real SDK refund objects."""
         calls["refund_params"] = params
-        return SimpleNamespace(auto_paging_iter=lambda: (
-            stripe.Refund.construct_from({
-                "id": f"re_{index}", "payment_intent": "pi_older_payment",
-                "amount": 250, "currency": "usd", "status": "succeeded",
-                "reason": None, "created": 150, "balance_transaction": None,
-            }, None)
-            for index in range(205)
-        ))
+        return SimpleNamespace(
+            auto_paging_iter=lambda: (
+                stripe.Refund.construct_from(
+                    {
+                        "id": f"re_{index}",
+                        "payment_intent": "pi_older_payment",
+                        "amount": 250,
+                        "currency": "usd",
+                        "status": "succeeded",
+                        "reason": None,
+                        "created": 150,
+                        "balance_transaction": None,
+                    },
+                    None,
+                )
+                for index in range(205)
+            )
+        )
 
     monkeypatch.setenv("STRIPE_API_SECRET_KEY", "sk_test_example")
     monkeypatch.setattr(stripe_service.stripe, "StripeClient", FakeStripeClient)
@@ -143,7 +169,12 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     intent = SimpleNamespace(
         id="pi_new",
         metadata=stripe.StripeObject.construct_from(
-            {"orderId": "42621", "eventNames": "VIP Night", "stripeAccount": "acct_test"}, None
+            {
+                "orderId": "42621",
+                "eventNames": "VIP Night",
+                "stripeAccount": "acct_test",
+            },
+            None,
         ),
         status="succeeded",
         description=None,
@@ -169,24 +200,30 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
             status="succeeded",
         ),
     ]
-    client = SimpleNamespace(v1=SimpleNamespace(
-        payment_intents=SimpleNamespace(
-            list=lambda params: SimpleNamespace(auto_paging_iter=lambda: iter(intents))
-        ),
-        refunds=SimpleNamespace(
-            list=lambda params: SimpleNamespace(auto_paging_iter=lambda: iter(()))
-        ),
-    ))
+    client = SimpleNamespace(
+        v1=SimpleNamespace(
+            payment_intents=SimpleNamespace(
+                list=lambda params: SimpleNamespace(
+                    auto_paging_iter=lambda: iter(intents)
+                )
+            ),
+            refunds=SimpleNamespace(
+                list=lambda params: SimpleNamespace(auto_paging_iter=lambda: iter(()))
+            ),
+        )
+    )
     monkeypatch.setenv("STRIPE_API_SECRET_KEY", "sk_test_example")
     monkeypatch.setattr(stripe_service.stripe, "StripeClient", lambda api_key: client)
     lookups = []
     inserts = []
     monkeypatch.setattr(
-        stripe_service, "db_query_all",
+        stripe_service,
+        "db_query_all",
         lambda sql, data: lookups.append((sql, data)) or orders,
     )
     monkeypatch.setattr(
-        stripe_service, "db_insert",
+        stripe_service,
+        "db_insert",
         lambda sql, data: inserts.append((sql, data)) or 0,
     )
 

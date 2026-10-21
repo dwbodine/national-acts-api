@@ -24,13 +24,21 @@ def save_state(path, state):
     temporary.replace(path)
 
 
-def sync_reports(session, base_url, state_path, days=7, poll_seconds=30, wait_seconds=600):
+def sync_reports(
+    session, base_url, state_path, days=7, poll_seconds=30, wait_seconds=600
+):
     """Refresh complete UTC days once per run date and resume outstanding reports."""
     today = datetime.now(timezone.utc).date()
     run_date = today.isoformat()
-    state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+    state = (
+        json.loads(state_path.read_text(encoding="utf-8"))
+        if state_path.exists()
+        else {}
+    )
     jobs = state.setdefault("jobs", {})
-    dates = {(today - timedelta(days=offset)).isoformat() for offset in range(1, days + 1)}
+    dates = {
+        (today - timedelta(days=offset)).isoformat() for offset in range(1, days + 1)
+    }
     # Include unfinished reports even if their dates have aged out of the window.
     dates.update(day for day, job in jobs.items() if job.get("status") == "pending")
     for day in sorted(dates):
@@ -66,7 +74,9 @@ def sync_reports(session, base_url, state_path, days=7, poll_seconds=30, wait_se
                 count = report.get("rows_upserted")
                 if not isinstance(count, int) or count < 0:
                     raise ValueError("Report endpoint did not confirm database import")
-                job.update(status="succeeded", completed_on=run_date, rows_upserted=count)
+                job.update(
+                    status="succeeded", completed_on=run_date, rows_upserted=count
+                )
                 save_state(state_path, state)
                 LOGGER.info("Imported %s: %s rows (%s)", day, count, job["report_id"])
                 break
@@ -87,14 +97,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--days", type=int, default=7)
     parser.add_argument("--base-url", default="http://127.0.0.1:5000")
-    parser.add_argument("--state-file", type=Path, default=Path("/app/tmp/stripe-fees/state.json"))
+    parser.add_argument(
+        "--state-file", type=Path, default=Path("/app/tmp/stripe-fees/state.json")
+    )
     parser.add_argument("--env-file", default="/app/.env")
     parser.add_argument("--poll-seconds", type=int, default=30)
     parser.add_argument("--wait-seconds", type=int, default=600)
     args = parser.parse_args()
     if min(args.days, args.poll_seconds, args.wait_seconds) < 1:
         parser.error("days, poll-seconds, and wait-seconds must be positive")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     load_dotenv(args.env_file, override=False)
     api_key = os.getenv("STRIPE_API_PUBLIC_KEY")
     if not api_key:
@@ -103,11 +117,17 @@ def main():
         with requests.Session() as session:
             session.headers["x-api-key"] = api_key
             sync_reports(
-                session, args.base_url.rstrip("/"), args.state_file,
-                args.days, args.poll_seconds, args.wait_seconds,
+                session,
+                args.base_url.rstrip("/"),
+                args.state_file,
+                args.days,
+                args.poll_seconds,
+                args.wait_seconds,
             )
     except (requests.RequestException, ValueError, OSError, RuntimeError):
-        LOGGER.exception("Fee sync stopped; saved reports will be resumed on the next run")
+        LOGGER.exception(
+            "Fee sync stopped; saved reports will be resumed on the next run"
+        )
         return 1
     return 0
 

@@ -27,7 +27,9 @@ logger.setLevel(logging.INFO)
 def stripe_fee_report():
     """Start a fee report for midnight UTC through the following midnight."""
     sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
-    api_key = get_override_string_value_or_default(os.environ.get("STRIPE_API_PUBLIC_KEY"))
+    api_key = get_override_string_value_or_default(
+        os.environ.get("STRIPE_API_PUBLIC_KEY")
+    )
     if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
     payload = request.get_json(silent=True)
@@ -58,7 +60,9 @@ def stripe_fee_report():
 def get_stripe_fee_report(report_id):
     """Import completed reports and return their status and imported row count."""
     sender_key = get_override_string_value_or_default(request.headers.get("x-api-key"))
-    api_key = get_override_string_value_or_default(os.environ.get("STRIPE_API_PUBLIC_KEY"))
+    api_key = get_override_string_value_or_default(
+        os.environ.get("STRIPE_API_PUBLIC_KEY")
+    )
     if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
     if not report_id.startswith("frr_"):
@@ -68,7 +72,12 @@ def get_stripe_fee_report(report_id):
     try:
         service = StripeService()
         result = service.get_fee_report(report_id)
-    except (stripe.StripeError, requests.RequestException, ValueError, csv.Error) as error:
+    except (
+        stripe.StripeError,
+        requests.RequestException,
+        ValueError,
+        csv.Error,
+    ) as error:
         if isinstance(error, stripe.InvalidRequestError) and (
             error.http_status == 404 or error.code == "resource_missing"
         ):

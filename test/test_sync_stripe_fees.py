@@ -10,7 +10,9 @@ from tools.sync_stripe_fees import sync_reports
 
 
 def response(data):
-    return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: data)
+    return SimpleNamespace(
+        status_code=200, raise_for_status=lambda: None, json=lambda: data
+    )
 
 
 def test_daily_sync_creates_imports_and_skips_completed_dates(workspace_tmp_path):
@@ -18,10 +20,10 @@ def test_daily_sync_creates_imports_and_skips_completed_dates(workspace_tmp_path
     creates = []
     gets = []
     session = SimpleNamespace(
-        post=lambda url, **kwargs: creates.append(kwargs) or response({"id": "frr_test"}),
-        get=lambda url, **kwargs: gets.append(url) or response(
-            {"status": "succeeded", "rows_upserted": 12}
-        ),
+        post=lambda url, **kwargs: creates.append(kwargs)
+        or response({"id": "frr_test"}),
+        get=lambda url, **kwargs: gets.append(url)
+        or response({"status": "succeeded", "rows_upserted": 12}),
     )
     sync_reports(session, "http://api", state, days=1)
     sync_reports(session, "http://api", state, days=1)

@@ -12,14 +12,11 @@ def upgrade():
     """Extend existing transactions while supporting the previous API image."""
     # Previously imported transactions were all succeeded. Unknown historical
     # payment methods/accounts remain empty until populated from Stripe.
-    op.execute(
-        """ALTER TABLE StripeTransactions
+    op.execute("""ALTER TABLE StripeTransactions
         ADD COLUMN Status VARCHAR(32) NOT NULL DEFAULT 'succeeded',
         ADD COLUMN PaymentMethod VARCHAR(32) NOT NULL DEFAULT 'card',
-        ADD COLUMN StripeAccount VARCHAR(64) NOT NULL DEFAULT ''"""
-    )
-    op.execute(
-        """CREATE TABLE StripeRefunds (
+        ADD COLUMN StripeAccount VARCHAR(64) NOT NULL DEFAULT ''""")
+    op.execute("""CREATE TABLE StripeRefunds (
             StripeRefundId VARCHAR(100) NOT NULL PRIMARY KEY,
             PaymentIntentId VARCHAR(100) NOT NULL,
             Amount DECIMAL(18,2) NOT NULL,
@@ -38,10 +35,8 @@ def upgrade():
             ExchangeRate DECIMAL(18,8) NOT NULL,
             LastUpdated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY IX_StripeRefunds_PaymentIntentId (PaymentIntentId)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"""
-    )
-    op.execute(
-        """CREATE TABLE StripeFees (
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci""")
+    op.execute("""CREATE TABLE StripeFees (
             StripeFeeId BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
             FeeRowKey CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             Suite VARCHAR(100) NULL,
@@ -72,17 +67,14 @@ def upgrade():
             KEY IX_StripeFees_BalanceTransactionId (BalanceTransactionId),
             KEY IX_StripeFees_FeeTransactionId (FeeTransactionId),
             KEY IX_StripeFees_IncurredAt (IncurredAt)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"""
-    )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci""")
 
 
 def downgrade():
     """Remove fee/refund storage and the added transaction details."""
     op.execute("DROP TABLE StripeFees")
     op.execute("DROP TABLE StripeRefunds")
-    op.execute(
-        """ALTER TABLE StripeTransactions
+    op.execute("""ALTER TABLE StripeTransactions
         DROP COLUMN StripeAccount,
         DROP COLUMN PaymentMethod,
-        DROP COLUMN Status"""
-    )
+        DROP COLUMN Status""")
