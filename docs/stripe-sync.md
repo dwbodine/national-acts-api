@@ -1,7 +1,7 @@
 # Stripe synchronization on EC2
 
 Deploy the image containing both runners and apply migrations through
-`0004_stripe_payment_intents` before starting. The deployed fee API must import
+`0005_stripe_customer_phone` before starting. The deployed fee API must import
 reports into StripeFees and return `rows_upserted`, not CSV.
 
 These commands use the existing `nationalactsapi` container, its `/app/.env`,
