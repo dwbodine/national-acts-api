@@ -106,11 +106,6 @@ class StripeService:
 
                 event_id = metadata["eventIds"] if "eventIds" in metadata else None
 
-                if not event_id:
-                    logger.warning(
-                        "Payment intent %s has no event ID", payment_intent.id
-                    )
-
                 order_id = metadata["orderId"] if "orderId" in metadata else None
 
                 if not order_id:
@@ -120,7 +115,7 @@ class StripeService:
                         event_id,
                     )
 
-                if not order_id or not event_id:
+                if not order_id:
                     continue
 
                 status = payment_intent.status
@@ -334,18 +329,21 @@ class StripeService:
         )
 
     def _upsert_transaction(self, transaction: StripeTransaction):
-        """Insert a successful intent, preserving any previously stored transaction."""
+        """Resolve the native order within its account and insert a successful intent."""
         orders = db_query_all(
-            """SELECT DISTINCT tpo.TicketPartnerOrderId
+            """SELECT DISTINCT tso.Id, tso.OrderId, tso.EventId, tpo.TicketPartnerOrderId
             FROM TicketSocketOrders tso
-            JOIN TicketPartnerEvents tpe
+            JOIN TicketSocketEvents tse ON tse.Id=tso.TicketSocketEventId
+            JOIN SellerEventCategory sec
+                ON sec.SellerEventCategoryId=tse.SellerEventCategoryId
+            LEFT JOIN TicketPartnerEvents tpe
                 ON tpe.TicketPartnerId=2
                 AND tpe.PartnerEventId=tso.TicketSocketEventId
-            JOIN TicketPartnerOrders tpo
+            LEFT JOIN TicketPartnerOrders tpo
                 ON tpo.TicketPartnerEventId=tpe.TicketPartnerEventId
                 AND tpo.PartnerOrderId=tso.Id
-            WHERE tso.OrderId=%(order_id)s and tso.EventId=%(event_id)s""",
-            {"order_id": transaction.order_id, "event_id": transaction.event_id},
+            WHERE tso.OrderId=%(order_id)s AND sec.TicketSocketId=%(ticket_socket_id)s""",
+            {"order_id": transaction.order_id, "ticket_socket_id": transaction.ticket_socket_id},
         )
         # Keep unmatched/ambiguous transactions without assigning the wrong order.
         partner_order_id = (
@@ -353,13 +351,15 @@ class StripeService:
         )
         if partner_order_id is None:
             logger.warning(
-                "Stripe transaction %s matched %s partner orders for order %s and event %s",
+                "Stripe transaction %s matched %s order rows for order %s in TicketSocket %s",
                 transaction.stripe_id,
                 len(orders),
                 transaction.order_id,
-                transaction.event_id,
+                transaction.ticket_socket_id,
             )
             return
+        else:
+            transaction.event_id = orders[0]["EventId"]
 
         data = {
             "stripe_id": transaction.stripe_id,
@@ -408,7 +408,7 @@ class StripeService:
                 %(customer_name)s, %(customer_email)s, %(customer_phone)s,
                 %(currency)s, %(source_url)s, %(exchange_rate)s,
                 %(status)s, %(payment_method)s, %(stripe_account)s, %(application_fee)s,
-                %(insurance_verified)s, %(processing_fee_currency)s, %(native_event_id)s, 
+                %(insurance_verified)s, %(processing_fee_currency)s, %(native_event_id)s,
                 %(native_order_id)s
             ) ON DUPLICATE KEY UPDATE """ + duplicate_update,
             data,

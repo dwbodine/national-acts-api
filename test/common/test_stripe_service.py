@@ -171,13 +171,15 @@ def test_get_transactions_auto_pages_through_every_result(monkeypatch):
 @pytest.mark.parametrize(
     "orders, expected_order_id",
     [
-        ([{"TicketPartnerOrderId": 900}], 900),
+        ([{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": 900}], 900),
+        ([{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": None}], None),
         ([], None),
         ([{"TicketPartnerOrderId": 900}, {"TicketPartnerOrderId": 901}], None),
     ],
 )
+@pytest.mark.parametrize("event_metadata", [None, "", "999,888"])
 def test_successful_intents_are_saved_with_partner_order_mapping(
-    monkeypatch, orders, expected_order_id
+    monkeypatch, orders, expected_order_id, event_metadata
 ):
     """Match external order IDs and persist only succeeded intents with metadata."""
     intent = SimpleNamespace(
@@ -185,6 +187,8 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
         metadata=stripe.StripeObject.construct_from(
             {
                 "orderId": "42621",
+                "domain": "europe.nationalactsvip.com",
+                "eventIds": event_metadata,
                 "eventNames": "VIP Night",
                 "stripeAccount": "acct_test",
             },
@@ -245,10 +249,13 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
 
     assert transactions == []
     assert len(inserts) == 1
-    assert lookups[0][1] == {"order_id": "42621"}
+    assert lookups[0][1] == {"order_id": "42621", "ticket_socket_id": 2}
     assert "WHERE tso.OrderId=%(order_id)s" in lookups[0][0]
+    assert "sec.TicketSocketId=%(ticket_socket_id)s" in lookups[0][0]
     sql, data = inserts[0]
     assert data["partner_order_id"] == expected_order_id
+    assert data["native_order_id"] == (42621 if len(orders) == 1 else "42621")
+    assert data["native_event_id"] == (77 if len(orders) == 1 else None)
     assert data["stripe_id"] == "pi_new"
     assert data["date_received"] == datetime(2024, 1, 1)
     assert data["total"] == 125
@@ -265,3 +272,20 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     assert sql.split("ON DUPLICATE KEY UPDATE")[1].strip() == (
         "PaymentIntentId=PaymentIntentId"
     )
+
+
+@pytest.mark.parametrize("domain, expected_account", [
+    ("secure.nationalactsvip.com", 1), ("europe.nationalactsvip.com", 2),
+    ("australia.nationalactsvip.com", 3), ("tickets.nationalactsvip.com", 4),
+    ("japan.nationalactsvip.com", 5), ("secure.savingabelvip.com", 6),
+])
+def test_domain_identifies_ticket_socket_account(domain, expected_account):
+    """Account identity must reach the upsert even when eventIds is absent."""
+    intent = SimpleNamespace(
+        id="pi_account", metadata={"orderId": "42547", "domain": domain},
+        description="", created=100, amount=100, currency="usd",
+        application_fee_amount=None, payment_method_types=["card"], latest_charge=None,
+    )
+    transaction = stripe_service.StripeTransaction("42547", "succeeded", intent)
+    assert transaction.ticket_socket_id == expected_account
+    assert transaction.event_id == ""

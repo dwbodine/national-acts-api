@@ -18,13 +18,13 @@ class StripeTransaction:
     def __init__(
         self,
         order_id: str,
-        event_id: str,
         status: str,
         payment_intent: stripe.PaymentIntent,
+        event_id: str | None = None,
     ):
         self.stripe_id = payment_intent.id
         self.order_id = order_id
-        self.event_id = event_id.split(",", 1)[0].strip()
+        self.event_id = (event_id or "").split(",", 1)[0].strip()
         self.status = status
         charge = payment_intent.latest_charge
         method_details = getattr(charge, "payment_method_details", None)
@@ -77,16 +77,22 @@ class StripeTransaction:
         match source_url:
             case str() as url if url.startswith("europe"):
                 self.source_url = "europe.nationalactsvip.com"
+                self.ticket_socket_id = 2
             case str() as url if url.startswith("tickets"):
                 self.source_url = "tickets.nationalactsvip.com"
+                self.ticket_socket_id = 4
             case str() as url if url.startswith("australia"):
                 self.source_url = "australia.nationalactsvip.com"
+                self.ticket_socket_id = 3
             case str() as url if url.startswith("japan"):
                 self.source_url = "japan.nationalactsvip.com"
+                self.ticket_socket_id = 5
             case str() as url if url.find("savingabel") != -1:
                 self.source_url = "secure.savingabelvip.com"
+                self.ticket_socket_id = 6
             case _:
                 self.source_url = "secure.nationalactsvip.com"
+                self.ticket_socket_id = 1
 
         self.processing_fee = (
             (payment_intent.latest_charge.balance_transaction.fee / 100)
@@ -132,6 +138,7 @@ class StripeTransaction:
     stripe_id: str = ""
     order_id: str = ""
     event_id: str = ""
+    ticket_socket_id: int = 1
     event_name: str = ""
     description: str = ""
     date_received: str = ""
