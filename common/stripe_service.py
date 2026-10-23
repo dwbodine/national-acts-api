@@ -121,12 +121,6 @@ class StripeService:
                 status = payment_intent.status
 
                 if status != "succeeded":
-                    logger.warning(
-                        "Payment intent %s for order %s has status %s",
-                        payment_intent.id,
-                        order_id,
-                        status,
-                    )
                     continue
 
                 order_count += 1
