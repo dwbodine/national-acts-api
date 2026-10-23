@@ -335,10 +335,11 @@ class StripeService:
         )
         if partner_order_id is None:
             logger.warning(
-                "Stripe transaction %s matched %s partner orders for order %s",
+                "Stripe transaction %s matched %s partner orders for order %s and event %s",
                 transaction.stripe_id,
                 len(orders),
                 transaction.order_id,
+                transaction.event_id,
             )
             return
 
