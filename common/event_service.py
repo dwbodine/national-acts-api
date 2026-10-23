@@ -23,6 +23,7 @@ from common.models.ticket_socket import (
 )
 from common.order_service import OrderService
 from common.ticket_partner_service import TicketPartnerService
+from common.stripe_financial_service import StripeFinancialService
 from common.utility import (
     get_override_float_value_or_default,
     get_timezone_abbreviation,
@@ -60,6 +61,7 @@ class EventService:
         is_public: bool = False,
         is_website: bool = False,
         is_portal: bool = False,
+        include_stripe_financials: bool = False,
     ):
         """
         main method to fetch events and orders
@@ -412,6 +414,8 @@ class EventService:
 
             events.append(vip_event)
 
+        if include_stripe_financials and get_orders and not is_public:
+            StripeFinancialService().enrich_events(events)
         return events
 
     def __get_ticket_types_from_event_id(

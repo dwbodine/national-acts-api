@@ -474,6 +474,9 @@ class DataRefreshService:
                             )
 
                             order_data = {
+                                "customer_processing_fee": getattr(
+                                    order, "customer_processing_fee", None
+                                ),
                                 "purchaseDate": get_override_string_value_or_default(
                                     purchase_date
                                 ),
@@ -655,6 +658,7 @@ class DataRefreshService:
                                 # update existing order
                                 sql = """UPDATE TicketSocketOrders
                                         SET PurchaseDate=%(purchaseDate)s,
+                                        CustomerProcessingFee=COALESCE(%(customer_processing_fee)s, CustomerProcessingFee),
                                         PurchaseTimestamp=%(purchaseTimestamp)s,
                                         PurchaseUnixTimestamp=%(purchaseUnixTimestamp)s,
                                         Phone=%(phone)s, PhoneFormatted=%(phone_formatted)s,
@@ -684,13 +688,13 @@ class DataRefreshService:
                                     ticket_socket_event_id
                                 )
                                 sql = """INSERT INTO TicketSocketOrders
-                                            (TicketSocketEventId, OrderId,
+                                            (CustomerProcessingFee, TicketSocketEventId, OrderId,
                                             PurchaseDate, PurchaseTimestamp, PurchaseUnixTimestamp, 
                                             Phone, PhoneFormatted, EventId, UserId,
                                             PurchaserLastName, PurchaserFirstName, PurchaserCity, PurchaserState,
                                             PurchaserZip, PurchaserCountry,
                                             PurchaserIpAddress, Email, LastUpdate) VALUES
-                                    (%(ticket_socket_event_id)s, %(order_id)s,
+                                    (%(customer_processing_fee)s, %(ticket_socket_event_id)s, %(order_id)s,
                                     %(purchaseDate)s, %(purchaseTimestamp)s, %(purchaseUnixTimestamp)s,
                                     %(phone)s, %(phone_formatted)s, 
                                     %(event_id)s, %(user_id)s, %(purchaserLastName)s, %(purchaserFirstName)s,

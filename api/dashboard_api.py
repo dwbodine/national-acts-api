@@ -10,6 +10,7 @@ from flask_jwt_extended import jwt_required
 
 from common.common_api import is_admin_logged_in
 from common.dashboard_service import DashboardService
+from common.admin_settlement_service import AdminSettlementService
 from common.user_activity_service import UserActivityService
 from common.models.user import UserActivity
 from common.utility import (
@@ -19,6 +20,30 @@ from common.utility import (
 )
 
 dashboard_api = Blueprint("dashboard_api", __name__)
+
+
+@dashboard_api.route("/dashboard/settlements")
+@jwt_required()
+def get_admin_settlements():
+    """Expose internal checkout and processor costs only to verified administrators."""
+    if not is_admin_logged_in():
+        return {"msg": "Unauthorized"}, 401
+    try:
+        start = int(request.args["start"])
+        end = int(request.args["end"])
+        if start < 0 or end < start:
+            raise ValueError("Invalid range")
+        datetime.fromtimestamp(start, pytz.utc)
+        datetime.fromtimestamp(end, pytz.utc)
+        seller_id = int(request.args["sellerId"]) if request.args.get("sellerId") else None
+        event_ids = None
+        if "eventIds" in request.args:
+            event_ids = [int(value) for value in request.args["eventIds"].split(",") if value]
+            if any(value <= 0 for value in event_ids) or len(event_ids) > 5000:
+                raise ValueError("Invalid event IDs")
+    except (KeyError, ValueError, OverflowError, OSError):
+        return {"msg": "Valid start/end timestamps and numeric IDs are required"}, 400
+    return AdminSettlementService().get_report(start, end, seller_id, event_ids)
 
 
 @dashboard_api.route("/dashboard/getDashboardDataSecured/<int:year>")

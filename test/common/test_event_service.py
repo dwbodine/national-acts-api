@@ -1233,6 +1233,27 @@ import pytest
 from common.ticket_partner_service import TicketPartnerService
 
 
+@pytest.mark.parametrize("include,public,get_orders,expected", [
+    (False, False, True, False), (True, False, True, True),
+    (True, True, True, False), (True, False, False, False),
+])
+def test_stripe_financial_enrichment_is_optional_and_private(
+    monkeypatch, include, public, get_orders, expected
+):
+    """Only explicitly requested private order lookups trigger bulk enrichment."""
+    monkeypatch.setattr(event_service, "db_query_all", lambda *args: [])
+    calls = []
+    monkeypatch.setattr(
+        event_service, "StripeFinancialService",
+        lambda: SimpleNamespace(enrich_events=lambda events: calls.append(events)),
+    )
+    events = event_service.EventService().get_events_and_orders(
+        get_orders=get_orders, is_public=public, include_stripe_financials=include
+    )
+    assert events == []
+    assert bool(calls) is expected
+
+
 @pytest.fixture(autouse=True)
 def partner_mapping_fixture(monkeypatch):
     """Existing unit fixtures use equal mapping/provider IDs; distinct IDs have dedicated tests."""

@@ -7,6 +7,7 @@ import copy
 import logging
 import json
 import re
+from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
@@ -558,6 +559,8 @@ class TicketSocketService:
                 total_count = get_override_int_value_or_default(tickets["totalCount"])
 
         order_tickets = []
+        processing_fees = []
+        processing_fees_complete = True
         if total_count > 0:
             ticket_data = tickets["data"]
             for item in ticket_data:
@@ -569,6 +572,11 @@ class TicketSocketService:
 
                 if item_event_id <= 0 or item_event_id != int(event_id):
                     continue
+
+                if item.get("individualProcessingFee") is None:
+                    processing_fees_complete = False
+                else:
+                    processing_fees.append(Decimal(str(item["individualProcessingFee"])))
 
                 if order.purchase_date is None and "purchaseDate" in item:
                     # datetime is not serializable in python,
@@ -801,4 +809,6 @@ class TicketSocketService:
 
         if len(order_tickets) > 0:
             order.tickets = order_tickets
+        if processing_fees and processing_fees_complete:
+            order.customer_processing_fee = sum(processing_fees, Decimal(0))
         return order

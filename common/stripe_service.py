@@ -68,6 +68,8 @@ class StripeService:
     Service to interact with Stripe API
     """
 
+    refresh_financials = False
+
     def get_transactions(self, start: int = None, end: int = None):
         """
         Get payment intents and refunds from Stripe API within the specified date range.
@@ -359,21 +361,32 @@ class StripeService:
             "status": transaction.status,
             "payment_method": transaction.payment_method or "",
             "stripe_account": transaction.stripe_account or "",
+            "application_fee": transaction.application_fee,
+            "insurance_verified": int(transaction.insurance_verified),
+            "processing_fee_currency": transaction.processing_fee_currency,
         }
-        # All stored rows are successful. The duplicate branch must not refresh
-        # amounts, order links, or LastUpdated, including concurrent imports.
+        # Ordinary imports preserve successful rows, including concurrent imports.
+        # Explicit reconciliation refreshes only fee metadata and payment method.
+        duplicate_update = "PaymentIntentId=PaymentIntentId"
+        if self.refresh_financials:
+            duplicate_update = """ProcessingFee=VALUES(ProcessingFee),
+                ProcessingFeeCurrency=VALUES(ProcessingFeeCurrency),
+                ApplicationFee=VALUES(ApplicationFee), Insurance=VALUES(Insurance),
+                InsuranceVerified=VALUES(InsuranceVerified), PaymentMethod=VALUES(PaymentMethod)"""
         db_insert(
             """INSERT INTO StripePaymentIntents (
                 PaymentIntentId, TicketPartnerOrderId, EventName, Description,
                 DateReceived, Total, Insurance, ProcessingFee, CustomerName,
                 CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate,
-                Status, PaymentMethod, StripeAccount
+                Status, PaymentMethod, StripeAccount, ApplicationFee,
+                InsuranceVerified, ProcessingFeeCurrency
             ) VALUES (
                 %(stripe_id)s, %(partner_order_id)s, %(event_name)s, %(description)s,
                 %(date_received)s, %(total)s, %(insurance)s, %(processing_fee)s,
                 %(customer_name)s, %(customer_email)s, %(customer_phone)s,
                 %(currency)s, %(source_url)s, %(exchange_rate)s,
-                %(status)s, %(payment_method)s, %(stripe_account)s
-            ) ON DUPLICATE KEY UPDATE PaymentIntentId=PaymentIntentId""",
+                %(status)s, %(payment_method)s, %(stripe_account)s, %(application_fee)s,
+                %(insurance_verified)s, %(processing_fee_currency)s
+            ) ON DUPLICATE KEY UPDATE """ + duplicate_update,
             data,
         )

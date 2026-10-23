@@ -121,6 +121,7 @@ class TicketSocketOrder:
     Order object from TicketSocket API
     """
 
+    customer_processing_fee = None
     original_order_id: int = 0
     original_event_id: int = 0
     user_id: int = 0

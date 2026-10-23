@@ -4,9 +4,26 @@ Unit tests for common.ticket_socket_service helpers.
 
 import json
 from datetime import datetime
+from decimal import Decimal
+
+import pytest
 
 from common import ticket_socket_service
 from common.models.ticket_socket import Country
+
+
+@pytest.mark.parametrize("fees, expected", [(["5.43", "5.43"], Decimal("10.86")),
+                                           ([0, 0], Decimal(0)), ([None, "5.43"], None)])
+def test_checkout_fee_sum_requires_complete_matching_tickets(monkeypatch, fees, expected):
+    """Use TicketSocket's actual checkout fee, including explicit zero and missing data."""
+    service = create_service(monkeypatch)
+    tickets = [build_order_ticket_item(id=index + 1, individualProcessingFee=fee)
+               for index, fee in enumerate(fees)]
+    tickets.append(build_order_ticket_item(id=10, eventId=88, individualProcessingFee="999"))
+    order = service._TicketSocketService__parse_response_to_order_object(
+        70854, 77, {"tickets": {"totalCount": len(tickets), "data": tickets}}
+    )
+    assert order.customer_processing_fee == expected
 
 
 def create_service(

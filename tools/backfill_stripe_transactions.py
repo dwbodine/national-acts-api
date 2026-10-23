@@ -98,6 +98,8 @@ def main():
     parser.add_argument("--chunk-hours", type=int, default=24)
     parser.add_argument("--max-chunks", type=int)
     parser.add_argument("--attempts", type=int, default=3)
+    parser.add_argument("--refresh-financials", action="store_true",
+                        help="Refresh processing/application fee metadata on existing payments")
     parser.add_argument("--env-file", default="/app/.env")
     parser.add_argument(
         "--state-file", type=Path, default=Path("/app/tmp/stripe-backfill/state.json")
@@ -115,8 +117,10 @@ def main():
     )  # pylint: disable=import-outside-toplevel
 
     try:
+        service = StripeService()
+        service.refresh_financials = args.refresh_financials
         backfill(
-            StripeService(),
+            service,
             args.state_file,
             midnight(args.start_date),
             midnight(args.end_date) if args.end_date else None,

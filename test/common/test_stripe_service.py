@@ -9,6 +9,20 @@ import stripe
 from common import stripe_service
 
 
+def test_transaction_exchange_rate_is_not_scaled():
+    """Stripe exchange rates are ratios, unlike amount fields in minor units."""
+    intent = SimpleNamespace(
+        id="pi_rate", metadata={}, description="", created=100,
+        amount=1000, currency="cad", application_fee_amount=None,
+        payment_method_types=["card"],
+        latest_charge=SimpleNamespace(balance_transaction=SimpleNamespace(
+            fee=30, exchange_rate=1.25,
+        )),
+    )
+    transaction = stripe_service.StripeTransaction("42", "succeeded", intent)
+    assert transaction.exchange_rate == 1.25
+
+
 def test_expanded_refund_details_are_persisted(monkeypatch):
     """Keep expanded payment metadata and the refund exchange rate in storage."""
     refund = stripe.Refund.construct_from(
@@ -238,7 +252,9 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     assert data["stripe_id"] == "pi_new"
     assert data["date_received"] == datetime(2024, 1, 1)
     assert data["total"] == 125
-    assert data["insurance"] == 5
+    assert data["insurance"] is None
+    assert data["application_fee"] == 5
+    assert data["insurance_verified"] == 0
     assert data["processing_fee"] == 3.5
     assert data["description"] == ""
     assert data["status"] == "succeeded"

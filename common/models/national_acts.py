@@ -224,6 +224,7 @@ class VipOrder(TicketSocketOrder):
     National acts orders
     """
 
+    stripe_financials_loaded: bool = False
     ticket_partner_event_id: int = 0
     ticket_partner_order_id: int = 0
     ticket_partner_id: int = 0
@@ -318,6 +319,7 @@ class VipEvent(TicketSocketEvent):
     National acts events
     """
 
+    stripe_financials_loaded: bool = False
     # base properties
     ticket_partner_id: int = 0
     ticket_partner_event_id: int = 0

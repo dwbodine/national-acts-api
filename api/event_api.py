@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 import pytz
 
 from common.admin_service import AdminService
-from common.common_api import get_user_from_jwt
+from common.common_api import get_user_from_jwt, is_admin_logged_in
 from common.daily_order_service import DailyOrderService
 from common.event_service import EventService
 from common.order_service import OrderService
@@ -95,6 +95,9 @@ def get_events_and_orders_secured():
         seller_ids=seller_ids,
         tour_id=tour_id,
         is_portal=is_portal,
+        include_stripe_financials=get_override_bool_value_or_default(
+            request.args.get("includeStripeFinancials")
+        ) and is_admin_logged_in(),
     )
     return convert_to_json(results)
 
