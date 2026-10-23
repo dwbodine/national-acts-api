@@ -326,8 +326,8 @@ class StripeService:
             JOIN TicketPartnerOrders tpo
                 ON tpo.TicketPartnerEventId=tpe.TicketPartnerEventId
                 AND tpo.PartnerOrderId=tso.Id
-            WHERE tso.OrderId=%(order_id)s""",
-            {"order_id": transaction.order_id},
+            WHERE tso.OrderId=%(order_id)s and tso.EventId=%(event_id)s""",
+            {"order_id": transaction.order_id, "event_id": transaction.event_id},
         )
         # Keep unmatched/ambiguous transactions without assigning the wrong order.
         partner_order_id = (
@@ -340,6 +340,7 @@ class StripeService:
                 len(orders),
                 transaction.order_id,
             )
+            return
 
         data = {
             "stripe_id": transaction.stripe_id,
@@ -364,6 +365,8 @@ class StripeService:
             "application_fee": transaction.application_fee,
             "insurance_verified": int(transaction.insurance_verified),
             "processing_fee_currency": transaction.processing_fee_currency,
+            "native_event_id": transaction.event_id,
+            "native_order_id": transaction.order_id,
         }
         # Ordinary imports preserve successful rows, including concurrent imports.
         # Explicit reconciliation refreshes only fee metadata and payment method.
@@ -379,14 +382,15 @@ class StripeService:
                 DateReceived, Total, Insurance, ProcessingFee, CustomerName,
                 CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate,
                 Status, PaymentMethod, StripeAccount, ApplicationFee,
-                InsuranceVerified, ProcessingFeeCurrency
+                InsuranceVerified, ProcessingFeeCurrency, NativeEventId, NativeOrderId
             ) VALUES (
                 %(stripe_id)s, %(partner_order_id)s, %(event_name)s, %(description)s,
                 %(date_received)s, %(total)s, %(insurance)s, %(processing_fee)s,
                 %(customer_name)s, %(customer_email)s, %(customer_phone)s,
                 %(currency)s, %(source_url)s, %(exchange_rate)s,
                 %(status)s, %(payment_method)s, %(stripe_account)s, %(application_fee)s,
-                %(insurance_verified)s, %(processing_fee_currency)s
+                %(insurance_verified)s, %(processing_fee_currency)s, %(native_event_id)s, 
+                %(native_order_id)s
             ) ON DUPLICATE KEY UPDATE """ + duplicate_update,
             data,
         )

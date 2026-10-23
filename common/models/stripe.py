@@ -27,7 +27,10 @@ class StripeTransaction:
         charge = payment_intent.latest_charge
         method_details = getattr(charge, "payment_method_details", None)
         self.payment_method = getattr(method_details, "type", None)
-        if not self.payment_method and len(payment_intent.payment_method_types or []) == 1:
+        if (
+            not self.payment_method
+            and len(payment_intent.payment_method_types or []) == 1
+        ):
             self.payment_method = payment_intent.payment_method_types[0]
         self.stripe_account = (
             payment_intent.metadata["stripeAccount"]
@@ -68,11 +71,25 @@ class StripeTransaction:
             if "customerPhone" in payment_intent.metadata
             else ""
         )
-        self.source_url = (
+        source_url = (
             payment_intent.metadata["domain"]
             if "domain" in payment_intent.metadata
             else ""
         )
+
+        match source_url:
+            case str() as url if url.startswith("europe"):
+                self.source_url = "europe.nationalactsvip.com"
+            case str() as url if url.startswith("tickets"):
+                self.source_url = "tickets.nationalactsvip.com"
+            case str() as url if url.startswith("australia"):
+                self.source_url = "australia.nationalactsvip.com"
+            case str() as url if url.startswith("japan"):
+                self.source_url = "japan.nationalactsvip.com"
+            case str() as url if url.find("savingabel") != -1:
+                self.source_url = "secure.savingabelvip.com"
+            case _:
+                self.source_url = "secure.nationalactsvip.com"
 
         self.processing_fee = (
             (payment_intent.latest_charge.balance_transaction.fee / 100)
@@ -83,14 +100,25 @@ class StripeTransaction:
         balance = getattr(charge, "balance_transaction", None)
         self.processing_fee_currency = getattr(balance, "currency", None)
         details = getattr(balance, "fee_details", None)
-        application_details = [fee for fee in details or [] if fee.type == "application_fee"]
-        self.insurance_verified = self.application_fee == 0 or bool(application_details) and all(
-            fee.application == TICKETSOCKET_INSURANCE_APPLICATION for fee in application_details
+        application_details = [
+            fee for fee in details or [] if fee.type == "application_fee"
+        ]
+        self.insurance_verified = (
+            self.application_fee == 0
+            or bool(application_details)
+            and all(
+                fee.application == TICKETSOCKET_INSURANCE_APPLICATION
+                for fee in application_details
+            )
         )
         self.insurance = self.application_fee if self.insurance_verified else None
         if details is not None:
             self.processing_fee = sum(
-                (Decimal(str(fee.amount)) / 100 for fee in details if fee.type == "stripe_fee"),
+                (
+                    Decimal(str(fee.amount)) / 100
+                    for fee in details
+                    if fee.type == "stripe_fee"
+                ),
                 Decimal(0),
             )
         elif self.processing_fee >= self.application_fee:
