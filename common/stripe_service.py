@@ -103,9 +103,24 @@ class StripeService:
                 transaction_count += 1
 
                 metadata = payment_intent.metadata
+
+                event_id = metadata["eventIds"] if "eventIds" in metadata else None
+
+                if not event_id:
+                    logger.warning(
+                        "Payment intent %s has no event ID", payment_intent.id
+                    )
+
                 order_id = metadata["orderId"] if "orderId" in metadata else None
 
                 if not order_id:
+                    logger.warning(
+                        "Payment intent %s for event %s has no order ID",
+                        payment_intent.id,
+                        event_id,
+                    )
+
+                if not order_id or not event_id:
                     continue
 
                 status = payment_intent.status
@@ -122,7 +137,10 @@ class StripeService:
                 order_count += 1
 
                 transaction = StripeTransaction(
-                    order_id=order_id, status=status, payment_intent=payment_intent
+                    order_id=order_id,
+                    event_id=event_id,
+                    status=status,
+                    payment_intent=payment_intent,
                 )
                 transactions.append(transaction)
 

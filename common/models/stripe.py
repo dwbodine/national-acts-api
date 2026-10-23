@@ -18,11 +18,13 @@ class StripeTransaction:
     def __init__(
         self,
         order_id: str,
+        event_id: str,
         status: str,
         payment_intent: stripe.PaymentIntent,
     ):
         self.stripe_id = payment_intent.id
         self.order_id = order_id
+        self.event_id = event_id.split(",", 1)[0].strip()
         self.status = status
         charge = payment_intent.latest_charge
         method_details = getattr(charge, "payment_method_details", None)
@@ -35,11 +37,6 @@ class StripeTransaction:
         self.stripe_account = (
             payment_intent.metadata["stripeAccount"]
             if "stripeAccount" in payment_intent.metadata
-            else ""
-        )
-        self.event_id = (
-            payment_intent.metadata["eventIds"]
-            if "eventIds" in payment_intent.metadata
             else ""
         )
         self.event_name = (
