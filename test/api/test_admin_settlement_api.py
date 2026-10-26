@@ -7,6 +7,7 @@ from flask_jwt_extended import get_jwt
 
 from api import dashboard_api, event_api, stripe_api
 from common import common_api
+from common.stripe_payment_intent_service import PaymentIntentConflict
 
 
 @pytest.fixture(autouse=True)
@@ -91,3 +92,63 @@ def test_missing_payments_exports_and_paginates(monkeypatch, client, auth_header
         assert "attachment" in response.headers["Content-Disposition"]
         assert "42547" in response.text
         assert "'=UNTRUSTED()" in response.text
+
+
+@pytest.mark.parametrize("spelling", ["missing", "misssing"])
+def test_missing_details_accepts_camel_case_dates(monkeypatch, client, auth_headers, spelling):
+    calls = []
+    monkeypatch.setattr(stripe_api, "StripeReconciliationService", lambda: SimpleNamespace(
+        get_missing_payments=lambda *args: calls.append(args) or {"orders": [
+            {"EventTitle": "VIP", "Venue": "Theater", "City": "Austin"}]}))
+    response = client.get(f"/stripe/payment-intents/{spelling}/details?"
+                          "startDate=2026-01-01&endDate=2027-01-01&ticketSocketId=4",
+                          headers=auth_headers())
+    assert response.status_code == 200
+    assert response.get_json()["orders"][0]["EventTitle"] == "VIP"
+    assert calls[0][0].isoformat() == "2026-01-01"
+    assert calls[0][1].isoformat() == "2027-01-01"
+    assert calls[0][2] == 4
+
+
+def test_payment_update_is_admin_only(monkeypatch, client, auth_headers):
+    monkeypatch.setattr(stripe_api, "StripePaymentIntentService",
+                        lambda: pytest.fail("Unauthorized request attempted a write"))
+    assert client.post("/stripe/payment-intents/update", json={}).status_code == 401
+    assert client.post("/stripe/payment-intents/update", json={},
+                       headers=auth_headers(role="client")).status_code == 401
+
+
+@pytest.mark.parametrize("created, expected_status", [(False, 200), (True, 201)])
+def test_payment_update_saves_supplied_fields(monkeypatch, client, auth_headers,
+                                            created, expected_status):
+    calls = []
+    monkeypatch.setattr(stripe_api, "StripePaymentIntentService", lambda: SimpleNamespace(
+        save=lambda payload: calls.append(payload) or {
+            "created": created, "paymentIntent": {"StripePaymentIntentId": 7}}))
+    payload = {"StripePaymentIntentId": 7, "TicketPartnerOrderId": 5}
+    response = client.post("/stripe/payment-intents/update", json=payload, headers=auth_headers())
+    assert response.status_code == expected_status
+    assert calls == [payload]
+    assert response.get_json()["paymentIntent"]["StripePaymentIntentId"] == 7
+
+
+@pytest.mark.parametrize("error, status", [(ValueError("Invalid field"), 400),
+                                         (PaymentIntentConflict("Duplicate payment"), 409)])
+def test_payment_update_reports_validation_and_conflicts(monkeypatch, client, auth_headers,
+                                                       error, status):
+    def save(_payload):
+        raise error
+
+    monkeypatch.setattr(stripe_api, "StripePaymentIntentService",
+                        lambda: SimpleNamespace(save=save))
+    response = client.post("/stripe/payment-intents/update", json={"StripePaymentIntentId": 7},
+                           headers=auth_headers())
+    assert response.status_code == status
+    assert response.get_json()["msg"] == str(error)
+
+
+@pytest.mark.parametrize("payload", [None, [], {}, {"StripePaymentIntentId": True},
+                                     {"StripePaymentIntentId": 7, "Total": "NaN"}])
+def test_payment_update_rejects_invalid_payload_before_database(client, auth_headers, payload):
+    response = client.post("/stripe/payment-intents/update", json=payload, headers=auth_headers())
+    assert response.status_code == 400

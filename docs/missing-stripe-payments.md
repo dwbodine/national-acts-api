@@ -45,3 +45,75 @@ curl --fail \
 The older ad-hoc monthly SQL must also join `TicketPartnerEvents` to `Events` and
 apply these event filters to the eligible-order denominator; changing import
 matching alone does not change that query's missing percentages.
+
+## Detail endpoint
+
+The following routes return the same report with detailed order/event rows:
+
+```text
+GET /stripe/payment-intents/missing/details?startDate=2026-01-01&endDate=2027-01-01&ticketSocketId=4
+GET /stripe/payment-intents/misssing/details?startDate=2026-01-01&endDate=2027-01-01&ticketSocketId=4
+```
+
+Both spellings are supported, including the originally requested `misssing` path.
+`startDate` and `endDate` are YYYY-MM-DD purchase dates with an exclusive end.
+The existing snake_case parameter names continue to work. The `orders` array also
+includes seller ID, venue, city and state alongside event title, date and IDs.
+Pagination and CSV options work on all three report routes.
+
+## Insert or update a local payment intent
+
+```text
+POST /stripe/payment-intents/update
+Authorization: Bearer <admin JWT>
+Content-Type: application/json
+```
+
+This endpoint writes the local database. It does not call Stripe or change a
+payment at Stripe. JSON uses database column names. `StripePaymentIntentId` is
+the local integer primary key; `PaymentIntentId` is the Stripe `pi_...` identifier.
+
+To reconcile an existing payment with an order, send only the fields to change:
+
+```json
+{
+  "StripePaymentIntentId": 123,
+  "TicketPartnerOrderId": 456
+}
+```
+
+The service resolves `NativeOrderId`/`NativeEventId` from that eligible TicketSocket
+order. Explicitly supplied native IDs must agree with the order. Other payment
+fields remain unchanged. A payment cannot be relinked to an excluded, deleted or
+cancelled event, or to an unknown order. A null partner order ID removes the link.
+
+To insert, omit the local ID for automatic allocation, or provide a currently
+unused positive integer ID. New rows require all these fields:
+
+```json
+{
+  "PaymentIntentId": "pi_REPLACE_WITH_REAL_STRIPE_ID",
+  "Description": "tickets.nationalactsvip.com Order 42547",
+  "DateReceived": "2026-03-15T12:00:00Z",
+  "Total": "123.45",
+  "ProcessingFee": "3.45",
+  "ProcessingFeeCurrency": "usd",
+  "Currency": "usd",
+  "SourceUrl": "tickets.nationalactsvip.com",
+  "ExchangeRate": "1",
+  "TicketPartnerOrderId": 456
+}
+```
+
+`TicketPartnerOrderId` is optional for new unlinked rows. Nullable customer/event
+fields may be omitted or explicitly null. Database defaults apply on insertion,
+including `Status='succeeded'`, `PaymentMethod='card'` and `Insurance=0`.
+`DateReceived` accepts ISO datetimes; offsets are normalized to UTC. Decimal
+amounts should be supplied as strings to preserve precision. Only succeeded
+payments are supported. `LastUpdated` is managed by the service.
+
+Responses contain `created` and the saved `paymentIntent` row: HTTP 201 for an
+insert and 200 for an update. Invalid fields/order links return 400; duplicate
+Stripe identifiers return 409. The Stripe identifier of an existing row cannot
+be changed, because refunds and fees reference it. Writes are transactional;
+ordinary scheduled imports still do not overwrite existing successful rows.

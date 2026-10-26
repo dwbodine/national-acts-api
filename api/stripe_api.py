@@ -15,6 +15,7 @@ from flask_jwt_extended import jwt_required
 from common.stripe_service import FeeReportNotReady, StripeService
 from common.common_api import is_admin_logged_in
 from common.stripe_reconciliation_service import StripeReconciliationService
+from common.stripe_payment_intent_service import PaymentIntentConflict, StripePaymentIntentService
 from common.utility import (
     convert_to_json,
     get_override_int_value_or_default,
@@ -27,6 +28,21 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+@stripe_api.route("/stripe/payment-intents/update", methods=["POST"])
+@jwt_required()
+def update_payment_intent():
+    """Explicitly save one local payment intent, allowing administrator reconciliation."""
+    if not is_admin_logged_in():
+        return {"msg": "Unauthorized"}, 401
+    try:
+        result = StripePaymentIntentService().save(request.get_json(silent=True))
+    except PaymentIntentConflict as error:
+        return {"msg": str(error)}, 409
+    except (TypeError, ValueError) as error:
+        return {"msg": str(error)}, 400
+    return result, 201 if result["created"] else 200
+
+
 @stripe_api.route("/stripe/payment-intents/missing", methods=["GET"])
 @jwt_required()
 def missing_payment_intents():
@@ -34,14 +50,15 @@ def missing_payment_intents():
     if not is_admin_logged_in():
         return {"msg": "Unauthorized"}, 401
     try:
-        start = date.fromisoformat(request.args["start_date"])
-        end = date.fromisoformat(request.args["end_date"])
-        if (start >= end or start.isoformat() != request.args["start_date"]
-                or end.isoformat() != request.args["end_date"]):
+        start_value = request.args.get("startDate", request.args.get("start_date"))
+        end_value = request.args.get("endDate", request.args.get("end_date"))
+        start = date.fromisoformat(start_value)
+        end = date.fromisoformat(end_value)
+        if (start >= end or start.isoformat() != start_value
+                or end.isoformat() != end_value):
             raise ValueError("Invalid date range")
-        account = (
-            int(request.args["ticket_socket_id"]) if "ticket_socket_id" in request.args else None
-        )
+        account_value = request.args.get("ticketSocketId", request.args.get("ticket_socket_id"))
+        account = int(account_value) if account_value is not None else None
         limit = int(request.args.get("limit", 100))
         offset = int(request.args.get("offset", 0))
         output_format = request.args.get("format", "json")
@@ -50,7 +67,8 @@ def missing_payment_intents():
             raise ValueError("Invalid report options")
     except (KeyError, TypeError, ValueError):
         return {"msg": "Provide YYYY-MM-DD start_date/end_date (end exclusive), "
-                "positive ticket_socket_id, limit 1-1000, offset >= 0, format json/csv"}, 400
+                "(startDate/endDate also accepted), positive ticket_socket_id, "
+                "limit 1-1000, offset >= 0, format json/csv"}, 400
     report = StripeReconciliationService().get_missing_payments(
         start, end, account, None if output_format == "csv" else limit,
         0 if output_format == "csv" else offset,
@@ -59,7 +77,8 @@ def missing_payment_intents():
         return report
     columns = ["TicketSocketOrderId", "NativeOrderId", "NativeEventId", "TicketSocketId",
                "AccountName", "TicketPartnerOrderId", "EventId", "EventTitle", "EventDate",
-               "PurchaseDate", "IsManualTransfer", "CustomerName", "CustomerEmail",
+               "SellerId", "Venue", "City", "State", "PurchaseDate", "IsManualTransfer",
+               "CustomerName", "CustomerEmail",
                "CustomerProcessingFee"]
     output = StringIO()
     writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")

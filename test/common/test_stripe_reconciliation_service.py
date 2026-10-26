@@ -20,10 +20,12 @@ def order_database(monkeypatch):
                                sep.join(str(value) for value in args if value is not None))
     connection.executescript("""
         CREATE TABLE Events (EventId INT, Title TEXT, EventDate TEXT,
-            ExcludeFromDashboard INT, IsDeleted INT, IsCancelled INT);
+            ExcludeFromDashboard INT, IsDeleted INT, IsCancelled INT, SellerId INT, VenueId INT);
+        CREATE TABLE Venues (VenueId INT, Venue TEXT, City TEXT, State TEXT);
         CREATE TABLE TicketSocket (TicketSocketId INT, AccountName TEXT);
         CREATE TABLE SellerEventCategory (SellerEventCategoryId INT, TicketSocketId INT);
-        CREATE TABLE TicketSocketEvents (Id INT, SellerEventCategoryId INT);
+        CREATE TABLE TicketSocketEvents (Id INT, SellerEventCategoryId INT,
+            Venue TEXT, City TEXT, State TEXT);
         CREATE TABLE TicketPartnerEvents (TicketPartnerEventId INT, TicketPartnerId INT,
             PartnerEventId INT, EventId INT);
         CREATE TABLE TicketPartnerOrders (TicketPartnerOrderId INT, TicketPartnerEventId INT,
@@ -34,12 +36,13 @@ def order_database(monkeypatch):
         CREATE TABLE StripePaymentIntents (PaymentIntentId TEXT, TicketPartnerOrderId INT, Status TEXT);
         INSERT INTO TicketSocket VALUES (4, 'Tickets'), (1, 'Secure');
         INSERT INTO SellerEventCategory VALUES (1, 4), (2, 1);
+        INSERT INTO Venues VALUES (1, 'Theater', 'Austin', 'TX');
     """)
     for index, flags in enumerate([(0, 0, 0), (1, 0, 0), (0, 1, 0),
                                   (0, 0, 1), (None, None, None), (0, 0, 0)], 1):
-        connection.execute("INSERT INTO Events VALUES (?, ?, '2026-06-01', ?, ?, ?)",
+        connection.execute("INSERT INTO Events VALUES (?, ?, '2026-06-01', ?, ?, ?, 1, 1)",
                            (index, f"Event {index}", *flags))
-        connection.execute("INSERT INTO TicketSocketEvents VALUES (?, ?)",
+        connection.execute("INSERT INTO TicketSocketEvents (Id, SellerEventCategoryId) VALUES (?, ?)",
                            (index, 2 if index == 6 else 1))
         connection.execute("INSERT INTO TicketPartnerEvents VALUES (?, 2, ?, ?)",
                            (index, index, index))
@@ -71,6 +74,7 @@ def test_coverage_ignores_excluded_deleted_cancelled_events(order_database):
     assert report["missingPaymentIntents"] == 1
     assert report["missingPercentage"] == 50
     assert [row["NativeOrderId"] for row in report["orders"]] == [105]
+    assert report["orders"][0]["Venue"] == "Theater"
     assert report["months"][0]["TotalOrders"] == 2
     # A paid order is recognized only after successful payment status.
     order_database.execute("UPDATE StripePaymentIntents SET Status='succeeded' WHERE PaymentIntentId='pi_pending'")

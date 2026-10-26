@@ -23,6 +23,9 @@ class StripeReconciliationService:
             SELECT tso.Id AS TicketSocketOrderId, tso.OrderId AS NativeOrderId,
                 tso.EventId AS NativeEventId, sec.TicketSocketId, account.AccountName,
                 po.TicketPartnerOrderId, ev.EventId, ev.Title AS EventTitle, ev.EventDate,
+                ev.SellerId, COALESCE(venue.Venue, tse.Venue) AS Venue,
+                COALESCE(venue.City, tse.City) AS City,
+                COALESCE(venue.State, tse.State) AS State,
                 tso.PurchaseDate, tso.IsManualTransfer,
                 CONCAT_WS(' ', tso.PurchaserFirstName, tso.PurchaserLastName) AS CustomerName,
                 tso.Email AS CustomerEmail, tso.CustomerProcessingFee
@@ -34,6 +37,7 @@ class StripeReconciliationService:
             JOIN TicketPartnerEvents pe ON pe.TicketPartnerId=2
                 AND pe.PartnerEventId=tso.TicketSocketEventId
             JOIN Events ev ON ev.EventId=pe.EventId
+            LEFT JOIN Venues venue ON venue.VenueId=ev.VenueId
             LEFT JOIN TicketPartnerOrders po ON po.TicketPartnerEventId=pe.TicketPartnerEventId
                 AND po.PartnerOrderId=tso.Id
             WHERE tso.PurchaseDate >= %(start)s AND tso.PurchaseDate < %(end)s
