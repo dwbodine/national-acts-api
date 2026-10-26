@@ -23,6 +23,7 @@ from stripe.params import (
 
 from common.db import db_insert, db_query_all
 from common.models.stripe import StripeRefund, StripeTransaction
+from common.stripe_reconciliation_service import ELIGIBLE_EVENTS_SQL
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -333,10 +334,12 @@ class StripeService:
             LEFT JOIN TicketPartnerEvents tpe
                 ON tpe.TicketPartnerId=2
                 AND tpe.PartnerEventId=tso.TicketSocketEventId
+            JOIN Events ev ON ev.EventId=tpe.EventId
             LEFT JOIN TicketPartnerOrders tpo
                 ON tpo.TicketPartnerEventId=tpe.TicketPartnerEventId
                 AND tpo.PartnerOrderId=tso.Id
-            WHERE tso.OrderId=%(order_id)s AND sec.TicketSocketId=%(ticket_socket_id)s""",
+            WHERE tso.OrderId=%(order_id)s AND sec.TicketSocketId=%(ticket_socket_id)s
+                AND """ + ELIGIBLE_EVENTS_SQL,
             {"order_id": transaction.order_id, "ticket_socket_id": transaction.ticket_socket_id},
         )
         # Keep unmatched/ambiguous transactions without assigning the wrong order.
@@ -352,8 +355,7 @@ class StripeService:
                 transaction.ticket_socket_id,
             )
             return
-        else:
-            transaction.event_id = orders[0]["EventId"]
+        transaction.event_id = orders[0]["EventId"]
 
         data = {
             "stripe_id": transaction.stripe_id,

@@ -81,7 +81,9 @@ def test_unknown_and_cross_currency_costs_are_not_zero(payments):
 
 def test_explicit_refresh_only_updates_financial_fields(monkeypatch):
     writes = []
-    monkeypatch.setattr(stripe_service, "db_query_all", lambda *_: [])
+    monkeypatch.setattr(stripe_service, "db_query_all", lambda *_: [
+        {"TicketPartnerOrderId": 1, "EventId": 77, "OrderId": 42, "Id": 80}
+    ])
     monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append((sql, data)))
     service = stripe_service.StripeService()
     service._upsert_transaction(payment())

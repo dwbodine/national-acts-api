@@ -248,13 +248,16 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     transactions = stripe_service.StripeService().get_transactions(100, 200)
 
     assert transactions == []
-    assert len(inserts) == 1
     assert lookups[0][1] == {"order_id": "42621", "ticket_socket_id": 2}
     assert "WHERE tso.OrderId=%(order_id)s" in lookups[0][0]
     assert "sec.TicketSocketId=%(ticket_socket_id)s" in lookups[0][0]
+    if expected_order_id is None:
+        assert inserts == []
+        return
+    assert len(inserts) == 1
     sql, data = inserts[0]
     assert data["partner_order_id"] == expected_order_id
-    assert data["native_order_id"] == (42621 if len(orders) == 1 else "42621")
+    assert data["native_order_id"] == "42621"
     assert data["native_event_id"] == (77 if len(orders) == 1 else None)
     assert data["stripe_id"] == "pi_new"
     assert data["date_received"] == datetime(2024, 1, 1)

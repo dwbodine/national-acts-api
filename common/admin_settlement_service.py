@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytz
 
 from common.db import db_convert_list_to_parameters, db_query_all
+from common.stripe_reconciliation_service import ELIGIBLE_EVENTS_SQL
 
 
 def amount(value):
@@ -89,6 +90,7 @@ class AdminSettlementService:
         if seller_id:
             where += " AND ev.SellerId=%(seller)s"
             data["seller"] = seller_id
+        where = "(" + where + ") AND " + ELIGIBLE_EVENTS_SQL
         orders = db_query_all("""SELECT po.TicketPartnerOrderId, pe.EventId,
             tso.OrderId, tso.PurchaseDate, tso.CustomerProcessingFee,
             rates.ServiceTokenId AS Currency,
