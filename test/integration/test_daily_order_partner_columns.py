@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 import shutil
 
@@ -26,7 +27,8 @@ def test_refresh_cleanup_and_rollups_use_only_partner_columns(database, monkeypa
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("__pycache__"),
     )
-    run("upgrade", "7e3584499b4c")
+    # Current refresh SQL needs later migrations, including CustomerProcessingFee.
+    run("upgrade")
 
     def connect(timeout=3000):
         return mariadb.connect(
@@ -65,6 +67,7 @@ def test_refresh_cleanup_and_rollups_use_only_partner_columns(database, monkeypa
     order.purchase_date = "2026-10-15"
     order.purchase_timestamp = "2026-10-15 12:00:00"
     order.purchase_unix_timestamp = 0
+    order.customer_processing_fee = Decimal("10.86")
     order.tickets = []
     event = VipEvent()
     event.original_event_id, event.seller_id, event.seller_event_category_id = 900, 1, 1
@@ -92,6 +95,9 @@ def test_refresh_cleanup_and_rollups_use_only_partner_columns(database, monkeypa
     assert result is not None and result.succeeded
     assert result.order_data_rows_removed == 2
     with engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT CustomerProcessingFee FROM TicketSocketOrders WHERE Id=110"
+        ).scalar_one() == Decimal("10.86")
         remaining = connection.exec_driver_sql(
             "SELECT TicketPartnerEventId, PurchaseDate FROM DailyOrderData ORDER BY TicketPartnerEventId"
         ).all()
