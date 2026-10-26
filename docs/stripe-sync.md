@@ -40,6 +40,46 @@ An optional weekly wider reconciliation can share the same lock and checkpoint:
 0 6 * * 0 /usr/bin/flock -n /home/ec2-user/stripe-fees.lock /usr/bin/docker exec --user 5678 nationalactsapi python -m tools.sync_stripe_fees --days 30 >> /home/ec2-user/stripe-fees.log 2>&1
 ```
 
+## Fixed-date StripeFees backfill
+
+After deploying the updated runner, supply both dates instead of `--days`.
+Dates are UTC calendar days: start is inclusive, end is exclusive. Only complete
+days are allowed, so the end must be today UTC or earlier.
+
+For January 1 through October 25, 2026:
+
+```bash
+/usr/bin/flock -n /home/ec2-user/stripe-fees.lock \
+  /usr/bin/docker exec --user 5678 nationalactsapi \
+  python -m tools.sync_stripe_fees \
+    --start-date 2026-01-01 \
+    --end-date 2026-10-26 \
+    --state-file /app/tmp/stripe-fees/backfill-2026-fixed.json
+```
+
+The runner creates and imports one daily report at a time. Completed days stay
+completed across runs and UTC date changes. Pending report IDs resume without
+creating replacements. A report is marked completed only after the endpoint
+confirms its database import, including a successful zero-row day. Days deferred
+because fee data is not yet available remain unfinished and are retried on rerun.
+
+Rerun the **identical date range and checkpoint** after interruption. The final
+log says either `Fee backfill complete` or `Fee backfill incomplete` with counts
+of imported days. An incomplete run with unavailable dates can exit successfully;
+its checkpoint still records those dates as unfinished, and the log requests a retry.
+
+The checkpoint saves its mode and range. Changing those dates requires a new
+state file; rolling-sync and backfill checkpoints cannot be mixed. Omitting
+`--state-file` in fixed mode defaults to a separate
+`/app/tmp/stripe-fees/backfill-START-END.json` file. Rolling sync keeps its existing
+`/app/tmp/stripe-fees/state.json` default and refreshes recent completed days on
+each new UTC run date so newly published fees can be imported.
+
+Use the same `stripe-fees.lock` as the fee cron to prevent overlapping runs.
+For a deliberately repeated historical refresh or a different interval, use a
+fresh backfill state file. Identical fee rows remain deduplicated in the database.
+The importer continues to retain only `incurred_by_type=payment_intent` rows.
+
 ## One-time payment intent and refund backfill
 
 The runner calls StripeService directly, bypassing HTTP/Gunicorn timeouts. It
