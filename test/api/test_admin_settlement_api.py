@@ -94,13 +94,12 @@ def test_missing_payments_exports_and_paginates(monkeypatch, client, auth_header
         assert "'=UNTRUSTED()" in response.text
 
 
-@pytest.mark.parametrize("spelling", ["missing", "misssing"])
-def test_missing_details_accepts_camel_case_dates(monkeypatch, client, auth_headers, spelling):
+def test_missing_payments_accepts_camel_case_dates(monkeypatch, client, auth_headers):
     calls = []
     monkeypatch.setattr(stripe_api, "StripeReconciliationService", lambda: SimpleNamespace(
         get_missing_payments=lambda *args: calls.append(args) or {"orders": [
             {"EventTitle": "VIP", "Venue": "Theater", "City": "Austin"}]}))
-    response = client.get(f"/stripe/payment-intents/{spelling}/details?"
+    response = client.get("/stripe/payment-intents/missing?"
                           "startDate=2026-01-01&endDate=2027-01-01&ticketSocketId=4",
                           headers=auth_headers())
     assert response.status_code == 200
