@@ -11,8 +11,11 @@ MONEY_CONTEXT = Context(prec=50)
 def json_row(row):
     """Preserve database precision and serialize dates for existing JSON encoders."""
     return {
-        key: str(value) if isinstance(value, Decimal) else
-        value.isoformat() if isinstance(value, (date, datetime)) else value
+        key: (
+            str(value)
+            if isinstance(value, Decimal)
+            else value.isoformat() if isinstance(value, (date, datetime)) else value
+        )
         for key, value in row.items()
     }
 
@@ -25,23 +28,31 @@ def attach_financials(target, payments, refunds, fees):
     buckets = {}
     payment_currencies = set()
     for rows, field, amount_field in (
-        (payments, "gross", "Total"), (refunds, "refunded", "Amount"),
+        (payments, "gross", "Total"),
+        (refunds, "refunded", "Amount"),
         (fees, "reported_fees", "Amount"),
     ):
         for row in rows:
             if field != "reported_fees" and row.get("Status") != "succeeded":
                 continue
             currency = row["Currency"].lower()
-            totals = buckets.setdefault(currency, {
-                "gross": Decimal(0), "refunded": Decimal(0), "reported_fees": Decimal(0),
-            })
+            totals = buckets.setdefault(
+                currency,
+                {
+                    "gross": Decimal(0),
+                    "refunded": Decimal(0),
+                    "reported_fees": Decimal(0),
+                },
+            )
             value = Decimal(str(row[amount_field]))
             if field == "reported_fees":
                 value = MONEY_CONTEXT.add(value, Decimal(str(row.get("Tax") or 0)))
             elif field == "gross":
                 payment_currencies.add(currency)
             totals[field] = MONEY_CONTEXT.add(totals[field], value)
-    payment_currency_by_id = {row["PaymentIntentId"]: row["Currency"].lower() for row in payments}
+    payment_currency_by_id = {
+        row["PaymentIntentId"]: row["Currency"].lower() for row in payments
+    }
     mismatch = any(
         row["Currency"].lower() != payment_currency_by_id.get(row[key])
         for rows, key in ((refunds, "PaymentIntentId"), (fees, "IncurredBy"))
@@ -51,13 +62,20 @@ def attach_financials(target, payments, refunds, fees):
     target.stripe_totals_by_currency = {}
     for currency, totals in buckets.items():
         net = MONEY_CONTEXT.subtract(
-            MONEY_CONTEXT.subtract(totals["gross"], totals["refunded"]), totals["reported_fees"]
+            MONEY_CONTEXT.subtract(totals["gross"], totals["refunded"]),
+            totals["reported_fees"],
         )
         target.stripe_totals_by_currency[currency] = {
             **{key: str(value) for key, value in totals.items()},
-            "net": str(net) if not mismatch and currency in payment_currencies else None,
+            "net": (
+                str(net) if not mismatch and currency in payment_currencies else None
+            ),
         }
-    single = next(iter(target.stripe_totals_by_currency.values())) if len(buckets) == 1 else {}
+    single = (
+        next(iter(target.stripe_totals_by_currency.values()))
+        if len(buckets) == 1
+        else {}
+    )
     target.stripe_currency = next(iter(buckets)) if len(buckets) == 1 else None
     target.stripe_gross = single.get("gross")
     target.stripe_refunded = single.get("refunded")
@@ -81,7 +99,9 @@ class StripeFinancialService:
         if partner_order_ids is not None:
             if not partner_order_ids:
                 return [], [], []
-            placeholders = db_convert_list_to_parameters(partner_order_ids, data, "order")
+            placeholders = db_convert_list_to_parameters(
+                partner_order_ids, data, "order"
+            )
             where = " WHERE pi.TicketPartnerOrderId IN " + placeholders
         source = """ FROM StripePaymentIntents pi
             LEFT JOIN TicketPartnerOrders po
@@ -89,22 +109,28 @@ class StripeFinancialService:
         payments = db_query_all("SELECT pi.*" + source + where, data)
         refunds = db_query_all(
             "SELECT r.* FROM StripeRefunds r LEFT JOIN StripePaymentIntents pi "
-            "ON pi.PaymentIntentId=r.PaymentIntentId" + where, data,
+            "ON pi.PaymentIntentId=r.PaymentIntentId" + where,
+            data,
         )
         fees = db_query_all(
             "SELECT f.* FROM StripeFees f LEFT JOIN StripePaymentIntents pi "
             "ON pi.PaymentIntentId=f.IncurredBy AND f.IncurredByType='payment_intent'"
             + (where + " AND " if where else " WHERE ")
-            + "f.IncurredByType='payment_intent'", data,
+            + "f.IncurredByType='payment_intent'",
+            data,
         )
         return payments, refunds, fees
 
     def enrich_events(self, events):
         """Attach financials to all loaded orders using three database queries total."""
-        ids = sorted({
-            order.ticket_partner_order_id for event in events for order in event.orders
-            if order.ticket_partner_order_id
-        })
+        ids = sorted(
+            {
+                order.ticket_partner_order_id
+                for event in events
+                for order in event.orders
+                if order.ticket_partner_order_id
+            }
+        )
         payments, refunds, fees = self.get_financials(ids)
         by_order = {}
         by_payment = {}
@@ -112,7 +138,10 @@ class StripeFinancialService:
             order_id = payment["TicketPartnerOrderId"]
             by_order.setdefault(order_id, [[], [], []])[0].append(payment)
             by_payment[payment["PaymentIntentId"]] = order_id
-        for rows, key, position in ((refunds, "PaymentIntentId", 1), (fees, "IncurredBy", 2)):
+        for rows, key, position in (
+            (refunds, "PaymentIntentId", 1),
+            (fees, "IncurredBy", 2),
+        ):
             for row in rows:
                 order_id = by_payment.get(row[key])
                 if order_id is not None:

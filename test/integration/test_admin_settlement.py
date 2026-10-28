@@ -14,9 +14,12 @@ pytestmark = pytest.mark.integration
 
 def test_accounting_upgrade_and_report_query(database, monkeypatch):
     run, engine, root = database
-    shutil.copytree(Path(__file__).resolve().parents[2] / "migrations/versions",
-                    root / "migrations/versions", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        Path(__file__).resolve().parents[2] / "migrations/versions",
+        root / "migrations/versions",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
     run("upgrade", "0005_stripe_customer_phone")
     with engine.begin() as connection:
         connection.exec_driver_sql("""INSERT INTO StripePaymentIntents (
@@ -35,14 +38,22 @@ def test_accounting_upgrade_and_report_query(database, monkeypatch):
 
     def query(sql, data=None):
         with engine.connect() as connection:
-            return [dict(row) for row in connection.exec_driver_sql(sql, data).mappings()]
+            return [
+                dict(row) for row in connection.exec_driver_sql(sql, data).mappings()
+            ]
 
     monkeypatch.setattr(admin_settlement_service, "db_query_all", query)
     # An empty database still resolves every table, field, grouping and date filter.
-    assert admin_settlement_service.AdminSettlementService().get_report(1, 2)["orders"] == []
-    assert admin_settlement_service.AdminSettlementService().get_report(
-        1, 2, seller_id=4, event_ids=[10]
-    )["orders"] == []
+    assert (
+        admin_settlement_service.AdminSettlementService().get_report(1, 2)["orders"]
+        == []
+    )
+    assert (
+        admin_settlement_service.AdminSettlementService().get_report(
+            1, 2, seller_id=4, event_ids=[10]
+        )["orders"]
+        == []
+    )
     run("downgrade", "0005_stripe_customer_phone")
     with engine.connect() as connection:
         row = connection.exec_driver_sql(

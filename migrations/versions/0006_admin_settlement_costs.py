@@ -29,9 +29,11 @@ def upgrade():
 
 def downgrade():
     """Restore the previous importer representation before removing the new columns."""
-    incompatible = op.get_bind().execute(text("""SELECT COUNT(*) FROM StripePaymentIntents
+    incompatible = (
+        op.get_bind().execute(text("""SELECT COUNT(*) FROM StripePaymentIntents
         WHERE ApplicationFee <> 0 AND ProcessingFeeCurrency IS NOT NULL
             AND ProcessingFeeCurrency <> Currency""")).scalar_one()
+    )
     if incompatible:
         raise RuntimeError("Cannot restore combined fees across different currencies")
     op.execute("""UPDATE StripePaymentIntents SET

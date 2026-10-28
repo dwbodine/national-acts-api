@@ -1233,10 +1233,15 @@ import pytest
 from common.ticket_partner_service import TicketPartnerService
 
 
-@pytest.mark.parametrize("include,public,get_orders,expected", [
-    (False, False, True, False), (True, False, True, True),
-    (True, True, True, False), (True, False, False, False),
-])
+@pytest.mark.parametrize(
+    "include,public,get_orders,expected",
+    [
+        (False, False, True, False),
+        (True, False, True, True),
+        (True, True, True, False),
+        (True, False, False, False),
+    ],
+)
 def test_stripe_financial_enrichment_is_optional_and_private(
     monkeypatch, include, public, get_orders, expected
 ):
@@ -1244,7 +1249,8 @@ def test_stripe_financial_enrichment_is_optional_and_private(
     monkeypatch.setattr(event_service, "db_query_all", lambda *args: [])
     calls = []
     monkeypatch.setattr(
-        event_service, "StripeFinancialService",
+        event_service,
+        "StripeFinancialService",
         lambda: SimpleNamespace(enrich_events=lambda events: calls.append(events)),
     )
     events = event_service.EventService().get_events_and_orders(

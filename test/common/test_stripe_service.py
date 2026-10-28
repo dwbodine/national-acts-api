@@ -12,12 +12,20 @@ from common import stripe_service
 def test_transaction_exchange_rate_is_not_scaled():
     """Stripe exchange rates are ratios, unlike amount fields in minor units."""
     intent = SimpleNamespace(
-        id="pi_rate", metadata={}, description="", created=100,
-        amount=1000, currency="cad", application_fee_amount=None,
+        id="pi_rate",
+        metadata={},
+        description="",
+        created=100,
+        amount=1000,
+        currency="cad",
+        application_fee_amount=None,
         payment_method_types=["card"],
-        latest_charge=SimpleNamespace(balance_transaction=SimpleNamespace(
-            fee=30, exchange_rate=1.25,
-        )),
+        latest_charge=SimpleNamespace(
+            balance_transaction=SimpleNamespace(
+                fee=30,
+                exchange_rate=1.25,
+            )
+        ),
     )
     transaction = stripe_service.StripeTransaction("42", "succeeded", intent)
     assert transaction.exchange_rate == 1.25
@@ -171,8 +179,14 @@ def test_get_transactions_auto_pages_through_every_result(monkeypatch):
 @pytest.mark.parametrize(
     "orders, expected_order_id",
     [
-        ([{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": 900}], 900),
-        ([{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": None}], None),
+        (
+            [{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": 900}],
+            900,
+        ),
+        (
+            [{"Id": 80, "OrderId": 42621, "EventId": 77, "TicketPartnerOrderId": None}],
+            None,
+        ),
         ([], None),
         ([{"TicketPartnerOrderId": 900}, {"TicketPartnerOrderId": 901}], None),
     ],
@@ -277,17 +291,29 @@ def test_successful_intents_are_saved_with_partner_order_mapping(
     )
 
 
-@pytest.mark.parametrize("domain, expected_account", [
-    ("secure.nationalactsvip.com", 1), ("europe.nationalactsvip.com", 2),
-    ("australia.nationalactsvip.com", 3), ("tickets.nationalactsvip.com", 4),
-    ("japan.nationalactsvip.com", 5), ("secure.savingabelvip.com", 6),
-])
+@pytest.mark.parametrize(
+    "domain, expected_account",
+    [
+        ("secure.nationalactsvip.com", 1),
+        ("europe.nationalactsvip.com", 2),
+        ("australia.nationalactsvip.com", 3),
+        ("tickets.nationalactsvip.com", 4),
+        ("japan.nationalactsvip.com", 5),
+        ("secure.savingabelvip.com", 6),
+    ],
+)
 def test_domain_identifies_ticket_socket_account(domain, expected_account):
     """Account identity must reach the upsert even when eventIds is absent."""
     intent = SimpleNamespace(
-        id="pi_account", metadata={"orderId": "42547", "domain": domain},
-        description="", created=100, amount=100, currency="usd",
-        application_fee_amount=None, payment_method_types=["card"], latest_charge=None,
+        id="pi_account",
+        metadata={"orderId": "42547", "domain": domain},
+        description="",
+        created=100,
+        amount=100,
+        currency="usd",
+        application_fee_amount=None,
+        payment_method_types=["card"],
+        latest_charge=None,
     )
     transaction = stripe_service.StripeTransaction("42547", "succeeded", intent)
     assert transaction.ticket_socket_id == expected_account

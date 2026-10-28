@@ -576,7 +576,9 @@ class TicketSocketService:
                 if item.get("individualProcessingFee") is None:
                     processing_fees_complete = False
                 else:
-                    processing_fees.append(Decimal(str(item["individualProcessingFee"])))
+                    processing_fees.append(
+                        Decimal(str(item["individualProcessingFee"]))
+                    )
 
                 if order.purchase_date is None and "purchaseDate" in item:
                     # datetime is not serializable in python,

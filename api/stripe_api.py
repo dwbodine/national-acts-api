@@ -15,7 +15,10 @@ from flask_jwt_extended import jwt_required
 from common.stripe_service import FeeReportNotReady, StripeService
 from common.common_api import is_admin_logged_in
 from common.stripe_reconciliation_service import StripeReconciliationService
-from common.stripe_payment_intent_service import PaymentIntentConflict, StripePaymentIntentService
+from common.stripe_payment_intent_service import (
+    PaymentIntentConflict,
+    StripePaymentIntentService,
+)
 from common.utility import (
     convert_to_json,
     get_override_int_value_or_default,
@@ -54,44 +57,84 @@ def missing_payment_intents():
         end_value = request.args.get("endDate", request.args.get("end_date"))
         start = date.fromisoformat(start_value)
         end = date.fromisoformat(end_value)
-        if (start >= end or start.isoformat() != start_value
-                or end.isoformat() != end_value):
+        if (
+            start >= end
+            or start.isoformat() != start_value
+            or end.isoformat() != end_value
+        ):
             raise ValueError("Invalid date range")
-        account_value = request.args.get("ticketSocketId", request.args.get("ticket_socket_id"))
+        account_value = request.args.get(
+            "ticketSocketId", request.args.get("ticket_socket_id")
+        )
         account = int(account_value) if account_value is not None else None
         limit = int(request.args.get("limit", 100))
         offset = int(request.args.get("offset", 0))
         output_format = request.args.get("format", "json")
-        if (account is not None and account <= 0 or not 1 <= limit <= 1000
-                or offset < 0 or output_format not in ("json", "csv")):
+        if (
+            account is not None
+            and account <= 0
+            or not 1 <= limit <= 1000
+            or offset < 0
+            or output_format not in ("json", "csv")
+        ):
             raise ValueError("Invalid report options")
     except (KeyError, TypeError, ValueError):
-        return {"msg": "Provide YYYY-MM-DD start_date/end_date (end exclusive), "
-                "(startDate/endDate also accepted), positive ticket_socket_id, "
-                "limit 1-1000, offset >= 0, format json/csv"}, 400
+        return {
+            "msg": "Provide YYYY-MM-DD start_date/end_date (end exclusive), "
+            "(startDate/endDate also accepted), positive ticket_socket_id, "
+            "limit 1-1000, offset >= 0, format json/csv"
+        }, 400
     report = StripeReconciliationService().get_missing_payments(
-        start, end, account, None if output_format == "csv" else limit,
+        start,
+        end,
+        account,
+        None if output_format == "csv" else limit,
         0 if output_format == "csv" else offset,
     )
     if output_format == "json":
         return report
-    columns = ["TicketSocketOrderId", "NativeOrderId", "NativeEventId", "TicketSocketId",
-               "AccountName", "TicketPartnerOrderId", "EventId", "EventTitle", "EventDate",
-               "SellerId", "Venue", "City", "State", "PurchaseDate", "IsManualTransfer",
-               "CustomerName", "CustomerEmail",
-               "CustomerProcessingFee"]
+    columns = [
+        "TicketSocketOrderId",
+        "NativeOrderId",
+        "NativeEventId",
+        "TicketSocketId",
+        "AccountName",
+        "TicketPartnerOrderId",
+        "EventId",
+        "EventTitle",
+        "EventDate",
+        "SellerId",
+        "Venue",
+        "City",
+        "State",
+        "PurchaseDate",
+        "IsManualTransfer",
+        "CustomerName",
+        "CustomerEmail",
+        "CustomerProcessingFee",
+    ]
     output = StringIO()
     writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")
     writer.writeheader()
     for order in report["orders"]:
         # Customer/event text is untrusted when opened in a spreadsheet.
-        safe = {key: "'" + value if isinstance(value, str)
-                and value.lstrip().startswith(("=", "+", "-", "@")) else value
-                for key, value in order.items()}
+        safe = {
+            key: (
+                "'" + value
+                if isinstance(value, str)
+                and value.lstrip().startswith(("=", "+", "-", "@"))
+                else value
+            )
+            for key, value in order.items()
+        }
         writer.writerow(safe)
-    return Response(output.getvalue(), mimetype="text/csv", headers={
-        "Content-Disposition": f'attachment; filename="missing-payments-{start}-{end}.csv"',
-    })
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="missing-payments-{start}-{end}.csv"',
+        },
+    )
 
 
 @stripe_api.route("/stripe/fees/report", methods=["POST"])

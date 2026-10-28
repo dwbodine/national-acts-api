@@ -13,34 +13,74 @@ from common import stripe_payment_intent_service as payment_service
 pytestmark = pytest.mark.integration
 
 
-def test_manual_payment_insert_update_and_duplicate_rollback(database, monkeypatch):
+def test_manual_payment_insert_and_update_by_local_and_stripe_ids(
+    database, monkeypatch
+):
     run, engine, root = database
-    shutil.copytree(Path(__file__).resolve().parents[2] / "migrations/versions",
-                    root / "migrations/versions", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        Path(__file__).resolve().parents[2] / "migrations/versions",
+        root / "migrations/versions",
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
     run("upgrade")
-    monkeypatch.setattr(payment_service, "db_get_connection", lambda: mariadb.connect(
-        host="127.0.0.1", port=int(os.environ["TEST_MARIADB_PORT"]), user="root",
-        password=os.environ["TEST_MARIADB_PASSWORD"], database=os.environ["MIGRATION_DB_DB"],
-        autocommit=True,
-    ))
+    monkeypatch.setattr(
+        payment_service,
+        "db_get_connection",
+        lambda: mariadb.connect(
+            host="127.0.0.1",
+            port=int(os.environ["TEST_MARIADB_PORT"]),
+            user="root",
+            password=os.environ["TEST_MARIADB_PASSWORD"],
+            database=os.environ["MIGRATION_DB_DB"],
+            autocommit=True,
+        ),
+    )
     service = payment_service.StripePaymentIntentService()
-    payload = {"PaymentIntentId": "pi_manual_test", "Description": "Manual import",
-               "DateReceived": "2026-10-26T12:00:00Z", "Total": "100.25",
-               "ProcessingFee": "3.25", "Currency": "usd", "ExchangeRate": "1",
-               "SourceUrl": "tickets.nationalactsvip.com"}
+    payload = {
+        "PaymentIntentId": "pi_manual_test",
+        "Description": "Manual import",
+        "DateReceived": "2026-10-26T12:00:00Z",
+        "Total": "100.25",
+        "ProcessingFee": "3.25",
+        "Currency": "usd",
+        "ExchangeRate": "1",
+        "SourceUrl": "tickets.nationalactsvip.com",
+    }
     inserted = service.save(payload)
     record_id = inserted["paymentIntent"]["StripePaymentIntentId"]
     assert inserted["created"] is True
     assert inserted["paymentIntent"]["Total"] == "100.25"
     assert inserted["paymentIntent"]["PaymentMethod"] == "card"
-    updated = service.save({"StripePaymentIntentId": record_id, "CustomerName": "Manual Buyer",
-                            "PaymentMethod": None, "Insurance": None})
+    updated = service.save(
+        {
+            "StripePaymentIntentId": record_id,
+            "CustomerName": "Manual Buyer",
+            "PaymentMethod": None,
+            "Insurance": None,
+        }
+    )
     assert updated["created"] is False
     assert updated["paymentIntent"]["PaymentMethod"] is None
     assert updated["paymentIntent"]["Insurance"] is None
     assert updated["paymentIntent"]["Total"] == "100.25"
-    with pytest.raises(payment_service.PaymentIntentConflict):
-        service.save(payload)
+    updated_by_stripe_id = service.save(
+        {
+            "PaymentIntentId": "pi_manual_test",
+            "Total": "101.25",
+            "NativeOrderId": 42547,
+            "NativeEventId": 123,
+        }
+    )
+    assert updated_by_stripe_id["created"] is False
+    assert updated_by_stripe_id["paymentIntent"]["StripePaymentIntentId"] == record_id
+    assert updated_by_stripe_id["paymentIntent"]["Total"] == "101.25"
+    assert updated_by_stripe_id["paymentIntent"]["NativeOrderId"] == 42547
+    assert updated_by_stripe_id["paymentIntent"]["NativeEventId"] == 123
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT COUNT(*) FROM StripePaymentIntents").scalar_one() == 1
+        assert (
+            connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM StripePaymentIntents"
+            ).scalar_one()
+            == 1
+        )

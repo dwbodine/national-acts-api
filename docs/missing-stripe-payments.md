@@ -70,8 +70,23 @@ Content-Type: application/json
 ```
 
 This endpoint writes the local database. It does not call Stripe or change a
-payment at Stripe. JSON uses database column names. `StripePaymentIntentId` is
-the local integer primary key; `PaymentIntentId` is the Stripe `pi_...` identifier.
+payment at Stripe. JSON uses database column names. `PaymentIntentId` is the
+Stripe `pi_...` identifier and is looked up first. If it already exists, all
+supplied fields overwrite that row, including nullable fields and native IDs.
+Omitted fields remain unchanged. The existing integer primary key is preserved,
+even if a different `StripePaymentIntentId` was supplied. Local integer ID lookup
+remains supported when no row matches the Stripe identifier.
+
+For example, this corrects the native IDs on an existing payment without requiring
+the full insert payload:
+
+```json
+{
+  "PaymentIntentId": "pi_REPLACE_WITH_REAL_STRIPE_ID",
+  "NativeOrderId": 42547,
+  "NativeEventId": 123
+}
+```
 
 To reconcile an existing payment with an order, send only the fields to change:
 
@@ -86,9 +101,13 @@ The service resolves `NativeOrderId`/`NativeEventId` from that eligible TicketSo
 order. Explicitly supplied native IDs must agree with the order. Other payment
 fields remain unchanged. A payment cannot be relinked to an excluded, deleted or
 cancelled event, or to an unknown order. A null partner order ID removes the link.
+If native IDs are corrected without explicitly supplying a partner order link,
+an incompatible previous link is cleared. An explicitly supplied partner order
+must agree with the supplied native IDs.
 
 To insert, omit the local ID for automatic allocation, or provide a currently
-unused positive integer ID. New rows require all these fields:
+unused positive integer ID. If the Stripe identifier already exists, the request
+updates that row instead of inserting a duplicate. New rows require all these fields:
 
 ```json
 {
@@ -113,7 +132,8 @@ amounts should be supplied as strings to preserve precision. Only succeeded
 payments are supported. `LastUpdated` is managed by the service.
 
 Responses contain `created` and the saved `paymentIntent` row: HTTP 201 for an
-insert and 200 for an update. Invalid fields/order links return 400; duplicate
-Stripe identifiers return 409. The Stripe identifier of an existing row cannot
-be changed, because refunds and fees reference it. Writes are transactional;
+insert and 200 for an update. Invalid fields/order links return 400; conflicting
+identifiers return 409. Local-ID updates cannot replace that row's Stripe
+identifier with a different, previously unknown identifier, because refunds and
+fees reference it. Writes are transactional;
 ordinary scheduled imports still do not overwrite existing successful rows.

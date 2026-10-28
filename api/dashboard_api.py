@@ -35,10 +35,14 @@ def get_admin_settlements():
             raise ValueError("Invalid range")
         datetime.fromtimestamp(start, pytz.utc)
         datetime.fromtimestamp(end, pytz.utc)
-        seller_id = int(request.args["sellerId"]) if request.args.get("sellerId") else None
+        seller_id = (
+            int(request.args["sellerId"]) if request.args.get("sellerId") else None
+        )
         event_ids = None
         if "eventIds" in request.args:
-            event_ids = [int(value) for value in request.args["eventIds"].split(",") if value]
+            event_ids = [
+                int(value) for value in request.args["eventIds"].split(",") if value
+            ]
             if any(value <= 0 for value in event_ids) or len(event_ids) > 5000:
                 raise ValueError("Invalid event IDs")
     except (KeyError, ValueError, OverflowError, OSError):

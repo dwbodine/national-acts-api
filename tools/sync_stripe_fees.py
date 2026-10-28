@@ -33,8 +33,15 @@ def save_state(path, state):
 
 
 def sync_reports(
-    session, base_url, state_path, days=7, poll_seconds=30, wait_seconds=600,
-    *, start_date=None, end_date=None,
+    session,
+    base_url,
+    state_path,
+    days=7,
+    poll_seconds=30,
+    wait_seconds=600,
+    *,
+    start_date=None,
+    end_date=None,
 ):
     """Refresh rolling days, or permanently checkpoint a fixed [start, end) backfill."""
     today = datetime.now(timezone.utc).date()
@@ -59,24 +66,35 @@ def sync_reports(
     if any(not isinstance(job, dict) for job in jobs.values()):
         raise ValueError("Invalid report job in fee-sync checkpoint")
     if fixed:
-        bounds = {"version": 1, "mode": "backfill", "start_date": start_date.isoformat(),
-                  "end_date": end_date.isoformat()}
+        bounds = {
+            "version": 1,
+            "mode": "backfill",
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+        }
         if state.get("mode") == "backfill":
             if any(state.get(key) != value for key, value in bounds.items()):
-                raise ValueError("Backfill checkpoint does not match the requested date range")
+                raise ValueError(
+                    "Backfill checkpoint does not match the requested date range"
+                )
         elif jobs or state.get("mode") is not None:
             raise ValueError("Use a separate state file for the fixed backfill")
-        dates = {(start_date + timedelta(days=offset)).isoformat()
-                 for offset in range((end_date - start_date).days)}
+        dates = {
+            (start_date + timedelta(days=offset)).isoformat()
+            for offset in range((end_date - start_date).days)
+        }
         if set(jobs) - dates:
-            raise ValueError("Backfill checkpoint contains dates outside the fixed range")
+            raise ValueError(
+                "Backfill checkpoint contains dates outside the fixed range"
+            )
         state.update(bounds)
         save_state(state_path, state)
     else:
         if state.get("mode") == "backfill":
             raise ValueError("Use a separate state file for rolling sync")
         dates = {
-            (today - timedelta(days=offset)).isoformat() for offset in range(1, days + 1)
+            (today - timedelta(days=offset)).isoformat()
+            for offset in range(1, days + 1)
         }
         # Include unfinished reports even if their dates have aged out of the window.
         dates.update(day for day, job in jobs.items() if job.get("status") == "pending")
@@ -85,7 +103,9 @@ def sync_reports(
         if fixed and job.get("status") == "succeeded":
             count = job.get("rows_upserted")
             if not isinstance(count, int) or isinstance(count, bool) or count < 0:
-                raise ValueError("Completed backfill job lacks a confirmed database import")
+                raise ValueError(
+                    "Completed backfill job lacks a confirmed database import"
+                )
             continue
         if not fixed and job.get("completed_on") == run_date:
             continue
@@ -137,25 +157,37 @@ def sync_reports(
     if fixed:
         completed = sum(jobs.get(day, {}).get("status") == "succeeded" for day in dates)
         if completed == len(dates):
-            LOGGER.info("Fee backfill complete: %s days in [%s, %s)",
-                        completed, start_date, end_date)
+            LOGGER.info(
+                "Fee backfill complete: %s days in [%s, %s)",
+                completed,
+                start_date,
+                end_date,
+            )
         else:
             LOGGER.warning(
                 "Fee backfill incomplete: %s/%s days imported; rerun the same "
-                "range and state file to retry unavailable days", completed, len(dates)
+                "range and state file to retry unavailable days",
+                completed,
+                len(dates),
             )
 
 
 def main():
     """Run inside the deployed API container using its environment and mounted tmp."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--days", type=int,
-                        help="Rolling lookback (default: 7); cannot use with dates")
-    parser.add_argument("--start-date", type=parse_date, help="Inclusive UTC date: YYYY-MM-DD")
-    parser.add_argument("--end-date", type=parse_date, help="Exclusive UTC date: YYYY-MM-DD")
+    parser.add_argument(
+        "--days", type=int, help="Rolling lookback (default: 7); cannot use with dates"
+    )
+    parser.add_argument(
+        "--start-date", type=parse_date, help="Inclusive UTC date: YYYY-MM-DD"
+    )
+    parser.add_argument(
+        "--end-date", type=parse_date, help="Exclusive UTC date: YYYY-MM-DD"
+    )
     parser.add_argument("--base-url", default="http://127.0.0.1:5000")
     parser.add_argument(
-        "--state-file", type=Path,
+        "--state-file",
+        type=Path,
         help="Checkpoint path; fixed backfills default to a separate file named for their dates",
     )
     parser.add_argument("--env-file", default="/app/.env")
@@ -167,14 +199,23 @@ def main():
     if args.start_date is not None and args.days is not None:
         parser.error("Use either --days or --start-date/--end-date")
     if args.start_date is not None and (
-        args.start_date >= args.end_date or args.end_date > datetime.now(timezone.utc).date()
+        args.start_date >= args.end_date
+        or args.end_date > datetime.now(timezone.utc).date()
     ):
         parser.error("Use start-date < end-date <= today UTC (end exclusive)")
-    if min(args.days if args.days is not None else 7, args.poll_seconds, args.wait_seconds) < 1:
+    if (
+        min(
+            args.days if args.days is not None else 7,
+            args.poll_seconds,
+            args.wait_seconds,
+        )
+        < 1
+    ):
         parser.error("days, poll-seconds, and wait-seconds must be positive")
     state_path = args.state_file or (
         Path(f"/app/tmp/stripe-fees/backfill-{args.start_date}-{args.end_date}.json")
-        if args.start_date is not None else Path("/app/tmp/stripe-fees/state.json")
+        if args.start_date is not None
+        else Path("/app/tmp/stripe-fees/state.json")
     )
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"

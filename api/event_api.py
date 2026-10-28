@@ -97,7 +97,8 @@ def get_events_and_orders_secured():
         is_portal=is_portal,
         include_stripe_financials=get_override_bool_value_or_default(
             request.args.get("includeStripeFinancials")
-        ) and is_admin_logged_in(),
+        )
+        and is_admin_logged_in(),
     )
     return convert_to_json(results)
 

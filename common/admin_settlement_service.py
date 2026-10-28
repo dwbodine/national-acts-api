@@ -21,29 +21,51 @@ def reconcile_order(order, payments):
     cost_known = bool(paid) and all(
         (row.get("ProcessingFeeCurrency") or "").lower() == currency for row in paid
     )
-    same_currency = bool(paid) and all(row["Currency"].lower() == currency for row in paid)
-    actual = sum((amount(row["ProcessingFee"]) for row in paid), Decimal(0)) if cost_known else None
-    insurance_known = same_currency and all(row.get("InsuranceVerified") for row in paid)
+    same_currency = bool(paid) and all(
+        row["Currency"].lower() == currency for row in paid
+    )
+    actual = (
+        sum((amount(row["ProcessingFee"]) for row in paid), Decimal(0))
+        if cost_known
+        else None
+    )
+    insurance_known = same_currency and all(
+        row.get("InsuranceVerified") for row in paid
+    )
     insurance = (
-        sum((amount(row["Insurance"]) for row in paid), Decimal(0)) if insurance_known else None
+        sum((amount(row["Insurance"]) for row in paid), Decimal(0))
+        if insurance_known
+        else None
     )
     application_fee = (
-        sum((amount(row["ApplicationFee"]) for row in paid), Decimal(0)) if same_currency else None
+        sum((amount(row["ApplicationFee"]) for row in paid), Decimal(0))
+        if same_currency
+        else None
     )
-    difference = actual - amount(checkout) if actual is not None and checkout is not None else None
+    difference = (
+        actual - amount(checkout)
+        if actual is not None and checkout is not None
+        else None
+    )
     return {
         "ticketPartnerOrderId": order["TicketPartnerOrderId"],
-        "orderId": order["OrderId"], "eventId": order["EventId"],
-        "purchaseDate": str(order["PurchaseDate"]), "currency": currency,
+        "orderId": order["OrderId"],
+        "eventId": order["EventId"],
+        "purchaseDate": str(order["PurchaseDate"]),
+        "currency": currency,
         "ticketSales": str(amount(order["TicketSales"])),
         "serviceFees": str(amount(order["ServiceFees"])),
-        "customerProcessingFee": str(amount(checkout)) if checkout is not None else None,
+        "customerProcessingFee": (
+            str(amount(checkout)) if checkout is not None else None
+        ),
         "actualProcessingFee": str(actual) if actual is not None else None,
         "processingShortfall": str(difference) if difference is not None else None,
         "insurancePremium": str(insurance) if insurance is not None else None,
         "applicationFee": str(application_fee) if application_fee is not None else None,
         "insuranceVerified": bool(insurance_known),
-        "paymentMethods": sorted({row.get("PaymentMethod") or "unknown" for row in paid}),
+        "paymentMethods": sorted(
+            {row.get("PaymentMethod") or "unknown" for row in paid}
+        ),
         "paymentIntentIds": [row["PaymentIntentId"] for row in paid],
     }
 
@@ -51,14 +73,27 @@ def reconcile_order(order, payments):
 def summarize(rows):
     """Sum known values by currency; include coverage so unknown costs never look complete."""
     totals = {}
-    fields = ("ticketSales", "serviceFees", "customerProcessingFee", "actualProcessingFee",
-              "processingShortfall", "insurancePremium", "applicationFee")
+    fields = (
+        "ticketSales",
+        "serviceFees",
+        "customerProcessingFee",
+        "actualProcessingFee",
+        "processingShortfall",
+        "insurancePremium",
+        "applicationFee",
+    )
     for row in rows:
-        summary = totals.setdefault(row["currency"], {
-            "orders": 0, **{field: Decimal(0) for field in fields},
-            "missingCustomerFee": 0, "missingStripeCost": 0, "unverifiedInsurance": 0,
-            "comparedOrders": 0,
-        })
+        summary = totals.setdefault(
+            row["currency"],
+            {
+                "orders": 0,
+                **{field: Decimal(0) for field in fields},
+                "missingCustomerFee": 0,
+                "missingStripeCost": 0,
+                "unverifiedInsurance": 0,
+                "comparedOrders": 0,
+            },
+        )
         summary["orders"] += 1
         for field in fields:
             if row[field] is not None:
@@ -67,8 +102,13 @@ def summarize(rows):
         summary["missingStripeCost"] += row["actualProcessingFee"] is None
         summary["unverifiedInsurance"] += row["insurancePremium"] is None
         summary["comparedOrders"] += row["processingShortfall"] is not None
-    return {currency: {key: str(value) if isinstance(value, Decimal) else value
-                       for key, value in summary.items()} for currency, summary in totals.items()}
+    return {
+        currency: {
+            key: str(value) if isinstance(value, Decimal) else value
+            for key, value in summary.items()
+        }
+        for currency, summary in totals.items()
+    }
 
 
 class AdminSettlementService:
@@ -79,19 +119,28 @@ class AdminSettlementService:
         data = {}
         if event_ids is not None:
             if not event_ids:
-                return {"orders": [], "totalsByCurrency": {}, "totalOrders": 0,
-                        "displayedOrders": 0}
-            where = "pe.EventId IN " + db_convert_list_to_parameters(event_ids, data, "event")
+                return {
+                    "orders": [],
+                    "totalsByCurrency": {},
+                    "totalOrders": 0,
+                    "displayedOrders": 0,
+                }
+            where = "pe.EventId IN " + db_convert_list_to_parameters(
+                event_ids, data, "event"
+            )
         else:
             pacific = pytz.timezone("America/Los_Angeles")
-            data = {"start": datetime.fromtimestamp(start, pacific).strftime("%Y-%m-%d"),
-                    "end": datetime.fromtimestamp(end, pacific).strftime("%Y-%m-%d")}
+            data = {
+                "start": datetime.fromtimestamp(start, pacific).strftime("%Y-%m-%d"),
+                "end": datetime.fromtimestamp(end, pacific).strftime("%Y-%m-%d"),
+            }
             where = "tso.PurchaseDate BETWEEN %(start)s AND %(end)s"
         if seller_id:
             where += " AND ev.SellerId=%(seller)s"
             data["seller"] = seller_id
         where = "(" + where + ") AND " + ELIGIBLE_EVENTS_SQL
-        orders = db_query_all("""SELECT po.TicketPartnerOrderId, pe.EventId,
+        orders = db_query_all(
+            """SELECT po.TicketPartnerOrderId, pe.EventId,
             tso.OrderId, tso.PurchaseDate, tso.CustomerProcessingFee,
             rates.ServiceTokenId AS Currency,
             CASE WHEN tso.IsComped=1 THEN 0 ELSE COALESCE(t.TicketSales,0) END AS TicketSales,
@@ -109,7 +158,9 @@ class AdminSettlementService:
             LEFT JOIN (SELECT TicketSocketOrderId, SUM(Price) AS TicketSales,
                 SUM(ServiceFee) AS ServiceFees FROM TicketSocketOrderTickets
                 GROUP BY TicketSocketOrderId) t ON t.TicketSocketOrderId=tso.Id
-            WHERE """ + where + " ORDER BY tso.PurchaseDate DESC, po.TicketPartnerOrderId DESC",
+            WHERE """
+            + where
+            + " ORDER BY tso.PurchaseDate DESC, po.TicketPartnerOrderId DESC",
             data,
         )
         payments = []
@@ -118,10 +169,13 @@ class AdminSettlementService:
             ids = db_convert_list_to_parameters(
                 [row["TicketPartnerOrderId"] for row in orders], payment_data, "order"
             )
-            payments = db_query_all("""SELECT TicketPartnerOrderId, PaymentIntentId,
+            payments = db_query_all(
+                """SELECT TicketPartnerOrderId, PaymentIntentId,
                 Status, Currency, ProcessingFee, ProcessingFeeCurrency, Insurance,
                 InsuranceVerified, ApplicationFee, PaymentMethod
-                FROM StripePaymentIntents WHERE TicketPartnerOrderId IN """ + ids, payment_data)
+                FROM StripePaymentIntents WHERE TicketPartnerOrderId IN """ + ids,
+                payment_data,
+            )
         by_order = {}
         for payment in payments:
             by_order.setdefault(payment["TicketPartnerOrderId"], []).append(payment)
@@ -129,5 +183,9 @@ class AdminSettlementService:
             reconcile_order(order, by_order.get(order["TicketPartnerOrderId"], []))
             for order in orders
         ]
-        return {"orders": rows[:100], "totalsByCurrency": summarize(rows),
-                "totalOrders": len(rows), "displayedOrders": min(100, len(rows))}
+        return {
+            "orders": rows[:100],
+            "totalsByCurrency": summarize(rows),
+            "totalOrders": len(rows),
+            "displayedOrders": min(100, len(rows)),
+        }

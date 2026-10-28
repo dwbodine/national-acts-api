@@ -339,8 +339,12 @@ class StripeService:
                 ON tpo.TicketPartnerEventId=tpe.TicketPartnerEventId
                 AND tpo.PartnerOrderId=tso.Id
             WHERE tso.OrderId=%(order_id)s AND sec.TicketSocketId=%(ticket_socket_id)s
-                AND """ + ELIGIBLE_EVENTS_SQL,
-            {"order_id": transaction.order_id, "ticket_socket_id": transaction.ticket_socket_id},
+                AND """
+            + ELIGIBLE_EVENTS_SQL,
+            {
+                "order_id": transaction.order_id,
+                "ticket_socket_id": transaction.ticket_socket_id,
+            },
         )
         # Keep unmatched/ambiguous transactions without assigning the wrong order.
         partner_order_id = (
