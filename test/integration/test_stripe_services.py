@@ -34,7 +34,7 @@ def test_services_use_partner_ids_and_preserve_provider_identity(database, monke
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("__pycache__"),
     )
-    run("upgrade", "7e3584499b4c")
+    run("upgrade")
 
     def connect(timeout=3000):
         return mariadb.connect(
@@ -109,12 +109,13 @@ def test_services_use_partner_ids_and_preserve_provider_identity(database, monke
         )
         for transaction_id in ("pi_first", "pi_second"):
             connection.exec_driver_sql(
-                """INSERT INTO StripeTransactions
-                (StripeTransactionId, TicketPartnerOrderId, EventName, Description,
+                """INSERT INTO StripePaymentIntents
+                (PaymentIntentId, TicketPartnerOrderId, EventName, Description,
                  DateReceived, Total, Insurance, ProcessingFee, CustomerName,
-                 CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate)
+                 CustomerEmail, CustomerPhone, Currency, SourceUrl, ExchangeRate,
+                 ProcessingFeeCurrency)
                 VALUES (%s, 1100, 'Service event', 'Payment', '2026-10-14 12:00:00',
-                        55, 0, 2, 'Buyer', 'buyer@example.com', '', 'USD', '', 1)""",
+                        55, 0, 2, 'Buyer', 'buyer@example.com', '', 'USD', '', 1, 'usd')""",
                 (transaction_id,),
             )
         connection.exec_driver_sql(
@@ -123,6 +124,12 @@ def test_services_use_partner_ids_and_preserve_provider_identity(database, monke
         connection.exec_driver_sql(
             "INSERT INTO FanMomentImages (FanMomentId, ImageName) VALUES (1, 'example.jpg'), (2, 'local.jpg')"
         )
+    compact_event = EventService().get_events_and_orders(event_id=10, get_orders=True)[0]
+    assert len(compact_event.orders) == 1
+    assert compact_event.orders[0].exchange_rate == 1
+    assert compact_event.orders[0].stripe_processing_fee == "4.00"
+    assert compact_event.orders[0].other_fees == []
+    assert not hasattr(compact_event.orders[0], "stripe_payments")
     assert len(OrderService().get_orders(ts_order_id=1100)) == 1
     with engine.connect() as connection:
         overview = (

@@ -1,48 +1,48 @@
-# Optional Stripe event financials
+# Stripe fields on event orders
 
-For private events with loaded orders:
+`EventService.get_events_and_orders(get_orders=True)` automatically integrates
+compact Stripe data for private order results. The `includeStripeFinancials`
+request option and `include_stripe_financials` service parameter are removed.
 
-```python
-events = EventService().get_events_and_orders(
-    event_id=event_id,
-    get_orders=True,
-    include_stripe_financials=True,
-)
+Order properties:
+
+- `exchange_rate`: recorded Stripe `ExchangeRate`, or null without a linked
+  successful payment. Multiple payments must agree on currency and rate;
+  otherwise the single rate is unknown. No TicketSocket rate fallback is used.
+- `stripe_processing_fee`: stored Stripe processing fee, summed for multiple
+  payments only when their fee currencies are compatible.
+- `insurance`: stored Stripe insurance, or null when unknown. Multiple payments
+  are summed only within one currency.
+- `other_fees`: report fees joined through `StripeFees.IncurredBy = PaymentIntentId`,
+  restricted to `IncurredByType='payment_intent'` and successful payments.
+
+The API uses existing camelCase serialization. Example admin order fields:
+
+```json
+{
+  "exchangeRate": 0.75,
+  "stripeProcessingFee": "14.76",
+  "insurance": "26.80",
+  "otherFees": [
+    {"key": "Radar standard", "value": "0.07", "currency": "usd"}
+  ]
+}
 ```
 
-The authenticated `/events/getEventsAndOrders` endpoint accepts
-`includeStripeFinancials=1` for administrators only. The default stays false. Public requests and
-requests omitting orders do not load Stripe data.
+Fee keys use feature name, falling back to fee description. Values include amount
+plus tax and are grouped by name and currency. Decimal strings preserve precision;
+different currencies remain separate. All matching report categories are included.
+Those categories can overlap the separately returned processing fee, so the
+endpoint does not combine them into a net total.
 
-Each loaded order and event receives these additional fields:
+Missing payments return null rate/amounts and an empty fee array. Null order
+mappings remain unassigned. Two bulk queries load payment fields and report fees.
+Raw payment/refund records and event-level Stripe summaries are not attached.
 
-- `stripe_payments`, `stripe_refunds`, and `stripe_fees`: supporting database rows.
-- `stripe_totals_by_currency`: gross, succeeded refunds, reported fees including
-  tax, and provisional net, grouped by currency.
-- `stripe_currency`, `stripe_gross`, `stripe_refunded`, `stripe_reported_fees`, and
-  `stripe_net`: convenient single-currency values, or null for multiple currencies.
-- `stripe_currency_mismatch`: refunds/fees whose currency differs from their payment.
-  Net remains null in that case; no implicit currency conversion is performed.
-- `stripe_fees_available`: at least one fee row exists, not a completeness guarantee.
-- `stripe_net_is_provisional`: true because fee reports arrive later and currently
-  contain only payment-intent-attributed fees.
-- `stripe_financials_loaded`: true after enrichment.
+Processing fees, insurance and other fees remain admin-only at the authenticated
+event API boundary. Clients receive the Stripe-derived exchange rate. Public
+event results do not load orders or Stripe fields.
 
-Amounts are calculated with Decimal and serialized as decimal strings to preserve
-precision. Supporting rows retain the database's column names. Event totals count
-each partner order once. Pending/failed refunds appear in supporting rows but do
-not reduce totals. Reported fees are summed once; the payment's ProcessingFee is
-not added again. Ticket counts, refund flags, and existing revenue calculations
-remain independent.
-
-Three bulk queries load payments, refunds, and fees separately, preventing
-multiplication from one-to-many joins. PaymentIntentId links both refunds and
-payment-intent-attributed fees. TicketPartnerOrderId links payments to orders.
-
-Null order mappings remain null: no metadata fallback assigns them to an event.
-`StripeFinancialService().get_financials()` without an order filter retains those
-payments via left joins for reconciliation. Event-scoped results cannot include
-payments with no known order/event association.
-
-The Stripe model now stores exchange rates as ratios rather than dividing them
-by 100. Existing persisted exchange-rate values are not rewritten by this change.
+These are returned order fields. Existing ticket revenue/refund calculations and
+USD totals retain their current calculation; changing the returned exchange rate
+does not recalculate those totals.

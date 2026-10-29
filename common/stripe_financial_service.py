@@ -8,6 +8,19 @@ from common.db import db_convert_list_to_parameters, db_query_all
 MONEY_CONTEXT = Context(prec=50)
 
 
+def _sum_payment_field(payments, field, currency_field):
+    """Return exact source amounts, leaving unknown/mixed totals unset."""
+    if not payments or any(row.get(field) is None for row in payments):
+        return None
+    currencies = {(row.get(currency_field) or "").lower() for row in payments}
+    if len(currencies) > 1 or len(payments) > 1 and "" in currencies:
+        return None
+    total = Decimal(0)
+    for row in payments:
+        total = MONEY_CONTEXT.add(total, Decimal(str(row[field])))
+    return str(total)
+
+
 def json_row(row):
     """Preserve database precision and serialize dates for existing JSON encoders."""
     return {
@@ -91,6 +104,51 @@ def attach_financials(target, payments, refunds, fees):
 
 class StripeFinancialService:
     """Read the three Stripe tables independently to avoid multiplying child rows."""
+
+    def enrich_order_fields(self, events):
+        """Integrate compact Stripe fields, without raw payments/refunds or event summaries."""
+        orders = [order for event in events for order in event.orders]
+        ids = sorted({order.ticket_partner_order_id for order in orders
+                      if order.ticket_partner_order_id})
+        payments, fees = [], []
+        if ids:
+            data = {}
+            placeholders = db_convert_list_to_parameters(ids, data, "order")
+            payments = db_query_all("""SELECT PaymentIntentId, TicketPartnerOrderId,
+                ExchangeRate, ProcessingFee, ProcessingFeeCurrency, Insurance, Currency, Status
+                FROM StripePaymentIntents WHERE Status='succeeded'
+                AND TicketPartnerOrderId IN """ + placeholders, data)
+            fees = db_query_all("""SELECT pi.TicketPartnerOrderId, f.FeatureName,
+                f.FeeDescription, f.Amount, f.Tax, f.Currency
+                FROM StripeFees f JOIN StripePaymentIntents pi ON pi.PaymentIntentId=f.IncurredBy
+                WHERE f.IncurredByType='payment_intent' AND pi.Status='succeeded'
+                AND pi.TicketPartnerOrderId IN """ + placeholders, data)
+        by_order, fees_by_order = {}, {}
+        for payment in payments:
+            if payment["Status"] == "succeeded":
+                by_order.setdefault(payment["TicketPartnerOrderId"], []).append(payment)
+        for fee in fees:
+            fees_by_order.setdefault(fee["TicketPartnerOrderId"], []).append(fee)
+        for order in orders:
+            paid = by_order.get(order.ticket_partner_order_id, [])
+            currencies = {row["Currency"].lower() for row in paid}
+            rates = {row.get("ExchangeRate") for row in paid}
+            order.exchange_rate = (
+                float(next(iter(rates))) if len(currencies) == 1 and len(rates) == 1
+                and None not in rates else None
+            )
+            order.stripe_processing_fee = _sum_payment_field(paid, "ProcessingFee",
+                                                           "ProcessingFeeCurrency")
+            order.insurance = _sum_payment_field(paid, "Insurance", "Currency")
+            grouped = {}
+            for fee in fees_by_order.get(order.ticket_partner_order_id, []):
+                key = (fee.get("FeatureName") or fee.get("FeeDescription") or "Stripe fee",
+                       fee["Currency"].lower())
+                value = MONEY_CONTEXT.add(Decimal(str(fee["Amount"])),
+                                          Decimal(str(fee.get("Tax") or 0)))
+                grouped[key] = MONEY_CONTEXT.add(grouped.get(key, Decimal(0)), value)
+            order.other_fees = [{"key": key, "value": str(value), "currency": currency}
+                                for (key, currency), value in sorted(grouped.items())]
 
     def get_financials(self, partner_order_ids=None):
         """Return payment rows with nullable mappings; optionally scope to known orders."""

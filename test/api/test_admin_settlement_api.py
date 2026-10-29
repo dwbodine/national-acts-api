@@ -1,6 +1,7 @@
 """Internal financial reporting must not be exposed to clients."""
 
 from types import SimpleNamespace
+import json
 
 import pytest
 from flask_jwt_extended import get_jwt
@@ -56,23 +57,31 @@ def test_invalid_settlement_scope_is_rejected(client, auth_headers, query):
     )
 
 
-def test_client_cannot_opt_into_raw_stripe_financials(
-    monkeypatch, client, auth_headers
+@pytest.mark.parametrize("role, show_costs", [("admin", True), ("client", False)])
+def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
+    monkeypatch, client, auth_headers, role, show_costs
 ):
     calls = []
+    order = SimpleNamespace(exchange_rate=1.25, stripe_processing_fee="14.76",
+                            insurance="26.80", other_fees=[{"key": "Radar", "value": "0.07"}])
     monkeypatch.setattr(
         event_api,
         "EventService",
         lambda: SimpleNamespace(
-            get_events_and_orders=lambda **kwargs: calls.append(kwargs) or []
+            get_events_and_orders=lambda **kwargs: calls.append(kwargs)
+                or [SimpleNamespace(orders=[order])]
         ),
     )
     response = client.get(
         "/events/getEventsAndOrders?includeStripeFinancials=1",
-        headers=auth_headers(role="client"),
+        headers=auth_headers(role=role),
     )
     assert response.status_code == 200
-    assert calls[0]["include_stripe_financials"] is False
+    assert "include_stripe_financials" not in calls[0]
+    data = json.loads(response.text)[0]["orders"][0]
+    assert data["exchangeRate"] == 1.25
+    for field in ("stripeProcessingFee", "insurance", "otherFees"):
+        assert (field in data) is show_costs
 
 
 def test_missing_payments_is_admin_only(monkeypatch, client, auth_headers):

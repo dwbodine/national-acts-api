@@ -53,6 +53,7 @@ class FakeOrder:
     """
 
     def __init__(self):
+        self.ticket_partner_order_id = 0
         self.is_comped = False
         self.num_tickets = 2
         self.has_refunds = False
@@ -1234,27 +1235,26 @@ from common.ticket_partner_service import TicketPartnerService
 
 
 @pytest.mark.parametrize(
-    "include,public,get_orders,expected",
+    "public,get_orders,expected",
     [
-        (False, False, True, False),
-        (True, False, True, True),
-        (True, True, True, False),
-        (True, False, False, False),
+        (False, True, True),
+        (True, True, False),
+        (False, False, False),
     ],
 )
-def test_stripe_financial_enrichment_is_optional_and_private(
-    monkeypatch, include, public, get_orders, expected
+def test_stripe_order_fields_are_automatic_and_private(
+    monkeypatch, public, get_orders, expected
 ):
-    """Only explicitly requested private order lookups trigger bulk enrichment."""
+    """Private order lookups always integrate Stripe data without an opt-in flag."""
     monkeypatch.setattr(event_service, "db_query_all", lambda *args: [])
     calls = []
     monkeypatch.setattr(
         event_service,
         "StripeFinancialService",
-        lambda: SimpleNamespace(enrich_events=lambda events: calls.append(events)),
+        lambda: SimpleNamespace(enrich_order_fields=lambda events: calls.append(events)),
     )
     events = event_service.EventService().get_events_and_orders(
-        get_orders=get_orders, is_public=public, include_stripe_financials=include
+        get_orders=get_orders, is_public=public
     )
     assert events == []
     assert bool(calls) is expected

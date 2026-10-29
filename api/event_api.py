@@ -95,11 +95,12 @@ def get_events_and_orders_secured():
         seller_ids=seller_ids,
         tour_id=tour_id,
         is_portal=is_portal,
-        include_stripe_financials=get_override_bool_value_or_default(
-            request.args.get("includeStripeFinancials")
-        )
-        and is_admin_logged_in(),
     )
+    if not is_admin_logged_in():
+        for event in results:
+            for order in getattr(event, "orders", []):
+                for field in ("stripe_processing_fee", "insurance", "other_fees"):
+                    vars(order).pop(field, None)
     return convert_to_json(results)
 
 

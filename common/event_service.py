@@ -61,7 +61,6 @@ class EventService:
         is_public: bool = False,
         is_website: bool = False,
         is_portal: bool = False,
-        include_stripe_financials: bool = False,
     ):
         """
         main method to fetch events and orders
@@ -414,8 +413,8 @@ class EventService:
 
             events.append(vip_event)
 
-        if include_stripe_financials and get_orders and not is_public:
-            StripeFinancialService().enrich_events(events)
+        if get_orders and not is_public:
+            StripeFinancialService().enrich_order_fields(events)
         return events
 
     def __get_ticket_types_from_event_id(
