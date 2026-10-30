@@ -52,3 +52,6 @@ event results do not load orders or Stripe fields.
 These are returned order fields. Existing ticket revenue/refund calculations and
 USD totals retain their current calculation; changing the returned exchange rate
 does not recalculate those totals.
+
+`net_service_fees` (`netServiceFees`) is calculated as `partner_processing_fee -
+stripe_processing_fee - radar_fee`. Each missing input counts as zero.

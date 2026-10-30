@@ -283,10 +283,10 @@ class VipOrder(TicketSocketOrder):
         self.net_service_fees = "0"
 
     def update_net_service_fees(self):
-        """Subtract USD Stripe costs, treating missing inputs as zero."""
+        """Subtract Stripe costs from the partner checkout fee; missing inputs are zero."""
         amounts = [
             Decimal(str(getattr(self, field, None) or 0))
-            for field in ("service_fees_usd", "stripe_processing_fee", "radar_fee")
+            for field in ("partner_processing_fee", "stripe_processing_fee", "radar_fee")
         ]
         self.net_service_fees = str(amounts[0] - amounts[1] - amounts[2])
 
