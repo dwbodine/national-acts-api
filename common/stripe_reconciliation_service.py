@@ -43,7 +43,8 @@ class StripeReconciliationService:
             LEFT JOIN TicketPartnerOrders po ON po.TicketPartnerEventId=pe.TicketPartnerEventId
                 AND po.PartnerOrderId=tso.Id
             WHERE tso.PurchaseDate >= %(start)s AND tso.PurchaseDate < %(end)s
-                AND tso.IsDeleted <> 1 AND tso.IsComped <> 1 AND tso.IsActive=1 AND tso.IsManualTransfer <> 1
+                AND tso.IsDeleted <> 1 AND tso.IsComped <> 1 
+                AND tso.IsActive=1 AND tso.IsManualTransfer <> 1
                 AND """
             + ELIGIBLE_EVENTS_SQL
             + account_filter

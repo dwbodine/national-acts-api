@@ -41,14 +41,16 @@ def missing_stripe_fees():
     try:
         start = date.fromisoformat(request.args["startDate"])
         end = date.fromisoformat(request.args["endDate"])
-        days = int(request.args.get("minimumAgeDays", 7))
+        days = int(request.args.get("minimumAgeDays", 0))
         limit = int(request.args.get("limit", 100))
         offset = int(request.args.get("offset", 0))
-        if start >= end or days < 1 or not 1 <= limit <= 1000 or offset < 0:
+        if start >= end or days < 0 or not 1 <= limit <= 1000 or offset < 0:
             raise ValueError("Invalid report options")
     except (KeyError, TypeError, ValueError):
-        return {"msg": "Provide startDate/endDate (end exclusive), minimumAgeDays >= 1, "
-                "limit 1-1000 and offset >= 0"}, 400
+        return {
+            "msg": "Provide startDate/endDate (end exclusive), minimumAgeDays >= 0, "
+            "limit 1-1000 and offset >= 0"
+        }, 400
     return StripeFeeReconciliationService().get_missing(start, end, days, limit, offset)
 
 

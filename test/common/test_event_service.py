@@ -1251,7 +1251,9 @@ def test_stripe_order_fields_are_automatic_and_private(
     monkeypatch.setattr(
         event_service,
         "StripeFinancialService",
-        lambda: SimpleNamespace(enrich_order_fields=lambda events: calls.append(events)),
+        lambda: SimpleNamespace(
+            enrich_order_fields=lambda events: calls.append(events)
+        ),
     )
     events = event_service.EventService().get_events_and_orders(
         get_orders=get_orders, is_public=public

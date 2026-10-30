@@ -124,7 +124,9 @@ def test_services_use_partner_ids_and_preserve_provider_identity(database, monke
         connection.exec_driver_sql(
             "INSERT INTO FanMomentImages (FanMomentId, ImageName) VALUES (1, 'example.jpg'), (2, 'local.jpg')"
         )
-    compact_event = EventService().get_events_and_orders(event_id=10, get_orders=True)[0]
+    compact_event = EventService().get_events_and_orders(event_id=10, get_orders=True)[
+        0
+    ]
     assert len(compact_event.orders) == 1
     assert compact_event.orders[0].exchange_rate == 1
     assert compact_event.orders[0].stripe_processing_fee == "4.00"

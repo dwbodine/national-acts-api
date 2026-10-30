@@ -47,7 +47,9 @@ def test_report_creates_exact_utc_day(report_client, monkeypatch):
             )
         )
     )
-    client.v1.accounts = SimpleNamespace(retrieve_current=lambda: SimpleNamespace(id="acct_test"))
+    client.v1.accounts = SimpleNamespace(
+        retrieve_current=lambda: SimpleNamespace(id="acct_test")
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     response = report_client.post(
         "/stripe/fees/report",
@@ -102,7 +104,9 @@ def test_report_defers_days_beyond_stripe_availability(report_client, monkeypatc
             )
         )
     )
-    client.v1.accounts = SimpleNamespace(retrieve_current=lambda: SimpleNamespace(id="acct_test"))
+    client.v1.accounts = SimpleNamespace(
+        retrieve_current=lambda: SimpleNamespace(id="acct_test")
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     response = report_client.post(
         "/stripe/fees/report",
@@ -135,7 +139,13 @@ def test_get_report_returns_status_and_result(report_client, monkeypatch, status
     result = {"id": "file_test"} if status == "succeeded" else None
     parameters = {"interval_start": 1790812800, "interval_end": 1790899200}
     report = stripe.StripeObject.construct_from(
-        {"id": "frr_test", "status": status, "result": result, "parameters": parameters}, None
+        {
+            "id": "frr_test",
+            "status": status,
+            "result": result,
+            "parameters": parameters,
+        },
+        None,
     )
     client = SimpleNamespace(
         v1=SimpleNamespace(
@@ -146,7 +156,9 @@ def test_get_report_returns_status_and_result(report_client, monkeypatch, status
             )
         )
     )
-    client.v1.accounts = SimpleNamespace(retrieve_current=lambda: SimpleNamespace(id="acct_test"))
+    client.v1.accounts = SimpleNamespace(
+        retrieve_current=lambda: SimpleNamespace(id="acct_test")
+    )
     monkeypatch.setattr(stripe, "StripeClient", lambda api_key: client)
     downloads = []
     writes = []

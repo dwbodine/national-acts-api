@@ -99,8 +99,13 @@ def get_events_and_orders_secured():
     if not is_admin_logged_in():
         for event in results:
             for order in getattr(event, "orders", []):
-                for field in ("stripe_processing_fee", "insurance", "radar_fee",
-                              "partner_processing_fee", "other_fees"):
+                for field in (
+                    "stripe_processing_fee",
+                    "insurance",
+                    "radar_fee",
+                    "partner_processing_fee",
+                    "other_fees",
+                ):
                     vars(order).pop(field, None)
     return convert_to_json(results)
 

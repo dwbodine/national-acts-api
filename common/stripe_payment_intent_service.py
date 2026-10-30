@@ -40,8 +40,12 @@ DECIMAL_FIELDS = {
     "RadarFee": (10, 2),
 }
 ID_FIELDS = {"TicketPartnerOrderId", "NativeOrderId", "NativeEventId"}
-EDITABLE_FIELDS = (set(TEXT_FIELDS) | set(DECIMAL_FIELDS) | ID_FIELDS
-                   | {"DateReceived", "InsuranceVerified", "IsReconciled"})
+EDITABLE_FIELDS = (
+    set(TEXT_FIELDS)
+    | set(DECIMAL_FIELDS)
+    | ID_FIELDS
+    | {"DateReceived", "InsuranceVerified", "IsReconciled"}
+)
 REQUIRED_INSERT_FIELDS = {
     "PaymentIntentId",
     "Description",

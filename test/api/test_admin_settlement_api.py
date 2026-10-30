@@ -62,14 +62,20 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
     monkeypatch, client, auth_headers, role, show_costs
 ):
     calls = []
-    order = SimpleNamespace(exchange_rate=1.25, stripe_processing_fee="14.76",
-                            insurance="26.80", radar_fee="0.07", partner_processing_fee="10.86", other_fees=[{"key": "Radar", "value": "0.07"}])
+    order = SimpleNamespace(
+        exchange_rate=1.25,
+        stripe_processing_fee="14.76",
+        insurance="26.80",
+        radar_fee="0.07",
+        partner_processing_fee="10.86",
+        other_fees=[{"key": "Radar", "value": "0.07"}],
+    )
     monkeypatch.setattr(
         event_api,
         "EventService",
         lambda: SimpleNamespace(
             get_events_and_orders=lambda **kwargs: calls.append(kwargs)
-                or [SimpleNamespace(orders=[order])]
+            or [SimpleNamespace(orders=[order])]
         ),
     )
     response = client.get(
@@ -80,7 +86,13 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
     assert "include_stripe_financials" not in calls[0]
     data = json.loads(response.text)[0]["orders"][0]
     assert data["exchangeRate"] == 1.25
-    for field in ("stripeProcessingFee", "insurance", "radarFee", "partnerProcessingFee", "otherFees"):
+    for field in (
+        "stripeProcessingFee",
+        "insurance",
+        "radarFee",
+        "partnerProcessingFee",
+        "otherFees",
+    ):
         assert (field in data) is show_costs
 
 

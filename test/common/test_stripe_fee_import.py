@@ -140,16 +140,19 @@ def test_radar_totals_are_recomputed_after_import(monkeypatch, radar_updates):
     monkeypatch.setattr(
         stripe_service, "db_insert", lambda sql, data: writes.append(data)
     )
-    report = csv_content([
-        {"incurred_by": "pi_one", "feature_name": "Radar standard"},
-        {"incurred_by": "pi_one", "product": "Radar", "amount": "0.02"},
-        {"incurred_by": "pi_two", "feature_name": "Processing"},
-    ])
+    report = csv_content(
+        [
+            {"incurred_by": "pi_one", "feature_name": "Radar standard"},
+            {"incurred_by": "pi_one", "product": "Radar", "amount": "0.02"},
+            {"incurred_by": "pi_two", "feature_name": "Processing"},
+        ]
+    )
     service = stripe_service.StripeService()
     service._upsert_fee_report(report)
     assert len(writes) == 3
     assert [data["payment_intent_id"] for _, data in radar_updates] == [
-        "pi_one", "pi_two"
+        "pi_one",
+        "pi_two",
     ]
     sql = radar_updates[0][0]
     assert "SUM(Amount + Tax)" in sql
@@ -161,24 +164,45 @@ def test_radar_totals_are_recomputed_after_import(monkeypatch, radar_updates):
     assert radar_updates[:2] == radar_updates[2:]
 
 
-def test_charge_resolution_retains_original_and_excludes_refunds(monkeypatch, radar_updates):
+def test_charge_resolution_retains_original_and_excludes_refunds(
+    monkeypatch, radar_updates
+):
     """Resolve once per object, retaining distinct payment/refund fee types."""
     writes, lookups = [], []
-    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
-    client = SimpleNamespace(v1=SimpleNamespace(
-        charges=SimpleNamespace(retrieve=lambda key: lookups.append(key) or
-                                SimpleNamespace(payment_intent="pi_charge")),
-        refunds=SimpleNamespace(retrieve=lambda key: SimpleNamespace(payment_intent="pi_refund")),
-    ))
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
+    client = SimpleNamespace(
+        v1=SimpleNamespace(
+            charges=SimpleNamespace(
+                retrieve=lambda key: lookups.append(key)
+                or SimpleNamespace(payment_intent="pi_charge")
+            ),
+            refunds=SimpleNamespace(
+                retrieve=lambda key: SimpleNamespace(payment_intent="pi_refund")
+            ),
+        )
+    )
     counts = {}
-    report = csv_content([
-        {"incurred_by": "ch_one", "incurred_by_type": "charge", "feature_name": "Radar"},
-        {"incurred_by": "ch_one", "incurred_by_type": "charge", "amount": "0.02"},
-        {"incurred_by": "re_one", "incurred_by_type": "refund"},
-        {"incurred_by": "po_one", "incurred_by_type": "payout"},
-        {"incurred_by": "po_one", "incurred_by_type": "payout"},
-    ])
-    assert stripe_service.StripeService()._upsert_fee_report(report, client, "acct_one", counts) == 4
+    report = csv_content(
+        [
+            {
+                "incurred_by": "ch_one",
+                "incurred_by_type": "charge",
+                "feature_name": "Radar",
+            },
+            {"incurred_by": "ch_one", "incurred_by_type": "charge", "amount": "0.02"},
+            {"incurred_by": "re_one", "incurred_by_type": "refund"},
+            {"incurred_by": "po_one", "incurred_by_type": "payout"},
+            {"incurred_by": "po_one", "incurred_by_type": "payout"},
+        ]
+    )
+    assert (
+        stripe_service.StripeService()._upsert_fee_report(
+            report, client, "acct_one", counts
+        )
+        == 4
+    )
     assert lookups == ["ch_one"]
     assert writes[0]["IncurredBy"] == "ch_one"
     assert writes[0]["PaymentIntentId"] == "pi_charge"

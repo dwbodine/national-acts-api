@@ -202,13 +202,20 @@ class StripeService:
         account = client.v1.accounts.retrieve_current().id
         parameters = result["parameters"]
         audit = {
-            "report_id": report_id, "account": account,
+            "report_id": report_id,
+            "account": account,
             "start": datetime.fromtimestamp(
-                parameters["interval_start"], timezone.utc).replace(tzinfo=None),
+                parameters["interval_start"], timezone.utc
+            ).replace(tzinfo=None),
             "end": datetime.fromtimestamp(
-                parameters["interval_end"], timezone.utc).replace(tzinfo=None),
-            "status": report.status, "read": 0, "imported": 0, "skipped": 0,
-            "unresolved": 0, "error": None,
+                parameters["interval_end"], timezone.utc
+            ).replace(tzinfo=None),
+            "status": report.status,
+            "read": 0,
+            "imported": 0,
+            "skipped": 0,
+            "unresolved": 0,
+            "error": None,
         }
         if report.status == "succeeded":
             audit["status"] = "importing"
@@ -220,7 +227,8 @@ class StripeService:
                 )
                 audit["status"] = "succeeded"
                 result["import_counts"] = {
-                    key: audit[key] for key in ("read", "imported", "skipped", "unresolved")
+                    key: audit[key]
+                    for key in ("read", "imported", "skipped", "unresolved")
                 }
             elif report.status == "failed":
                 audit["error"] = str(result.get("error") or "Stripe report failed")
@@ -234,7 +242,8 @@ class StripeService:
     @staticmethod
     def _record_fee_import(data):
         """Persist import outcome separately from Stripe's report generation status."""
-        db_update("""INSERT INTO StripeFeeReportImports
+        db_update(
+            """INSERT INTO StripeFeeReportImports
             (ReportId, StripeAccount, IntervalStart, IntervalEnd, Status,
              RowsRead, RowsImported, RowsSkipped, RowsUnresolved, Error, ImportedAt)
             VALUES (%(report_id)s, %(account)s, %(start)s, %(end)s, %(status)s,
@@ -243,9 +252,13 @@ class StripeService:
             ON DUPLICATE KEY UPDATE Status=VALUES(Status), RowsRead=VALUES(RowsRead),
                 RowsImported=VALUES(RowsImported), RowsSkipped=VALUES(RowsSkipped),
                 RowsUnresolved=VALUES(RowsUnresolved), Error=VALUES(Error),
-                ImportedAt=VALUES(ImportedAt), LastUpdated=UTC_TIMESTAMP()""", data)
+                ImportedAt=VALUES(ImportedAt), LastUpdated=UTC_TIMESTAMP()""",
+            data,
+        )
 
-    def _upsert_fee_report(self, content: bytes, client=None, account=None, counts=None):
+    def _upsert_fee_report(
+        self, content: bytes, client=None, account=None, counts=None
+    ):
         """Import decimal fee amounts and preserve distinct rows with shared Stripe IDs."""
         reader = csv.DictReader(StringIO(content.decode("utf-8-sig")), strict=True)
         if not set(FEE_COLUMNS).issubset(reader.fieldnames or []):
@@ -306,7 +319,9 @@ class StripeService:
                 kind, source_id = attribution
                 payment_id = source_id if kind == "payment_intent" else None
                 if source_id and client and kind in ("charge", "refund"):
-                    resource = (client.v1.charges if kind == "charge" else client.v1.refunds)
+                    resource = (
+                        client.v1.charges if kind == "charge" else client.v1.refunds
+                    )
                     source = resource.retrieve(source_id)
                     payment_id = source.payment_intent
                     if payment_id is not None and not isinstance(payment_id, str):
@@ -327,12 +342,13 @@ class StripeService:
                 data,
             )
             counts["imported"] += 1
-        for payment_intent_id in sorted({
-            row["PaymentIntentId"] for row in rows.values() if row["PaymentIntentId"]
-        }):
+        for payment_intent_id in sorted(
+            {row["PaymentIntentId"] for row in rows.values() if row["PaymentIntentId"]}
+        ):
             # Recalculate from all stored reports, including overlapping imports.
             # No matching Radar rows leaves the existing unknown value untouched.
-            db_update("""UPDATE StripePaymentIntents pi
+            db_update(
+                """UPDATE StripePaymentIntents pi
                 JOIN (
                     SELECT PaymentIntentId, SUM(Amount + Tax) AS RadarFee
                     FROM StripeFees
@@ -343,7 +359,8 @@ class StripeService:
                     GROUP BY PaymentIntentId
                 ) fees ON fees.PaymentIntentId = pi.PaymentIntentId
                 SET pi.RadarFee = fees.RadarFee""",
-                {"payment_intent_id": payment_intent_id})
+                {"payment_intent_id": payment_intent_id},
+            )
         return len(rows)
 
     def get_fee_report_csv(self, file_id: str):

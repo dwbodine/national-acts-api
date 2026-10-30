@@ -110,22 +110,34 @@ class StripeFinancialService:
     def enrich_order_fields(self, events):
         """Integrate compact Stripe fields, without raw payments/refunds or event summaries."""
         orders = [order for event in events for order in event.orders]
-        ids = sorted({order.ticket_partner_order_id for order in orders
-                      if order.ticket_partner_order_id})
+        ids = sorted(
+            {
+                order.ticket_partner_order_id
+                for order in orders
+                if order.ticket_partner_order_id
+            }
+        )
         payments, fees = [], []
         if ids:
             data = {}
             placeholders = db_convert_list_to_parameters(ids, data, "order")
-            payments = db_query_all("""SELECT PaymentIntentId, TicketPartnerOrderId,
+            payments = db_query_all(
+                """SELECT PaymentIntentId, TicketPartnerOrderId,
                 ExchangeRate, ProcessingFee, ProcessingFeeCurrency, Insurance, RadarFee,
                 Currency, Status
                 FROM StripePaymentIntents WHERE Status='succeeded'
-                AND TicketPartnerOrderId IN """ + placeholders, data)
-            fees = db_query_all("""SELECT pi.TicketPartnerOrderId, f.FeatureName,
+                AND TicketPartnerOrderId IN """ + placeholders,
+                data,
+            )
+            fees = db_query_all(
+                """SELECT pi.TicketPartnerOrderId, f.FeatureName,
                 f.FeeDescription, f.Amount, f.Tax, f.Currency
-                FROM StripeFees f JOIN StripePaymentIntents pi ON pi.PaymentIntentId=f.PaymentIntentId
+                FROM StripeFees f 
+                JOIN StripePaymentIntents pi ON pi.PaymentIntentId=f.PaymentIntentId
                 WHERE f.IncurredByType IN ('payment_intent', 'charge') AND pi.Status='succeeded'
-                AND pi.TicketPartnerOrderId IN """ + placeholders, data)
+                AND pi.TicketPartnerOrderId IN """ + placeholders,
+                data,
+            )
         by_order, fees_by_order = {}, {}
         for payment in payments:
             if payment["Status"] == "succeeded":
@@ -137,22 +149,29 @@ class StripeFinancialService:
             currencies = {row["Currency"].lower() for row in paid}
             rates = {row.get("ExchangeRate") for row in paid}
             order.exchange_rate = (
-                float(next(iter(rates))) if len(currencies) == 1 and len(rates) == 1
-                and None not in rates else None
+                float(next(iter(rates)))
+                if len(currencies) == 1 and len(rates) == 1 and None not in rates
+                else None
             )
-            order.stripe_processing_fee = _sum_payment_field(paid, "ProcessingFee",
-                                                           "ProcessingFeeCurrency")
+            order.stripe_processing_fee = _sum_payment_field(
+                paid, "ProcessingFee", "ProcessingFeeCurrency"
+            )
             order.insurance = _sum_payment_field(paid, "Insurance", "Currency")
             order.radar_fee = _sum_payment_field(paid, "RadarFee", None)
             grouped = {}
             for fee in fees_by_order.get(order.ticket_partner_order_id, []):
-                key = (fee.get("FeatureName") or fee.get("FeeDescription") or "Stripe fee",
-                       fee["Currency"].lower())
-                value = MONEY_CONTEXT.add(Decimal(str(fee["Amount"])),
-                                          Decimal(str(fee.get("Tax") or 0)))
+                key = (
+                    fee.get("FeatureName") or fee.get("FeeDescription") or "Stripe fee",
+                    fee["Currency"].lower(),
+                )
+                value = MONEY_CONTEXT.add(
+                    Decimal(str(fee["Amount"])), Decimal(str(fee.get("Tax") or 0))
+                )
                 grouped[key] = MONEY_CONTEXT.add(grouped.get(key, Decimal(0)), value)
-            order.other_fees = [{"key": key, "value": str(value), "currency": currency}
-                                for (key, currency), value in sorted(grouped.items())]
+            order.other_fees = [
+                {"key": key, "value": str(value), "currency": currency}
+                for (key, currency), value in sorted(grouped.items())
+            ]
 
     def get_financials(self, partner_order_ids=None):
         """Return payment rows with nullable mappings; optionally scope to known orders."""

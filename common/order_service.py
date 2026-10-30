@@ -210,7 +210,9 @@ class OrderService:
             event_id = get_override_int_value_or_default(row["EventId"])
             order = VipOrder()
             partner_fee = row.get("CustomerProcessingFee")
-            order.partner_processing_fee = str(partner_fee) if partner_fee is not None else None
+            order.partner_processing_fee = (
+                str(partner_fee) if partner_fee is not None else None
+            )
             order.original_order_id = order_id
             order.original_event_id = event_id
             order.last_update = get_override_string_value_or_default(row["LastUpdate"])
@@ -332,7 +334,9 @@ class OrderService:
             event_id = get_override_int_value_or_default(row["EventId"])
             order = VipOrder()
             partner_fee = row.get("CustomerProcessingFee")
-            order.partner_processing_fee = str(partner_fee) if partner_fee is not None else None
+            order.partner_processing_fee = (
+                str(partner_fee) if partner_fee is not None else None
+            )
             order.original_order_id = order_id
             order.original_event_id = event_id
             order.venue = get_override_string_value_or_default(row["Venue"])
