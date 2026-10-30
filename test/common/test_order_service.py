@@ -98,6 +98,7 @@ def build_order_row(**overrides):
     """
     row = {
         "ExchangeRate": 1.5,
+        "CustomerProcessingFee": "10.86",
         "Symbol": "C$",
         "Multiplier": 2.0,
         "CurrencyAbbrev": "CAD",
@@ -278,6 +279,7 @@ def test_get_orders_builds_numeric_search_and_maps_orders(monkeypatch):
     assert orders[0].exchange_rate == 3.0
     assert orders[0].currency_abbrev == "CAD"
     assert orders[0].currency_symbol == "C$"
+    assert orders[0].partner_processing_fee == "10.86"
     assert orders[0].revenue == 50
     assert orders[0].service_fees == 10
     assert orders[0].notes == "Front row"
@@ -486,6 +488,7 @@ def test_get_orders_from_event_id_maps_rows_and_respects_flags(monkeypatch):
     assert "o.IsActive = 1" in calls[0][0]
     assert calls[0][1] == {"ticketPartnerEventId": 44}
     assert orders[0].ticket_partner_event_id == 44
+    assert orders[0].partner_processing_fee == "10.86"
     assert orders[0].revenue == 20
 
 

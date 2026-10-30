@@ -199,23 +199,64 @@ class StripeService:
         client = stripe.StripeClient(api_key=api_key)
         report = client.v1.reporting.report_runs.retrieve(report_id)
         result = report.to_dict()
+        account = client.v1.accounts.retrieve_current().id
+        parameters = result["parameters"]
+        audit = {
+            "report_id": report_id, "account": account,
+            "start": datetime.fromtimestamp(
+                parameters["interval_start"], timezone.utc).replace(tzinfo=None),
+            "end": datetime.fromtimestamp(
+                parameters["interval_end"], timezone.utc).replace(tzinfo=None),
+            "status": report.status, "read": 0, "imported": 0, "skipped": 0,
+            "unresolved": 0, "error": None,
+        }
         if report.status == "succeeded":
-            result["rows_upserted"] = self._upsert_fee_report(
-                self.get_fee_report_csv(report.result.id)
-            )
+            audit["status"] = "importing"
+        self._record_fee_import(audit)
+        try:
+            if report.status == "succeeded":
+                result["rows_upserted"] = self._upsert_fee_report(
+                    self.get_fee_report_csv(report.result.id), client, account, audit
+                )
+                audit["status"] = "succeeded"
+                result["import_counts"] = {
+                    key: audit[key] for key in ("read", "imported", "skipped", "unresolved")
+                }
+            elif report.status == "failed":
+                audit["error"] = str(result.get("error") or "Stripe report failed")
+        except Exception as error:
+            audit.update(status="failed", error=str(error))
+            self._record_fee_import(audit)
+            raise
+        self._record_fee_import(audit)
         return result
 
-    def _upsert_fee_report(self, content: bytes):
+    @staticmethod
+    def _record_fee_import(data):
+        """Persist import outcome separately from Stripe's report generation status."""
+        db_update("""INSERT INTO StripeFeeReportImports
+            (ReportId, StripeAccount, IntervalStart, IntervalEnd, Status,
+             RowsRead, RowsImported, RowsSkipped, RowsUnresolved, Error, ImportedAt)
+            VALUES (%(report_id)s, %(account)s, %(start)s, %(end)s, %(status)s,
+                    %(read)s, %(imported)s, %(skipped)s, %(unresolved)s, %(error)s,
+                    IF(%(status)s='succeeded', UTC_TIMESTAMP(), NULL))
+            ON DUPLICATE KEY UPDATE Status=VALUES(Status), RowsRead=VALUES(RowsRead),
+                RowsImported=VALUES(RowsImported), RowsSkipped=VALUES(RowsSkipped),
+                RowsUnresolved=VALUES(RowsUnresolved), Error=VALUES(Error),
+                ImportedAt=VALUES(ImportedAt), LastUpdated=UTC_TIMESTAMP()""", data)
+
+    def _upsert_fee_report(self, content: bytes, client=None, account=None, counts=None):
         """Import decimal fee amounts and preserve distinct rows with shared Stripe IDs."""
         reader = csv.DictReader(StringIO(content.decode("utf-8-sig")), strict=True)
         if not set(FEE_COLUMNS).issubset(reader.fieldnames or []):
             raise ValueError("Stripe fee report is missing required columns")
         rows = {}
+        counts = counts if counts is not None else {}
+        counts.update(read=0, imported=0, skipped=0, unresolved=0)
         for row in reader:
+            counts["read"] += 1
             if None in row or any(value is None for value in row.values()):
                 raise ValueError("Malformed Stripe fee report row")
-            if row["incurred_by_type"] != "payment_intent":
-                continue
             data = {
                 column: row[header] or None for header, column in FEE_COLUMNS.items()
             }
@@ -257,7 +298,24 @@ class StripeService:
                 json.dumps([signature, 0]).encode("utf-8")
             ).hexdigest()
             rows[data["FeeRowKey"]] = data
+        counts["skipped"] = counts["read"] - len(rows)
+        resolved = {}
         for data in rows.values():
+            attribution = (data["IncurredByType"], data["IncurredBy"])
+            if attribution not in resolved:
+                kind, source_id = attribution
+                payment_id = source_id if kind == "payment_intent" else None
+                if source_id and client and kind in ("charge", "refund"):
+                    resource = (client.v1.charges if kind == "charge" else client.v1.refunds)
+                    source = resource.retrieve(source_id)
+                    payment_id = source.payment_intent
+                    if payment_id is not None and not isinstance(payment_id, str):
+                        payment_id = payment_id.id
+                resolved[attribution] = payment_id
+            data["PaymentIntentId"] = resolved[attribution]
+            data["StripeAccount"] = account
+            if not data["PaymentIntentId"]:
+                counts["unresolved"] += 1
             columns = ", ".join(data)
             placeholders = ", ".join(f"%({column})s" for column in data)
             updates = ", ".join(
@@ -268,21 +326,22 @@ class StripeService:
                 f"ON DUPLICATE KEY UPDATE {updates}, LastUpdated=CURRENT_TIMESTAMP",
                 data,
             )
+            counts["imported"] += 1
         for payment_intent_id in sorted({
-            row["IncurredBy"] for row in rows.values() if row["IncurredBy"]
+            row["PaymentIntentId"] for row in rows.values() if row["PaymentIntentId"]
         }):
             # Recalculate from all stored reports, including overlapping imports.
             # No matching Radar rows leaves the existing unknown value untouched.
             db_update("""UPDATE StripePaymentIntents pi
                 JOIN (
-                    SELECT IncurredBy, SUM(Amount + Tax) AS RadarFee
+                    SELECT PaymentIntentId, SUM(Amount + Tax) AS RadarFee
                     FROM StripeFees
-                    WHERE IncurredByType = 'payment_intent'
-                        AND IncurredBy = %(payment_intent_id)s
+                    WHERE IncurredByType IN ('payment_intent', 'charge')
+                        AND PaymentIntentId = %(payment_intent_id)s
                         AND (LOCATE('radar', LOWER(FeatureName)) > 0
                              OR LOWER(Product) = 'radar')
-                    GROUP BY IncurredBy
-                ) fees ON fees.IncurredBy = pi.PaymentIntentId
+                    GROUP BY PaymentIntentId
+                ) fees ON fees.PaymentIntentId = pi.PaymentIntentId
                 SET pi.RadarFee = fees.RadarFee""",
                 {"payment_intent_id": payment_intent_id})
         return len(rows)

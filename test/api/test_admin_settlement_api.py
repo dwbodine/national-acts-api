@@ -63,7 +63,7 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
 ):
     calls = []
     order = SimpleNamespace(exchange_rate=1.25, stripe_processing_fee="14.76",
-                            insurance="26.80", other_fees=[{"key": "Radar", "value": "0.07"}])
+                            insurance="26.80", radar_fee="0.07", partner_processing_fee="10.86", other_fees=[{"key": "Radar", "value": "0.07"}])
     monkeypatch.setattr(
         event_api,
         "EventService",
@@ -80,7 +80,7 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
     assert "include_stripe_financials" not in calls[0]
     data = json.loads(response.text)[0]["orders"][0]
     assert data["exchangeRate"] == 1.25
-    for field in ("stripeProcessingFee", "insurance", "otherFees"):
+    for field in ("stripeProcessingFee", "insurance", "radarFee", "partnerProcessingFee", "otherFees"):
         assert (field in data) is show_costs
 
 

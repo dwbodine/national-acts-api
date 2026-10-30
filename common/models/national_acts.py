@@ -224,6 +224,10 @@ class VipOrder(TicketSocketOrder):
     National acts orders
     """
 
+    stripe_processing_fee: str | None = None
+    insurance: str | None = None
+    radar_fee: str | None = None
+    partner_processing_fee: str | None = None
     stripe_financials_loaded: bool = False
     ticket_partner_event_id: int = 0
     ticket_partner_order_id: int = 0
@@ -266,6 +270,14 @@ class VipOrder(TicketSocketOrder):
     last_update: str = None
     notes: str = None
     is_manual_transfer: bool = False
+
+    def __init__(self):
+        """Include nullable Stripe amounts in the serialized order payload."""
+        super().__init__()
+        self.stripe_processing_fee = None
+        self.insurance = None
+        self.radar_fee = None
+        self.partner_processing_fee = None
 
     def get_totals(self):
         """

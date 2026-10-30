@@ -37,8 +37,11 @@ DECIMAL_FIELDS = {
     "ExchangeRate": (10, 6),
     "Insurance": (18, 6),
     "ApplicationFee": (18, 6),
+    "RadarFee": (10, 2),
 }
 ID_FIELDS = {"TicketPartnerOrderId", "NativeOrderId", "NativeEventId"}
+EDITABLE_FIELDS = (set(TEXT_FIELDS) | set(DECIMAL_FIELDS) | ID_FIELDS
+                   | {"DateReceived", "InsuranceVerified", "IsReconciled"})
 REQUIRED_INSERT_FIELDS = {
     "PaymentIntentId",
     "Description",
@@ -74,16 +77,7 @@ def validate_changes(payload):
     """Only bind known database fields, with schema-compatible types and precision."""
     if not isinstance(payload, dict):
         raise ValueError("A JSON object is required")
-    allowed = (
-        set(TEXT_FIELDS)
-        | set(DECIMAL_FIELDS)
-        | ID_FIELDS
-        | {
-            "StripePaymentIntentId",
-            "DateReceived",
-            "InsuranceVerified",
-        }
-    )
+    allowed = EDITABLE_FIELDS | {"StripePaymentIntentId"}
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError("Unknown fields: " + ", ".join(sorted(unknown)))
@@ -111,7 +105,7 @@ def validate_changes(payload):
         elif field in ID_FIELDS:
             changes[field] = positive_id(value, field) if value is not None else None
         elif field in DECIMAL_FIELDS:
-            if field == "Insurance" and value is None:
+            if field in ("Insurance", "RadarFee") and value is None:
                 continue
             try:
                 number = Decimal(str(value))
@@ -126,9 +120,9 @@ def validate_changes(payload):
             ):
                 raise ValueError(f"Invalid precision or range for {field}")
             changes[field] = number
-        elif field == "InsuranceVerified":
+        elif field in ("InsuranceVerified", "IsReconciled"):
             if not isinstance(value, (int, bool)) or value not in (0, 1):
-                raise ValueError("InsuranceVerified must be 0 or 1")
+                raise ValueError(f"{field} must be 0 or 1")
         elif field == "DateReceived":
             if not isinstance(value, str):
                 raise ValueError("DateReceived must be an ISO datetime")

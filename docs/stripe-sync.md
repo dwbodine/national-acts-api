@@ -14,18 +14,18 @@ Keep the existing 20-minute `/stripe/transactions` cron: it imports payment
 intents and refunds. Fees have a separate daily job.
 
 First exercise one available window. Recent unavailable days are deferred, so
-use the full seven-day window for the initial server check:
+use the full fourteen-day window for the initial server check:
 
 ```bash
 /usr/bin/flock -n /home/ec2-user/stripe-fees.lock \
   /usr/bin/docker exec --user 5678 nationalactsapi \
-  python -m tools.sync_stripe_fees --days 7
+  python -m tools.sync_stripe_fees --days 14
 ```
 
 Then add this using `crontab -e`:
 
 ```cron
-0 4 * * * /usr/bin/flock -n /home/ec2-user/stripe-fees.lock /usr/bin/docker exec --user 5678 nationalactsapi python -m tools.sync_stripe_fees --days 7 >> /home/ec2-user/stripe-fees.log 2>&1
+0 4 * * * /usr/bin/flock -n /home/ec2-user/stripe-fees.lock /usr/bin/docker exec --user 5678 nationalactsapi python -m tools.sync_stripe_fees --days 14 >> /home/ec2-user/stripe-fees.log 2>&1
 ```
 
 This runs at 04:00 in the cron server's timezone, processing UTC calendar days.
@@ -37,7 +37,7 @@ manually to resume. The checkpoint is `/app/tmp/stripe-fees/state.json`.
 An optional weekly wider reconciliation can share the same lock and checkpoint:
 
 ```cron
-0 6 * * 0 /usr/bin/flock -n /home/ec2-user/stripe-fees.lock /usr/bin/docker exec --user 5678 nationalactsapi python -m tools.sync_stripe_fees --days 30 >> /home/ec2-user/stripe-fees.log 2>&1
+0 6 * * 0 /usr/bin/flock -n /home/ec2-user/stripe-fees.lock /usr/bin/docker exec --user 5678 nationalactsapi python -m tools.sync_stripe_fees --days 60 >> /home/ec2-user/stripe-fees.log 2>&1
 ```
 
 ## Fixed-date StripeFees backfill
@@ -78,7 +78,9 @@ each new UTC run date so newly published fees can be imported.
 Use the same `stripe-fees.lock` as the fee cron to prevent overlapping runs.
 For a deliberately repeated historical refresh or a different interval, use a
 fresh backfill state file. Identical fee rows remain deduplicated in the database.
-The importer continues to retain only `incurred_by_type=payment_intent` rows.
+The importer preserves all attribution types. Charge and refund rows are resolved
+to a separate PaymentIntentId through Stripe; their original IDs and types remain unchanged.
+Refund-attributed fees do not contribute to payment Radar totals or order otherFees.
 
 ## One-time payment intent and refund backfill
 
@@ -129,3 +131,61 @@ Historical TicketSocket orders and partner mappings should already exist, since
 existing payment intent rows keep their original links, including unmatched links.
 The current created-time transaction window does not revisit older intents or
 refunds whose status changes later; that needs separate reconciliation/webhooks.
+
+## Fee reconciliation and coverage
+
+Apply migrations through `0010_stripe_fee_reconciliation` before deploying the importer.
+The daily 14-day overlap and weekly 60-day refresh above revisit completed dates
+on each new UTC run date. The runner defaults to seven days unless `--days` is supplied.
+Monitor nonzero exits and `Fee backfill incomplete` messages; importing a report
+is not proof that every payment has a fee. Retain the persistent tmp volume and lock.
+
+`StripeFeeReportImports` records the Stripe account owning the API key, report ID,
+UTC interval, import status, counts, import time and error. Counts describe the
+latest attempt: read CSV rows, imported unique rows (including reimports), skipped
+identical CSV rows, and rows without a resolved payment link. Payout and other
+non-payment rows can legitimately be unresolved. Failed attempts retain progress
+counts; reruns are idempotent. Pending generation is distinct from successful import.
+
+Old checkpoints predate the new attribution handling. Run the historical fee backfill
+again with a **new state file**, for example:
+
+```bash
+/usr/bin/flock -n /home/ec2-user/stripe-fees.lock \
+  /usr/bin/docker exec --user 5678 nationalactsapi \
+  python -m tools.sync_stripe_fees \
+    --start-date 2026-01-01 --end-date 2026-10-29 \
+    --state-file /app/tmp/stripe-fees/backfill-2026-resolved-v1.json
+```
+
+The end date is exclusive; adjust it to today's UTC date for a fresh run.
+A successful zero-row report does not set RadarFee to zero. Missing fees stay NULL.
+Existing Radar totals are recomputed from all stored payment- and charge-attributed
+Radar rows, including tax; refund Radar fees remain separate.
+
+Admin JWT endpoint:
+
+```text
+GET /stripe/fees/missing?startDate=2026-01-01&endDate=2027-01-01&minimumAgeDays=7&limit=100&offset=0
+```
+
+The response keeps `total`, `limit`, `offset`, and a `payments` list. Each item
+contains the local `StripePaymentIntentId` and all editable payment-intent fields
+in database/PascalCase naming; read-only `LastUpdated` is omitted. An item can be
+submitted directly to `POST /stripe/payment-intents/update` after editing.
+`RadarFee` accepts a decimal with at most two places, zero, or null to restore an
+unknown amount. `IsReconciled` accepts 0 or 1 when explicitly supplied.
+
+This paged report lists older succeeded payments without a resolved payment or
+charge fee row. Refund-only matches do not hide missing payment fees. It reports
+unknown coverage, not a guaranteed Stripe omission. Review the account and date
+coverage in StripeFeeReportImports, then inspect the original CSV when a gap persists.
+The importer uses the configured API key's account; it does not automatically
+fetch reports from every connected account. Compare that account with payment metadata.
+
+```sql
+SELECT StripeAccount, IntervalStart, IntervalEnd, ReportId, Status,
+       RowsRead, RowsImported, RowsSkipped, RowsUnresolved, ImportedAt, Error
+FROM StripeFeeReportImports
+ORDER BY IntervalStart DESC, LastUpdated DESC;
+```

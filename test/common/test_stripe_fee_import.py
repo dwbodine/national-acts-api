@@ -3,6 +3,7 @@
 import csv
 from decimal import Decimal
 from io import StringIO
+from types import SimpleNamespace
 
 import pytest
 
@@ -109,8 +110,8 @@ def test_missing_headers_are_rejected():
         stripe_service.StripeService()._upsert_fee_report(b"amount,currency\n1,usd\n")
 
 
-def test_only_payment_intent_fees_are_imported(monkeypatch):
-    """Ignore charge, refund, and unclassified rows in a mixed fee report."""
+def test_all_attribution_types_are_preserved(monkeypatch):
+    """Preserve charge, refund, and unclassified rows without rewriting attribution."""
     writes = []
     monkeypatch.setattr(
         stripe_service, "db_insert", lambda sql, data: writes.append(data)
@@ -125,9 +126,12 @@ def test_only_payment_intent_fees_are_imported(monkeypatch):
             ]
         )
     )
-    assert count == 1
-    assert len(writes) == 1
-    assert writes[0]["IncurredBy"] == "pi_keep"
+    assert count == 4
+    assert len(writes) == 4
+    assert writes[0]["PaymentIntentId"] == "pi_keep"
+    assert writes[1]["IncurredBy"] == "ch_skip"
+    assert writes[2]["IncurredByType"] == "refund"
+    assert writes[2]["PaymentIntentId"] is None
 
 
 def test_radar_totals_are_recomputed_after_import(monkeypatch, radar_updates):
@@ -150,8 +154,36 @@ def test_radar_totals_are_recomputed_after_import(monkeypatch, radar_updates):
     sql = radar_updates[0][0]
     assert "SUM(Amount + Tax)" in sql
     assert "SET pi.RadarFee = fees.RadarFee" in sql
-    assert "IncurredByType = 'payment_intent'" in sql
+    assert "IncurredByType IN ('payment_intent', 'charge')" in sql
     assert "LOCATE('radar', LOWER(FeatureName))" in sql
     assert "LOWER(Product) = 'radar'" in sql
     service._upsert_fee_report(report)
     assert radar_updates[:2] == radar_updates[2:]
+
+
+def test_charge_resolution_retains_original_and_excludes_refunds(monkeypatch, radar_updates):
+    """Resolve once per object, retaining distinct payment/refund fee types."""
+    writes, lookups = [], []
+    monkeypatch.setattr(stripe_service, "db_insert", lambda sql, data: writes.append(data))
+    client = SimpleNamespace(v1=SimpleNamespace(
+        charges=SimpleNamespace(retrieve=lambda key: lookups.append(key) or
+                                SimpleNamespace(payment_intent="pi_charge")),
+        refunds=SimpleNamespace(retrieve=lambda key: SimpleNamespace(payment_intent="pi_refund")),
+    ))
+    counts = {}
+    report = csv_content([
+        {"incurred_by": "ch_one", "incurred_by_type": "charge", "feature_name": "Radar"},
+        {"incurred_by": "ch_one", "incurred_by_type": "charge", "amount": "0.02"},
+        {"incurred_by": "re_one", "incurred_by_type": "refund"},
+        {"incurred_by": "po_one", "incurred_by_type": "payout"},
+        {"incurred_by": "po_one", "incurred_by_type": "payout"},
+    ])
+    assert stripe_service.StripeService()._upsert_fee_report(report, client, "acct_one", counts) == 4
+    assert lookups == ["ch_one"]
+    assert writes[0]["IncurredBy"] == "ch_one"
+    assert writes[0]["PaymentIntentId"] == "pi_charge"
+    assert writes[2]["IncurredByType"] == "refund"
+    assert writes[2]["PaymentIntentId"] == "pi_refund"
+    assert all(row["StripeAccount"] == "acct_one" for row in writes)
+    assert counts == {"read": 5, "imported": 4, "skipped": 1, "unresolved": 1}
+    assert all("IN ('payment_intent', 'charge')" in sql for sql, _ in radar_updates)

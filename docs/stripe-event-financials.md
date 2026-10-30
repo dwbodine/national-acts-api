@@ -13,6 +13,10 @@ Order properties:
   payments only when their fee currencies are compatible.
 - `insurance`: stored Stripe insurance, or null when unknown. Multiple payments
   are summed only within one currency.
+- `partner_processing_fee`: TicketSocketOrders `CustomerProcessingFee`, the amount
+  collected at checkout; null when unknown.
+- `radar_fee`: stored StripePaymentIntents `RadarFee` in USD; summed across linked
+  successful payments, or null if any amount is unknown.
 - `other_fees`: report fees joined through `StripeFees.IncurredBy = PaymentIntentId`,
   restricted to `IncurredByType='payment_intent'` and successful payments.
 
@@ -23,6 +27,8 @@ The API uses existing camelCase serialization. Example admin order fields:
   "exchangeRate": 0.75,
   "stripeProcessingFee": "14.76",
   "insurance": "26.80",
+  "radarFee": "0.07",
+  "partnerProcessingFee": "10.86",
   "otherFees": [
     {"key": "Radar standard", "value": "0.07", "currency": "usd"}
   ]
@@ -39,7 +45,7 @@ Missing payments return null rate/amounts and an empty fee array. Null order
 mappings remain unassigned. Two bulk queries load payment fields and report fees.
 Raw payment/refund records and event-level Stripe summaries are not attached.
 
-Processing fees, insurance and other fees remain admin-only at the authenticated
+Processing fees, insurance, Radar fees and other fees remain admin-only at the authenticated
 event API boundary. Clients receive the Stripe-derived exchange rate. Public
 event results do not load orders or Stripe fields.
 

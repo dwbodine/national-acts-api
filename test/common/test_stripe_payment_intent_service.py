@@ -90,6 +90,7 @@ def payments(order_database, monkeypatch):
             Status TEXT NOT NULL DEFAULT 'succeeded', PaymentMethod TEXT DEFAULT 'card',
             StripeAccount TEXT NOT NULL DEFAULT '', ApplicationFee NUMERIC NOT NULL DEFAULT 0,
             InsuranceVerified INT NOT NULL DEFAULT 0, ProcessingFeeCurrency TEXT,
+            RadarFee NUMERIC, IsReconciled INT NOT NULL DEFAULT 0,
             LastUpdated TEXT DEFAULT CURRENT_TIMESTAMP
         );
         INSERT INTO StripePaymentIntents (StripePaymentIntentId, PaymentIntentId, Description,
@@ -115,6 +116,43 @@ def new_payment(**overrides):
         "TicketPartnerOrderId": 5,
         **overrides,
     }
+
+
+@pytest.mark.parametrize("radar", ["0.07", "0", None])
+def test_radar_fee_can_be_saved_and_cleared(payments, radar):
+    database, _ = payments
+    payment_service.StripePaymentIntentService().save({
+        "StripePaymentIntentId": 7, "RadarFee": radar,
+    })
+    value = database.execute(
+        "SELECT RadarFee FROM StripePaymentIntents WHERE StripePaymentIntentId=7"
+    ).fetchone()[0]
+    assert value == (float(radar) if radar is not None else None)
+
+
+@pytest.mark.parametrize("radar", ["0.001", "100000000", "NaN", True])
+def test_radar_fee_rejects_invalid_amounts(radar):
+    with pytest.raises(ValueError):
+        payment_service.validate_changes({"StripePaymentIntentId": 7, "RadarFee": radar})
+
+
+def test_missing_fee_row_can_be_submitted_to_save(payments, monkeypatch):
+    from common import stripe_fee_reconciliation_service as fee_report
+    database, _ = payments
+    row = dict(database.execute("SELECT * FROM StripePaymentIntents").fetchone())
+    row.pop("LastUpdated")
+    calls = []
+    results = iter([[{"total": 1}], [row]])
+    monkeypatch.setattr(fee_report, "db_query_all",
+                        lambda sql, data: calls.append(sql) or next(results))
+    report = fee_report.StripeFeeReconciliationService().get_missing(
+        datetime(2026, 1, 1), datetime(2027, 1, 1))
+    payload = report["payments"][0]
+    assert "pi.CustomerName" in calls[1] and "pi.RadarFee" in calls[1]
+    assert "pi.LastUpdated" not in calls[1]
+    payload["RadarFee"] = "0.07"
+    payment_service.StripePaymentIntentService().save(payload)
+    assert database.execute("SELECT RadarFee FROM StripePaymentIntents").fetchone()[0] == 0.07
 
 
 def test_partial_update_links_order_without_overwriting_payment_amount(payments):

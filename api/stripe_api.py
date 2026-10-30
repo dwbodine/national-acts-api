@@ -13,6 +13,7 @@ from flask import Blueprint, Response, request
 from flask_jwt_extended import jwt_required
 
 from common.stripe_service import FeeReportNotReady, StripeService
+from common.stripe_fee_reconciliation_service import StripeFeeReconciliationService
 from common.common_api import is_admin_logged_in
 from common.stripe_reconciliation_service import StripeReconciliationService
 from common.stripe_payment_intent_service import (
@@ -29,6 +30,26 @@ stripe_api = Blueprint("stripe_api", __name__)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+@stripe_api.route("/stripe/fees/missing", methods=["GET"])
+@jwt_required()
+def missing_stripe_fees():
+    """Admin-only report of aged payments without resolved fees."""
+    if not is_admin_logged_in():
+        return {"msg": "Unauthorized"}, 401
+    try:
+        start = date.fromisoformat(request.args["startDate"])
+        end = date.fromisoformat(request.args["endDate"])
+        days = int(request.args.get("minimumAgeDays", 7))
+        limit = int(request.args.get("limit", 100))
+        offset = int(request.args.get("offset", 0))
+        if start >= end or days < 1 or not 1 <= limit <= 1000 or offset < 0:
+            raise ValueError("Invalid report options")
+    except (KeyError, TypeError, ValueError):
+        return {"msg": "Provide startDate/endDate (end exclusive), minimumAgeDays >= 1, "
+                "limit 1-1000 and offset >= 0"}, 400
+    return StripeFeeReconciliationService().get_missing(start, end, days, limit, offset)
 
 
 @stripe_api.route("/stripe/payment-intents/update", methods=["POST"])

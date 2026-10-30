@@ -13,6 +13,8 @@ def _sum_payment_field(payments, field, currency_field):
     if not payments or any(row.get(field) is None for row in payments):
         return None
     currencies = {(row.get(currency_field) or "").lower() for row in payments}
+    if currency_field is None:
+        currencies = {"usd"}
     if len(currencies) > 1 or len(payments) > 1 and "" in currencies:
         return None
     total = Decimal(0)
@@ -115,13 +117,14 @@ class StripeFinancialService:
             data = {}
             placeholders = db_convert_list_to_parameters(ids, data, "order")
             payments = db_query_all("""SELECT PaymentIntentId, TicketPartnerOrderId,
-                ExchangeRate, ProcessingFee, ProcessingFeeCurrency, Insurance, Currency, Status
+                ExchangeRate, ProcessingFee, ProcessingFeeCurrency, Insurance, RadarFee,
+                Currency, Status
                 FROM StripePaymentIntents WHERE Status='succeeded'
                 AND TicketPartnerOrderId IN """ + placeholders, data)
             fees = db_query_all("""SELECT pi.TicketPartnerOrderId, f.FeatureName,
                 f.FeeDescription, f.Amount, f.Tax, f.Currency
-                FROM StripeFees f JOIN StripePaymentIntents pi ON pi.PaymentIntentId=f.IncurredBy
-                WHERE f.IncurredByType='payment_intent' AND pi.Status='succeeded'
+                FROM StripeFees f JOIN StripePaymentIntents pi ON pi.PaymentIntentId=f.PaymentIntentId
+                WHERE f.IncurredByType IN ('payment_intent', 'charge') AND pi.Status='succeeded'
                 AND pi.TicketPartnerOrderId IN """ + placeholders, data)
         by_order, fees_by_order = {}, {}
         for payment in payments:
@@ -140,6 +143,7 @@ class StripeFinancialService:
             order.stripe_processing_fee = _sum_payment_field(paid, "ProcessingFee",
                                                            "ProcessingFeeCurrency")
             order.insurance = _sum_payment_field(paid, "Insurance", "Currency")
+            order.radar_fee = _sum_payment_field(paid, "RadarFee", None)
             grouped = {}
             for fee in fees_by_order.get(order.ticket_partner_order_id, []):
                 key = (fee.get("FeatureName") or fee.get("FeeDescription") or "Stripe fee",
@@ -172,9 +176,10 @@ class StripeFinancialService:
         )
         fees = db_query_all(
             "SELECT f.* FROM StripeFees f LEFT JOIN StripePaymentIntents pi "
-            "ON pi.PaymentIntentId=f.IncurredBy AND f.IncurredByType='payment_intent'"
+            "ON pi.PaymentIntentId=f.PaymentIntentId "
+            "AND f.IncurredByType IN ('payment_intent', 'charge')"
             + (where + " AND " if where else " WHERE ")
-            + "f.IncurredByType='payment_intent'",
+            + "f.IncurredByType IN ('payment_intent', 'charge')",
             data,
         )
         return payments, refunds, fees

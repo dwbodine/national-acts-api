@@ -99,7 +99,8 @@ def get_events_and_orders_secured():
     if not is_admin_logged_in():
         for event in results:
             for order in getattr(event, "orders", []):
-                for field in ("stripe_processing_fee", "insurance", "other_fees"):
+                for field in ("stripe_processing_fee", "insurance", "radar_fee",
+                              "partner_processing_fee", "other_fees"):
                     vars(order).pop(field, None)
     return convert_to_json(results)
 
@@ -119,6 +120,10 @@ def order_by_id():
         return {"msg": "Bad Request"}, 400
 
     results = service.get_orders(ts_order_id=order_id)
+    if not is_admin_logged_in():
+        for order in results:
+            fields = order if isinstance(order, dict) else vars(order)
+            fields.pop("partner_processing_fee", None)
     return convert_to_json(results)
 
 
@@ -152,6 +157,10 @@ def orders_secured():
         show_deleted,
         ignore_flags,
     )
+    if not is_admin_logged_in():
+        for order in results:
+            fields = order if isinstance(order, dict) else vars(order)
+            fields.pop("partner_processing_fee", None)
     return convert_to_json(results)
 
 
