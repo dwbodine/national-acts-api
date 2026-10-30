@@ -2,6 +2,8 @@
 
 from datetime import date
 from decimal import Decimal
+import csv
+from io import StringIO
 import os
 from pathlib import Path
 import shutil
@@ -14,9 +16,26 @@ from test_migrations import database  # pylint: disable=unused-import
 
 from common import db, stripe_service
 from common.stripe_fee_reconciliation_service import StripeFeeReconciliationService
-from test.common.test_stripe_fee_import import csv_content
 
 pytestmark = pytest.mark.integration
+
+
+def csv_content(rows):
+    """Build integration input without importing another test module."""
+    stream = StringIO()
+    writer = csv.DictWriter(stream, fieldnames=stripe_service.FEE_COLUMNS)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({
+            "balance_transaction_id": "txn_shared",
+            "fee_transaction_id": "ft_shared",
+            "currency": "usd",
+            "amount": "0.050000000000000000",
+            "incurred_by_type": "payment_intent",
+            "incurred_at": "2026-10-09 00:00:00",
+            **row,
+        })
+    return stream.getvalue().encode("utf-8-sig")
 
 
 def test_import_attribution_audit_and_missing_fees(database, monkeypatch):
