@@ -229,7 +229,7 @@ class VipOrder(TicketSocketOrder):
     insurance: str | None = None
     radar_fee: str | None = None
     partner_processing_fee: str | None = None
-    net_service_fees: str | None = None
+    net_service_fees: str = "0"
     stripe_financials_loaded: bool = False
     ticket_partner_event_id: int = 0
     ticket_partner_order_id: int = 0
@@ -280,23 +280,15 @@ class VipOrder(TicketSocketOrder):
         self.insurance = None
         self.radar_fee = None
         self.partner_processing_fee = None
-        self.net_service_fees = None
+        self.net_service_fees = "0"
 
     def update_net_service_fees(self):
-        """Subtract known USD Stripe costs, preserving unknown amounts as null."""
+        """Subtract USD Stripe costs, treating missing inputs as zero."""
         amounts = [
-            getattr(self, field, None)
+            Decimal(str(getattr(self, field, None) or 0))
             for field in ("service_fees_usd", "stripe_processing_fee", "radar_fee")
         ]
-        self.net_service_fees = (
-            str(
-                Decimal(str(amounts[0]))
-                - Decimal(str(amounts[1]))
-                - Decimal(str(amounts[2]))
-            )
-            if all(value is not None for value in amounts)
-            else None
-        )
+        self.net_service_fees = str(amounts[0] - amounts[1] - amounts[2])
 
     def get_totals(self):
         """

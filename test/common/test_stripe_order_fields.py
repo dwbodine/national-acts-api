@@ -16,7 +16,7 @@ def test_vip_order_defines_nullable_stripe_amounts_in_payload():
         "insurance": None,
         "radarFee": None,
         "partnerProcessingFee": None,
-        "netServiceFees": None,
+        "netServiceFees": "0",
     }
 
 
@@ -159,10 +159,18 @@ def test_net_service_fees_handles_unknown_zero_and_negative_values():
     order.service_fees_usd = 10
     order.stripe_processing_fee = "12.00"
     order.update_net_service_fees()
-    assert order.net_service_fees is None
+    assert order.net_service_fees == "-2.00"
     order.radar_fee = "0.00"
     order.update_net_service_fees()
     assert order.net_service_fees == "-2.00"
     order.stripe_processing_fee = "0.00"
     order.update_net_service_fees()
     assert order.net_service_fees == "10.00"
+    order.service_fees_usd = None
+    order.stripe_processing_fee = None
+    order.radar_fee = None
+    order.update_net_service_fees()
+    assert order.net_service_fees == "0"
+    order.service_fees_usd = "5.00"
+    order.update_net_service_fees()
+    assert order.net_service_fees == "5.00"
