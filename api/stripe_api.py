@@ -35,7 +35,7 @@ logger.setLevel(logging.INFO)
 @stripe_api.route("/stripe/fees/missing", methods=["GET"])
 @jwt_required()
 def missing_stripe_fees():
-    """Admin-only report of aged payments without resolved fees."""
+    """Admin-only report of aged payments whose RadarFee is NULL."""
     if not is_admin_logged_in():
         return {"msg": "Unauthorized"}, 401
     try:

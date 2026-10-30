@@ -1,4 +1,4 @@
-"""Identify older successful payments without resolved payment fee rows."""
+"""Identify older successful payments with unknown Radar fees."""
 
 from common.db import db_query_all
 from common.stripe_financial_service import json_row
@@ -21,9 +21,7 @@ class StripeFeeReconciliationService:
             WHERE pi.Status='succeeded' AND pi.DateReceived >= %(start)s
                 AND pi.DateReceived < %(end)s
                 AND pi.DateReceived < UTC_TIMESTAMP() - INTERVAL %(days)s DAY
-                AND NOT EXISTS (SELECT 1 FROM StripeFees f
-                    WHERE f.PaymentIntentId=pi.PaymentIntentId
-                        AND f.IncurredByType IN ('payment_intent', 'charge'))"""
+                AND pi.RadarFee IS NULL"""
         total = db_query_all("SELECT COUNT(*) AS total" + source, data)[0]["total"]
         columns = ", ".join(
             "pi." + field

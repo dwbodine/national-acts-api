@@ -176,8 +176,8 @@ submitted directly to `POST /stripe/payment-intents/update` after editing.
 `RadarFee` accepts a decimal with at most two places, zero, or null to restore an
 unknown amount. `IsReconciled` accepts 0 or 1 when explicitly supplied.
 
-This paged report lists older succeeded payments without a resolved payment or
-charge fee row. Refund-only matches do not hide missing payment fees. It reports
+This paged report lists older succeeded payments where `RadarFee IS NULL`.
+Zero and nonzero RadarFee values are considered present, regardless of StripeFees matches. It reports
 unknown coverage, not a guaranteed Stripe omission. Review the account and date
 coverage in StripeFeeReportImports, then inspect the original CSV when a gap persists.
 The importer uses the configured API key's account; it does not automatically
