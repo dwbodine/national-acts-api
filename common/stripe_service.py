@@ -21,7 +21,7 @@ from stripe.params import (
     RefundListParamsCreated,
 )
 
-from common.db import db_insert, db_query_all
+from common.db import db_insert, db_query_all, db_update
 from common.models.stripe import StripeRefund, StripeTransaction
 from common.stripe_reconciliation_service import ELIGIBLE_EVENTS_SQL
 
@@ -268,6 +268,23 @@ class StripeService:
                 f"ON DUPLICATE KEY UPDATE {updates}, LastUpdated=CURRENT_TIMESTAMP",
                 data,
             )
+        for payment_intent_id in sorted({
+            row["IncurredBy"] for row in rows.values() if row["IncurredBy"]
+        }):
+            # Recalculate from all stored reports, including overlapping imports.
+            # No matching Radar rows leaves the existing unknown value untouched.
+            db_update("""UPDATE StripePaymentIntents pi
+                JOIN (
+                    SELECT IncurredBy, SUM(Amount + Tax) AS RadarFee
+                    FROM StripeFees
+                    WHERE IncurredByType = 'payment_intent'
+                        AND IncurredBy = %(payment_intent_id)s
+                        AND (LOCATE('radar', LOWER(FeatureName)) > 0
+                             OR LOWER(Product) = 'radar')
+                    GROUP BY IncurredBy
+                ) fees ON fees.IncurredBy = pi.PaymentIntentId
+                SET pi.RadarFee = fees.RadarFee""",
+                {"payment_intent_id": payment_intent_id})
         return len(rows)
 
     def get_fee_report_csv(self, file_id: str):

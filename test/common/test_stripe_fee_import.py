@@ -9,6 +9,16 @@ import pytest
 from common import stripe_service
 
 
+@pytest.fixture(autouse=True)
+def radar_updates(monkeypatch):
+    """Capture derived fee refreshes without connecting to a database."""
+    updates = []
+    monkeypatch.setattr(
+        stripe_service, "db_update", lambda sql, data: updates.append((sql, data))
+    )
+    return updates
+
+
 def csv_content(rows):
     """Create representative itemized fee CSV bytes."""
     stream = StringIO()
@@ -118,3 +128,30 @@ def test_only_payment_intent_fees_are_imported(monkeypatch):
     assert count == 1
     assert len(writes) == 1
     assert writes[0]["IncurredBy"] == "pi_keep"
+
+
+def test_radar_totals_are_recomputed_after_import(monkeypatch, radar_updates):
+    """Refresh each affected intent from all stored fees, rather than incrementing."""
+    writes = []
+    monkeypatch.setattr(
+        stripe_service, "db_insert", lambda sql, data: writes.append(data)
+    )
+    report = csv_content([
+        {"incurred_by": "pi_one", "feature_name": "Radar standard"},
+        {"incurred_by": "pi_one", "product": "Radar", "amount": "0.02"},
+        {"incurred_by": "pi_two", "feature_name": "Processing"},
+    ])
+    service = stripe_service.StripeService()
+    service._upsert_fee_report(report)
+    assert len(writes) == 3
+    assert [data["payment_intent_id"] for _, data in radar_updates] == [
+        "pi_one", "pi_two"
+    ]
+    sql = radar_updates[0][0]
+    assert "SUM(Amount + Tax)" in sql
+    assert "SET pi.RadarFee = fees.RadarFee" in sql
+    assert "IncurredByType = 'payment_intent'" in sql
+    assert "LOCATE('radar', LOWER(FeatureName))" in sql
+    assert "LOWER(Product) = 'radar'" in sql
+    service._upsert_fee_report(report)
+    assert radar_updates[:2] == radar_updates[2:]
