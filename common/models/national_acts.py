@@ -284,11 +284,18 @@ class VipOrder(TicketSocketOrder):
 
     def update_net_service_fees(self):
         """Subtract known USD Stripe costs, preserving unknown amounts as null."""
-        amounts = [getattr(self, field, None) for field in
-                   ("service_fees_usd", "stripe_processing_fee", "radar_fee")]
+        amounts = [
+            getattr(self, field, None)
+            for field in ("service_fees_usd", "stripe_processing_fee", "radar_fee")
+        ]
         self.net_service_fees = (
-            str(Decimal(str(amounts[0])) - Decimal(str(amounts[1])) - Decimal(str(amounts[2])))
-            if all(value is not None for value in amounts) else None
+            str(
+                Decimal(str(amounts[0]))
+                - Decimal(str(amounts[1]))
+                - Decimal(str(amounts[2]))
+            )
+            if all(value is not None for value in amounts)
+            else None
         )
 
     def get_totals(self):

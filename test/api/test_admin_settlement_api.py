@@ -67,7 +67,8 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
         stripe_processing_fee="14.76",
         insurance="26.80",
         radar_fee="0.07",
-        partner_processing_fee="10.86", net_service_fees="10.16",
+        partner_processing_fee="10.86",
+        net_service_fees="10.16",
         other_fees=[{"key": "Radar", "value": "0.07"}],
     )
     monkeypatch.setattr(
@@ -90,7 +91,8 @@ def test_compact_stripe_costs_are_admin_only_without_a_request_switch(
         "stripeProcessingFee",
         "insurance",
         "radarFee",
-        "partnerProcessingFee", "netServiceFees",
+        "partnerProcessingFee",
+        "netServiceFees",
         "otherFees",
     ):
         assert (field in data) is show_costs

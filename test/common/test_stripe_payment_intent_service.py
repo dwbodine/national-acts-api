@@ -143,8 +143,11 @@ def test_radar_fee_rejects_invalid_amounts(radar):
 
 
 @pytest.mark.parametrize("radar, expected", [(None, 1), ("0", 0), ("0.07", 0)])
-def test_missing_fees_only_includes_null_radar_fee(payments, monkeypatch, radar, expected):
+def test_missing_fees_only_includes_null_radar_fee(
+    payments, monkeypatch, radar, expected
+):
     from common import stripe_fee_reconciliation_service as fee_report
+
     database, _ = payments
     database.execute("UPDATE StripePaymentIntents SET RadarFee=?", (radar,))
 
@@ -154,7 +157,9 @@ def test_missing_fees_only_includes_null_radar_fee(payments, monkeypatch, radar,
         return [dict(row) for row in database.execute(sql, data).fetchall()]
 
     monkeypatch.setattr(fee_report, "db_query_all", query)
-    report = fee_report.StripeFeeReconciliationService().get_missing("2026-01-01", "2027-01-01")
+    report = fee_report.StripeFeeReconciliationService().get_missing(
+        "2026-01-01", "2027-01-01"
+    )
     assert report["total"] == expected
     assert len(report["payments"]) == expected
 
