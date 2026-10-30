@@ -6,6 +6,7 @@ import calendar
 import logging
 import datetime
 import traceback
+from decimal import Decimal
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
@@ -228,6 +229,7 @@ class VipOrder(TicketSocketOrder):
     insurance: str | None = None
     radar_fee: str | None = None
     partner_processing_fee: str | None = None
+    net_service_fees: str | None = None
     stripe_financials_loaded: bool = False
     ticket_partner_event_id: int = 0
     ticket_partner_order_id: int = 0
@@ -278,6 +280,16 @@ class VipOrder(TicketSocketOrder):
         self.insurance = None
         self.radar_fee = None
         self.partner_processing_fee = None
+        self.net_service_fees = None
+
+    def update_net_service_fees(self):
+        """Subtract known USD Stripe costs, preserving unknown amounts as null."""
+        amounts = [getattr(self, field, None) for field in
+                   ("service_fees_usd", "stripe_processing_fee", "radar_fee")]
+        self.net_service_fees = (
+            str(Decimal(str(amounts[0])) - Decimal(str(amounts[1])) - Decimal(str(amounts[2])))
+            if all(value is not None for value in amounts) else None
+        )
 
     def get_totals(self):
         """
@@ -316,6 +328,7 @@ class VipOrder(TicketSocketOrder):
 
         self.revenue_usd = self.revenue * self.exchange_rate
         self.service_fees_usd = self.service_fees * self.exchange_rate
+        self.update_net_service_fees()
         self.revenue_refunded_usd = self.revenue_refunded * self.exchange_rate
         self.service_fee_revenue_refunded_usd = (
             self.service_fee_revenue_refunded * self.exchange_rate

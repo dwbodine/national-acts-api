@@ -119,12 +119,13 @@ def new_payment(**overrides):
 
 
 @pytest.mark.parametrize("radar", ["0.07", "0", None])
-def test_radar_fee_can_be_saved_and_cleared(payments, radar):
+@pytest.mark.parametrize("field", ["RadarFee", "radar_fee", "radarFee"])
+def test_radar_fee_can_be_saved_and_cleared(payments, radar, field):
     database, _ = payments
     payment_service.StripePaymentIntentService().save(
         {
             "StripePaymentIntentId": 7,
-            "RadarFee": radar,
+            field: radar,
         }
     )
     value = database.execute(

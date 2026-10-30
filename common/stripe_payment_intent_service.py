@@ -81,6 +81,13 @@ def validate_changes(payload):
     """Only bind known database fields, with schema-compatible types and precision."""
     if not isinstance(payload, dict):
         raise ValueError("A JSON object is required")
+    payload = dict(payload)
+    for alias in ("radar_fee", "radarFee"):
+        if alias in payload:
+            value = payload.pop(alias)
+            if "RadarFee" in payload and payload["RadarFee"] != value:
+                raise ValueError("Conflicting RadarFee values")
+            payload["RadarFee"] = value
     allowed = EDITABLE_FIELDS | {"StripePaymentIntentId"}
     unknown = set(payload) - allowed
     if unknown:

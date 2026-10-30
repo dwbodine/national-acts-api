@@ -16,6 +16,7 @@ def test_vip_order_defines_nullable_stripe_amounts_in_payload():
         "insurance": None,
         "radarFee": None,
         "partnerProcessingFee": None,
+        "netServiceFees": None,
     }
 
 
@@ -67,6 +68,7 @@ def test_compact_fields_use_stripe_and_join_fee_rows_by_payment_intent(monkeypat
     order.ticket_partner_order_id = 10
     order.exchange_rate = 99
     order.revenue = 200
+    order.service_fees_usd = 25
     missing = SimpleNamespace(ticket_partner_order_id=None, exchange_rate=1)
     event = SimpleNamespace(orders=[order, missing])
     financial.StripeFinancialService().enrich_order_fields([event])
@@ -74,6 +76,7 @@ def test_compact_fields_use_stripe_and_join_fee_rows_by_payment_intent(monkeypat
     assert order.stripe_processing_fee == "14.76"
     assert order.insurance == "26.80"
     assert order.radar_fee == "0.08"
+    assert order.net_service_fees == "10.16"
     assert "RadarFee" in calls[0][0]
     assert order.other_fees == [
         {"key": "Radar standard", "value": "0.03", "currency": "eur"},
@@ -149,3 +152,17 @@ def test_unknown_radar_fee_is_not_reported_as_zero(monkeypatch):
         [SimpleNamespace(orders=[order])]
     )
     assert order.radar_fee is None
+
+
+def test_net_service_fees_handles_unknown_zero_and_negative_values():
+    order = VipOrder()
+    order.service_fees_usd = 10
+    order.stripe_processing_fee = "12.00"
+    order.update_net_service_fees()
+    assert order.net_service_fees is None
+    order.radar_fee = "0.00"
+    order.update_net_service_fees()
+    assert order.net_service_fees == "-2.00"
+    order.stripe_processing_fee = "0.00"
+    order.update_net_service_fees()
+    assert order.net_service_fees == "10.00"

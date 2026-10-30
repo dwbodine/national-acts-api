@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Context, Decimal
 
 from common.db import db_convert_list_to_parameters, db_query_all
+from common.models.national_acts import VipOrder
 
 MONEY_CONTEXT = Context(prec=50)
 
@@ -158,6 +159,7 @@ class StripeFinancialService:
             )
             order.insurance = _sum_payment_field(paid, "Insurance", "Currency")
             order.radar_fee = _sum_payment_field(paid, "RadarFee", None)
+            VipOrder.update_net_service_fees(order)
             grouped = {}
             for fee in fees_by_order.get(order.ticket_partner_order_id, []):
                 key = (

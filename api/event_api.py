@@ -104,6 +104,7 @@ def get_events_and_orders_secured():
                     "insurance",
                     "radar_fee",
                     "partner_processing_fee",
+                    "net_service_fees",
                     "other_fees",
                 ):
                     vars(order).pop(field, None)
