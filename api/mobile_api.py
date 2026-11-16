@@ -33,6 +33,8 @@ def mobile_checkin(ticket_id: str):
     )
 
     if sender_key is None or api_key is None or sender_key != api_key:
+        print("sender_key: ", sender_key)
+        print("api_key: ", api_key)
         return {"msg": "Unauthorized"}, 401
 
     service = TicketOrdersService()
