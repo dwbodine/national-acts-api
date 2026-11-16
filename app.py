@@ -32,6 +32,7 @@ from api.messaging_api import messaging_api
 from api.ticket_orders_api import ticket_orders_api
 from api.external_api import external_api
 from api.stripe_api import stripe_api
+from api.mobile_api import mobile_api
 from common.db import db_get_connection
 
 current_path = os.path.dirname(__file__)
@@ -100,6 +101,7 @@ app.register_blueprint(messaging_api)
 app.register_blueprint(ticket_orders_api)
 app.register_blueprint(external_api)
 app.register_blueprint(stripe_api)
+app.register_blueprint(mobile_api)
 
 
 @app.after_request
