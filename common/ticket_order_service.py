@@ -399,7 +399,7 @@ class TicketOrdersService:
             return response
 
         ticket_id = get_override_string_value_or_default(result["Id"])
-        response.ticket_id = ticket_id
+        response.ticket_id = bar_code
 
         is_checked = get_override_bool_value_or_default(result["IsCheckedIn"])
         is_active = get_override_bool_value_or_default(result["IsActive"])
