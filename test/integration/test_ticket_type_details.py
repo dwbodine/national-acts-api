@@ -80,6 +80,8 @@ def test_ticket_type_backfill_projection_and_downgrade(database, monkeypatch):
         assert rows[1]["TicketTypeOrder"] == 2
         assert rows[3]["IsActive"] == 0
         assert rows[1]["TicketTypeLastUpdated"] == rows[1]["TicketSocketLastUpdate"]
+    # Current services require columns added after the ticket-type migration.
+    run("upgrade", "head")
     events = EventService().get_events_and_orders(event_id=10, get_orders=True)
     assert [kind.ticket_type_name for kind in events[0].ticket_types] == [
         "Comp",
