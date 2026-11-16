@@ -7,6 +7,7 @@ import logging
 import datetime
 import traceback
 from decimal import Decimal
+from common.constants import TicketCheckInStatus
 from common.utility import (
     get_override_bool_value_or_default,
     get_override_float_value_or_default,
@@ -286,7 +287,11 @@ class VipOrder(TicketSocketOrder):
         """Subtract Stripe costs from the partner checkout fee; missing inputs are zero."""
         amounts = [
             Decimal(str(getattr(self, field, None) or 0))
-            for field in ("partner_processing_fee", "stripe_processing_fee", "radar_fee")
+            for field in (
+                "partner_processing_fee",
+                "stripe_processing_fee",
+                "radar_fee",
+            )
         ]
         self.net_service_fees = str(amounts[0] - amounts[1] - amounts[2])
 
@@ -1052,3 +1057,14 @@ class FileReport:
     def __init__(self, orphaned: list[str], missing: list[str]):
         self.orphaned = orphaned
         self.missing = missing
+
+
+class TicketCheckIn:
+    """
+    Represents a ticket check-in event
+    """
+
+    ticket_id: str = None
+    check_in_status: TicketCheckInStatus = None
+    check_in_time: str = None
+    error_message: str = None

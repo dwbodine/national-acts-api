@@ -26,15 +26,17 @@ def csv_content(rows):
     writer = csv.DictWriter(stream, fieldnames=stripe_service.FEE_COLUMNS)
     writer.writeheader()
     for row in rows:
-        writer.writerow({
-            "balance_transaction_id": "txn_shared",
-            "fee_transaction_id": "ft_shared",
-            "currency": "usd",
-            "amount": "0.050000000000000000",
-            "incurred_by_type": "payment_intent",
-            "incurred_at": "2026-10-09 00:00:00",
-            **row,
-        })
+        writer.writerow(
+            {
+                "balance_transaction_id": "txn_shared",
+                "fee_transaction_id": "ft_shared",
+                "currency": "usd",
+                "amount": "0.050000000000000000",
+                "incurred_by_type": "payment_intent",
+                "incurred_at": "2026-10-09 00:00:00",
+                **row,
+            }
+        )
     return stream.getvalue().encode("utf-8-sig")
 
 

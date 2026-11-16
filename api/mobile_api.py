@@ -4,7 +4,11 @@ Mobile API routes - used by the mobile app to access/update data in the system.
 
 import json
 import logging
-from flask import Blueprint, Response, request
+from flask import Blueprint, request
+
+from common.constants import TicketCheckInStatus
+from common.models.national_acts import TicketCheckIn
+from common.utility import convert_to_json
 
 mobile_api = Blueprint("mobile_api", __name__)
 
@@ -42,10 +46,15 @@ def mobile_checkin(ticket_id: str):
             "Mobile check-in JSON payload: %s",
             json.dumps(payload),
         )
-        
+
     if ticket_id is not None:
         logger.info("Mobile check-in for ticket ID: %s", ticket_id)
     else:
         logger.info("Mobile check-in received no ticket ID")
 
-    return Response("ok", mimetype="text/plain")
+    response = TicketCheckIn()
+    response.ticket_id = ticket_id
+    response.check_in_status = TicketCheckInStatus.SUCCESS
+    response.check_in_time = "2024-06-10 12:34:56"
+
+    return convert_to_json(response)

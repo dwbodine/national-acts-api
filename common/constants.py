@@ -94,6 +94,17 @@ class TicketPartner(IntEnum):
     TICKET_SOCKET = 2
 
 
+class TicketCheckInStatus(IntEnum):
+    """
+    Enum to translate to a ticket check-in status
+    """
+
+    SUCCESS = 1
+    ALREADY_CHECKED_IN = 2
+    INVALID_TICKET = 3
+    ERROR = 4
+
+
 HEADER_IMAGE_WIDTH: int = 1600
 HOMEBANNER_IMAGE_WIDTH: int = 1600
 LOGO_IMAGE_WIDTH: int = 400
