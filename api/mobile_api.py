@@ -5,6 +5,7 @@ Mobile API routes - used by the mobile app to access/update data in the system.
 import json
 import logging
 from flask import Blueprint, request
+from flask_jwt_extended import jwt_required
 
 from common.constants import TicketCheckInStatus
 from common.models.national_acts import TicketCheckIn
@@ -17,6 +18,7 @@ logger.setLevel(logging.INFO)
 
 
 @mobile_api.route("/mobile/ticket/checkin/<string:ticket_id>", methods=["POST"])
+@jwt_required()
 def mobile_checkin(ticket_id: str):
     """
     Handle ticket socket check-in requests.

@@ -2,8 +2,12 @@
 Class for ticket orders
 """
 
+import datetime
+import pytz
+
 from common.db import db_delete, db_insert, db_query_all, db_query_one, db_update
 from common.event_service import EventService
+from common.models.national_acts import TicketCheckIn, TicketCheckInStatus
 from common.models.ticket_order import (
     TicketOrder,
     TicketOrderAgeLimit,
@@ -371,3 +375,62 @@ class TicketOrdersService:
                 order_to_update.price_levels = new_levels
 
         return order_to_update if success is True else None
+
+    def check_in_ticket(self, bar_code: str) -> TicketCheckIn:
+        """
+        Check in a ticket
+        """
+        response = TicketCheckIn()
+
+        if bar_code is None or len(bar_code.strip()) == 0:
+            response.check_in_status = TicketCheckInStatus.ERROR
+            response.error_message = "Ticket ID is required"
+            return response
+
+        sql = """SELECT Id, IsCheckedIn, CheckedInDate, IsActive
+                    From TicketSocketOrderTickets 
+                    WHERE BarCode=%(bar_code)s"""
+        data = {"bar_code": bar_code}
+        result = db_query_one(sql, data)
+
+        if not result:
+            response.check_in_status = TicketCheckInStatus.INVALID_TICKET
+            response.error_message = "Ticket ID not found"
+            return response
+
+        ticket_id = get_override_string_value_or_default(result["Id"])
+        response.ticket_id = ticket_id
+
+        is_checked = get_override_bool_value_or_default(result["IsCheckedIn"])
+        is_active = get_override_bool_value_or_default(result["IsActive"])
+        checked_in_date = get_override_string_value_or_default(result["CheckedInDate"])
+
+        if not is_active:
+            response.check_in_status = TicketCheckInStatus.ERROR
+            response.error_message = "Ticket is not active"
+            return response
+
+        if is_checked:
+            response.check_in_status = TicketCheckInStatus.ALREADY_CHECKED_IN
+            response.check_in_time = checked_in_date
+            return response
+
+        current_timestamp = datetime.datetime.now(
+            pytz.timezone("America/Los_Angeles")
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+        sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=1,
+                    CheckedInDate=%(current_timestamp)s,
+                    LastUpdate=CURRENT_TIMESTAMP
+                    WHERE Id=%(ticket_id)s"""
+        data = {"ticket_id": ticket_id, "current_timestamp": current_timestamp}
+        success = db_update(sql, data)
+
+        if success is not True:
+            response.check_in_status = TicketCheckInStatus.ERROR
+            response.error_message = f"Failed to check in ticket {ticket_id}"
+        else:
+            response.check_in_status = TicketCheckInStatus.SUCCESS
+            response.check_in_time = current_timestamp
+
+        return response
