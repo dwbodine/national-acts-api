@@ -376,7 +376,7 @@ class TicketOrdersService:
 
         return order_to_update if success is True else None
 
-    def check_in_ticket(self, bar_code: str) -> TicketCheckIn:
+    def check_in_ticket(self, bar_code: str, event_id: int) -> TicketCheckIn:
         """
         Check in a ticket
         """
@@ -387,15 +387,30 @@ class TicketOrdersService:
             response.error_message = "Ticket ID is required"
             return response
 
-        sql = """SELECT Id, IsCheckedIn, CheckedInDate, IsActive
-                    From TicketSocketOrderTickets 
-                    WHERE BarCode=%(bar_code)s"""
+        sql = """SELECT tsot.Id, tsot.IsCheckedIn, tsot.CheckedInDate, tsot.IsActive, e.EventId
+                    FROM TicketSocketOrderTickets tsot
+                    LEFT JOIN TicketPartnerOrderTickets tpot ON tpot.PartnerTicketId = tsot.Id
+                    LEFT JOIN TicketPartnerOrders tpo
+                        ON tpo.TicketPartnerOrderId = tpot.TicketPartnerOrderId
+                    LEFT JOIN TicketPartnerEvents tpe
+                        ON tpe.TicketPartnerEventId = tpo.TicketPartnerEventId
+                        AND tpe.TicketPartnerId = 2
+                    LEFT JOIN Events e ON e.EventId = tpe.EventId
+                    WHERE tsot.BarCode=%(bar_code)s"""
         data = {"bar_code": bar_code}
         result = db_query_one(sql, data)
 
         if not result:
             response.check_in_status = TicketCheckInStatus.INVALID_TICKET
             response.error_message = "Ticket ID not found"
+            return response
+
+        ticket_event_id = get_override_int_value_or_default(
+            result["EventId"], default=None
+        )
+        if ticket_event_id is None or ticket_event_id != event_id:
+            response.check_in_status = TicketCheckInStatus.INVALID_TICKET
+            response.error_message = "Ticket ID does not match event"
             return response
 
         ticket_id = get_override_string_value_or_default(result["Id"])

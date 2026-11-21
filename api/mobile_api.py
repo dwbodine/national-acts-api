@@ -35,7 +35,13 @@ def mobile_checkin(ticket_id: str):
     if sender_key is None or api_key is None or sender_key != api_key:
         return {"msg": "Unauthorized"}, 401
 
+    payload = request.get_json(silent=True)
+    event_id = payload.get("eventId") if isinstance(payload, dict) else None
+
+    if not isinstance(event_id, int):
+        return {"msg": "Invalid event ID"}, 400
+
     service = TicketOrdersService()
-    response = service.check_in_ticket(ticket_id)
+    response = service.check_in_ticket(ticket_id, event_id)
 
     return convert_to_json(response)
