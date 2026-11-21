@@ -799,3 +799,13 @@ def get_pacific_date_from_utc_datetime_string(utc_datetime_string: str) -> str:
         .timestamp()
     )
     return get_pacific_date_from_unix_timestamp(unix_timestamp)
+
+
+def get_pacific_timestamp_from_utc_datetime_string(utc_datetime_string: str) -> str:
+    """Convert a UTC timestamp to Pacific time without discarding the time."""
+    return (
+        datetime.strptime(utc_datetime_string, "%Y-%m-%d %H:%M:%S")
+        .replace(tzinfo=timezone.utc)
+        .astimezone(pytz.timezone("America/Los_Angeles"))
+        .strftime("%Y-%m-%d %H:%M:%S")
+    )

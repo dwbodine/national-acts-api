@@ -675,7 +675,7 @@ def test_get_tickets_from_order_id_maps_refund_and_chargeback_data(monkeypatch):
 
     monkeypatch.setattr(
         order_service,
-        "get_pacific_date_from_utc_datetime_string",
+        "get_pacific_timestamp_from_utc_datetime_string",
         convert_to_pacific,
     )
 

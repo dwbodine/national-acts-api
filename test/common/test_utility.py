@@ -1283,3 +1283,19 @@ def test_get_pacific_date_from_utc_datetime_string_converts_to_pacific_date(
         utility.get_pacific_date_from_utc_datetime_string(utc_datetime_string)
         == expected
     )
+
+
+@pytest.mark.parametrize(
+    ("utc_timestamp", "expected"),
+    [
+        ("2026-01-02 07:30:15", "2026-01-01 23:30:15"),
+        ("2026-01-02 08:00:00", "2026-01-02 00:00:00"),
+        ("2026-07-02 06:30:15", "2026-07-01 23:30:15"),
+        ("2026-07-02 07:00:00", "2026-07-02 00:00:00"),
+    ],
+)
+def test_get_pacific_timestamp_preserves_time(utc_timestamp, expected):
+    assert (
+        utility.get_pacific_timestamp_from_utc_datetime_string(utc_timestamp)
+        == expected
+    )

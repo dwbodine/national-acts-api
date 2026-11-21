@@ -22,7 +22,7 @@ from common.utility import (
     get_override_string_value_or_default,
     get_override_tinyint_value_or_default_from_bool,
     get_pacific_date_from_unix_timestamp,
-    get_pacific_date_from_utc_datetime_string,
+    get_pacific_timestamp_from_utc_datetime_string,
 )
 
 
@@ -524,7 +524,7 @@ class OrderService:
             ticket.is_checked_in = is_checked_in
             checked_in_date = get_override_string_value_or_default(row["CheckedInDate"])
             if is_checked_in is True and checked_in_date is not None:
-                ticket.checked_in_date = get_pacific_date_from_utc_datetime_string(
+                ticket.checked_in_date = get_pacific_timestamp_from_utc_datetime_string(
                     checked_in_date
                 )
             is_charged_back: bool = get_override_bool_value_or_default(
