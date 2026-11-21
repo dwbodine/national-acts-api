@@ -3,7 +3,6 @@ Class for ticket orders
 """
 
 import datetime
-import pytz
 
 from common.db import db_delete, db_insert, db_query_all, db_query_one, db_update
 from common.event_service import EventService
@@ -19,6 +18,7 @@ from common.utility import (
     get_override_int_value_or_default,
     get_override_string_value_or_default,
     get_override_tinyint_value_or_default_from_bool,
+    get_pacific_timestamp_from_utc_datetime_string,
 )
 
 
@@ -427,11 +427,15 @@ class TicketOrdersService:
 
         if is_checked:
             response.check_in_status = TicketCheckInStatus.ALREADY_CHECKED_IN
-            response.check_in_time = checked_in_date
+            response.check_in_time = (
+                get_pacific_timestamp_from_utc_datetime_string(checked_in_date)
+                if checked_in_date is not None
+                else None
+            )
             return response
 
         current_timestamp = datetime.datetime.now(
-            pytz.timezone("America/Los_Angeles")
+            datetime.timezone.utc
         ).strftime("%Y-%m-%d %H:%M:%S")
 
         sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=1,
@@ -446,6 +450,8 @@ class TicketOrdersService:
             response.error_message = f"Failed to check in ticket {ticket_id}"
         else:
             response.check_in_status = TicketCheckInStatus.SUCCESS
-            response.check_in_time = current_timestamp
+            response.check_in_time = get_pacific_timestamp_from_utc_datetime_string(
+                current_timestamp
+            )
 
         return response
