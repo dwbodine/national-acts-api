@@ -2,14 +2,11 @@
 Mobile API routes - used by the mobile app to access/update data in the system.
 """
 
-import json
 import logging
 import os
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
-from common.constants import TicketCheckInStatus
-from common.models.national_acts import TicketCheckIn
 from common.ticket_order_service import TicketOrdersService
 from common.utility import convert_to_json, get_override_string_value_or_default
 
