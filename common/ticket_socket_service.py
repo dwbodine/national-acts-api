@@ -10,6 +10,7 @@ import re
 from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import traceback
 from typing import Any
 
 import pytz
@@ -356,8 +357,8 @@ class TicketSocketService:
                 if "start" in item:
                     event_utc = get_override_int_value_or_default(item["start"])
 
-                # need at least one of them to be non-zero
-                if display_date is None and event_utc == 0:
+                # timezone alone does not describe an event date
+                if display_date is None and event_utc <= 0:
                     continue
 
                 # note: this is a total hack since TicketSocket returns in UTC
@@ -369,14 +370,33 @@ class TicketSocketService:
                 # from TS in the front end.  With any luck the "displayStartDate" comes back
                 # with a valid value and we use that for our date instead
 
-                try:
-                    event_date = datetime.strptime(display_date, "%m/%d/%Y")
-                    event.event_date = event_date.strftime("%Y-%m-%d")
-                except Exception:  # pylint: disable=broad-exception-caught
+                if display_date is not None and len(display_date) > 0:
+                    try:
+                        event_date = datetime.strptime(display_date, "%m/%d/%Y")
+                        event.event_date = event_date.strftime("%Y-%m-%d")
+                    except Exception as error:  # pylint: disable=broad-exception-caught
+                        error_message: str = str(error) + "\n" + traceback.format_exc()
+                        logger.error("%s", error_message)
+
+                if event.event_date is None and event_utc > 0 and timezone is not None:
+                    try:
+                        tz = pytz.timezone(timezone)
+                        event_date = datetime.fromtimestamp(
+                            event_utc, tz=pytz.utc
+                        ).astimezone(tz)
+                        event.event_date = event_date.strftime("%Y-%m-%d")
+                    except Exception as error:  # pylint: disable=broad-exception-caught
+                        error_message: str = str(error) + "\n" + traceback.format_exc()
+                        logger.error("%s", error_message)
+
+                if event.event_date is None and event_utc > 0:
                     event_time: int = event_utc + (self.utc_offset_hours * 60 * 60)
-                    event.event_date = datetime.fromtimestamp(event_time).strftime(
-                        "%Y-%m-%d"
-                    )
+                    event.event_date = datetime.fromtimestamp(
+                        event_time, tz=pytz.utc
+                    ).strftime("%Y-%m-%d")
+
+                if event.event_date is None:
+                    continue
 
                 # ticket types
                 ticket_types = []

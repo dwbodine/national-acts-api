@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import pytest
+import pytz
 
 from common import ticket_socket_service
 from common.models.ticket_socket import Country
@@ -379,6 +380,73 @@ def test_get_events_and_orders_uses_required_start_and_timestamp_fallback(
     assert events[0].venue.address1 == "456 Side"
     assert events[0].venue.country.country_name == "Canada"
     assert events[0].venue.timezone is None
+
+
+def test_get_events_and_orders_uses_valid_timezone_when_display_date_is_invalid(
+    monkeypatch,
+):
+    """Invalid display dates fall through to timezone-aware UTC timestamps."""
+    service = create_service(monkeypatch, utc_offset_hours=-5)
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_country_from_country_name",
+        lambda country_name, state, zip_code: None,
+    )
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_https_response",
+        lambda host, url, bearer_token: [
+            {
+                "id": 61,
+                "title": "Timezone Event",
+                "categories": [{"id": 4}],
+                "customFields": {"timezone": "America/Chicago"},
+                "displayStartDate": "not-a-date",
+                "start": 1713882000,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        ticket_socket_service.TicketSocketService,
+        "get_orders_from_event_id",
+        lambda self, event_id: [],
+    )
+
+    events = service.get_events_and_orders(unix_start=5000)
+
+    expected = (
+        datetime.fromtimestamp(1713882000, tz=pytz.utc)
+        .astimezone(pytz.timezone("America/Chicago"))
+        .strftime("%Y-%m-%d")
+    )
+    assert len(events) == 1
+    assert events[0].event_date == expected
+
+
+def test_get_events_and_orders_skips_timezone_without_timestamp(monkeypatch):
+    """A timezone without a display date or start timestamp is not enough."""
+    service = create_service(monkeypatch)
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_country_from_country_name",
+        lambda country_name, state, zip_code: None,
+    )
+    monkeypatch.setattr(
+        ticket_socket_service,
+        "get_https_response",
+        lambda host, url, bearer_token: [
+            {
+                "id": 62,
+                "title": "No Timestamp",
+                "categories": [{"id": 4}],
+                "customFields": {"timezone": "America/Chicago"},
+            }
+        ],
+    )
+
+    events = service.get_events_and_orders(unix_start=5000)
+
+    assert events == []
 
 
 def test_get_ticket_types_from_event_normalizes_names_and_deleted_status(

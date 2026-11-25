@@ -434,9 +434,9 @@ class TicketOrdersService:
             )
             return response
 
-        current_timestamp = datetime.datetime.now(
-            datetime.timezone.utc
-        ).strftime("%Y-%m-%d %H:%M:%S")
+        current_timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
         sql = """UPDATE TicketSocketOrderTickets SET IsCheckedIn=1,
                     CheckedInDate=%(current_timestamp)s,
