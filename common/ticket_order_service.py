@@ -387,7 +387,8 @@ class TicketOrdersService:
             response.error_message = "Ticket ID is required"
             return response
 
-        sql = """SELECT tsot.Id, tsot.IsCheckedIn, tsot.CheckedInDate, tsot.IsActive, e.EventId
+        sql = """SELECT tsot.Id, tsot.IsCheckedIn, tsot.CheckedInDate, tsot.IsActive, e.EventId,
+                    tsot.AttendeeFirstName, tsot.AttendeeLastName
                     FROM TicketSocketOrderTickets tsot
                     LEFT JOIN TicketPartnerOrderTickets tpot ON tpot.PartnerTicketId = tsot.Id
                     LEFT JOIN TicketPartnerOrders tpo
@@ -419,6 +420,16 @@ class TicketOrdersService:
         is_checked = get_override_bool_value_or_default(result["IsCheckedIn"])
         is_active = get_override_bool_value_or_default(result["IsActive"])
         checked_in_date = get_override_string_value_or_default(result["CheckedInDate"])
+        first_name = get_override_string_value_or_default(result["AttendeeFirstName"])
+        last_name = get_override_string_value_or_default(result["AttendeeLastName"])
+        if first_name is not None and last_name is not None:
+            response.ticket_holder_name = f"{first_name} {last_name}"
+        elif first_name is not None:
+            response.ticket_holder_name = first_name
+        elif last_name is not None:
+            response.ticket_holder_name = last_name
+        else:
+            response.ticket_holder_name = "n/a"
 
         if not is_active:
             response.check_in_status = TicketCheckInStatus.ERROR

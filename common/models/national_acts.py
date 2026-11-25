@@ -1068,3 +1068,4 @@ class TicketCheckIn:
     check_in_status: TicketCheckInStatus = None
     check_in_time: str = None
     error_message: str = None
+    ticket_holder_name: str = None
